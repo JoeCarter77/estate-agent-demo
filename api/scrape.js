@@ -21,10 +21,12 @@ export default async function handler(req, res) {
     'Cache-Control': 'no-cache',
   };
 
-  // Keywords that score a link as high-value for a gym site
-  const HIGH_VALUE = ['class', 'schedule', 'timetable', 'price', 'membership', 'join', 'about',
-    'coach', 'trainer', 'instructor', 'trial', 'contact', 'location', 'faq', 'bjj',
-    'mma', 'boxing', 'judo', 'wrestling', 'programme', 'program', 'facility'];
+  // Keywords that score a link as high-value for an estate-agent site
+  const HIGH_VALUE = ['property', 'properties', 'for-sale', 'forsale', 'sale', 'to-let',
+    'tolet', 'let', 'lettings', 'rent', 'buy', 'buying', 'sell', 'selling', 'sold',
+    'valuation', 'valuations', 'value', 'search', 'listings', 'branch', 'branches',
+    'landlord', 'landlords', 'tenant', 'tenants', 'about', 'contact', 'fees', 'mortgage',
+    'commercial', 'new-home', 'new-homes', 'sstc', 'under-offer'];
 
   function scoreLink(href, base) {
     try {

@@ -1,6 +1,6 @@
 // api/chat.js — Vercel Serverless Function
 // POST /api/chat
-// Body: { messages, systemPrompt, gymName, gymUrl }
+// Body: { messages, systemPrompt, agencyName, agencyUrl }
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { messages, systemPrompt, gymName, gymUrl } = req.body;
+  const { messages, systemPrompt, agencyName, agencyUrl } = req.body;
 
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: 'Missing messages array' });
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
   // Use the fully-built system prompt from the frontend (includes scraped content + full instructions).
   // Fall back to a minimal prompt if somehow not provided.
-  const system = systemPrompt || fallbackPrompt(gymName, gymUrl);
+  const system = systemPrompt || fallbackPrompt(agencyName, agencyUrl);
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    const reply = data.content?.[0]?.text || "I'm not sure about that — please contact the gym directly.";
+    const reply = data.content?.[0]?.text || "I'm not sure about that — let me take your details and the team will confirm.";
     return res.status(200).json({ reply });
 
   } catch (error) {
@@ -55,6 +55,6 @@ export default async function handler(req, res) {
 }
 
 // Only used if the frontend somehow doesn't send a systemPrompt
-function fallbackPrompt(gymName, gymUrl) {
-  return `You are the AI assistant for ${gymName || 'this gym'}. Be friendly, concise, and helpful. Keep replies to 2-3 sentences. UK English only. Never invent specific prices, times, or class names.`;
+function fallbackPrompt(agencyName, agencyUrl) {
+  return `You are the AI assistant for ${agencyName || 'this estate agency'}. Be friendly, concise, and helpful. Keep replies to 2-3 sentences. UK English only. Never invent specific prices, addresses, or property availability — if unsure, offer to take the enquirer's details for the team to confirm.`;
 }

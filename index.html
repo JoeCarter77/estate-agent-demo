@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title id="page-title">Your Gym's Growth System — Gym Incubator</title>
+  <title id="page-title">AI Assistant for Estate Agents</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <script type="module">
@@ -641,13 +641,13 @@
 
     <!-- ══ LEFT ══ -->
     <div class="left">
-      <div class="eyebrow fu">Personalised for your gym</div>
+      <div class="eyebrow fu">Personalised for your agency</div>
 
       <h1 class="fu fu-1">
         <span class="lime" id="hero-name">Your Gym</span>'s Done-For-You Growth System,<br>Starting Here
       </h1>
 
-      <p class="left-click-hint fu fu-1"><span class="hint-arrow-desktop">←</span><span class="hint-arrow-mobile">↓</span> Click the icon and ask it something — "How much is membership?" or "Do you offer a free trial?"</p>
+      <p class="left-click-hint fu fu-1"><span class="hint-arrow-desktop">←</span><span class="hint-arrow-mobile">↓</span> Click the icon and ask it something — "Do you have any 3-bed houses?" or "Can I book a valuation?"</p>
 
       <!-- Browser mockup -->
       <div class="browser-wrap fu fu-2">
@@ -672,9 +672,9 @@
 
             <div class="in-browser-panel" id="ibp">
               <div class="cp-head">
-                <div class="cp-ava" id="cp-ava">🥋</div>
+                <div class="cp-ava" id="cp-ava">🏠</div>
                 <div>
-                  <div class="cp-name" id="cp-name">Gym Assistant</div>
+                  <div class="cp-name" id="cp-name">AI Assistant</div>
                   <div class="cp-online"><div class="cp-sdot"></div><span>Online now</span></div>
                 </div>
               </div>
@@ -688,7 +688,7 @@
                   <div class="mode-btn-icon">📞</div>
                   <div><div class="mode-btn-title">Voice Call</div><div class="mode-btn-desc">Talk to us now</div></div>
                 </button>
-                <p class="voice-hint">Try saying: "How much is membership?" or "What classes do you offer?"</p>
+                <p class="voice-hint">Try saying: "Do you have any 3-bed houses?" or "Can I book a valuation?"</p>
               </div>
               <div class="screen contact-screen" id="screen-contact">
                 <p class="contact-title" id="contact-title">Before we start…</p>
@@ -700,9 +700,9 @@
               <div class="screen chat-screen" id="screen-chat">
                 <div class="cp-msgs" id="cp-msgs"></div>
                 <div class="cp-suggs" id="cp-suggs">
-                  <button class="sq" onclick="sendSuggested(this)">What classes do you offer?</button>
-                  <button class="sq" onclick="sendSuggested(this)">How much does it cost?</button>
-                  <button class="sq" onclick="sendSuggested(this)">Do you offer a free trial?</button>
+                  <button class="sq" onclick="sendSuggested(this)">What have you got for sale?</button>
+                  <button class="sq" onclick="sendSuggested(this)">Can I book a valuation?</button>
+                  <button class="sq" onclick="sendSuggested(this)">How do I arrange a viewing?</button>
                 </div>
                 <div class="cp-sbar" id="cp-sbar" style="display:none"><div class="sdot"></div><span id="cp-sbar-txt">Training on website content…</span></div>
                 <div class="cp-inp-row">
@@ -749,9 +749,9 @@
             <img id="phone-img" class="phone-screenshot" alt="Mobile website screenshot" />
             <div class="in-browser-panel" id="ibp-phone">
               <div class="cp-head">
-                <div class="cp-ava">🥋</div>
+                <div class="cp-ava">🏠</div>
                 <div>
-                  <div class="cp-name" id="cp-name-phone">Gym Assistant</div>
+                  <div class="cp-name" id="cp-name-phone">AI Assistant</div>
                   <div class="cp-online"><div class="cp-sdot"></div><span>Online now</span></div>
                 </div>
               </div>
@@ -765,7 +765,7 @@
                   <div class="mode-btn-icon">📞</div>
                   <div><div class="mode-btn-title">Voice Call</div><div class="mode-btn-desc">Talk to us now</div></div>
                 </button>
-                <p class="voice-hint">Try saying: "How much is membership?" or "What classes do you offer?"</p>
+                <p class="voice-hint">Try saying: "Do you have any 3-bed houses?" or "Can I book a valuation?"</p>
               </div>
               <div class="screen contact-screen" id="screen-contact-phone">
                 <p class="contact-title" id="contact-title-phone">Before we start…</p>
@@ -777,9 +777,9 @@
               <div class="screen chat-screen" id="screen-chat-phone">
                 <div class="cp-msgs" id="cp-msgs-phone"></div>
                 <div class="cp-suggs" id="cp-suggs-phone">
-                  <button class="sq" onclick="sendSuggestedPhone(this)">What classes?</button>
-                  <button class="sq" onclick="sendSuggestedPhone(this)">How much?</button>
-                  <button class="sq" onclick="sendSuggestedPhone(this)">Free trial?</button>
+                  <button class="sq" onclick="sendSuggestedPhone(this)">For sale?</button>
+                  <button class="sq" onclick="sendSuggestedPhone(this)">Book a valuation?</button>
+                  <button class="sq" onclick="sendSuggestedPhone(this)">Arrange a viewing?</button>
                 </div>
                 <div class="cp-sbar" id="cp-sbar-phone" style="display:none"><div class="sdot"></div><span>Training…</span></div>
                 <div class="cp-inp-row">
@@ -1011,10 +1011,10 @@
     const p         = new URLSearchParams(window.location.search);
     const _fn       = p.get('first_name') || '';
     const firstName = (_fn === 'FAILED_OWNER' || _fn === 'FAILED_SCRAPE') ? '' : _fn;
-    const company   = p.get('company') || 'Your Gym';
+    const company   = p.get('company') || 'Your Agency';
     const gymUrl    = p.get('url')     || '';
 
-    document.getElementById('page-title').textContent    = company + ' — Gym Incubator';
+    document.getElementById('page-title').textContent    = company + ' — AI Assistant';
     document.getElementById('hero-name').textContent     = company;
     document.getElementById('cp-name').textContent       = company + ' Assistant';
     document.getElementById('mode-gym-name').textContent = company;
@@ -1070,8 +1070,8 @@
 
     // ── SCRAPE ──
     async function scrapeAndTrain() {
-      if (!gymUrl) { gymContext = 'Martial arts gym: ' + company + '.'; setReady(); return; }
-      gymContext = 'Martial arts gym called ' + company + '. Website: ' + gymUrl;
+      if (!gymUrl) { gymContext = 'UK estate agency: ' + company + '.'; setReady(); return; }
+      gymContext = 'UK estate agency called ' + company + '. Website: ' + gymUrl;
       setReady();
       try {
         const res  = await fetch('/api/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: gymUrl }) });
@@ -1139,13 +1139,13 @@
     function buildSystemPrompt(mode) {
       const ctx = gymContext ? '\n\n--- WEBSITE CONTENT ---\n' + gymContext.slice(0, 8000) + '\n--- END ---' : '';
       const voiceRule = mode === 'voice' ? '\n\nVOICE RULES: Never use bullet points or lists. Full natural sentences only. Maximum 2 short sentences per response.' : '';
-      return 'You are the AI assistant for ' + company + ', a martial arts and fitness gym. Reply like a helpful receptionist — direct, warm, brief.\n\nMaximum 2 short sentences per reply. Never open with "Great question!", "Absolutely!" etc.\n\nUse the website content as your primary source of truth. State facts directly and confidently when the answer is there. If not, say so and suggest they contact the gym.' + ctx + voiceRule;
+      return 'You are the AI assistant for ' + company + ', an independent UK estate agency. Reply like a warm, professional front-of-house receptionist — direct, helpful, brief.\n\nMaximum 2 short sentences per reply. UK English. Never open with "Great question!", "Absolutely!" etc.\n\nUse the website content below as your primary source of truth for branches, services, fees and property listings. State facts directly and confidently when the answer is there. Never invent addresses, prices, availability or property details — if something is not in the content, say you will take their details for the team to confirm.\n\nRoute the enquiry early: if they mention selling or letting out their home, treat them as a prospective seller/landlord and offer to book a free valuation (this is the priority). If they are buying or renting, help with their search and offer to arrange a viewing or register their requirements. If they are an existing client, point them to the right branch or team.' + ctx + voiceRule;
     }
 
     function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
 
-    function initChat(name) { addMsg('Hi ' + name + '! I\'m the AI assistant for ' + company + ' — ask me anything about classes, pricing, or how to get started. 👊', 'bot'); setTimeout(function() { document.getElementById('cp-inp').focus(); }, 80); }
-    function initChatPhone(name) { addMsgPhone('Hi ' + name + '! I\'m the AI assistant for ' + company + ' — ask me anything. 👊', 'bot'); setTimeout(function() { document.getElementById('cp-inp-phone').focus(); }, 80); }
+    function initChat(name) { addMsg('Hi ' + name + '! I\'m the AI assistant for ' + company + ' — ask me about our properties, booking a valuation, or arranging a viewing. 🏠', 'bot'); setTimeout(function() { document.getElementById('cp-inp').focus(); }, 80); }
+    function initChatPhone(name) { addMsgPhone('Hi ' + name + '! I\'m the AI assistant for ' + company + ' — ask me anything. 🏠', 'bot'); setTimeout(function() { document.getElementById('cp-inp-phone').focus(); }, 80); }
 
     function addMsg(text, role) { const c = document.getElementById('cp-msgs'); const d = document.createElement('div'); d.className = 'msg ' + role; d.innerHTML = '<div class="bubble">' + esc(text) + '</div>'; c.appendChild(d); c.scrollTop = c.scrollHeight; }
     function addMsgPhone(text, role) { const c = document.getElementById('cp-msgs-phone'); const d = document.createElement('div'); d.className = 'msg ' + role; d.innerHTML = '<div class="bubble">' + esc(text) + '</div>'; c.appendChild(d); c.scrollTop = c.scrollHeight; }
@@ -1161,7 +1161,7 @@
       if (!text) return;
       sending = true; inp.value = ''; document.getElementById('cp-send').disabled = true;
       addMsg(text, 'user'); history.push({ role: 'user', content: text }); showTyping();
-      try { const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: history, systemPrompt: buildSystemPrompt('chat'), gymName: company, gymUrl }) }); const data = await res.json(); removeTyping(); const reply = data.reply || "Sorry, I couldn't process that. Try again!"; addMsg(reply, 'bot'); history.push({ role: 'assistant', content: reply }); }
+      try { const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: history, systemPrompt: buildSystemPrompt('chat'), agencyName: company, agencyUrl: gymUrl }) }); const data = await res.json(); removeTyping(); const reply = data.reply || "Sorry, I couldn't process that. Try again!"; addMsg(reply, 'bot'); history.push({ role: 'assistant', content: reply }); }
       catch { removeTyping(); addMsg("Having trouble connecting right now — please try again.", 'bot'); }
       sending = false; document.getElementById('cp-send').disabled = false; inp.focus();
     }
@@ -1172,7 +1172,7 @@
       if (!text) return;
       sendingPhone = true; inp.value = ''; document.getElementById('cp-send-phone').disabled = true;
       addMsgPhone(text, 'user'); historyPhone.push({ role: 'user', content: text }); showTypingPhone();
-      try { const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: historyPhone, systemPrompt: buildSystemPrompt('chat'), gymName: company, gymUrl }) }); const data = await res.json(); removeTypingPhone(); const reply = data.reply || "Sorry, couldn't process that. Try again!"; addMsgPhone(reply, 'bot'); historyPhone.push({ role: 'assistant', content: reply }); }
+      try { const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: historyPhone, systemPrompt: buildSystemPrompt('chat'), agencyName: company, agencyUrl: gymUrl }) }); const data = await res.json(); removeTypingPhone(); const reply = data.reply || "Sorry, couldn't process that. Try again!"; addMsgPhone(reply, 'bot'); historyPhone.push({ role: 'assistant', content: reply }); }
       catch { removeTypingPhone(); addMsgPhone("Having trouble connecting — please try again.", 'bot'); }
       sendingPhone = false; document.getElementById('cp-send-phone').disabled = false; inp.focus();
     }
@@ -1187,7 +1187,7 @@
         const VapiSDK = window._VapiClass;
         if (!VapiSDK || typeof VapiSDK !== 'function') throw new Error('Vapi SDK not loaded yet — try again in a moment');
         vapi = new VapiSDK(VAPI_PUBLIC_KEY);
-        vapi.on('call-start', function() { vapiActive = true; orb.className = 'voice-orb listening'; statusEl.textContent = 'Listening…'; statusEl.className = 'voice-status-label active'; transcript.textContent = 'Go ahead — ask anything about classes, pricing or booking a free trial.'; });
+        vapi.on('call-start', function() { vapiActive = true; orb.className = 'voice-orb listening'; statusEl.textContent = 'Listening…'; statusEl.className = 'voice-status-label active'; transcript.textContent = 'Go ahead — ask about our properties, booking a valuation or arranging a viewing.'; });
         vapi.on('speech-start', function() { orb.className = 'voice-orb speaking'; statusEl.textContent = 'AI Speaking…'; statusEl.className = 'voice-status-label speaking'; });
         vapi.on('speech-end',   function() { orb.className = 'voice-orb listening'; statusEl.textContent = 'Listening…'; statusEl.className = 'voice-status-label active'; });
         vapi.on('message', function(msg) { if (msg.type === 'transcript' && msg.transcriptType === 'final') transcript.textContent = msg.transcript; });
