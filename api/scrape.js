@@ -83,16 +83,17 @@ export default async function handler(req, res) {
     const prose = await gatherProse(origin, baseUrl, homeHtml, homeText, listings, budgetLeft);
 
     const summary = buildSummary(listings);
+    const phone = extractPhone(homeHtml) || extractPhone(prose);
 
-    // CACHE SEAM: for a paying client, persist { summary, listings } keyed by domain
-    // here (KV/edge cache) and serve from cache, refreshing on a cron rather than
-    // re-scraping on every page load.
-    return res.status(200).json({ summary, listings, text: prose });
+    // CACHE SEAM: for a paying client, persist { summary, listings, phone } keyed by
+    // domain here (KV/edge cache) and serve from cache, refreshing on a cron rather
+    // than re-scraping on every page load.
+    return res.status(200).json({ summary, listings, phone, text: prose });
 
   } catch (err) {
     console.error('Scrape error:', err);
     // Always 200 so the chatbot degrades gracefully.
-    return res.status(200).json({ summary: '', listings: [], text: '' });
+    return res.status(200).json({ summary: '', listings: [], phone: '', text: '' });
   }
 }
 
@@ -368,6 +369,20 @@ function detectType(s) {
   if (/\bcommercial\b/.test(t)) return 'commercial';
   if (/\bhouse\b/.test(t)) return 'house';
   return '';
+}
+
+// Pull the agency's contact number so the assistant can hand off booking requests.
+// Prefer a tel: link (most reliable), fall back to a UK-format number in the text.
+function extractPhone(html) {
+  const s = String(html || '');
+  const tel = s.match(/href=["']tel:([+\d][\d\s()-]{7,})["']/i);
+  if (tel) return normalisePhone(tel[1]);
+  const text = extractText(s);
+  const m = text.match(/(\+44\s?\(?0?\)?[\d\s-]{9,13}|\b0\d{2,4}[\s-]?\d{3,4}[\s-]?\d{3,4}\b)/);
+  return m ? normalisePhone(m[1]) : '';
+}
+function normalisePhone(p) {
+  return String(p).replace(/[^\d+]/g, ' ').replace(/\s{2,}/g, ' ').trim().slice(0, 20);
 }
 
 function detectStatus(text, pageUrl) {
