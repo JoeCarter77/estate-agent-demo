@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title id="page-title">Novus — AI front desk for estate agents</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23172D67'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='21' font-weight='700' fill='white' text-anchor='middle'%3EN%3C/text%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%2711%2016%2080%2080%27%3E%3Crect%20x%3D%2711%27%20y%3D%2716%27%20width%3D%2780%27%20height%3D%2780%27%20rx%3D%2716%27%20fill%3D%27%23172D67%27/%3E%3Cpath%20d%3D%27M29%2082%20L29%2046%20C29%2030%2050%2030%2050%2046%20L73%2082%20L73%2030%27%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%2711%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <script type="module">
@@ -367,6 +367,22 @@
     .hero-demo .browser-wrap { width: 100%; max-width: 640px; }
     .hero-demo .browser-content { aspect-ratio: auto; height: 560px; }
 
+    /* ── NOVUS MARK / FOOTER ── */
+    .novus-mark { display: block; width: auto; }
+    .logo .novus-mark { height: 26px; color: var(--brand-navy); }
+    .cp-ava .novus-mark { height: 19px; }
+    .site-footer { border-top: 1px solid var(--border); background: var(--panel); }
+    .site-footer-inner { max-width: 1280px; margin: 0 auto; padding: 28px 48px; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+    .novus-lockup { display: flex; align-items: center; gap: 12px; }
+    .site-footer .novus-mark { height: 34px; color: var(--brand-navy); }
+    .novus-lockup-text { display: flex; flex-direction: column; line-height: 1.1; }
+    .novus-wordmark { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.05em; color: var(--brand-navy); }
+    .novus-tagline { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); margin-top: 3px; }
+    .site-footer-copy { font-size: 0.78rem; color: var(--text-3); }
+    .site-footer-copy a { color: var(--accent); text-decoration: none; }
+    .site-footer-copy a:hover { text-decoration: underline; }
+    @media (max-width: 640px) { .site-footer-inner { flex-direction: column; align-items: flex-start; gap: 16px; padding: 24px 20px; } }
+
     /* ══ ESTATE-AGENT REBUILD SECTIONS ══ */
 
     /* Section C — founder note */
@@ -407,8 +423,9 @@
 <body>
 
   <header>
-    <a class="logo" href="#" id="brand-logo">
-      <span class="logo-wordmark brand-slot" id="brand-wordmark">{{brand}}</span>
+    <a class="logo" href="https://trynovus.co.uk" id="brand-logo">
+      <svg class="novus-mark" viewBox="23 24 56 64" fill="none" aria-hidden="true"><path d="M29 82 L29 46 C29 30 50 30 50 46 L73 82 L73 30" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="logo-wordmark">NOVUS</span>
     </a>
     <div class="pill-live"><div class="live-dot"></div>Live Demo</div>
   </header>
@@ -461,7 +478,7 @@
 
             <div class="in-browser-panel open" id="ibp">
               <div class="cp-head">
-                <div class="cp-ava" id="cp-ava">N</div>
+                <div class="cp-ava" id="cp-ava"><svg class="novus-mark" viewBox="23 24 56 64" fill="none" aria-hidden="true"><path d="M29 82 L29 46 C29 30 50 30 50 46 L73 82 L73 30" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                 <div>
                   <div class="cp-name" id="cp-name">Your Agency</div>
                   <div class="cp-online"><div class="cp-sdot"></div><span>Online now</span></div>
@@ -526,7 +543,7 @@
             <img id="phone-img" class="phone-screenshot" alt="Mobile website screenshot" />
             <div class="in-browser-panel open" id="ibp-phone">
               <div class="cp-head">
-                <div class="cp-ava">N</div>
+                <div class="cp-ava"><svg class="novus-mark" viewBox="23 24 56 64" fill="none" aria-hidden="true"><path d="M29 82 L29 46 C29 30 50 30 50 46 L73 82 L73 30" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                 <div>
                   <div class="cp-name" id="cp-name-phone">Your Agency</div>
                   <div class="cp-online"><div class="cp-sdot"></div><span>Online now</span></div>
@@ -611,6 +628,21 @@
     </div>
   </section>
 
+  <!-- ══ FOOTER (Novus lockup) ══ -->
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <div class="novus-lockup">
+        <svg class="novus-mark" viewBox="23 24 56 64" fill="none" aria-hidden="true"><path d="M29 82 L29 46 C29 30 50 30 50 46 L73 82 L73 30" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="novus-lockup-text">
+          <span class="novus-wordmark">NOVUS</span>
+          <span class="novus-tagline">Never miss another enquiry</span>
+        </div>
+      </div>
+      <div class="site-footer-copy">AI front desk for independent UK estate agents · <a href="https://trynovus.co.uk">trynovus.co.uk</a></div>
+    </div>
+  </footer>
+
+
   <script>
     const VAPI_PUBLIC_KEY = 'a154a7cb-a164-4fd8-bf2d-6b3aaba450a0';
 
@@ -622,7 +654,7 @@
 
     // Brand slots — one-line swap once the name is locked (see item 5).
     const BRAND     = 'Novus';           // brand name (nav wordmark)
-    const JOE_PHONE = '{{joe_phone}}';   // TODO: set Joe's direct number
+    const JOE_PHONE = '07455 506761';    // Joe's direct number
     document.querySelectorAll('.brand-slot').forEach(function(el) { el.textContent = BRAND; });
     document.querySelectorAll('.joe-phone-slot').forEach(function(el) {
       el.textContent = JOE_PHONE;

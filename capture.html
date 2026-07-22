@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>See it live on your website — Novus</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23172D67'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='21' font-weight='700' fill='white' text-anchor='middle'%3EN%3C/text%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%2711%2016%2080%2080%27%3E%3Crect%20x%3D%2711%27%20y%3D%2716%27%20width%3D%2780%27%20height%3D%2780%27%20rx%3D%2716%27%20fill%3D%27%23172D67%27/%3E%3Cpath%20d%3D%27M29%2082%20L29%2046%20C29%2030%2050%2030%2050%2046%20L73%2082%20L73%2030%27%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%2711%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -268,13 +268,21 @@
       .stats { gap: 12px; }
       .stat-num { font-size: 22px; }
     }
+
+    .novus-mark { display: block; width: auto; }
+    .logo .novus-mark { height: 22px; color: var(--brand-navy); }
+    .site-footer { border-top: 1px solid var(--border); padding: 24px 32px; margin-top: 8px; display: flex; align-items: center; gap: 10px; justify-content: center; }
+    .site-footer .novus-mark { height: 22px; color: var(--brand-navy); }
+    .site-footer .fw { font-size: 0.95rem; font-weight: 800; letter-spacing: 0.05em; color: var(--brand-navy); }
+    .site-footer .ft { font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
   </style>
 </head>
 <body>
 
   <nav>
-    <a class="logo" href="#">
-      <span class="logo-inc brand-slot">{{brand}}</span>
+    <a class="logo" href="https://trynovus.co.uk">
+      <svg class="novus-mark" viewBox="23 24 56 64" fill="none" aria-hidden="true"><path d="M29 82 L29 46 C29 30 50 30 50 46 L73 82 L73 30" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="logo-inc">NOVUS</span>
     </a>
     <div class="nav-pill">
       <span class="live-dot"></span>
@@ -433,5 +441,11 @@
     });
   </script>
 
+
+  <footer class="site-footer">
+    <svg class="novus-mark" viewBox="23 24 56 64" fill="none" aria-hidden="true"><path d="M29 82 L29 46 C29 30 50 30 50 46 L73 82 L73 30" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="fw">NOVUS</span>
+    <span class="ft">· Never miss another enquiry</span>
+  </footer>
 </body>
 </html>
