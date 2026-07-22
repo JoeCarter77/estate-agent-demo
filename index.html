@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title id="page-title">AI Assistant for Estate Agents</title>
+  <title id="page-title">Novus — AI front desk for estate agents</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23172D67'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='21' font-weight='700' fill='white' text-anchor='middle'%3EN%3C/text%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <script type="module">
@@ -12,29 +13,29 @@
   </script>
   <style>
     :root {
-      --black:      #000000;
-      --surface:    #0c0c0c;
-      --card:       #111111;
-      --card-hi:    #161616;
-      --border:     #1e1e1e;
-      --border-hi:  #2a2a2a;
-      --lime:       #aaff00;
-      --lime-hi:    #c5ff4d;
-      --lime-lo:    rgba(170,255,0,0.08);
-      --lime-bd:    rgba(170,255,0,0.22);
-      --white:      #ffffff;
-      --grey:       #aaaaaa;
-      --grey-dk:    #666666;
-      --green:      #22c55e;
-      --red:        #ef4444;
+      --page:       #FFFFFF;
+      --panel:      #F8FAFC;
+      --panel-2:    #F1F5F9;
+      --border:     #E2E8F0;
+      --border-hi:  #CBD5E1;
+      --brand-navy: #172D67;
+      --accent:     #2563EB;
+      --accent-hi:  #3B82F6;
+      --accent-lo:  rgba(37,99,235,0.08);
+      --accent-bd:  rgba(37,99,235,0.35);
+      --text:       #0F172A;
+      --text-2:     #475569;
+      --text-3:     #64748B;
+      --green:      #22C55E;
+      --red:        #EF4444;
       --radius:     14px;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
-      background: var(--black);
-      color: var(--white);
+      background: var(--page);
+      color: var(--text);
       font-family: 'Inter', sans-serif;
       min-height: 100vh;
       overflow-x: hidden;
@@ -53,13 +54,13 @@
       height: 60px;
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 48px;
-      background: rgba(0,0,0,0.9);
+      background: rgba(255,255,255,0.85);
       backdrop-filter: blur(20px);
       border-bottom: 1px solid var(--border);
     }
     .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-    .logo-wordmark { font-size: 0.9rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--white); }
-    .logo-wordmark span { color: var(--lime); }
+    .logo-wordmark { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.02em; color: var(--brand-navy); }
+    .logo-wordmark span { color: var(--brand-navy); }
     .pill-live { display: flex; align-items: center; gap: 7px; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.04em; color: var(--green); border: 1px solid rgba(34,197,94,0.2); background: rgba(34,197,94,0.06); padding: 5px 13px; border-radius: 100px; }
     .live-dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: blink 2s ease infinite; }
 
@@ -67,46 +68,47 @@
     .page {
       position: relative; z-index: 1;
       max-width: 1280px; margin: 0 auto;
-      padding: 72px 48px 0;
+      min-height: calc(100vh - 60px);
+      padding: 24px 48px;
       display: grid;
-      grid-template-columns: 1fr 440px;
-      gap: 56px;
-      align-items: start;
+      grid-template-columns: minmax(0, 42%) 1fr;
+      gap: 48px;
+      align-items: center;
     }
     .left { display: flex; flex-direction: column; gap: 36px; }
 
-    .eyebrow { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--lime); display: flex; align-items: center; gap: 10px; }
-    .eyebrow::before { content: ''; display: block; width: 24px; height: 1px; background: var(--lime); }
+    .eyebrow { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: 10px; }
+    .eyebrow::before { content: ''; display: block; width: 24px; height: 1px; background: var(--accent); }
 
     h1 { font-size: clamp(2.2rem, 3.6vw, 3.4rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.035em; }
-    h1 .lime { color: var(--lime); }
+    h1 .lime { color: var(--accent); }
 
     /* ── BROWSER ── */
     .browser-wrap { display: flex; flex-direction: column; gap: 10px; }
-    .browser { background: #0a0a0a; border-radius: var(--radius); border: 1px solid var(--border-hi); box-shadow: 0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px #060606, inset 0 1px 0 rgba(255,255,255,0.04); overflow: hidden; }
-    .browser-chrome { height: 42px; background: #111; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 14px; gap: 14px; }
+    .browser { background: #FFFFFF; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(15,23,42,0.12), 0 0 0 1px var(--border); overflow: hidden; }
+    .browser-chrome { height: 42px; background: var(--panel-2); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 14px; gap: 14px; }
     .tl { display: flex; gap: 6px; align-items: center; }
     .tl-dot { width: 11px; height: 11px; border-radius: 50%; }
     .tl-dot.red    { background: #ff5f57; }
     .tl-dot.yellow { background: #febc2e; }
     .tl-dot.green  { background: #28c840; }
-    .url-bar { flex: 1; background: #0d0d0d; border: 1px solid var(--border); border-radius: 7px; height: 27px; display: flex; align-items: center; padding: 0 10px; gap: 6px; max-width: 460px; margin: 0 auto; }
-    .url-bar-lock { color: var(--grey-dk); font-size: 0.62rem; }
-    .url-bar-text { font-size: 0.68rem; font-weight: 500; color: var(--grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .url-bar-text .url-domain { color: var(--white); }
-    .browser-content { position: relative; width: 100%; aspect-ratio: 16 / 10.5; background: #080808; overflow: hidden; }
-    .browser-loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #090909; transition: opacity 0.5s ease; }
+    .url-bar { flex: 1; background: #FFFFFF; border: 1px solid var(--border); border-radius: 7px; height: 27px; display: flex; align-items: center; padding: 0 10px; gap: 6px; max-width: 460px; margin: 0 auto; }
+    .url-bar-lock { color: var(--text-3); font-size: 0.62rem; }
+    .url-bar-text { font-size: 0.68rem; font-weight: 500; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .url-bar-text .url-domain { color: var(--text); }
+    .browser-content { position: relative; width: 100%; aspect-ratio: 16 / 10.5; background: #FFFFFF; overflow: hidden; }
+    .browser-loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #FFFFFF; transition: opacity 0.5s ease; }
     .browser-loading.gone { opacity: 0; pointer-events: none; }
-    .spin { width: 24px; height: 24px; border: 2px solid #1a1a1a; border-top-color: var(--lime); border-radius: 50%; animation: spin 0.7s linear infinite; }
-    .browser-loading p { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--grey-dk); }
+    .spin { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    .browser-loading p { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); }
     .browser-screenshot { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: none; }
 
     /* ── CHAT PANEL ── */
-    .in-browser-panel { position: absolute; bottom: 74px; right: 16px; z-index: 19; width: 300px; max-height: calc(100% - 94px); background: #0f0f0f; border: 1px solid var(--border-hi); border-radius: var(--radius); overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.9), 0 0 0 1px #080808, inset 0 1px 0 rgba(255,255,255,0.04); display: flex; flex-direction: column; opacity: 0; transform: translateY(16px) scale(0.95); pointer-events: none; transform-origin: bottom right; transition: opacity 0.22s ease, transform 0.26s cubic-bezier(0.34,1.56,0.64,1); }
+    .in-browser-panel { position: absolute; bottom: 74px; right: 16px; z-index: 19; width: 300px; max-height: calc(100% - 94px); background: #FFFFFF; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: 0 24px 60px rgba(15,23,42,0.18), 0 0 0 1px var(--border); display: flex; flex-direction: column; opacity: 0; transform: translateY(16px) scale(0.95); pointer-events: none; transform-origin: bottom right; transition: opacity 0.22s ease, transform 0.26s cubic-bezier(0.34,1.56,0.64,1); }
     .in-browser-panel.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: all; }
-    .cp-head { background: #111; padding: 12px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-    .cp-ava { width: 34px; height: 34px; flex-shrink: 0; background: var(--lime); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
-    .cp-name { font-size: 0.78rem; font-weight: 700; color: var(--white); }
+    .cp-head { background: var(--panel); padding: 12px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .cp-ava { width: 34px; height: 34px; flex-shrink: 0; background: var(--brand-navy); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; font-weight: 800; color: #fff; }
+    .cp-name { font-size: 0.78rem; font-weight: 700; color: var(--text); }
     .cp-online { font-size: 0.62rem; font-weight: 500; color: var(--green); display: flex; align-items: center; gap: 4px; margin-top: 1px; }
     .cp-sdot { width: 5px; height: 5px; background: var(--green); border-radius: 50%; animation: blink 2s ease infinite; }
 
@@ -116,24 +118,24 @@
     /* entry buttons (visible immediately — no click-to-reveal) */
     .entry-screen { padding: 18px 14px; gap: 10px; align-items: stretch; justify-content: center; }
     .entry-btn { font-family: 'Inter', sans-serif; border-radius: 11px; cursor: pointer; font-weight: 700; display: block; width: 100%; text-align: center; line-height: 1.35; transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s, background 0.15s, border-color 0.15s; }
-    .entry-primary { background: var(--lime); color: #000; border: none; padding: 15px 16px; font-size: 0.92rem; box-shadow: 0 6px 22px rgba(170,255,0,0.4); }
-    .entry-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(170,255,0,0.55); }
+    .entry-primary { background: var(--accent); color: #fff; border: none; padding: 15px 16px; font-size: 0.92rem; box-shadow: 0 6px 22px rgba(37,99,235,0.4); }
+    .entry-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(37,99,235,0.55); }
     .entry-primary:active { transform: translateY(0) scale(0.98); }
-    .entry-secondary { background: #141414; color: var(--white); border: 1px solid var(--border-hi); padding: 11px 14px; font-size: 0.76rem; }
-    .entry-secondary:hover { border-color: var(--lime-bd); background: #191919; }
-    .entry-hint { font-size: 0.64rem; color: var(--grey-dk); text-align: center; line-height: 1.5; margin-top: 2px; }
+    .entry-secondary { background: #FFFFFF; color: var(--text); border: 1px solid var(--border-hi); padding: 11px 14px; font-size: 0.76rem; }
+    .entry-secondary:hover { border-color: var(--accent); color: var(--accent); background: var(--panel); }
+    .entry-hint { font-size: 0.64rem; color: var(--text-3); text-align: center; line-height: 1.5; margin-top: 2px; }
 
     /* contact */
     .contact-screen { padding: 16px; gap: 9px; }
-    .contact-title { font-size: 0.84rem; font-weight: 700; color: var(--white); text-align: center; }
-    .contact-sub { font-size: 0.68rem; color: var(--grey-dk); text-align: center; line-height: 1.55; }
-    .contact-input { background: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 9px 12px; color: var(--white); font-family: 'Inter', sans-serif; font-size: 0.74rem; outline: none; width: 100%; transition: border-color 0.15s; }
-    .contact-input:focus { border-color: var(--lime-bd); }
-    .contact-input::placeholder { color: #555555; }
-    .contact-start-btn { background: var(--lime); color: #000; border: none; border-radius: 8px; padding: 10px; font-family: 'Inter', sans-serif; font-size: 0.78rem; font-weight: 700; cursor: pointer; width: 100%; margin-top: 2px; transition: background 0.15s, transform 0.12s; }
-    .contact-start-btn:hover { background: var(--lime-hi); transform: translateY(-1px); }
-    .contact-back { background: none; border: none; color: var(--grey-dk); font-family: 'Inter', sans-serif; font-size: 0.66rem; cursor: pointer; text-align: center; padding: 2px; transition: color 0.15s; }
-    .contact-back:hover { color: var(--grey); }
+    .contact-title { font-size: 0.84rem; font-weight: 700; color: var(--text); text-align: center; }
+    .contact-sub { font-size: 0.68rem; color: var(--text-3); text-align: center; line-height: 1.55; }
+    .contact-input { background: #FFFFFF; border: 1px solid var(--border-hi); border-radius: 8px; padding: 9px 12px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 0.74rem; outline: none; width: 100%; transition: border-color 0.15s; }
+    .contact-input:focus { border-color: var(--accent-bd); }
+    .contact-input::placeholder { color: #94A3B8; }
+    .contact-start-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 10px; font-family: 'Inter', sans-serif; font-size: 0.78rem; font-weight: 700; cursor: pointer; width: 100%; margin-top: 2px; transition: background 0.15s, transform 0.12s; }
+    .contact-start-btn:hover { background: var(--accent-hi); transform: translateY(-1px); }
+    .contact-back { background: none; border: none; color: var(--text-3); font-family: 'Inter', sans-serif; font-size: 0.66rem; cursor: pointer; text-align: center; padding: 2px; transition: color 0.15s; }
+    .contact-back:hover { color: var(--text-2); }
 
     /* chat */
     .chat-screen { overflow: hidden; }
@@ -143,79 +145,67 @@
     .msg { display: flex; gap: 6px; animation: msg-in 0.22s ease; }
     .msg.user { flex-direction: row-reverse; }
     .bubble { max-width: 82%; padding: 8px 11px; font-size: 0.76rem; line-height: 1.55; border-radius: 10px; }
-    .msg.bot  .bubble { background: #181818; color: #c8c8c8; border: 1px solid var(--border); border-radius: 3px 10px 10px 10px; }
-    .msg.user .bubble { background: var(--lime); color: #000; font-weight: 600; border-radius: 10px 3px 10px 10px; }
+    .msg.bot  .bubble { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 3px 10px 10px 10px; }
+    .msg.user .bubble { background: var(--brand-navy); color: #fff; font-weight: 600; border-radius: 10px 3px 10px 10px; }
     .typing-row { display: flex; gap: 6px; }
-    .typing-bub { padding: 9px 13px; background: #181818; border: 1px solid var(--border); border-radius: 3px 10px 10px 10px; display: flex; gap: 4px; align-items: center; }
-    .td { width: 4px; height: 4px; background: #3a3a3a; border-radius: 50%; animation: tdot 1.1s ease infinite; }
+    .typing-bub { padding: 9px 13px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 3px 10px 10px 10px; display: flex; gap: 4px; align-items: center; }
+    .td { width: 4px; height: 4px; background: #94A3B8; border-radius: 50%; animation: tdot 1.1s ease infinite; }
     .td:nth-child(2) { animation-delay: 0.16s; }
     .td:nth-child(3) { animation-delay: 0.32s; }
     .cp-suggs { padding: 0 10px 8px; display: flex; flex-wrap: wrap; gap: 5px; max-height: 52px; overflow: hidden; flex-shrink: 0; }
-    .sq { background: #121212; border: 1px solid var(--border); border-radius: 100px; padding: 4px 10px; font-size: 0.63rem; font-weight: 500; color: #555; cursor: pointer; font-family: 'Inter', sans-serif; white-space: nowrap; transition: border-color 0.15s, color 0.15s; }
-    .sq:hover { border-color: var(--lime-bd); color: var(--lime); }
-    .cp-sbar { padding: 5px 12px; background: #0a0a0a; border-top: 1px solid var(--border); font-size: 0.56rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; flex-shrink: 0; display: flex; align-items: center; gap: 6px; color: #333; }
-    .cp-sbar.loading { color: var(--lime); }
+    .sq { background: #FFFFFF; border: 1px solid var(--border-hi); border-radius: 100px; padding: 4px 10px; font-size: 0.63rem; font-weight: 500; color: var(--text); cursor: pointer; font-family: 'Inter', sans-serif; white-space: nowrap; transition: border-color 0.15s, color 0.15s; }
+    .sq:hover { border-color: var(--accent-bd); color: var(--accent); }
+    .cp-sbar { padding: 5px 12px; background: var(--panel); border-top: 1px solid var(--border); font-size: 0.56rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; flex-shrink: 0; display: flex; align-items: center; gap: 6px; color: var(--text-3); }
+    .cp-sbar.loading { color: var(--accent); }
     .cp-sbar.done    { color: var(--green); }
     .cp-sbar.error   { color: #ef444488; }
     .sdot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
     .loading .sdot { animation: blink 1s ease infinite; }
     .cp-inp-row { padding: 8px 10px; border-top: 1px solid var(--border); display: flex; gap: 6px; align-items: center; flex-shrink: 0; min-width: 0; }
-    .cp-inp { flex: 1; min-width: 0; background: #141414; border: 1px solid var(--border); border-radius: 100px; padding: 7px 11px; color: var(--white); font-family: 'Inter', sans-serif; font-size: 0.74rem; outline: none; transition: border-color 0.15s; }
-    .cp-inp:focus { border-color: var(--lime-bd); }
-    .cp-inp::placeholder { color: #2a2a2a; }
+    .cp-inp { flex: 1; min-width: 0; background: #FFFFFF; border: 1px solid var(--border); border-radius: 100px; padding: 7px 11px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 0.74rem; outline: none; transition: border-color 0.15s; }
+    .cp-inp:focus { border-color: var(--accent-bd); }
+    .cp-inp::placeholder { color: #94A3B8; }
     .cp-inp:disabled { opacity: 0.35; }
-    .cp-send { width: 30px; height: 30px; background: var(--lime); border: none; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s, transform 0.12s; }
-    .cp-send:hover { background: var(--lime-hi); transform: scale(1.08); }
+    .cp-send { width: 30px; height: 30px; background: var(--accent); border: none; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s, transform 0.12s; }
+    .cp-send:hover { background: var(--accent-hi); transform: scale(1.08); }
     .cp-send:active { transform: scale(0.92); }
     .cp-send:disabled { opacity: 0.35; cursor: default; transform: none; }
-    .chat-back-btn { width: 28px; height: 28px; flex-shrink: 0; background: #1a1a1a; border: 1px solid var(--border-hi); border-radius: 50%; color: var(--grey); font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s; }
-    .chat-back-btn:hover { background: #252525; color: var(--white); }
+    .chat-back-btn { width: 28px; height: 28px; flex-shrink: 0; background: var(--panel-2); border: 1px solid var(--border-hi); border-radius: 50%; color: var(--text-2); font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s; }
+    .chat-back-btn:hover { background: var(--border); color: var(--text); }
 
     /* voice */
     .voice-screen { padding: 24px 16px; gap: 18px; align-items: center; justify-content: center; }
     .voice-orb-wrap { position: relative; display: flex; align-items: center; justify-content: center; width: 96px; height: 96px; }
-    .voice-orb { width: 76px; height: 76px; border-radius: 50%; background: #1a1a1a; border: 1px solid var(--border-hi); display: flex; align-items: center; justify-content: center; transition: background 0.3s, border-color 0.3s; }
+    .voice-orb { width: 76px; height: 76px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--border-hi); display: flex; align-items: center; justify-content: center; transition: background 0.3s, border-color 0.3s; }
     .voice-orb.connecting { animation: orb-connecting 1.5s ease infinite; }
-    .voice-orb.listening  { background: var(--lime); border-color: var(--lime); animation: orb-pulse 1.4s ease infinite; }
-    .voice-orb.speaking   { background: var(--lime-hi); border-color: var(--lime-hi); animation: orb-pulse-fast 0.7s ease infinite; }
-    .voice-orb.idle       { background: #141414; border-color: var(--border); }
-    .voice-status-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--grey-dk); text-align: center; transition: color 0.3s; }
-    .voice-status-label.active   { color: var(--lime); }
+    .voice-orb.listening  { background: var(--accent); border-color: var(--accent); animation: orb-pulse 1.4s ease infinite; }
+    .voice-orb.speaking   { background: var(--accent-hi); border-color: var(--accent-hi); animation: orb-pulse-fast 0.7s ease infinite; }
+    .voice-orb.idle       { background: var(--panel-2); border-color: var(--border); }
+    .voice-status-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); text-align: center; transition: color 0.3s; }
+    .voice-status-label.active   { color: var(--accent); }
     .voice-status-label.speaking { color: var(--green); }
     .voice-status-label.error    { color: var(--red); }
-    .voice-transcript { background: #111; border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; font-size: 0.71rem; color: var(--grey); line-height: 1.6; text-align: center; min-height: 52px; width: 100%; display: flex; align-items: center; justify-content: center; font-style: italic; }
-    .voice-end-btn { background: #141414; border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; padding: 9px 22px; color: var(--red); font-family: 'Inter', sans-serif; font-size: 0.72rem; font-weight: 700; cursor: pointer; letter-spacing: 0.04em; transition: background 0.15s, border-color 0.15s; }
+    .voice-transcript { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; font-size: 0.71rem; color: var(--text-2); line-height: 1.6; text-align: center; min-height: 52px; width: 100%; display: flex; align-items: center; justify-content: center; font-style: italic; }
+    .voice-end-btn { background: var(--panel); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; padding: 9px 22px; color: var(--red); font-family: 'Inter', sans-serif; font-size: 0.72rem; font-weight: 700; cursor: pointer; letter-spacing: 0.04em; transition: background 0.15s, border-color 0.15s; }
     .voice-end-btn:hover { background: rgba(239,68,68,0.1); border-color: var(--red); }
 
     /* ── RIGHT COLUMN ── */
     .right { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 16px; padding-top: 80px; }
 
     .intro-text { display: flex; flex-direction: column; gap: 10px; }
-    .intro-text-title { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; color: var(--white); line-height: 1.25; }
-    .intro-text-title strong { color: var(--lime); }
-    .intro-text-sub { font-size: 0.95rem; color: var(--grey); line-height: 1.75; font-weight: 300; }
+    .intro-text-title { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text); line-height: 1.25; }
+    .intro-text-title strong { color: var(--accent); }
+    .intro-text-sub { font-size: 0.95rem; color: var(--text-2); line-height: 1.75; font-weight: 300; }
 
-    .left-click-hint {
-      font-size: 0.82rem; font-weight: 600;
-      color: var(--lime); letter-spacing: 0.02em;
-      margin-bottom: -12px;
-    }
-      font-size: 0.78rem; font-weight: 600;
-      color: var(--lime);
-      letter-spacing: 0.04em;
-      margin-top: 4px;
-    }
-    .hint-arrow-mobile { display: inline; }
-    .hint-arrow-desktop { display: none; }
-    .stats { display: grid; grid-template-columns: repeat(3,1fr); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--card); }
+    .stats { display: grid; grid-template-columns: repeat(3,1fr); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
     .stat { padding: 22px 12px; text-align: center; border-right: 1px solid var(--border); }
     .stat:last-child { border-right: none; }
-    .stat-n { font-size: 2rem; font-weight: 800; letter-spacing: -0.05em; color: var(--lime); line-height: 1; }
-    .stat-l { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--grey-dk); margin-top: 5px; }
+    .stat-n { font-size: 2rem; font-weight: 800; letter-spacing: -0.05em; color: var(--accent); line-height: 1; }
+    .stat-l { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin-top: 5px; }
 
     /* Teaser card linking to page 2 */
     .teaser-card {
-      background: var(--card);
+      background: var(--panel);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 24px 20px;
@@ -224,18 +214,18 @@
     .teaser-label {
       font-size: 0.6rem; font-weight: 700;
       letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--lime);
+      color: var(--accent);
     }
     .teaser-heading {
       font-size: 1.15rem; font-weight: 800;
       letter-spacing: -0.02em; line-height: 1.3;
-      color: var(--white);
+      color: var(--text);
     }
-    .teaser-heading span { color: var(--lime); }
+    .teaser-heading span { color: var(--accent); }
     .teaser-stat {
       font-size: 0.9rem; font-weight: 300;
-      color: var(--grey); line-height: 1.6;
-      border-left: 2px solid var(--lime);
+      color: var(--text-2); line-height: 1.6;
+      border-left: 2px solid var(--accent);
       padding-left: 12px;
     }
     .teaser-stats-row {
@@ -245,25 +235,25 @@
       margin: 4px 0;
     }
     .teaser-mini-stat {
-      background: #0a0a0a;
+      background: var(--panel);
       padding: 12px 10px;
       display: flex; flex-direction: column; gap: 3px;
       text-align: center;
     }
     .teaser-mini-stat span {
       font-size: 1.15rem; font-weight: 800;
-      letter-spacing: -0.03em; color: var(--lime);
+      letter-spacing: -0.03em; color: var(--accent);
       line-height: 1;
     }
     .teaser-mini-stat {
       font-size: 0.62rem; font-weight: 600;
       letter-spacing: 0.06em; text-transform: uppercase;
-      color: var(--grey-dk);
+      color: var(--text-3);
     }
-    .teaser-heading .lime-soft { color: var(--lime); }
+    .teaser-heading .lime-soft { color: var(--accent); }
     .teaser-btn {
       display: flex; align-items: center; justify-content: center; gap: 8px;
-      background: var(--lime); color: #000;
+      background: var(--accent); color: #fff;
       font-family: 'Inter', sans-serif;
       font-size: 0.9rem; font-weight: 800;
       letter-spacing: -0.01em;
@@ -275,14 +265,14 @@
       width: 100%;
       border-radius: 0;
     }
-    .teaser-btn:hover { background: var(--lime-hi); transform: translateY(-1px); }
+    .teaser-btn:hover { background: var(--accent-hi); transform: translateY(-1px); }
     .teaser-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
     .page-bottom-margin { height: 80px; }
 
     /* ── FULL WIDTH CTA ── */
     .cta-full {
       position: relative; z-index: 1;
-      background: var(--card);
+      background: var(--panel);
       border-top: 1px solid var(--border);
       margin-top: 48px;
       padding: 48px 0;
@@ -298,27 +288,27 @@
       font-weight: 800; letter-spacing: -0.035em;
       line-height: 1.1; margin-bottom: 10px;
     }
-    .cta-full-text p { font-size: 0.88rem; color: var(--grey); line-height: 1.7; max-width: 520px; }
+    .cta-full-text p { font-size: 0.88rem; color: var(--text-2); line-height: 1.7; max-width: 520px; }
     .btn-cta-full {
       flex-shrink: 0;
-      background: var(--lime); color: #000;
+      background: var(--accent); color: #fff;
       font-family: 'Inter', sans-serif; font-size: 0.95rem; font-weight: 800;
       letter-spacing: -0.01em; padding: 16px 32px;
       border-radius: 10px; border: none; cursor: pointer;
       text-decoration: none; white-space: nowrap;
       transition: background 0.15s, transform 0.12s;
     }
-    .btn-cta-full:hover { background: var(--lime-hi); transform: translateY(-2px); }
+    .btn-cta-full:hover { background: var(--accent-hi); transform: translateY(-2px); }
 
     /* ── PHONE MOCKUP ── */
     .phone-wrap { display: none; flex-direction: column; gap: 10px; }
-    .phone-shell { position: relative; width: 260px; margin: 0 auto; background: #0a0a0a; border-radius: 36px; border: 2px solid var(--border-hi); box-shadow: 0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px #060606, inset 0 1px 0 rgba(255,255,255,0.06); padding: 14px 10px; display: flex; flex-direction: column; }
-    .phone-notch { width: 80px; height: 22px; background: #0a0a0a; border-radius: 0 0 14px 14px; margin: 0 auto 6px; display: flex; align-items: center; justify-content: center; gap: 6px; }
-    .phone-notch-dot { width: 8px; height: 8px; background: #1a1a1a; border-radius: 50%; }
-    .phone-notch-cam { width: 10px; height: 10px; background: #1a1a1a; border-radius: 50%; border: 1px solid #2a2a2a; }
-    .phone-screen { position: relative; width: 100%; border-radius: 22px; aspect-ratio: 9/16; overflow: hidden; background: #080808; }
+    .phone-shell { position: relative; width: 260px; margin: 0 auto; background: var(--panel-2); border-radius: 36px; border: 2px solid var(--border-hi); box-shadow: 0 20px 50px rgba(15,23,42,0.14), 0 0 0 1px var(--border); padding: 14px 10px; display: flex; flex-direction: column; }
+    .phone-notch { width: 80px; height: 22px; background: var(--panel-2); border-radius: 0 0 14px 14px; margin: 0 auto 6px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .phone-notch-dot { width: 8px; height: 8px; background: var(--border-hi); border-radius: 50%; }
+    .phone-notch-cam { width: 10px; height: 10px; background: var(--border-hi); border-radius: 50%; border: 1px solid var(--border); }
+    .phone-screen { position: relative; width: 100%; border-radius: 22px; aspect-ratio: 9/16; overflow: hidden; background: #FFFFFF; }
     .phone-screenshot { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: none; border-radius: 22px; }
-    .phone-loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #090909; border-radius: 22px; transition: opacity 0.5s ease; }
+    .phone-loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #FFFFFF; border-radius: 22px; transition: opacity 0.5s ease; }
     .phone-loading.gone { opacity: 0; pointer-events: none; }
     .phone-home-bar { width: 80px; height: 4px; background: var(--border-hi); border-radius: 2px; margin: 10px auto 0; }
     .phone-screen .in-browser-bubble { width: 42px; height: 42px; bottom: 12px; right: 12px; }
@@ -332,8 +322,8 @@
     @keyframes msg-in        { from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);} }
     @keyframes fade-up       { from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);} }
     @keyframes orb-connecting{ 0%,100%{opacity:1;}50%{opacity:0.4;} }
-    @keyframes orb-pulse     { 0%,100%{box-shadow:0 0 0 0 rgba(170,255,0,0.4);}60%{box-shadow:0 0 0 18px rgba(170,255,0,0);} }
-    @keyframes orb-pulse-fast{ 0%,100%{box-shadow:0 0 0 0 rgba(170,255,0,0.5);}60%{box-shadow:0 0 0 22px rgba(170,255,0,0);} }
+    @keyframes orb-pulse     { 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,0.4);}60%{box-shadow:0 0 0 18px rgba(37,99,235,0);} }
+    @keyframes orb-pulse-fast{ 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,0.5);}60%{box-shadow:0 0 0 22px rgba(37,99,235,0);} }
 
     .fu   { animation: fade-up 0.65s ease both; }
     .fu-1 { animation-delay: 0.08s; }
@@ -343,53 +333,74 @@
 
     /* ── RESPONSIVE ── */
     @media (max-width: 980px) {
-      .page { grid-template-columns: 1fr; padding: 40px 20px 0; gap: 24px; }
+      .page { grid-template-columns: 1fr; min-height: 0; padding: 28px 20px 40px; gap: 22px; align-items: stretch; }
       header { padding: 0 20px; }
       .right { position: static; padding-top: 0; }
       .browser-wrap { display: none !important; }
       .phone-wrap { display: flex !important; }
+      .hero-copy { display: contents; }
+      .hero-copy-top { order: 1; }
+      .hero-demo { order: 2; }
+      .hero-copy-actions { order: 3; }
+      .hero-demo .browser-content { height: auto; }
       .cta-full { padding: 40px 0; margin-top: 32px; }
       .cta-full-inner { padding: 0 20px; flex-direction: column; align-items: flex-start; gap: 20px; }
       .btn-cta-full { width: 100%; text-align: center; padding: 14px 24px; }
     }
 
+    /* ── HERO (two-column, above the fold) ── */
+    .hero-copy { display: flex; flex-direction: column; gap: 22px; justify-content: center; }
+    .hero-copy-top { display: flex; flex-direction: column; gap: 14px; }
+    .hero-copy-actions { display: flex; flex-direction: column; gap: 18px; }
+    .hero-eyebrow { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--brand-navy); }
+    .hero-headline { font-size: clamp(1.55rem, 2.5vw, 2.25rem); font-weight: 800; line-height: 1.12; letter-spacing: -0.03em; color: var(--text); }
+    .hero-headline .company-slot { color: var(--brand-navy); }
+    .hero-sub { font-size: 0.95rem; line-height: 1.65; color: var(--text-2); max-width: 460px; }
+    .hero-try { display: flex; flex-direction: column; gap: 9px; }
+    .hero-try-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
+    .hero-chips { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+    .hero-chip { font-family: 'Inter', sans-serif; background: #fff; border: 1px solid var(--border-hi); color: var(--text); border-radius: 100px; padding: 9px 15px; font-size: 0.82rem; font-weight: 500; cursor: pointer; text-align: left; transition: border-color 0.15s, color 0.15s, background 0.15s; }
+    .hero-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-lo); }
+    .hero-cta { display: inline-block; align-self: flex-start; text-align: center; background: var(--accent); color: #fff; font-weight: 800; font-size: 0.9rem; padding: 14px 22px; border-radius: 10px; text-decoration: none; line-height: 1.35; transition: background 0.15s, transform 0.15s; }
+    .hero-cta:hover { background: var(--accent-hi); transform: translateY(-1px); }
+    .hero-demo { position: static; padding-top: 0; display: flex; align-items: center; justify-content: center; min-width: 0; }
+    .hero-demo .browser-wrap { width: 100%; max-width: 640px; }
+    .hero-demo .browser-content { aspect-ratio: auto; height: 560px; }
+
     /* ══ ESTATE-AGENT REBUILD SECTIONS ══ */
-    /* Section B — the one promise (right column) */
-    .promise { display: flex; flex-direction: column; gap: 14px; }
-    .promise-eyebrow { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--lime); }
-    .promise-title { font-size: 1.85rem; line-height: 1.12; font-weight: 800; color: var(--white); letter-spacing: -0.02em; }
-    .promise-sub { font-size: 0.92rem; line-height: 1.6; color: var(--grey); }
-    .promise-cta { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; margin-top: 6px; background: var(--lime); color: #000; font-weight: 800; font-size: 0.86rem; padding: 12px 18px; border-radius: 10px; text-decoration: none; transition: background 0.15s, transform 0.15s; }
-    .promise-cta:hover { background: var(--lime-hi); transform: translateY(-1px); }
 
     /* Section C — founder note */
-    .founder-note { padding: 56px 24px; border-top: 1px solid var(--border); background: #0b0b0b; }
+    .founder-note { padding: 56px 24px; border-top: 1px solid var(--border); background: var(--panel); }
     .founder-note-inner { max-width: 760px; margin: 0 auto; display: flex; gap: 22px; align-items: flex-start; }
-    .founder-photo { width: 66px; height: 66px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(135deg, var(--lime), #7ab800); color: #000; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 800; }
-    .founder-note-name { font-size: 0.9rem; font-weight: 700; color: var(--white); margin-bottom: 8px; }
-    .founder-note-body p { font-size: 0.98rem; line-height: 1.7; color: var(--grey); }
+    .founder-photo { width: 66px; height: 66px; flex-shrink: 0; border-radius: 50%; background: var(--brand-navy); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 800; }
+    .founder-note-name { font-size: 0.9rem; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .founder-note-body p { font-size: 0.98rem; line-height: 1.7; color: var(--text-2); }
 
     /* Section D — honest scope */
     .scope { padding: 56px 24px; border-top: 1px solid var(--border); }
     .scope-inner { max-width: 720px; margin: 0 auto; text-align: center; }
-    .scope-lead { font-size: 1.15rem; font-weight: 700; color: var(--white); margin-bottom: 12px; }
-    .scope-body { font-size: 0.98rem; line-height: 1.7; color: var(--grey); }
+    .scope-lead { font-size: 1.15rem; font-weight: 700; color: var(--text); margin-bottom: 12px; }
+    .scope-body { font-size: 0.98rem; line-height: 1.7; color: var(--text-2); }
 
     /* Section E — final CTA */
-    .final-cta { padding: 64px 24px; border-top: 1px solid var(--border); background: #0b0b0b; }
+    .final-cta { padding: 64px 24px; border-top: 1px solid var(--border); background: var(--panel); }
     .final-cta-inner { max-width: 640px; margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 18px; }
-    .final-cta-title { font-size: 1.6rem; font-weight: 800; line-height: 1.2; color: var(--white); letter-spacing: -0.02em; }
+    .final-cta-title { font-size: 1.6rem; font-weight: 800; line-height: 1.2; color: var(--text); letter-spacing: -0.02em; }
     .final-cta-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: center; }
-    .final-cta-btn { background: var(--lime); color: #000; font-weight: 800; font-size: 0.95rem; padding: 14px 26px; border-radius: 10px; text-decoration: none; transition: background 0.15s, transform 0.15s; }
-    .final-cta-btn:hover { background: var(--lime-hi); transform: translateY(-1px); }
-    .final-cta-or { font-size: 0.9rem; color: var(--grey); }
-    .final-cta-phone { color: var(--lime); text-decoration: none; font-weight: 700; }
+    .final-cta-btn { background: var(--accent); color: #fff; font-weight: 800; font-size: 0.95rem; padding: 14px 26px; border-radius: 10px; text-decoration: none; transition: background 0.15s, transform 0.15s; }
+    .final-cta-btn:hover { background: var(--accent-hi); transform: translateY(-1px); }
+    .final-cta-or { font-size: 0.9rem; color: var(--text-2); }
+    .final-cta-phone { color: var(--accent); text-decoration: none; font-weight: 700; }
     .final-cta-phone:hover { text-decoration: underline; }
-    .final-cta-terms { font-size: 0.8rem; color: var(--grey-dk); }
+    .final-cta-terms { font-size: 0.8rem; color: var(--text-3); }
     @media (max-width: 980px) {
       .founder-note-inner { flex-direction: column; align-items: center; text-align: center; gap: 16px; }
-      .promise-title { font-size: 1.55rem; }
       .final-cta-title { font-size: 1.35rem; }
+      /* hero stack order: headline -> demo -> try/cta (must follow base .hero-copy rule) */
+      .hero-copy { display: contents; }
+      .hero-copy-top { order: 1; }
+      .hero-demo { order: 2; }
+      .hero-copy-actions { order: 3; margin-top: 2px; }
     }
   </style>
 </head>
@@ -405,15 +416,28 @@
   <div class="page">
 
     <!-- ══ LEFT ══ -->
-    <div class="left">
-      <div class="eyebrow fu">Live demo — personalised for your agency</div>
+    <!-- ══ LEFT (copy) ══ -->
+    <div class="left hero-copy">
+      <div class="hero-copy-top">
+        <div class="hero-eyebrow fu">LIVE DEMO — <span class="company-slot">Your Agency</span></div>
+        <h1 class="hero-headline fu fu-1"><span class="company-slot">Your Agency</span>'s front desk — open 24/7.</h1>
+        <p class="hero-sub fu fu-1">This is a working demo, trained on just a sample of your live listings. The full build learns your whole catalogue and is tuned to your area, your buyers and exactly what you want it to do — capture, qualify, book.</p>
+      </div>
+      <div class="hero-copy-actions fu fu-2">
+        <div class="hero-try">
+          <div class="hero-try-label">Try asking it:</div>
+          <div class="hero-chips">
+            <button class="hero-chip" onclick="askDemo(this.textContent)">Is the 3-bed on the high street still available?</button>
+            <button class="hero-chip" onclick="askDemo(this.textContent)">Can I book a viewing?</button>
+            <button class="hero-chip" onclick="askDemo(this.textContent)">Can you value my house?</button>
+          </div>
+        </div>
+        <a class="hero-cta" href="#pricing">See what this costs for <span class="company-slot">Your Agency</span> →</a>
+      </div>
+    </div>
 
-      <h1 class="fu fu-1">
-        <span class="lime" id="hero-name">Your Agency</span>'s front desk,<br>open 24/7 — right on your site.
-      </h1>
-
-      <p class="left-click-hint fu fu-1"><span class="hint-arrow-desktop">←</span><span class="hint-arrow-mobile">↓</span> Go on — start a call, or ask it whether a property's still available.</p>
-
+    <!-- ══ RIGHT (live demo) ══ -->
+    <div class="right hero-demo fu fu-2">
       <!-- Browser mockup -->
       <div class="browser-wrap fu fu-2">
         <div class="browser">
@@ -437,7 +461,7 @@
 
             <div class="in-browser-panel open" id="ibp">
               <div class="cp-head">
-                <div class="cp-ava" id="cp-ava">🏠</div>
+                <div class="cp-ava" id="cp-ava">N</div>
                 <div>
                   <div class="cp-name" id="cp-name">Your Agency</div>
                   <div class="cp-online"><div class="cp-sdot"></div><span>Online now</span></div>
@@ -467,14 +491,14 @@
                   <button class="chat-back-btn" onclick="goBackToMode()" title="Back">←</button>
                   <input class="cp-inp" id="cp-inp" type="text" placeholder="Ask anything…" disabled />
                   <button class="cp-send" id="cp-send" onclick="sendMsg()" disabled>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                   </button>
                 </div>
               </div>
               <div class="screen voice-screen" id="screen-voice">
                 <div class="voice-orb-wrap">
                   <div class="voice-orb idle" id="voice-orb">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                   </div>
                 </div>
                 <div class="voice-status-label" id="voice-status">Connecting…</div>
@@ -497,12 +521,12 @@
           <div class="phone-screen">
             <div class="phone-loading" id="phone-loading">
               <div class="spin"></div>
-              <p style="font-size:0.6rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--grey-dk);">Loading…</p>
+              <p style="font-size:0.6rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);">Loading…</p>
             </div>
             <img id="phone-img" class="phone-screenshot" alt="Mobile website screenshot" />
             <div class="in-browser-panel open" id="ibp-phone">
               <div class="cp-head">
-                <div class="cp-ava">🏠</div>
+                <div class="cp-ava">N</div>
                 <div>
                   <div class="cp-name" id="cp-name-phone">Your Agency</div>
                   <div class="cp-online"><div class="cp-sdot"></div><span>Online now</span></div>
@@ -532,14 +556,14 @@
                   <button class="chat-back-btn" onclick="goBackToModePhone()" title="Back">←</button>
                   <input class="cp-inp" id="cp-inp-phone" type="text" placeholder="Ask anything…" disabled />
                   <button class="cp-send" id="cp-send-phone" onclick="sendMsgPhone()" disabled>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                   </button>
                 </div>
               </div>
               <div class="screen voice-screen" id="screen-voice-phone">
                 <div class="voice-orb-wrap">
                   <div class="voice-orb idle" id="voice-orb-phone">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                   </div>
                 </div>
                 <div class="voice-status-label" id="voice-status-phone">Connecting…</div>
@@ -552,20 +576,6 @@
         </div>
       </div>
     </div>
-
-    <!-- ══ RIGHT ══ -->
-    <div class="right fu fu-2">
-
-      <div class="promise">
-        <div class="promise-eyebrow"><span class="company-slot">Your agency</span> — every enquiry, covered.</div>
-        <h2 class="promise-title">Picks up every time — even when <span class="company-slot">your agency</span> can't.</h2>
-        <p class="promise-sub">Trained on your live listings. "Is the 3-bed on the high street still available?" gets answered from your real stock — any time it's asked, day or night.</p>
-        <a class="promise-cta" href="#pricing">See what this costs for <span class="company-slot">your agency</span> &rarr;</a>
-      </div>
-
-
-    </div>
-
 
   </div><!-- /page -->
 
@@ -611,7 +621,7 @@
     const gymUrl    = p.get('url')     || '';
 
     // Brand slots — one-line swap once the name is locked (see item 5).
-    const BRAND     = '{{brand}}';       // TODO: set brand name, e.g. 'Kerb'
+    const BRAND     = 'Novus';           // brand name (nav wordmark)
     const JOE_PHONE = '{{joe_phone}}';   // TODO: set Joe's direct number
     document.querySelectorAll('.brand-slot').forEach(function(el) { el.textContent = BRAND; });
     document.querySelectorAll('.joe-phone-slot').forEach(function(el) {
@@ -619,8 +629,7 @@
       if (el.tagName === 'A') el.setAttribute('href', 'tel:' + JOE_PHONE.replace(/\s+/g, ''));
     });
 
-    document.getElementById('page-title').textContent      = company;
-    document.getElementById('hero-name').textContent       = company;
+    document.getElementById('page-title').textContent      = company + ' — Novus';
     document.getElementById('cp-name').textContent         = company;
     document.getElementById('cp-name-phone').textContent   = company;
     document.getElementById('entry-company').textContent       = company;
@@ -647,10 +656,10 @@
     // ── SCREENSHOT ──
     function showScreenshotFallback(parent) {
       parent.insertAdjacentHTML('afterbegin',
-        '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#090909;padding:24px;text-align:center;z-index:1;">' +
+        '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#F8FAFC;padding:24px;text-align:center;z-index:1;">' +
         '<div style="font-size:1.8rem">🌐</div>' +
-        '<div style="font-size:0.62rem;font-weight:600;letter-spacing:.08em;color:var(--lime);">' + gymUrl.replace(/^https?:\/\//, '') + '</div>' +
-        '<p style="font-size:.72rem;color:#525252;line-height:1.6;">Your AI sales assistant is fully trained on this site.</p></div>');
+        '<div style="font-size:0.62rem;font-weight:600;letter-spacing:.08em;color:var(--accent);">' + gymUrl.replace(/^https?:\/\//, '') + '</div>' +
+        '<p style="font-size:.72rem;color:#64748B;line-height:1.6;">Your AI sales assistant is fully trained on this site.</p></div>');
     }
 
     function loadScreenshot() {
@@ -706,6 +715,18 @@
     function showScreen(id) { document.querySelectorAll('.screen:not([id$="-phone"])').forEach(function(s) { s.classList.remove('active'); }); document.getElementById('screen-' + id).classList.add('active'); }
     function showScreenPhone(id) { document.querySelectorAll('[id^="screen-"][id$="-phone"]').forEach(function(s) { s.classList.remove('active'); }); document.getElementById('screen-' + id + '-phone').classList.add('active'); }
 
+    // Hero "Try asking it" chips → send the question straight into the live demo chat
+    function askDemo(q) {
+      var mobile = window.matchMedia('(max-width: 980px)').matches;
+      if (mobile) {
+        if (selectedModePhone !== 'chat') selectModePhone('chat');
+        setTimeout(function() { var i = document.getElementById('cp-inp-phone'); if (i) { i.value = q; sendMsgPhone(); } }, 60);
+      } else {
+        if (selectedMode !== 'chat') selectMode('chat');
+        setTimeout(function() { var i = document.getElementById('cp-inp'); if (i) { i.value = q; sendMsg(); } }, 60);
+      }
+    }
+
     function selectMode(mode) { selectedMode = mode; if (mode === 'voice') { showScreen('voice'); startVoiceCall(); } else { showScreen('chat'); initChat('there'); } }
     function selectModePhone(mode) { selectedModePhone = mode; if (mode === 'voice') { showScreenPhone('voice'); startVoiceCallPhone(); } else { showScreenPhone('chat'); initChatPhone('there'); } }
 
@@ -739,34 +760,58 @@
     const GHL_WEBHOOK_URL = '';
     function sendLeadToGHL(name, email) { if (!GHL_WEBHOOK_URL) return; fetch(GHL_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, company, gymUrl, source: 'demo-page', mode: selectedMode }) }).catch(function(){}); }
 
-    function listingsBlock() {
-      if (!siteListings.length) return '';
-      const lines = siteListings.slice(0, 25).map(function(l) {
-        const bits = [l.address || 'Address on request'];
-        if (l.price) bits.push(l.price);
-        if (l.beds) bits.push(l.beds + ' bed');
-        if (l.baths) bits.push(l.baths + ' bath');
-        if (l.type) bits.push(l.type);
-        if (l.status) bits.push(l.status);
-        return '- ' + bits.join(' · ') + (l.url ? ' — ' + l.url : '');
-      });
-      return '\n\n--- LIVE LISTINGS' + (siteSummary ? ' (' + siteSummary + ')' : '') + ' ---\n' + lines.join('\n') + '\n--- END LISTINGS ---';
-    }
-
     function buildSystemPrompt(mode) {
-      const listings = listingsBlock();
-      const listingRule = listings ? '\n\nWhen asked about specific properties (beds, price, availability, area), answer ONLY from the LIVE LISTINGS below — never invent one. If nothing matches, say so and offer to take their details so the team can send matching properties.' : '';
-      const phoneClause = sitePhone ? (' on ' + sitePhone) : '';
-      const bookingRule = '\n\nBOOKING: You cannot book viewings or valuations into a diary yourself, and must not promise a specific appointment time. If they want to book one, respond in this style: "I can\'t book that in directly just yet — give us a call' + phoneClause + ' and we\'ll get you sorted."';
-      const ctx = gymContext ? '\n\n--- WEBSITE CONTENT ---\n' + gymContext.slice(0, 6000) + '\n--- END ---' : '';
-      const voiceRule = mode === 'voice' ? '\n\nVOICE RULES: Never use bullet points or lists. Full natural sentences only. Maximum 2 short sentences per response.' : '';
-      return 'You are the AI assistant for ' + company + ', an independent UK estate agency. Reply like a warm, professional front-of-house receptionist — direct, helpful, brief.\n\nMaximum 2 short sentences per reply. UK English. Never open with "Great question!", "Absolutely!" etc.\n\nUse the website content below as your primary source of truth for branches, services, fees and property listings. State facts directly and confidently when the answer is there. Never invent addresses, prices, availability or property details — if something is not in the content, say you will take their details for the team to confirm.\n\nRoute the enquiry early: if they mention selling or letting out their home, treat them as a prospective seller/landlord and encourage a free valuation (this is the priority). If they are buying or renting, help with their search and encourage a viewing or register their requirements. If they are an existing client, point them to the right branch or team.' + bookingRule + listingRule + listings + ctx + voiceRule;
+      const phone = sitePhone || 'our office number';
+      const listingsJson = siteListings.length
+        ? '\n\n--- CURRENT LISTINGS (PARTIAL SNAPSHOT — a small sample of ' + company + "'s stock, NOT the full inventory, and possibly out of date) ---\n"
+          + JSON.stringify(siteListings.slice(0, 25))
+          + (siteSummary ? '\nNote: ' + siteSummary : '')
+          + '\n--- END LISTINGS ---'
+        : '\n\n(No listings snapshot is available right now — capture the enquiry and route to the team.)';
+      const siteCtx = gymContext ? '\n\n--- GENERAL WEBSITE INFO (branches, fees, about — secondary reference) ---\n' + gymContext.slice(0, 3500) + '\n--- END ---' : '';
+      const voiceRule = mode === 'voice' ? '\n\nVOICE: Full natural sentences only, never lists or bullet points, maximum 2 short sentences per turn.' : '';
+
+      const prompt =
+`You are the AI front desk for ${company}, an independent UK estate agent. You handle enquiries from buyers, sellers, tenants and landlords via chat on the agency's website. You speak as the agency ("we", "us") — warm, concise, professional British English. You are not a generic assistant; you are this agency's front desk.
+
+WHAT YOU KNOW — AND WHAT YOU DON'T
+You are given a set of the agency's current listings as structured data. This is a PARTIAL snapshot, not the full stock, and it may be out of date. The agency has more properties than you can see, and availability/prices change daily. Because of this, follow these hard rules at all times:
+- Never state or imply a total count of properties ("we have three properties"). You don't know the total.
+- Never present the listings you can see as the complete inventory. They are examples, surfaced only when you're confident of a match.
+- Never assert a property is currently available, sold, or at a fixed price as hard fact. Your data is a snapshot — hedge and offer to have the team confirm.
+- Never invent a property, feature, price or detail that isn't in your data. If you don't have it, say so and capture the enquiry.
+- Every reply moves toward a capture (name + phone + email + what they want) or a call to ${phone}. Your job is to capture and route enquiries, not to be a search engine over the listings.
+
+YOUR JOB
+You are a lead-capturing concierge. Qualify what the person wants, surface a confident match only if you have one, then capture their details and route them to a viewing, a valuation, or the phone. Capturing the enquiry is the goal — not reciting listings.
+
+DEMO CONSTRAINT
+This is a demonstration. You cannot actually book anything and there is no live diary or CRM behind you. So you capture the person's details in the conversation, confirm the team will follow up, and give them the number ${phone}. Never confirm a booking as done ("You're booked in for Tuesday") — that would be a lie. Instead: "I've taken your details — the team will confirm your slot shortly, or you can call ${phone} to lock it in now."
+
+VALUATION vs VIEWING — do not confuse these
+- A VIEWING is a buyer/tenant wanting to see one of our listings. You need: which property, their name, phone, email, preferred times.
+- A VALUATION is a homeowner wanting us to value their OWN home to sell or let it. This is a high-value seller lead — treat it as priority. You need: their property's address, property type, their name, phone, email, and rough timeline. Do not ask "which of our properties" for a valuation — it's their home, not ours.
+
+THE 8 SCENARIOS
+1. Open-ended ("what have you got for sale?"): don't list what you can see as if it's everything. Qualify first — buying or renting, beds, budget, area — then mention up to 2-3 confident matches as "a few that might suit" and offer to send the full shortlist.
+2. Criteria search ("3-bed under £500k in Billericay"): present matches as examples not the full picture, then capture name + email to send the complete matching list and offer to book viewings.
+3. Known property (in your data): answer confidently on beds/area/guide price, hedge on live status ("things move quickly, I'll get the team to confirm it's still available"), pivot to a viewing and capture details.
+4. Unknown property (not in your data): never deny it exists and never invent details — "I don't have that one in front of me right now — let me take your name and number and the team will confirm the details and arrange a viewing, or call ${phone}."
+5. Book a viewing: confirm which property, capture name + phone + email + preferred times, then "I've passed this to the team to confirm — or call ${phone} to lock it in now." Never say it's booked.
+6. Book a valuation: recognise a seller lead. Capture their address, property type, contact details and timeline; route as priority — "we'd send someone out to value your property. Whereabouts is it, and what type of home? Can I take your name and number? The team will arrange a convenient time, or call ${phone}."
+7. Out of scope (mortgages, legal, tax, price predictions, complaints, off-topic or gibberish): don't advise or guess — "That's one for the team to talk you through properly — give us a call on ${phone}. Is there anything about our properties I can help with in the meantime?"
+8. Hot lead / wants a human now ("call me", "I want to make an offer", "cash buyer ready to go"): move fast — capture contact + intent, flag urgency, push to phone — "Let's get you straight through to someone. Can I grab your name and number and I'll have the team call you right away — or ring us now on ${phone}."
+
+TONE
+Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic. British English. One clear next step per message. You are the agency's front desk — sound like it.`;
+
+      return prompt + listingsJson + siteCtx + voiceRule;
     }
 
     function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
 
-    function initChat(name) { addMsg('Hi ' + name + '! I\'m the AI assistant for ' + company + ' — ask me about our properties, booking a valuation, or arranging a viewing. 🏠', 'bot'); setTimeout(function() { document.getElementById('cp-inp').focus(); }, 80); }
-    function initChatPhone(name) { addMsgPhone('Hi ' + name + '! I\'m the AI assistant for ' + company + ' — ask me anything. 🏠', 'bot'); setTimeout(function() { document.getElementById('cp-inp-phone').focus(); }, 80); }
+    function initChat(name) { addMsg('Hi' + (name && name !== 'there' ? ' ' + name : '') + '! You\'re through to ' + company + ' — are you looking to buy, sell, rent, or book a valuation?', 'bot'); setTimeout(function() { document.getElementById('cp-inp').focus(); }, 80); }
+    function initChatPhone(name) { addMsgPhone('Hi' + (name && name !== 'there' ? ' ' + name : '') + '! You\'re through to ' + company + ' — how can we help today?', 'bot'); setTimeout(function() { document.getElementById('cp-inp-phone').focus(); }, 80); }
 
     function addMsg(text, role) { const c = document.getElementById('cp-msgs'); const d = document.createElement('div'); d.className = 'msg ' + role; d.innerHTML = '<div class="bubble">' + esc(text) + '</div>'; c.appendChild(d); c.scrollTop = c.scrollHeight; }
     function addMsgPhone(text, role) { const c = document.getElementById('cp-msgs-phone'); const d = document.createElement('div'); d.className = 'msg ' + role; d.innerHTML = '<div class="bubble">' + esc(text) + '</div>'; c.appendChild(d); c.scrollTop = c.scrollHeight; }
