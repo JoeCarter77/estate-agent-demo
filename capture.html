@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>See Your Gym's System — Gym Incubator</title>
+  <title>See it live on your website</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -57,7 +57,6 @@
       gap: 6px;
     }
 
-    .logo-gym  { color: var(--white); }
     .logo-inc  { color: var(--green); }
 
     .nav-pill {
@@ -115,84 +114,6 @@
       color: var(--muted);
       font-weight: 300;
       margin-bottom: 24px;
-    }
-
-    /* ── VSL VIDEO ── */
-    .vsl {
-      position: relative;
-      margin-bottom: 32px;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      background: #000;
-      aspect-ratio: 16 / 9;
-    }
-
-    .vsl video {
-      width: 100%;
-      height: 100%;
-      display: block;
-      object-fit: cover;
-      background: #000;
-    }
-
-    /* Thumbnail overlay */
-    .vsl-thumb {
-      position: absolute;
-      inset: 0;
-      z-index: 2;
-      cursor: pointer;
-      background-size: cover;
-      background-position: center;
-      background-image: url('https://gym-incubator-demo.vercel.app/thumbnail.jpg');
-      transition: opacity 0.3s ease;
-    }
-
-    .vsl-thumb.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .vsl-thumb::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: rgba(0,0,0,0.28);
-    }
-
-    .vsl-play {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 68px;
-      height: 68px;
-      border-radius: 50%;
-      background: var(--green);
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding-left: 5px;
-      box-shadow: 0 8px 34px rgba(170,238,0,0.45);
-      transition: transform 0.16s ease;
-      z-index: 3;
-    }
-    .vsl-play:hover  { transform: translate(-50%, -50%) scale(1.08); }
-    .vsl-play:active { transform: translate(-50%, -50%) scale(0.94); }
-
-    .vsl-caption {
-      position: absolute;
-      left: 0; right: 0; bottom: 14px;
-      text-align: center;
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      color: rgba(255,255,255,0.85);
-      text-shadow: 0 1px 8px rgba(0,0,0,0.7);
-      pointer-events: none;
-      z-index: 3;
     }
 
     /* ── FORM ── */
@@ -347,9 +268,8 @@
 <body>
 
   <nav>
-    <a class="logo" href="https://www.gym-incubator.com">
-      <span class="logo-gym">GYM</span>
-      <span class="logo-inc">INCUBATOR</span>
+    <a class="logo" href="#">
+      <span class="logo-inc brand-slot">{{brand}}</span>
     </a>
     <div class="nav-pill">
       <span class="live-dot"></span>
@@ -361,30 +281,11 @@
     <div class="container">
 
       <div class="fu">
-        <h1>Your gym. <span class="green">Growing itself</span> while you coach.</h1>
+        <h1>Your website. <span class="green">Answering enquiries</span> while you're out on viewings.</h1>
       </div>
 
       <div class="fu">
-        <p class="subtext">Watch the 90-second breakdown, then see it live on your gym's site.</p>
-      </div>
-
-      <div class="fu">
-        <div class="vsl" id="vsl">
-          <video id="vslVideo"
-                 playsinline
-                 controls
-                 preload="metadata"
-                 poster="https://gym-incubator-demo.vercel.app/thumbnail.jpg">
-            <source src="https://gym-incubator-demo.vercel.app/0604-1-1_iIIOjhZy.mp4" type="video/mp4" />
-            Your browser does not support video playback.
-          </video>
-          <div class="vsl-thumb" id="vslThumb">
-            <button class="vsl-play" id="vslPlay" aria-label="Play video">
-              <svg viewBox="0 0 24 24" width="30" height="30" fill="#000"><path d="M8 5v14l11-7z"/></svg>
-            </button>
-            <div class="vsl-caption">▶ Watch: 6 leads a month → 90 new members in 90 days</div>
-          </div>
-        </div>
+        <p class="subtext">Pop in your details and see the AI receptionist live on your own agency's website — takes about 10 seconds.</p>
       </div>
 
       <form id="captureForm" novalidate>
@@ -399,18 +300,18 @@
 
         <div class="fu">
           <div class="form-group">
-            <label for="gymName">Gym name</label>
-            <input type="text" id="gymName" placeholder="e.g. Apex BJJ" autocomplete="organization" />
-            <div class="error-msg" id="gymNameErr">Enter your gym name</div>
+            <label for="agencyName">Agency name</label>
+            <input type="text" id="agencyName" placeholder="e.g. Henton Kirkman" autocomplete="organization" />
+            <div class="error-msg" id="agencyNameErr">Enter your agency name</div>
           </div>
         </div>
 
         <div class="fu">
           <div class="form-group">
-            <label for="websiteUrl">Gym website</label>
+            <label for="websiteUrl">Agency website</label>
             <div style="position:relative;display:flex;align-items:center;">
               <span style="position:absolute;left:16px;font-family:var(--font-body);font-size:15px;color:#fff;pointer-events:none;user-select:none;z-index:2;">https://www.</span>
-              <input type="text" id="websiteUrl" placeholder="apexbjj.co.uk" autocomplete="url" style="padding-left:116px;" />
+              <input type="text" id="websiteUrl" placeholder="hentonkirkman.co.uk" autocomplete="url" style="padding-left:116px;" />
             </div>
             <div class="error-msg" id="urlErr">Enter a valid website URL</div>
           </div>
@@ -420,7 +321,7 @@
           <div class="cta-wrap">
             <button type="submit" class="submit" id="submitBtn">
               <span class="btn-inner" style="display:flex;align-items:center;gap:9px">
-                See it live on my gym's website <span class="btn-arrow">→</span>
+                See it live on my agency's website <span class="btn-arrow">→</span>
               </span>
             </button>
           </div>
@@ -437,11 +338,11 @@
           </div>
           <div>
             <div class="stat-num">&lt;<span class="g">2s</span></div>
-            <div class="stat-label">Response time vs hours for most gyms</div>
+            <div class="stat-label">Response time vs hours for most agencies</div>
           </div>
           <div>
-            <div class="stat-num">£<span class="g">70k</span></div>
-            <div class="stat-label">Generated for Nexus BJJ</div>
+            <div class="stat-num"><span class="g">0</span></div>
+            <div class="stat-label">Enquiries missed out of hours</div>
           </div>
         </div>
       </div>
@@ -450,27 +351,11 @@
   </main>
 
   <script>
-    const DEMO_BASE   = 'https://gym-incubator-demo.vercel.app/';
-    const GHL_WEBHOOK = 'https://services.leadconnectorhq.com/hooks/TuuP0rHlr8x4keEW9mm6/webhook-trigger/9db41b6e-11c7-4637-98e8-9d553baa90d6';
+    const BRAND       = '{{brand}}';   // TODO: set brand name, e.g. 'Kerb'
+    const DEMO_BASE   = '/';            // same deployment serves the demo (index.html) at root
+    const GHL_WEBHOOK = '';             // TODO: point at the estate-agent lead webhook when ready
 
-    /* ── PLAY BUTTON ── */
-    const vslThumb = document.getElementById('vslThumb');
-    const vslPlay  = document.getElementById('vslPlay');
-    const vslVideo = document.getElementById('vslVideo');
-
-    vslPlay.addEventListener('click', function () {
-      vslThumb.classList.add('hidden');
-      const p = vslVideo.play();
-      if (p && p.catch) { p.catch(function(){}); }
-    });
-
-    vslVideo.addEventListener('pause', function () {
-      vslThumb.classList.remove('hidden');
-    });
-
-    vslVideo.addEventListener('ended', function () {
-      vslThumb.classList.remove('hidden');
-    });
+    document.querySelectorAll('.brand-slot').forEach(function(el) { el.textContent = BRAND; });
 
     /* ── SCREENSHOT PRE-WARM ── */
     let lastWarmed = '';
@@ -507,30 +392,32 @@
       e.preventDefault();
 
       const fn    = document.getElementById('firstName').value.trim();
-      const gn    = document.getElementById('gymName').value.trim();
+      const gn    = document.getElementById('agencyName').value.trim();
       const raw   = document.getElementById('websiteUrl').value.trim();
       const url   = buildUrl(raw);
       const clean = raw.replace(/^(https?:\/\/)?(www\.)?/, '').trim();
 
-      showErr('firstNameErr', false);
-      showErr('gymNameErr',   false);
-      showErr('urlErr',       false);
+      showErr('firstNameErr',  false);
+      showErr('agencyNameErr', false);
+      showErr('urlErr',        false);
 
       let ok = true;
-      if (!fn)    { showErr('firstNameErr', true); ok = false; }
-      if (!gn)    { showErr('gymNameErr',   true); ok = false; }
-      if (!clean) { showErr('urlErr',       true); ok = false; }
+      if (!fn)    { showErr('firstNameErr',  true); ok = false; }
+      if (!gn)    { showErr('agencyNameErr', true); ok = false; }
+      if (!clean) { showErr('urlErr',        true); ok = false; }
       if (!ok) return;
 
       btn.classList.add('loading');
 
       prewarm(url);
 
-      fetch(GHL_WEBHOOK, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ first_name: fn, company: gn, url: url, source: 'ad-capture' })
-      }).catch(function(){});
+      if (GHL_WEBHOOK) {
+        fetch(GHL_WEBHOOK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ first_name: fn, company: gn, url: url, source: 'ad-capture' })
+        }).catch(function(){});
+      }
 
       const paramStr = 'first_name=' + encodeURIComponent(fn)
                      + '&company='   + encodeURIComponent(gn)
