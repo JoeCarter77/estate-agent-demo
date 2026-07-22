@@ -1031,6 +1031,7 @@
 
     // ── STATE ──
     let chatOpen = false, gymContext = '', ready = false, sending = false, selectedMode = null, leadName = '', leadEmail = '';
+    let siteListings = [], siteSummary = '';
     const history = [];
     let vapi = null, vapiActive = false;
     let chatOpenPhone = false, selectedModePhone = null, leadNamePhone = '', leadEmailPhone = '';
@@ -1076,6 +1077,8 @@
       try {
         const res  = await fetch('/api/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: gymUrl }) });
         const data = await res.json();
+        if (Array.isArray(data.listings)) siteListings = data.listings;
+        if (data.summary) siteSummary = data.summary;
         if (data.text) { gymContext = data.text; }
       } catch {}
     }
@@ -1136,10 +1139,26 @@
     const GHL_WEBHOOK_URL = '';
     function sendLeadToGHL(name, email) { if (!GHL_WEBHOOK_URL) return; fetch(GHL_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, company, gymUrl, source: 'demo-page', mode: selectedMode }) }).catch(function(){}); }
 
+    function listingsBlock() {
+      if (!siteListings.length) return '';
+      const lines = siteListings.slice(0, 25).map(function(l) {
+        const bits = [l.address || 'Address on request'];
+        if (l.price) bits.push(l.price);
+        if (l.beds) bits.push(l.beds + ' bed');
+        if (l.baths) bits.push(l.baths + ' bath');
+        if (l.type) bits.push(l.type);
+        if (l.status) bits.push(l.status);
+        return '- ' + bits.join(' · ') + (l.url ? ' — ' + l.url : '');
+      });
+      return '\n\n--- LIVE LISTINGS' + (siteSummary ? ' (' + siteSummary + ')' : '') + ' ---\n' + lines.join('\n') + '\n--- END LISTINGS ---';
+    }
+
     function buildSystemPrompt(mode) {
-      const ctx = gymContext ? '\n\n--- WEBSITE CONTENT ---\n' + gymContext.slice(0, 8000) + '\n--- END ---' : '';
+      const listings = listingsBlock();
+      const listingRule = listings ? '\n\nWhen asked about specific properties (beds, price, availability, area), answer ONLY from the LIVE LISTINGS below — never invent one. If nothing matches, say so and offer to take their details so the team can send matching properties.' : '';
+      const ctx = gymContext ? '\n\n--- WEBSITE CONTENT ---\n' + gymContext.slice(0, 6000) + '\n--- END ---' : '';
       const voiceRule = mode === 'voice' ? '\n\nVOICE RULES: Never use bullet points or lists. Full natural sentences only. Maximum 2 short sentences per response.' : '';
-      return 'You are the AI assistant for ' + company + ', an independent UK estate agency. Reply like a warm, professional front-of-house receptionist — direct, helpful, brief.\n\nMaximum 2 short sentences per reply. UK English. Never open with "Great question!", "Absolutely!" etc.\n\nUse the website content below as your primary source of truth for branches, services, fees and property listings. State facts directly and confidently when the answer is there. Never invent addresses, prices, availability or property details — if something is not in the content, say you will take their details for the team to confirm.\n\nRoute the enquiry early: if they mention selling or letting out their home, treat them as a prospective seller/landlord and offer to book a free valuation (this is the priority). If they are buying or renting, help with their search and offer to arrange a viewing or register their requirements. If they are an existing client, point them to the right branch or team.' + ctx + voiceRule;
+      return 'You are the AI assistant for ' + company + ', an independent UK estate agency. Reply like a warm, professional front-of-house receptionist — direct, helpful, brief.\n\nMaximum 2 short sentences per reply. UK English. Never open with "Great question!", "Absolutely!" etc.\n\nUse the website content below as your primary source of truth for branches, services, fees and property listings. State facts directly and confidently when the answer is there. Never invent addresses, prices, availability or property details — if something is not in the content, say you will take their details for the team to confirm.\n\nRoute the enquiry early: if they mention selling or letting out their home, treat them as a prospective seller/landlord and offer to book a free valuation (this is the priority). If they are buying or renting, help with their search and offer to arrange a viewing or register their requirements. If they are an existing client, point them to the right branch or team.' + listingRule + listings + ctx + voiceRule;
     }
 
     function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
