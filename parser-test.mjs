@@ -1,8 +1,12 @@
-import { analyse, discoverListingsUrl, runScrape, tD, _loadParser } from './scraper-bench.mjs';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+
+// Set BEFORE importing so the module's main() is suppressed regardless of how
+// this test is launched (npm test, `node parser-test.mjs`, an IDE runner, …).
+process.env.IS_IMPORTED_FOR_TEST = '1';
+const { analyse, discoverListingsUrl, runScrape, tD, _loadParser } = await import('./scraper-bench.mjs');
 
 await _loadParser();
 let pass = 0, fail = 0;

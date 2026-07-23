@@ -581,20 +581,26 @@ function fmt(r) {
 
 async function main() {
   const { ids, zonesOnly } = parseArgs();
+  // Unconditional first output — so a run is NEVER silent, whatever follows.
+  console.log(`scraper-bench starting — ${zonesOnly ? 'zones' : `methods ${ids.join(',')}`} — node ${process.version} — ${new Date().toISOString()}`);
 
-  // Bright Data zone discovery / listing
+  // Bright Data zone discovery / listing (never fatal to the run)
   if (zonesOnly || (ids.includes('g') && process.env.BRIGHTDATA_KEY && !BD_ZONE)) {
     const key = process.env.BRIGHTDATA_KEY;
     if (!key) {
       console.log('BRIGHTDATA_KEY not set.');
       if (zonesOnly) return;
     } else {
-      const { zones, error } = await brightDataZones(key);
-      if (error) console.log(`Bright Data zone lookup failed: ${error}`);
-      else {
-        console.log('Bright Data zones:', zones.map((z) => `${z.name}${z.type ? ` (${z.type})` : ''}`).join(', ') || '(none)');
-        BD_ZONE = pickUnlockerZone(zones);
-        console.log(`→ using zone: ${BD_ZONE || '(none found — create a Web Unlocker zone)'}`);
+      try {
+        const { zones, error } = await brightDataZones(key);
+        if (error) console.log(`Bright Data zone lookup failed: ${error}`);
+        else {
+          console.log('Bright Data zones:', zones.map((z) => `${z.name}${z.type ? ` (${z.type})` : ''}`).join(', ') || '(none)');
+          BD_ZONE = pickUnlockerZone(zones);
+          console.log(`→ using zone: ${BD_ZONE || '(none found — create a Web Unlocker zone)'}`);
+        }
+      } catch (e) {
+        console.log(`Bright Data zone lookup errored (continuing): ${e.message}`);
       }
       if (zonesOnly) return;
     }
@@ -639,26 +645,23 @@ export async function _loadParser() {
   if (!parseHTML) ({ parse: parseHTML } = await import('node-html-parser'));
 }
 
-// Robust "is this the entry script?" check. Compares real filesystem paths
-// (not hand-built file:// URLs) so it works on Windows, with relative paths,
-// and through symlinks. `IS_IMPORTED_FOR_TEST` lets the fixture test skip main.
-import { fileURLToPath } from 'node:url';
-import { realpathSync } from 'node:fs';
-function isEntryScript() {
-  if (process.env.IS_IMPORTED_FOR_TEST) return false;
-  const entry = process.argv[1];
-  if (!entry) return false;
-  try {
-    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
-  } catch {
-    // fall back to basename match if realpath fails (e.g. odd launcher)
-    return entry.endsWith('scraper-bench.mjs');
-  }
-}
-
-if (isEntryScript()) {
+// Run main() whenever the file is executed. We DON'T compare argv[1] to
+// import.meta.url — that path-matching idiom silently failed on Windows
+// (drive-letter casing / 8.3 short names / npm shims), which is why this
+// script kept exiting 0 with no output. Instead, the only importer (the test
+// suite) sets IS_IMPORTED_FOR_TEST=1 before importing, which suppresses main.
+// Global handlers guarantee that nothing ever exits silently.
+if (!process.env.IS_IMPORTED_FOR_TEST) {
+  process.on('unhandledRejection', (e) => {
+    console.error('Unhandled rejection:', e);
+    process.exit(1);
+  });
+  process.on('uncaughtException', (e) => {
+    console.error('Uncaught exception:', e);
+    process.exit(1);
+  });
   main().catch((e) => {
-    console.error(e);
+    console.error('Fatal:', e);
     process.exit(1);
   });
 }
