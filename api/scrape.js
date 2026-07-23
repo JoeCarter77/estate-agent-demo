@@ -12,6 +12,10 @@
 
 import { analyse, discoverListingsUrl, classifyTier, extractPhone } from '../lib/extract.mjs';
 
+// Allow headroom for the Bright Data fallback (Vercel Pro honours this; Hobby is
+// capped at 10s, in which case the unlocker fallback may time out and we degrade).
+export const maxDuration = 30;
+
 const BROWSER_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -35,31 +39,49 @@ export default async function handler(req, res) {
 
   try {
     const baseUrl = url.startsWith('http') ? url : `https://${url}`;
+    let via = 'fetch';
 
-    // 1. Homepage.
+    // 1. Fetch-first (free, fast): homepage, then follow to a listings page if thin.
     const homeHtml = (await fetchPage(baseUrl)) || '';
     let best = analyse(homeHtml, baseUrl);
     let usedHtml = homeHtml;
-
-    // 2. Follow to a listings/for-sale page if the homepage is thin.
     if (best.full < 3 && homeHtml) {
       const listingsUrl = discoverListingsUrl(homeHtml, baseUrl);
       if (listingsUrl && listingsUrl !== baseUrl) {
         const html2 = await fetchPage(listingsUrl);
         if (html2) {
           const a2 = analyse(html2, listingsUrl);
-          if (a2.full > best.full || (a2.full === best.full && a2.count > best.count)) {
-            best = a2;
-            usedHtml = html2;
-          }
+          if (a2.full > best.full || (a2.full === best.full && a2.count > best.count)) { best = a2; usedHtml = html2; }
         }
       }
     }
 
+    // 2. Fallback (paid, slower): only for GENUINE blocks — plain fetch returned
+    //    nothing usable. Bright Data Web Unlocker uses residential IPs to get past
+    //    the datacenter-IP blocks that stop Vercel's own fetch. Fetch-first stays
+    //    primary; Scrape.do is intentionally NOT used (slower, worse hit rate).
+    if (best.full === 0 && process.env.BRIGHTDATA_KEY) {
+      const bdHome = await brightDataFetch(baseUrl);
+      if (bdHome) {
+        let a = analyse(bdHome, baseUrl);
+        let used = bdHome;
+        if (a.full < 3) {
+          const lu = discoverListingsUrl(bdHome, baseUrl);
+          if (lu && lu !== baseUrl) {
+            const bd2 = await brightDataFetch(lu);
+            if (bd2) { const a2 = analyse(bd2, lu); if (a2.full > a.full || (a2.full === a.full && a2.count > a.count)) { a = a2; used = bd2; } }
+          }
+        }
+        if (a.full > best.full || (best.count === 0 && a.count > best.count)) { best = a; usedHtml = used; via = 'brightdata'; }
+      }
+    }
+
     // 3. Context for AMBER/RED and general questions.
-    const company = extractCompany(homeHtml);
-    const location = extractLocation(best.listings, homeHtml);
-    const phone = extractPhone(homeHtml) || best.phone || '';
+    // Use the HTML we actually extracted from as a fallback source (the homepage
+    // may have been blocked and only the Bright Data HTML has content).
+    const company = extractCompany(homeHtml) || extractCompany(usedHtml);
+    const location = extractLocation(best.listings, homeHtml) || extractLocation(best.listings, usedHtml);
+    const phone = extractPhone(homeHtml) || best.phone || extractPhone(usedHtml) || '';
     const tier = classifyTier(best, { company, location, phone });
 
     const listings = best.listings.map((l) => ({
@@ -71,6 +93,9 @@ export default async function handler(req, res) {
       full: !!l.full,
     }));
 
+    // Per-prospect observability (shows in Vercel logs).
+    console.log(JSON.stringify({ scrape: baseUrl, company, tier, listings_found: listings.length, via }));
+
     // CACHE SEAM: for a paying client, persist this result keyed by domain (KV/edge)
     // and refresh on a cron rather than re-scraping on every page load.
     return res.status(200).json({
@@ -80,6 +105,7 @@ export default async function handler(req, res) {
       phone,
       company,
       location,
+      source: via,
       text: proseText(homeHtml, usedHtml),
     });
   } catch (err) {
@@ -99,6 +125,30 @@ async function fetchPage(pageUrl) {
     if (!r.ok) return null;
     const ct = r.headers.get('content-type') || '';
     if (ct && !ct.includes('html') && !ct.includes('xml')) return null;
+    return await r.text();
+  } catch {
+    return null;
+  }
+}
+
+// Bright Data Web Unlocker — residential-IP fetch for sites that block Vercel.
+// Needs BRIGHTDATA_KEY and a Web Unlocker zone (BRIGHTDATA_ZONE, default web_unlocker1)
+// set in the Vercel project env. Returns null on any failure so we degrade cleanly.
+async function brightDataFetch(url) {
+  const key = process.env.BRIGHTDATA_KEY;
+  if (!key) return null;
+  const zone = process.env.BRIGHTDATA_ZONE || 'web_unlocker1';
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    const r = await fetch('https://api.brightdata.com/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ zone, url, format: 'raw', country: 'gb' }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!r.ok) return null;
     return await r.text();
   } catch {
     return null;
