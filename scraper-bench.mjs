@@ -414,15 +414,44 @@ function extractListings(html, baseUrl) {
   return { listings: available, dropped: all.length - available.length };
 }
 
-// Diagnostic: per-card outerHTML + what the parser extracted. Used by --dump so
-// the exact markup of a failing site can be inspected without live access.
+// Which element/branch made a card look unavailable — so a --dump reveals
+// whether "Let Agreed" is the card's OWN status or bleeding in from scope.
+function unavailableEvidence(card) {
+  if (!card || !card.querySelectorAll) return null;
+  for (const e of [card, ...card.querySelectorAll('*')]) {
+    const cls = (e.getAttribute && e.getAttribute('class')) || '';
+    if (/status|ribbon|flag|availab|badge|banner|\btag\b|sticker|overlay|label/i.test(cls)) {
+      const m = cleanText(e).match(UNAVAILABLE);
+      if (m) return `status-el <${(e.rawTagName || '?').toLowerCase()} class="${cls}">: "${m[0]}"`;
+    }
+  }
+  const ct = cleanText(card);
+  const m = ct.length < 300 && ct.match(UNAVAILABLE);
+  return m ? `small-card(${ct.length}c) text match: "${m[0]}"` : null;
+}
+
+// Diagnostic: per-card HTML + what the parser extracted. Used by --dump so the
+// exact markup of a failing site can be inspected without live access. Images
+// are collapsed (their srcset/data URIs otherwise eat the whole budget and hide
+// the beds markup), and status-match provenance is included.
 function debugCards(html, baseUrl) {
   const root = parseHTML(html);
   const out = [];
   for (const card of collectCards(root)) {
     const l = buildListing(card, baseUrl);
-    const raw = (card.outerHTML || card.toString() || '').replace(/\s+/g, ' ').trim();
-    out.push({ ...l, html: raw.slice(0, 600) });
+    const raw = (card.outerHTML || card.toString() || '')
+      .replace(/<img\b[^>]*>/gi, '<img>')                       // drop srcset/src noise
+      .replace(/<(svg)\b[^>]*>[\s\S]*?<\/svg>/gi, '<svg/>')     // collapse inline svg (keep marker)
+      .replace(/\s+(style|srcset|data-[\w-]+)="[^"]*"/gi, '')   // drop noisy attrs
+      .replace(/\s+/g, ' ')
+      .trim();
+    const parent = card.parentNode;
+    out.push({
+      ...l,
+      evidence: unavailableEvidence(card),
+      parent: parent ? `<${(parent.rawTagName || '?').toLowerCase()} class="${(parent.getAttribute && parent.getAttribute('class')) || ''}">` : null,
+      html: raw.slice(0, 1800),
+    });
   }
   return out;
 }
@@ -761,6 +790,8 @@ async function dumpSite(target) {
   for (const c of cards.slice(0, 6)) {
     console.log(`• price=${c.price}  beds=${c.beds}  unavailable=${c.unavailable}  addr=${JSON.stringify(c.address)}`);
     console.log(`  url=${c.url}`);
+    console.log(`  parent=${c.parent}`);
+    if (c.unavailable) console.log(`  WHY-UNAVAILABLE: ${c.evidence}`);
     console.log(`  html: ${c.html}\n`);
   }
   if (!cards.length)
