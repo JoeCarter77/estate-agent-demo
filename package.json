@@ -1,5 +1,6 @@
 {
   "private": true,
+  "type": "module",
   "description": "Dev tooling for the Novus estate-agent demo (scraper benchmark). Not required by the Vercel serverless functions.",
   "scripts": {
     "bench": "node scraper-bench.mjs",

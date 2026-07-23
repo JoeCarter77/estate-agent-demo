@@ -361,6 +361,9 @@
     .hero-chips { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
     .hero-chip { font-family: 'Inter', sans-serif; background: #fff; border: 1px solid var(--border-hi); color: var(--text); border-radius: 100px; padding: 9px 15px; font-size: 0.82rem; font-weight: 500; cursor: pointer; text-align: left; transition: border-color 0.15s, color 0.15s, background 0.15s; }
     .hero-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-lo); }
+    .qr-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 4px 8px; }
+    .qr-chip { font-family: 'Inter', sans-serif; background: #fff; border: 1px solid var(--border-hi); color: var(--accent); border-radius: 100px; padding: 7px 12px; font-size: 0.78rem; font-weight: 500; cursor: pointer; text-align: left; line-height: 1.35; transition: background 0.15s, border-color 0.15s; }
+    .qr-chip:hover { background: var(--accent-lo); border-color: var(--accent); }
     .hero-cta { display: inline-block; align-self: flex-start; text-align: center; background: var(--accent); color: #fff; font-weight: 800; font-size: 0.9rem; padding: 14px 22px; border-radius: 10px; text-decoration: none; line-height: 1.35; transition: background 0.15s, transform 0.15s; }
     .hero-cta:hover { background: var(--accent-hi); transform: translateY(-1px); }
     .hero-demo { position: static; padding-top: 0; display: flex; align-items: center; justify-content: center; min-width: 0; }
@@ -475,8 +478,7 @@
       <div class="hero-copy-actions fu fu-2">
         <div class="hero-try">
           <div class="hero-try-label">Try asking it:</div>
-          <div class="hero-chips">
-            <button class="hero-chip" onclick="askDemo(this.textContent)">Is the 3-bed on the high street still available?</button>
+          <div class="hero-chips" id="hero-chips">
             <button class="hero-chip" onclick="askDemo(this.textContent)">Can I book a viewing?</button>
             <button class="hero-chip" onclick="askDemo(this.textContent)">Can you value my house?</button>
           </div>
@@ -755,6 +757,7 @@
     // ── STATE ──
     let chatOpen = true, gymContext = '', ready = false, sending = false, selectedMode = null, leadName = '', leadEmail = '';
     let siteListings = [], siteSummary = '', sitePhone = '';
+    let siteTier = 'AMBER', siteLocation = '', chatSeededByChip = false;
     const history = [];
     let vapi = null, vapiActive = false;
     let chatOpenPhone = true, selectedModePhone = null, leadNamePhone = '', leadEmailPhone = '';
@@ -803,8 +806,59 @@
         if (Array.isArray(data.listings)) siteListings = data.listings;
         if (data.summary) siteSummary = data.summary;
         if (data.phone) sitePhone = data.phone;
+        if (data.tier) siteTier = data.tier;
+        if (data.location) siteLocation = data.location;
         if (data.text) { gymContext = data.text; }
       } catch {}
+      renderHeroChips();
+    }
+
+    // ── TIER-DRIVEN BUTTONS ──
+    // Pick a specific scraped property to reference in a "still available?" button.
+    function specificPropertyQ() {
+      const l = siteListings.find(function(x) { return x.beds && x.address; }) || siteListings.find(function(x) { return x.address; });
+      if (!l || !l.address) return null;
+      const street = String(l.address).split(',')[0].trim();
+      if (!street) return null;
+      return l.beds ? 'Is the ' + l.beds + ' bed on ' + street + ' still available?'
+                    : 'Is the property on ' + street + ' still available?';
+    }
+    function townLabel() { return siteLocation || 'the area'; }
+    function criteriaQ() {
+      const prices = siteListings.map(function(l) { return l.priceValue; }).filter(Boolean).sort(function(a, b) { return a - b; });
+      let capK = 500;
+      if (prices.length) { const mid = prices[Math.floor(prices.length / 2)]; capK = Math.max(150, Math.round(mid / 1000 / 50) * 50); }
+      return 'What have you got in ' + townLabel() + ' under £' + capK + 'k?';
+    }
+
+    // Landing page: 3–4 buttons, tier-dependent.
+    function landingButtonLabels() {
+      const green = siteTier === 'GREEN' || siteTier === 'ULTRA_GREEN';
+      if (siteTier === 'ULTRA_GREEN') {
+        return [specificPropertyQ() || criteriaQ(), criteriaQ(), 'Can I book a viewing?', 'Can you value my house?'];
+      }
+      if (siteTier === 'GREEN') {
+        return [specificPropertyQ() || 'What have you got available?', 'What else have you got available?', 'Can I book a viewing?', 'Can you value my house?'];
+      }
+      // AMBER / RED
+      return ["I'm looking to buy in " + townLabel(), 'Can you value my house?', 'Can I book a viewing?', 'Do you do lettings?'];
+    }
+
+    // In-chat quick replies: exactly 2, tier-dependent.
+    function chatQuickReplyLabels() {
+      if (siteTier === 'GREEN' || siteTier === 'ULTRA_GREEN') {
+        return [specificPropertyQ() || 'What have you got available?', criteriaQ()];
+      }
+      return ["I'm looking to buy in " + townLabel(), 'Can you value my house?'];
+    }
+
+    function renderHeroChips() {
+      const box = document.getElementById('hero-chips');
+      if (!box) return;
+      const labels = landingButtonLabels().filter(Boolean);
+      box.innerHTML = labels.map(function(l) {
+        return '<button class="hero-chip" onclick="askDemo(this.textContent)">' + esc(l) + '</button>';
+      }).join('');
     }
 
     function setReady() {
@@ -827,10 +881,11 @@
     function askDemo(q) {
       var mobile = window.matchMedia('(max-width: 980px)').matches;
       if (mobile) {
-        if (selectedModePhone !== 'chat') selectModePhone('chat');
+        // set the seed flag only when opening a fresh chat (so initChat skips quick replies)
+        if (selectedModePhone !== 'chat') { chatSeededByChip = true; selectModePhone('chat'); }
         setTimeout(function() { var i = document.getElementById('cp-inp-phone'); if (i) { i.value = q; sendMsgPhone(); } }, 60);
       } else {
-        if (selectedMode !== 'chat') selectMode('chat');
+        if (selectedMode !== 'chat') { chatSeededByChip = true; selectMode('chat'); }
         setTimeout(function() { var i = document.getElementById('cp-inp'); if (i) { i.value = q; sendMsg(); } }, 60);
       }
     }
@@ -877,6 +932,7 @@
           + '\n--- END LISTINGS ---'
         : '\n\n(No listings snapshot is available right now — capture the enquiry and route to the team.)';
       const siteCtx = gymContext ? '\n\n--- GENERAL WEBSITE INFO (branches, fees, about — secondary reference) ---\n' + gymContext.slice(0, 3500) + '\n--- END ---' : '';
+      const locCtx = siteLocation ? '\n\nThe agency operates in and around ' + siteLocation + '. You can speak confidently about ' + siteLocation + ' and the surrounding area as their patch — but never invent a specific property you cannot see.' : '';
       const voiceRule = mode === 'voice' ? '\n\nVOICE: Full natural sentences only, never lists or bullet points, maximum 2 short sentences per turn.' : '';
 
       const prompt =
@@ -888,6 +944,8 @@ You are given a set of the agency's current listings as structured data. This is
 - Never present the listings you can see as the complete inventory. They are examples, surfaced only when you're confident of a match.
 - Never assert a property is currently available, sold, or at a fixed price as hard fact. Your data is a snapshot — hedge and offer to have the team confirm.
 - Never invent a property, feature, price or detail that isn't in your data. If you don't have it, say so and capture the enquiry.
+- When you mention listings, frame them as a partial view — "here's a couple of what we've currently got listed" — never as the complete or current picture. This applies EVEN when you can see several matches: a scraped list is never treated as the agency's full stock.
+- If they ask about a specific property you can't see, or ask "what else have you got" beyond what you've already mentioned, do NOT guess, invent, or claim there's nothing else. Say you don't have that one in front of you right now and offer to take their name and number so the team can check and call them back (or they can ring ${phone}).
 - Every reply moves toward a capture (name + phone + email + what they want) or a call to ${phone}. Your job is to capture and route enquiries, not to be a search engine over the listings.
 
 YOUR JOB
@@ -913,13 +971,34 @@ THE 8 SCENARIOS
 TONE
 Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic. British English. One clear next step per message. You are the agency's front desk — sound like it.`;
 
-      return prompt + listingsJson + siteCtx + voiceRule;
+      return prompt + listingsJson + siteCtx + locCtx + voiceRule;
     }
 
     function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
 
-    function initChat(name) { addMsg('Hi' + (name && name !== 'there' ? ' ' + name : '') + '! You\'re through to ' + company + ' — are you looking to buy, sell, rent, or book a valuation?', 'bot'); setTimeout(function() { document.getElementById('cp-inp').focus(); }, 80); }
-    function initChatPhone(name) { addMsgPhone('Hi' + (name && name !== 'there' ? ' ' + name : '') + '! You\'re through to ' + company + ' — how can we help today?', 'bot'); setTimeout(function() { document.getElementById('cp-inp-phone').focus(); }, 80); }
+    function initChat(name) { addMsg('Hi' + (name && name !== 'there' ? ' ' + name : '') + '! You\'re through to ' + company + ' — are you looking to buy, sell, rent, or book a valuation?', 'bot'); renderQuickReplies(false); setTimeout(function() { document.getElementById('cp-inp').focus(); }, 80); }
+    function initChatPhone(name) { addMsgPhone('Hi' + (name && name !== 'there' ? ' ' + name : '') + '! You\'re through to ' + company + ' — how can we help today?', 'bot'); renderQuickReplies(true); setTimeout(function() { document.getElementById('cp-inp-phone').focus(); }, 80); }
+
+    // In-chat quick replies (2, tier-dependent). Skipped when the chat was seeded
+    // by a landing-page chip (the user already asked something).
+    function renderQuickReplies(isPhone) {
+      if (chatSeededByChip) { chatSeededByChip = false; return; }
+      const labels = chatQuickReplyLabels().filter(Boolean).slice(0, 2);
+      if (!labels.length) return;
+      const c = document.getElementById(isPhone ? 'cp-msgs-phone' : 'cp-msgs');
+      if (!c) return;
+      const row = document.createElement('div');
+      row.className = 'qr-row';
+      row.id = isPhone ? 'qr-phone' : 'qr';
+      row.innerHTML = labels.map(function(l) { return '<button class="qr-chip" onclick="quickReply(this,' + (isPhone ? 'true' : 'false') + ')">' + esc(l) + '</button>'; }).join('');
+      c.appendChild(row); c.scrollTop = c.scrollHeight;
+    }
+    function quickReply(btn, isPhone) {
+      const q = btn.textContent;
+      const row = document.getElementById(isPhone ? 'qr-phone' : 'qr'); if (row) row.remove();
+      const id = isPhone ? 'cp-inp-phone' : 'cp-inp';
+      const i = document.getElementById(id); if (i) { i.value = q; isPhone ? sendMsgPhone() : sendMsg(); }
+    }
 
     function addMsg(text, role) { const c = document.getElementById('cp-msgs'); const d = document.createElement('div'); d.className = 'msg ' + role; d.innerHTML = '<div class="bubble">' + esc(text) + '</div>'; c.appendChild(d); c.scrollTop = c.scrollHeight; }
     function addMsgPhone(text, role) { const c = document.getElementById('cp-msgs-phone'); const d = document.createElement('div'); d.className = 'msg ' + role; d.innerHTML = '<div class="bubble">' + esc(text) + '</div>'; c.appendChild(d); c.scrollTop = c.scrollHeight; }
