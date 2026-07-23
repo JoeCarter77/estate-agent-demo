@@ -15,11 +15,17 @@
  *
  *   node scraper-bench.mjs                 # methods a,b,c,e (+ d if playwright installed)
  *   node scraper-bench.mjs --only=a,c      # subset of methods
- *   SCRAPEDO_KEY=xxx node scraper-bench.mjs --api   # also run method f (scraping API)
+ *   node --env-file=.env.local scraper-bench.mjs --api   # + method f (Scrape.do) & g (Bright Data)
  *
- * Optional deps (only needed for the methods you enable):
+ * Methods:
+ *   a plain fetch + Chrome UA   b rotating UAs   c Googlebot UA spoof
+ *   d headless Playwright       e screenshot-then-parse (thum.io)
+ *   f Scrape.do API             g Bright Data Web Unlocker API
+ *
+ * Optional deps / env (only needed for the methods you enable):
  *   npm i playwright            # method d (headless). then: npx playwright install chromium
- *   SCRAPEDO_KEY / SCRAPERAPI_KEY env var   # method f
+ *   SCRAPEDO_KEY (or SCRAPERAPI_KEY)         # method f
+ *   BRIGHTDATA_KEY [+ BRIGHTDATA_ZONE]       # method g (zone defaults to web_unlocker1)
  */
 
 const TARGETS = [
@@ -228,6 +234,34 @@ const methods = {
       return { ok: false, reachable: false, status: e.name, ms: Date.now() - t0, bytes: 0, listings: false, phone: null, hint: e.message?.slice(0, 60) };
     }
   },
+
+  // g) Bright Data Web Unlocker (direct API). Needs BRIGHTDATA_KEY + a zone.
+  //    Zone defaults to "web_unlocker1"; override with BRIGHTDATA_ZONE if yours
+  //    is named differently (Bright Data dashboard → Proxies & Scraping → your
+  //    Web Unlocker zone name). A wrong zone name returns a 4xx with an error body.
+  g: async (url) => {
+    const key = process.env.BRIGHTDATA_KEY;
+    if (!key) return { ok: false, status: 'SKIP', ms: 0, bytes: 0, listings: false, phone: null, hint: 'set BRIGHTDATA_KEY' };
+    const zone = process.env.BRIGHTDATA_ZONE || 'web_unlocker1';
+    const t0 = Date.now();
+    const { signal, done } = withTimeout(30000);
+    try {
+      const r = await fetch('https://api.brightdata.com/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify({ zone, url, format: 'raw', country: 'gb' }),
+        signal,
+      });
+      const body = await r.text();
+      done();
+      const a = analyseHtml(body);
+      const zoneErr = !r.ok && /zone|unknown|not found|auth/i.test(body) ? ` (zone="${zone}"? ${body.slice(0, 50)})` : '';
+      return { ok: r.ok && a.listings, reachable: r.ok, status: r.status, ms: Date.now() - t0, bytes: body.length, ...a, hint: (a.hint || '') + zoneErr };
+    } catch (e) {
+      done();
+      return { ok: false, reachable: false, status: e.name, ms: Date.now() - t0, bytes: 0, listings: false, phone: null, hint: e.message?.slice(0, 60) };
+    }
+  },
 };
 
 // ---- Runner --------------------------------------------------------------
@@ -237,7 +271,10 @@ function parseArgs() {
   const onlyArg = args.find((a) => a.startsWith('--only='));
   const wantApi = args.includes('--api');
   let ids = onlyArg ? onlyArg.split('=')[1].split(',') : ['a', 'b', 'c', 'd', 'e'];
-  if (wantApi && !ids.includes('f')) ids.push('f');
+  if (wantApi) {
+    if (!ids.includes('f')) ids.push('f'); // Scrape.do
+    if (!ids.includes('g')) ids.push('g'); // Bright Data Web Unlocker
+  }
   return ids.filter((id) => methods[id]);
 }
 
