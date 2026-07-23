@@ -236,22 +236,27 @@ function isElement(n) {
 function isNavHref(h) {
   return !h || /^(#|tel:|mailto:|javascript:|data:)/i.test(h);
 }
-function priceCount(text) {
+function distinctPrices(text) {
   const m = text.match(/£\s?(?:\d{1,3}(?:,\d{3})+|\d{4,})/g);
-  return m ? m.length : 0;
+  return m ? new Set(m.map((x) => x.replace(/\s+/g, ''))).size : 0;
 }
-function listingLinkCount(el) {
+function distinctListingHrefs(el) {
   if (!el || !el.querySelectorAll) return 0;
-  return el.querySelectorAll('a').filter((a) => {
+  const s = new Set();
+  for (const a of el.querySelectorAll('a')) {
     const h = a.getAttribute && a.getAttribute('href');
-    return h && LISTING_HREF.test(h);
-  }).length;
+    if (h && LISTING_HREF.test(h)) s.add(h.split('#')[0].replace(/\/+$/, ''));
+  }
+  return s.size;
 }
-// An element that spans 2+ listings (multiple detail links or prices) is a
-// grid/list container, not a single card — climbing into it collapses many
-// listings into one (the IPS "only 1 card" bug).
+// An element that spans 2+ DISTINCT listings (different detail URLs or prices)
+// is a grid/list container, not a single card — climbing into it collapses many
+// listings into one (the IPS bug). Counting DISTINCT (not raw) is essential:
+// one rich card often links to the same property several times (image, title,
+// "view") — Expert Agent "eapow" rows — which raw counting mistook for a
+// multi-card container, stopping the climb early and dropping beds (WN bug).
 function isMultiCardContainer(el, text) {
-  return listingLinkCount(el) >= 2 || priceCount(text) >= 2;
+  return distinctListingHrefs(el) >= 2 || distinctPrices(text) >= 2;
 }
 
 // Loose text-node strings inside a card. Some themes drop the address as bare
@@ -330,7 +335,7 @@ function cardFromPrice(priceEl) {
   let best = null;
   for (let d = 0; el && d < 7; d++) {
     const t = cleanText(el);
-    if (t.length > 1800) break;
+    if (t.length > 12000) break; // backstop only; isMultiCardContainer is the real stop
     if (el !== priceEl && isMultiCardContainer(el, t)) break; // stop before merging listings
     const links = el.querySelectorAll ? el.querySelectorAll('a') : [];
     const hasLink = links.some((a) => !isNavHref(a.getAttribute && a.getAttribute('href')));
@@ -381,7 +386,7 @@ function cardFromLink(anchor) {
   let best = null;
   for (let d = 0; el && d < 6; d++) {
     const t = cleanText(el);
-    if (t.length > 1800) break;
+    if (t.length > 12000) break; // backstop only; isMultiCardContainer is the real stop
     if (el !== anchor && isMultiCardContainer(el, t)) break; // stop before merging listings
     const hasAddr = !!pickAddressStrict(el);
     const hasPrice = !!extractPrice(t);

@@ -184,6 +184,26 @@ const wnPage = `<html><body><div class="results">
 r = analyse(wnPage, 'https://www.wnproperties.co.uk/');
 check('WN: beds outside the text-node-address element still captured (no regression)', r.full === 3, `full=${r.full}/${r.count} beds=${JSON.stringify(r.listings.map(l => l.beds))}`);
 
+// 7h. WN Properties REAL structure (Expert Agent "eapow"): the card
+//     <div class="...eapow-overview-row"> links to the same property TWICE
+//     (image + "view"), and beds live in a sibling of the inner
+//     eapow-overview-desc (which holds only title + price). The boundary walk
+//     must climb to eapow-overview-row — raw link-counting stopped it at desc.
+const eapowCard = (slug, addr, price, beds) =>
+  `<div class="span4 eapow-row0 eapow-overview-row">
+     <div class="eapow-overview-image"><a href="/property/${slug}/"><img alt=""></a></div>
+     <div class="span12 eapow-overview-desc"><h2 class="eapow-title">${addr}</h2><div class="eapow-overview-price">${price}</div></div>
+     <div class="eapow-overview-details"><span class="eapow-bedrooms"><i></i> ${beds}</span> Bedrooms</div>
+     <a class="eapow-more" href="/property/${slug}/">View details</a>
+   </div>`;
+const eapowPage = `<html><body><div class="eapow-overview">
+  ${eapowCard('oak-road-shenfield', 'Oak Road, Shenfield', '£400,000', '3')}
+  ${eapowCard('elm-avenue-shenfield', 'Elm Avenue, Shenfield', '£450,000', '4')}
+  ${eapowCard('mill-lane-hutton', 'Mill Lane, Hutton', '£375,000', '2')}
+  </div></body></html>`;
+r = analyse(eapowPage, 'https://www.wnproperties.co.uk/');
+check('WN eapow: climb to overview-row, beds+url captured → 3/3 full', r.full === 3, `full=${r.full}/${r.count} beds=${JSON.stringify(r.listings.map(l => l.beds))} urls=${r.listings.filter(l => l.url).length}`);
+
 // 7b. Bed icon as <img src=".../bedroom.svg"> with the number as a sibling.
 const imgSrcBeds = `<div class="p"><a href="/property/1">Willow Way, Brentwood</a><span class="price">£425,000</span>
   <ul class="feat"><li><img src="/assets/icons/bedroom.svg" class="ico" alt=""> 3</li><li><img src="/assets/icons/bathroom.svg"> 2</li></ul></div>`;
