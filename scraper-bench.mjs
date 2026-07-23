@@ -273,22 +273,37 @@ function cardTextNodes(card) {
   return out;
 }
 
-function pickAddress(card) {
-  if (!card || !card.querySelectorAll) return null;
+function addressCandidates(card, withTextNodes) {
   const cands = [];
   for (const h of card.querySelectorAll('h1,h2,h3,h4,h5')) cands.push(cleanText(h));
   for (const e of card.querySelectorAll('*')) {
     const cls = (e.getAttribute && e.getAttribute('class')) || '';
     if (/address|street|location|prop.*title|property.*title|displayaddress/i.test(cls)) cands.push(cleanText(e));
   }
-  for (const t of cardTextNodes(card)) cands.push(t); // bare text-node addresses
+  if (withTextNodes) for (const t of cardTextNodes(card)) cands.push(t); // bare text-node addresses
   for (const a of card.querySelectorAll('a')) cands.push(cleanText(a));
   for (const img of card.querySelectorAll('img')) {
     const alt = img.getAttribute && img.getAttribute('alt');
     if (alt) cands.push(decodeEntities(alt));
   }
+  return cands;
+}
+function firstAddress(cands) {
   for (const c of cands) if (isAddress(c)) return c.replace(/\s+/g, ' ').trim();
   return null;
+}
+// Full extractor (text-node aware) — used to fill the address FIELD.
+function pickAddress(card) {
+  if (!card || !card.querySelectorAll) return null;
+  return firstAddress(addressCandidates(card, true));
+}
+// Element-only — used for card-BOUNDARY detection. Critical: adding text-node
+// scanning to boundary detection shrank card scopes and excluded the beds
+// element (WN Properties 12/12 → 0/23 regression). Boundaries must stay on the
+// pre-existing element-only signal so the text-node change is purely additive.
+function pickAddressStrict(card) {
+  if (!card || !card.querySelectorAll) return null;
+  return firstAddress(addressCandidates(card, false));
 }
 
 // The tightest price-bearing leaf elements (a card can hold several nested
@@ -319,7 +334,7 @@ function cardFromPrice(priceEl) {
     if (el !== priceEl && isMultiCardContainer(el, t)) break; // stop before merging listings
     const links = el.querySelectorAll ? el.querySelectorAll('a') : [];
     const hasLink = links.some((a) => !isNavHref(a.getAttribute && a.getAttribute('href')));
-    const hasAddr = !!pickAddress(el);
+    const hasAddr = !!pickAddressStrict(el);
     if (el !== priceEl && hasLink && hasAddr) return el;
     if (hasLink || hasAddr) best = el;
     el = el.parentNode;
@@ -368,7 +383,7 @@ function cardFromLink(anchor) {
     const t = cleanText(el);
     if (t.length > 1800) break;
     if (el !== anchor && isMultiCardContainer(el, t)) break; // stop before merging listings
-    const hasAddr = !!pickAddress(el);
+    const hasAddr = !!pickAddressStrict(el);
     const hasPrice = !!extractPrice(t);
     if (el !== anchor && hasAddr && hasPrice) return el;
     if (hasAddr || hasPrice) best = el;

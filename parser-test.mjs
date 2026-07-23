@@ -170,6 +170,20 @@ const parabarPage = `<html><body><div class="wppf-carousel">
 r = analyse(parabarPage, 'https://parabar.co.uk/');
 check('Parabar: bare text-node address → 3/3 full cards', r.full === 3, `full=${r.full}/${r.count} addrs=${JSON.stringify(r.listings.map(l => l.address))}`);
 
+// 7g. WN Properties regression: a tighter inner element holds the link + a bare
+//     text-node address, while BEDS live in a sibling OUTSIDE it. Boundary
+//     detection must not shrink to the inner element (which would drop beds) —
+//     the text-node address change must be additive. (models the 12/12 → 0/23 break.)
+const wnRegression = (slug, addr, price, beds) =>
+  `<div class="listing"><div class="wrap"><a href="/property-for-sale/${slug}/"><img alt=""></a> ${addr} <span class="price">${price}</span></div><div class="meta">${beds}</div></div>`;
+const wnPage = `<html><body><div class="results">
+  ${wnRegression('oak-road', 'Oak Road, Shenfield', '£400,000', '3 Bedrooms')}
+  ${wnRegression('elm-avenue', 'Elm Avenue, Shenfield', '£450,000', '4 Bedrooms')}
+  ${wnRegression('mill-lane', 'Mill Lane, Hutton', '£375,000', '2 Bedrooms')}
+  </div></body></html>`;
+r = analyse(wnPage, 'https://www.wnproperties.co.uk/');
+check('WN: beds outside the text-node-address element still captured (no regression)', r.full === 3, `full=${r.full}/${r.count} beds=${JSON.stringify(r.listings.map(l => l.beds))}`);
+
 // 7b. Bed icon as <img src=".../bedroom.svg"> with the number as a sibling.
 const imgSrcBeds = `<div class="p"><a href="/property/1">Willow Way, Brentwood</a><span class="price">£425,000</span>
   <ul class="feat"><li><img src="/assets/icons/bedroom.svg" class="ico" alt=""> 3</li><li><img src="/assets/icons/bathroom.svg"> 2</li></ul></div>`;
