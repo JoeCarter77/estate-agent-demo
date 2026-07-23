@@ -158,6 +158,18 @@ const cdcPage = `<html><body>${cdcCard}${cdcCard.replace('Three-Bedrooms', 'Two-
 r = analyse(cdcPage, 'https://www.charlesdavidcasson.co.uk/');
 check('CDC: full page of spelled-out beds → 3/3 full ("For Sale" not dropped)', r.full === 3 && r.dropped === 0, `full=${r.full}/${r.count} dropped=${r.dropped}`);
 
+// 7f. Parabar: address is a BARE TEXT NODE loose in the card (no tag/class),
+//     sitting between the </a> and the price span. (real markup.)
+const parabarCard = (slug, sub, addr, price) =>
+  `<div class="item"><div class="wppf_slider_title"><a href="https://parabar.co.uk/property/${slug}/"><div class="wppf_subhead">${sub}&nbsp;</div></a> ${addr} <span class="up-price">${price}</span></div></div>`;
+const parabarPage = `<html><body><div class="wppf-carousel">
+  ${parabarCard('st-lawrence-road-upminster', 'For Sale 2 Bed House - Terraced', 'St. Lawrence Road, Upminster', 'Asking Price &pound;575,000')}
+  ${parabarCard('tawny-avenue-upminster', 'For Sale 5 Bed House - Semi-Detached', 'Tawny Avenue, Upminster', 'Asking Price &pound;1,250,000')}
+  ${parabarCard('chapel-street-billericay-4', 'For Sale 5 Bed House - Semi-Detached', 'Chapel Street, Billericay', 'Offers Over &pound;950,000')}
+  </div></body></html>`;
+r = analyse(parabarPage, 'https://parabar.co.uk/');
+check('Parabar: bare text-node address → 3/3 full cards', r.full === 3, `full=${r.full}/${r.count} addrs=${JSON.stringify(r.listings.map(l => l.address))}`);
+
 // 7b. Bed icon as <img src=".../bedroom.svg"> with the number as a sibling.
 const imgSrcBeds = `<div class="p"><a href="/property/1">Willow Way, Brentwood</a><span class="price">£425,000</span>
   <ul class="feat"><li><img src="/assets/icons/bedroom.svg" class="ico" alt=""> 3</li><li><img src="/assets/icons/bathroom.svg"> 2</li></ul></div>`;

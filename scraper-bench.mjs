@@ -254,6 +254,25 @@ function isMultiCardContainer(el, text) {
   return listingLinkCount(el) >= 2 || priceCount(text) >= 2;
 }
 
+// Loose text-node strings inside a card. Some themes drop the address as bare
+// text with no wrapping tag/class (Parabar: "St. Lawrence Road, Upminster" sits
+// directly in the card div), so element-only scanning misses it.
+function cardTextNodes(card) {
+  const out = [];
+  const walk = (el) => {
+    for (const n of el.childNodes || []) {
+      if (n.nodeType === 3) {
+        const t = decodeEntities(n.text || n.rawText || '').replace(/\s+/g, ' ').trim();
+        if (t.length >= 6) out.push(t);
+      } else if (n.childNodes && n.childNodes.length) {
+        walk(n);
+      }
+    }
+  };
+  walk(card);
+  return out;
+}
+
 function pickAddress(card) {
   if (!card || !card.querySelectorAll) return null;
   const cands = [];
@@ -262,6 +281,7 @@ function pickAddress(card) {
     const cls = (e.getAttribute && e.getAttribute('class')) || '';
     if (/address|street|location|prop.*title|property.*title|displayaddress/i.test(cls)) cands.push(cleanText(e));
   }
+  for (const t of cardTextNodes(card)) cands.push(t); // bare text-node addresses
   for (const a of card.querySelectorAll('a')) cands.push(cleanText(a));
   for (const img of card.querySelectorAll('img')) {
     const alt = img.getAttribute && img.getAttribute('alt');
