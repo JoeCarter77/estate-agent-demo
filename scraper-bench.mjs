@@ -16,11 +16,13 @@
  *   npm i node-html-parser          # required (structured extraction)
  *   npm i playwright && npx playwright install chromium   # optional, method d
  *
- * Usage:
- *   node --env-file=.env.local scraper-bench.mjs            # a,b,c,e (+d if installed)
- *   node --env-file=.env.local scraper-bench.mjs --api      # + f (Scrape.do) & g (Bright Data)
- *   node --env-file=.env.local scraper-bench.mjs --only=a,f
- *   node --env-file=.env.local scraper-bench.mjs --zones    # list your Bright Data zones & exit
+ * Usage (keys are auto-loaded from .env.local in the cwd — NO --env-file needed;
+ * a missing .env.local just warns and continues):
+ *   node scraper-bench.mjs            # a,b,c,e (+d if installed)
+ *   node scraper-bench.mjs --api      # + f (Scrape.do) & g (Bright Data)
+ *   node scraper-bench.mjs --only=a,f
+ *   node scraper-bench.mjs --zones    # list your Bright Data zones & exit
+ *   (or: npm run bench:api / npm run bench:zones / npm test)
  *
  * Methods:
  *   a plain fetch + Chrome UA   b rotating UAs   c Googlebot UA spoof
@@ -65,8 +67,41 @@ const UA_POOL = [
 const GOOGLEBOT_UA =
   'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
 
+// Load .env.local OURSELVES rather than relying on `node --env-file`.
+// `node --env-file=.env.local` ABORTS with exit 9 and no stdout when the file
+// is missing (and .env.local is gitignored, so it's absent on a clean clone) —
+// that was the recurring "zero output" bug. Self-loading degrades gracefully:
+// a missing file just warns and the run continues.
+import { readFileSync, existsSync } from 'node:fs';
+let ENV_LOADED = null;
+function loadEnvLocal() {
+  const candidates = ['.env.local']; // cwd first
+  try {
+    candidates.push(new URL('.env.local', import.meta.url)); // then next to the script
+  } catch {}
+  for (const p of candidates) {
+    try {
+      if (!existsSync(p)) continue;
+      const raw = readFileSync(p, 'utf8').replace(/^﻿/, ''); // strip BOM
+      for (const line of raw.split(/\r?\n/)) {
+        const s = line.trim();
+        if (!s || s.startsWith('#')) continue;
+        const eq = s.indexOf('=');
+        if (eq === -1) continue;
+        const k = s.slice(0, eq).trim();
+        let v = s.slice(eq + 1).trim();
+        if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+        if (k && process.env[k] === undefined) process.env[k] = v; // don't override real env
+      }
+      ENV_LOADED = typeof p === 'string' ? p : p.pathname;
+      return;
+    } catch {}
+  }
+}
+loadEnvLocal();
+
 let parseHTML = null;     // node-html-parser, loaded in main()
-let BD_ZONE = process.env.BRIGHTDATA_ZONE || null; // resolved in main()
+let BD_ZONE = process.env.BRIGHTDATA_ZONE || null; // resolved after loadEnvLocal()
 
 function browserHeaders(ua) {
   return {
@@ -582,7 +617,8 @@ function fmt(r) {
 async function main() {
   const { ids, zonesOnly } = parseArgs();
   // Unconditional first output — so a run is NEVER silent, whatever follows.
-  console.log(`scraper-bench starting — ${zonesOnly ? 'zones' : `methods ${ids.join(',')}`} — node ${process.version} — ${new Date().toISOString()}`);
+  console.log(`scraper-bench starting — ${zonesOnly ? 'zones' : `methods ${ids.join(',')}`} — node ${process.version}`);
+  console.log(ENV_LOADED ? `env: loaded ${ENV_LOADED}` : 'env: no .env.local found (methods f/g will skip without keys)');
 
   // Bright Data zone discovery / listing (never fatal to the run)
   if (zonesOnly || (ids.includes('g') && process.env.BRIGHTDATA_KEY && !BD_ZONE)) {
