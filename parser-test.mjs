@@ -1,5 +1,8 @@
 import { analyse, discoverListingsUrl, runScrape, tD, _loadParser } from './scraper-bench.mjs';
 import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 await _loadParser();
 let pass = 0, fail = 0;
@@ -103,12 +106,13 @@ check('runScrape follows homepage → listings page', r.full === 3 && /followed/
 
 // ---- 6. Method d (Playwright) actually runs ----
 console.log('\n[6] Playwright transport (method d)');
-writeFileSync('/tmp/prop2.html', `<html><body>
+const propPath = join(tmpdir(), 'novus-prop2.html');
+writeFileSync(propPath, `<html><body>
   <div class="card"><a href="/property/1">1 Bench Way, Billericay</a><span class="price">£450,000</span><span>3 bed</span></div>
   <div class="card"><a href="/property/2">2 Bench Way, Billericay</a><span class="price">£470,000</span><span>4 bed</span></div>
   <div class="card"><a href="/property/3">3 Bench Way, Billericay</a><span class="price">£490,000</span><span>2 bed</span></div>
   </body></html>`);
-const dres = await tD('file:///tmp/prop2.html');
+const dres = await tD(pathToFileURL(propPath).href);
 if (dres.status === 'SKIP') {
   console.log(`  ″ skipped (no browser): ${dres.hint}`);
 } else {
