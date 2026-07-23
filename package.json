@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "description": "Dev tooling for the Novus estate-agent demo (scraper benchmark). Not required by the Vercel serverless functions.",
+  "scripts": {
+    "bench": "node --env-file=.env.local scraper-bench.mjs",
+    "bench:api": "node --env-file=.env.local scraper-bench.mjs --api",
+    "bench:zones": "node --env-file=.env.local scraper-bench.mjs --zones"
+  },
+  "dependencies": {
+    "node-html-parser": "^9.0.0"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
