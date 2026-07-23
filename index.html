@@ -766,8 +766,9 @@
 
     // ── SCREENSHOT ──
     function showScreenshotFallback(parent) {
+      if (!parent || parent.querySelector('.mockup-fallback')) return;
       parent.insertAdjacentHTML('afterbegin',
-        '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#F8FAFC;padding:24px;text-align:center;z-index:1;">' +
+        '<div class="mockup-fallback" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#F8FAFC;padding:24px;text-align:center;z-index:2;">' +
         '<div style="font-size:1.8rem">🌐</div>' +
         '<div style="font-size:0.62rem;font-weight:600;letter-spacing:.08em;color:var(--accent);">' + gymUrl.replace(/^https?:\/\//, '') + '</div>' +
         '<p style="font-size:.72rem;color:#64748B;line-height:1.6;">Your AI sales assistant is fully trained on this site.</p></div>');
@@ -795,6 +796,19 @@
       img.src = 'https://image.thum.io/get/width/390/crop/844/noanimate/' + gymUrl;
     }
 
+    // Swap the (likely Cloudflare-interstitial) screenshot for the branded panel.
+    // Used when the scrape only succeeded via the Bright Data fallback — i.e. the
+    // site blocks direct access, so thum.io's shot is probably a "security
+    // verification" frame that makes the demo look broken.
+    function useBrandedMockup() {
+      ['browser', 'phone'].forEach(function(prefix) {
+        var img = document.getElementById(prefix + '-img');
+        var ldr = document.getElementById(prefix + '-loading');
+        if (ldr) ldr.classList.add('gone');
+        if (img) { img.style.display = 'none'; showScreenshotFallback(img.parentElement); }
+      });
+    }
+
     // ── SCRAPE ──
     async function scrapeAndTrain() {
       if (!gymUrl) { gymContext = 'UK estate agency: ' + company + '.'; setReady(); return; }
@@ -809,6 +823,7 @@
         if (data.tier) siteTier = data.tier;
         if (data.location) siteLocation = data.location;
         if (data.text) { gymContext = data.text; }
+        if (data.source === 'brightdata') useBrandedMockup();
       } catch {}
       renderHeroChips();
     }

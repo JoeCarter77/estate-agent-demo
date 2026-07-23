@@ -9,7 +9,7 @@ const parseCard = (html) => parseHTML(html).querySelector('div,tr,article,sectio
 // Set BEFORE importing so the module's main() is suppressed regardless of how
 // this test is launched (npm test, `node parser-test.mjs`, an IDE runner, …).
 process.env.IS_IMPORTED_FOR_TEST = '1';
-const { analyse, discoverListingsUrl, runScrape, tD, extractBeds, _loadParser } = await import('./scraper-bench.mjs');
+const { analyse, discoverListingsUrl, runScrape, tD, extractBeds, stripBadges, _loadParser } = await import('./scraper-bench.mjs');
 
 await _loadParser();
 let pass = 0, fail = 0;
@@ -224,6 +224,32 @@ const gridPage = `<html><body><table class="listings">
   </table></body></html>`;
 r = analyse(gridPage, 'https://ipschelmsford.co.uk/');
 check('IPS: grid of 4 rows → 4 cards (not collapsed to 1)', r.count === 4 && r.full === 4, `full=${r.full}/${r.count}`);
+
+// ---- 8. Address badge / marketing-prefix stripping (Keith Ashton bug) ----
+console.log('\n[8] address badge stripping');
+const badgeCases = [
+  ['** SIGNATURE HOMES ** Cory Drive, Rush Green, RM7', 'Cory Drive, Rush Green, RM7'],
+  ['★ GUIDE PRICE ★ Perry Street, Billericay', 'Perry Street, Billericay'],
+  ['NEW INSTRUCTION - Chapel Street, Billericay', 'Chapel Street, Billericay'],
+  ['SIGNATURE HOMES Cory Drive, Rush Green', 'Cory Drive, Rush Green'],
+  ['GUIDE PRICE 12 High Street, Brentwood', '12 High Street, Brentwood'],
+];
+for (const [input, want] of badgeCases) {
+  check('strip: ' + JSON.stringify(input).slice(0, 34), stripBadges(input) === want, '→ ' + JSON.stringify(stripBadges(input)));
+}
+// Legit addresses must be untouched:
+const keepCases = ['12 Cory Drive, Rush Green', 'Flat 3, High Street, Brentwood', 'St Johns Road, Billericay', 'Stratford-upon-Avon, Warwickshire'];
+for (const input of keepCases) {
+  check('keep: ' + JSON.stringify(input).slice(0, 34), stripBadges(input) === input, '→ ' + JSON.stringify(stripBadges(input)));
+}
+// End-to-end: badge in the card's address must not reach the listing.
+const badgePage = `<html><body>
+  <div class="card"><a href="/property-for-sale/1">** SIGNATURE HOMES ** Cory Drive, Rush Green, RM7</a><span class="price">£650,000</span><span>4 bed</span></div>
+  <div class="card"><a href="/property-for-sale/2">Perry Street, Billericay</a><span class="price">£950,000</span><span>5 bed</span></div>
+  <div class="card"><a href="/property-for-sale/3">Chapel Street, Billericay</a><span class="price">£499,995</span><span>3 bed</span></div>
+  </body></html>`;
+r = analyse(badgePage, 'https://www.keithashton.co.uk/');
+check('badge stripped in extracted listing address', r.listings[0].address === 'Cory Drive, Rush Green, RM7', '→ ' + JSON.stringify(r.listings[0].address));
 
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);
 process.exit(fail ? 1 : 0);

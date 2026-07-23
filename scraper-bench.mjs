@@ -123,7 +123,7 @@ function browserHeaders(ua) {
 // ---- Structured extraction (shared with production api/scrape.js) --------
 import {
   MIN_FULL, analyse, extractListings, discoverListingsUrl, debugCards,
-  isAddress, extractPrice, extractBeds, isUnavailable, statusUnavailable, cleanText,
+  isAddress, extractPrice, extractBeds, isUnavailable, statusUnavailable, cleanText, stripBadges,
 } from './lib/extract.mjs';
 
 // ---- fetch helpers -------------------------------------------------------
@@ -465,7 +465,7 @@ async function main() {
 }
 
 // exported for unit tests; run main() only when invoked directly
-export { analyse, extractListings, isAddress, extractPrice, extractBeds, discoverListingsUrl, isUnavailable, debugCards, statusUnavailable };
+export { analyse, extractListings, isAddress, extractPrice, extractBeds, discoverListingsUrl, isUnavailable, debugCards, statusUnavailable, stripBadges };
 export { runScrape, tD };
 export async function _loadParser() { /* parser is imported statically via lib/extract.mjs */ }
 
