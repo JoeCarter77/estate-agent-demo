@@ -2,11 +2,14 @@ import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { parse as parseHTML } from 'node-html-parser';
+// Parse an HTML fragment and return its outer card element (for extractBeds).
+const parseCard = (html) => parseHTML(html).querySelector('div,tr,article,section,li');
 
 // Set BEFORE importing so the module's main() is suppressed regardless of how
 // this test is launched (npm test, `node parser-test.mjs`, an IDE runner, …).
 process.env.IS_IMPORTED_FOR_TEST = '1';
-const { analyse, discoverListingsUrl, runScrape, tD, _loadParser } = await import('./scraper-bench.mjs');
+const { analyse, discoverListingsUrl, runScrape, tD, extractBeds, _loadParser } = await import('./scraper-bench.mjs');
 
 await _loadParser();
 let pass = 0, fail = 0;
@@ -124,6 +127,40 @@ if (dres.status === 'SKIP') {
   const da = analyse(dres.html, 'https://x.co.uk/');
   check('method d rendered HTML extracts 3 full cards', da.full === 3, `full=${da.full}`);
 }
+
+// ---- 7. Regression fixtures for the three reported bugs ----
+console.log('\n[7] reported-bug regressions');
+
+// 7a. Parabar: a "Let Agreed" badge that lands in EVERY card's scope must not
+//     wipe the whole page. When all candidates look unavailable, keep them.
+const allAgreed = `<html><body><section class="results">
+  <div class="card"><a href="/property-for-sale/1">Stock Road, Billericay</a><span class="price">£685,000</span><span>2 bed</span><div class="ribbon">Let Agreed</div></div>
+  <div class="card"><a href="/property-for-sale/2">Perry Street, Billericay</a><span class="price">£950,000</span><span>5 bed</span><div class="ribbon">Let Agreed</div></div>
+  <div class="card"><a href="/property-for-sale/3">Chapel Street, Billericay</a><span class="price">£499,995</span><span>3 bed</span><div class="ribbon">Let Agreed</div></div>
+  </section></body></html>`;
+r = analyse(allAgreed, 'https://parabar.co.uk/');
+check('Parabar: all-flagged page kept, not wiped to 0/0', r.full === 3 && r.dropped === 0, `full=${r.full}/${r.count} dropped=${r.dropped}`);
+
+// 7b. Bed icon as <img src=".../bedroom.svg"> with the number as a sibling.
+const imgSrcBeds = `<div class="p"><a href="/property/1">Willow Way, Brentwood</a><span class="price">£425,000</span>
+  <ul class="feat"><li><img src="/assets/icons/bedroom.svg" class="ico" alt=""> 3</li><li><img src="/assets/icons/bathroom.svg"> 2</li></ul></div>`;
+check('beds via <img src=bedroom.svg> + sibling number', extractBeds(parseCard(imgSrcBeds)) === 3, `got ${extractBeds(parseCard(imgSrcBeds))}`);
+
+// 7c. Bed icon as an SVG sprite <use href="#icon-bed"> with the number as a sibling.
+const svgUseBeds = `<div class="p"><a href="/property/1">Cedar Close, Chelmsford</a><span class="price">£560,000</span>
+  <span class="stat"><svg><use xlink:href="#icon-bed"></use></svg> 4</span></div>`;
+check('beds via <svg><use href=#icon-bed> + sibling number', extractBeds(parseCard(svgUseBeds)) === 4, `got ${extractBeds(parseCard(svgUseBeds))}`);
+
+// 7d. IPS: a grid/table where every row has a price+link must NOT collapse into
+//     one card. Expect one card per row.
+const gridPage = `<html><body><table class="listings">
+  <tr class="row"><td><a href="/property-details/1">1 Elm Grove, Chelmsford</a></td><td class="price">£300,000</td><td>2 bed</td></tr>
+  <tr class="row"><td><a href="/property-details/2">2 Elm Grove, Chelmsford</a></td><td class="price">£320,000</td><td>3 bed</td></tr>
+  <tr class="row"><td><a href="/property-details/3">3 Elm Grove, Chelmsford</a></td><td class="price">£340,000</td><td>4 bed</td></tr>
+  <tr class="row"><td><a href="/property-details/4">4 Elm Grove, Chelmsford</a></td><td class="price">£360,000</td><td>2 bed</td></tr>
+  </table></body></html>`;
+r = analyse(gridPage, 'https://ipschelmsford.co.uk/');
+check('IPS: grid of 4 rows → 4 cards (not collapsed to 1)', r.count === 4 && r.full === 4, `full=${r.full}/${r.count}`);
 
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);
 process.exit(fail ? 1 : 0);

@@ -22,6 +22,8 @@
  *   node scraper-bench.mjs --api      # + f (Scrape.do) & g (Bright Data)
  *   node scraper-bench.mjs --only=a,f
  *   node scraper-bench.mjs --zones    # list your Bright Data zones & exit
+ *   node scraper-bench.mjs --dump=ipschelmsford   # dump a site's card HTML + what
+ *                                                 # the parser extracted (diagnostic)
  *   (or: npm run bench:api / npm run bench:zones / npm test)
  *
  * Methods:
@@ -72,7 +74,7 @@ const GOOGLEBOT_UA =
 // is missing (and .env.local is gitignored, so it's absent on a clean clone) —
 // that was the recurring "zero output" bug. Self-loading degrades gracefully:
 // a missing file just warns and the run continues.
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 let ENV_LOADED = null;
 function loadEnvLocal() {
   const candidates = ['.env.local']; // cwd first
@@ -186,19 +188,24 @@ function extractBeds(card) {
     const lm = lab.match(/(\d{1,2})\s*bed/i) || lab.match(/bed[a-z]*\s*[:\-]?\s*(\d{1,2})/i);
     if (lm) return +lm[1];
   }
-  // 2) class/icon-based: an element whose class token starts with "bed"
-  //    (icon-bed, fa-bed, bedrooms…) → number in it or its parent/siblings
+  // 2) icon markup: an element that REFERS to a bed — via class token, an
+  //    <img src=".../bed.svg">, or an <svg><use href="#icon-bed">. The number
+  //    is usually a sibling text node, so read the element's parent scope.
   for (const e of els) {
-    const cls = ((e.getAttribute && e.getAttribute('class')) || '').toLowerCase();
-    const isBedEl = cls.split(/[\s_\-]+/).some((tok) => /^bed/.test(tok));
-    if (isBedEl) {
-      const scope = `${cleanText(e)} ${cleanText(e.parentNode)}`;
+    const g = e.getAttribute ? e.getAttribute.bind(e) : () => null;
+    const tag = (e.rawTagName || '').toLowerCase();
+    const cls = (g('class') || '').toLowerCase();
+    const classBed = cls.split(/[\s_\-]+/).some((tok) => /^bed/.test(tok));
+    const imgBed = tag === 'img' && /bed/i.test(g('src') || '');
+    const useBed = tag === 'use' && /bed/i.test(g('href') || g('xlink:href') || '');
+    if (classBed || imgBed || useBed) {
+      // widen scope for icon-only markup: self, parent, grandparent
+      const scope = `${cleanText(e)} ${cleanText(e.parentNode)} ${cleanText(e.parentNode && e.parentNode.parentNode)}`;
       const m = scope.match(/\b(\d{1,2})\b/);
       if (m) return +m[1];
     }
-    if ((e.rawTagName || '').toLowerCase() === 'img') {
-      const alt = (e.getAttribute && e.getAttribute('alt')) || '';
-      const am = alt.match(/(\d{1,2})\s*bed/i);
+    if (tag === 'img') {
+      const am = (g('alt') || '').match(/(\d{1,2})\s*bed/i);
       if (am) return +am[1];
     }
   }
@@ -223,6 +230,23 @@ function isElement(n) {
 }
 function isNavHref(h) {
   return !h || /^(#|tel:|mailto:|javascript:|data:)/i.test(h);
+}
+function priceCount(text) {
+  const m = text.match(/£\s?(?:\d{1,3}(?:,\d{3})+|\d{4,})/g);
+  return m ? m.length : 0;
+}
+function listingLinkCount(el) {
+  if (!el || !el.querySelectorAll) return 0;
+  return el.querySelectorAll('a').filter((a) => {
+    const h = a.getAttribute && a.getAttribute('href');
+    return h && LISTING_HREF.test(h);
+  }).length;
+}
+// An element that spans 2+ listings (multiple detail links or prices) is a
+// grid/list container, not a single card — climbing into it collapses many
+// listings into one (the IPS "only 1 card" bug).
+function isMultiCardContainer(el, text) {
+  return listingLinkCount(el) >= 2 || priceCount(text) >= 2;
 }
 
 function pickAddress(card) {
@@ -267,6 +291,7 @@ function cardFromPrice(priceEl) {
   for (let d = 0; el && d < 7; d++) {
     const t = cleanText(el);
     if (t.length > 1800) break;
+    if (el !== priceEl && isMultiCardContainer(el, t)) break; // stop before merging listings
     const links = el.querySelectorAll ? el.querySelectorAll('a') : [];
     const hasLink = links.some((a) => !isNavHref(a.getAttribute && a.getAttribute('href')));
     const hasAddr = !!pickAddress(el);
@@ -308,30 +333,98 @@ function listingUrl(card, base) {
   }
 }
 
+// Link-anchored card: climb from a property-detail <a> to the smallest
+// ancestor that also has an address (and ideally a price). Complements
+// price-anchoring so sites whose price isn't in a tidy leaf are still found.
+function cardFromLink(anchor) {
+  let el = anchor;
+  let best = null;
+  for (let d = 0; el && d < 6; d++) {
+    const t = cleanText(el);
+    if (t.length > 1800) break;
+    if (el !== anchor && isMultiCardContainer(el, t)) break; // stop before merging listings
+    const hasAddr = !!pickAddress(el);
+    const hasPrice = !!extractPrice(t);
+    if (el !== anchor && hasAddr && hasPrice) return el;
+    if (hasAddr || hasPrice) best = el;
+    el = el.parentNode;
+  }
+  return best;
+}
+
+// "Sold / Let Agreed / Under Offer" — but ONLY from a dedicated status element
+// or a small card, never from a large card scope (which bleeds a page-wide
+// badge into every listing — the Parabar bug).
+function statusUnavailable(card) {
+  if (!card || !card.querySelectorAll) return false;
+  for (const e of [card, ...card.querySelectorAll('*')]) {
+    const cls = (e.getAttribute && e.getAttribute('class')) || '';
+    if (/status|ribbon|flag|availab|badge|banner|\btag\b|sticker|overlay|label/i.test(cls)) {
+      if (UNAVAILABLE.test(cleanText(e))) return true;
+    }
+  }
+  const ct = cleanText(card);
+  return ct.length < 300 && UNAVAILABLE.test(ct);
+}
+
+function buildListing(card, base) {
+  const ct = cleanText(card);
+  const price = extractPrice(ct);
+  const url = listingUrl(card, base);
+  const address = pickAddress(card);
+  const beds = extractBeds(card);
+  const unavailable = statusUnavailable(card);
+  return { address, price, beds, url, unavailable, full: !!(price && beds != null && address && url) };
+}
+const fieldScore = (l) => (l.price ? 1 : 0) + (l.beds != null ? 1 : 0) + (l.address ? 1 : 0) + (l.url ? 1 : 0);
+
+// Collect candidate card elements from BOTH price anchors and listing-link
+// anchors, then keep the richest listing per unique url/address.
+function collectCards(root) {
+  const cards = new Set();
+  for (const pe of priceElements(root)) {
+    const c = cardFromPrice(pe);
+    if (c) cards.add(c);
+  }
+  for (const a of root.querySelectorAll('a')) {
+    const href = a.getAttribute && a.getAttribute('href');
+    if (href && LISTING_HREF.test(href)) {
+      const c = cardFromLink(a);
+      if (c) cards.add(c);
+    }
+  }
+  return cards;
+}
+
 function extractListings(html, baseUrl) {
   const root = parseHTML(html);
-  const seen = new Set();
-  const listings = [];
-  let dropped = 0;
-  for (const pe of priceElements(root)) {
-    const card = cardFromPrice(pe);
-    if (!card) continue;
-    const ct = cleanText(card);
-    const price = extractPrice(ct);
-    if (!price) continue;
-    if (isUnavailable(ct)) {
-      dropped++;
-      continue;
-    }
-    const url = listingUrl(card, baseUrl);
-    const address = pickAddress(card);
-    const key = url || `${price}|${address || ''}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const beds = extractBeds(card);
-    listings.push({ address, price, beds, url, full: !!(price && beds != null && address && url) });
+  const byKey = new Map();
+  for (const card of collectCards(root)) {
+    const l = buildListing(card, baseUrl);
+    if (!l.price && !l.url) continue; // junk
+    const key = l.url || `${l.price}|${l.address || ''}`;
+    const prev = byKey.get(key);
+    if (!prev || fieldScore(l) > fieldScore(prev)) byKey.set(key, l);
   }
-  return { listings, dropped };
+  const all = [...byKey.values()];
+  const available = all.filter((l) => !l.unavailable);
+  // Safety net: if EVERY candidate is flagged unavailable, that's a shared
+  // page badge bleeding into scope, not a page of 100% sold stock — keep them.
+  if (all.length >= 2 && available.length === 0) return { listings: all, dropped: 0 };
+  return { listings: available, dropped: all.length - available.length };
+}
+
+// Diagnostic: per-card outerHTML + what the parser extracted. Used by --dump so
+// the exact markup of a failing site can be inspected without live access.
+function debugCards(html, baseUrl) {
+  const root = parseHTML(html);
+  const out = [];
+  for (const card of collectCards(root)) {
+    const l = buildListing(card, baseUrl);
+    const raw = (card.outerHTML || card.toString() || '').replace(/\s+/g, ' ').trim();
+    out.push({ ...l, html: raw.slice(0, 600) });
+  }
+  return out;
 }
 
 const CHALLENGE =
@@ -603,10 +696,17 @@ function parseArgs() {
   const wantApi = args.includes('--api');
   let ids = onlyArg ? onlyArg.split('=')[1].split(',') : ['a', 'b', 'c', 'd', 'e'];
   if (wantApi) {
-    if (!ids.includes('f')) ids.push('f');
+    // Decision: fetch-first primary, Bright Data (g) as the block fallback.
+    // Scrape.do (f) dropped from the pipeline (slower, worse hit rate); still
+    // runnable on demand via --only=f for comparison.
     if (!ids.includes('g')) ids.push('g');
   }
-  return { ids: ids.filter((id) => methods[id]), zonesOnly: args.includes('--zones') };
+  const dumpArg = args.find((a) => a.startsWith('--dump='));
+  return {
+    ids: ids.filter((id) => methods[id]),
+    zonesOnly: args.includes('--zones'),
+    dump: dumpArg ? dumpArg.split('=').slice(1).join('=') : null,
+  };
 }
 
 function fmt(r) {
@@ -614,11 +714,75 @@ function fmt(r) {
   return `${flag} ${String(r.status).padEnd(7)} ${`${r.ms}ms`.padStart(7)}  ${r.hint || ''}`.trim();
 }
 
+// --dump=<name|url>: fetch a site (plain fetch + listings-page follow) and print
+// each candidate card's outerHTML + what the parser extracted, and save the raw
+// HTML. Lets a failing site's exact markup be inspected to fix extraction.
+async function dumpSite(target) {
+  const site = TARGETS.find(
+    (t) => t.url.includes(target) || t.name.toLowerCase().includes(String(target).toLowerCase())
+  );
+  const startUrl = site ? site.url : /^https?:/i.test(target) ? target : `https://${target}`;
+  console.log(`\n=== DUMP ${site ? site.name : startUrl} ===`);
+  const r1 = await tA(startUrl);
+  console.log(`homepage: ${startUrl} → status ${r1.status}, ${(r1.html || '').length} bytes`);
+  let html = r1.html;
+  let page = startUrl;
+  let a = analyse(html, startUrl);
+  if (a.full < MIN_FULL && html) {
+    const lu = discoverListingsUrl(html, startUrl);
+    if (lu && lu !== startUrl) {
+      const r2 = await tA(lu);
+      console.log(`followed → ${lu} → status ${r2.status}, ${(r2.html || '').length} bytes`);
+      if (r2.html) {
+        html = r2.html;
+        page = lu;
+        a = analyse(html, lu);
+      }
+    } else {
+      console.log('no listings-page link discovered from the homepage');
+    }
+  }
+  const host = (() => {
+    try {
+      return new URL(page).host;
+    } catch {
+      return 'site';
+    }
+  })();
+  const file = `dump-${host}.html`;
+  try {
+    writeFileSync(file, html || '');
+  } catch {}
+  console.log(`parsed page: ${page}`);
+  console.log(`analyse: full=${a.full}/${a.count} dropped=${a.dropped} hint="${a.hint}"`);
+  console.log(`raw HTML → ${file}`);
+  const cards = debugCards(html, page);
+  console.log(`\n${cards.length} candidate card(s) — showing up to 6:\n`);
+  for (const c of cards.slice(0, 6)) {
+    console.log(`• price=${c.price}  beds=${c.beds}  unavailable=${c.unavailable}  addr=${JSON.stringify(c.address)}`);
+    console.log(`  url=${c.url}`);
+    console.log(`  html: ${c.html}\n`);
+  }
+  if (!cards.length)
+    console.log(`(no candidate cards found — open ${file} and paste me the first listing <div>/<article> block)`);
+}
+
 async function main() {
-  const { ids, zonesOnly } = parseArgs();
+  const { ids, zonesOnly, dump } = parseArgs();
   // Unconditional first output — so a run is NEVER silent, whatever follows.
-  console.log(`scraper-bench starting — ${zonesOnly ? 'zones' : `methods ${ids.join(',')}`} — node ${process.version}`);
+  console.log(`scraper-bench starting — ${dump ? `dump ${dump}` : zonesOnly ? 'zones' : `methods ${ids.join(',')}`} — node ${process.version}`);
   console.log(ENV_LOADED ? `env: loaded ${ENV_LOADED}` : 'env: no .env.local found (methods f/g will skip without keys)');
+
+  if (dump) {
+    try {
+      ({ parse: parseHTML } = await import('node-html-parser'));
+    } catch {
+      console.error('Missing dependency. Run:  npm i node-html-parser');
+      return;
+    }
+    await dumpSite(dump);
+    return;
+  }
 
   // Bright Data zone discovery / listing (never fatal to the run)
   if (zonesOnly || (ids.includes('g') && process.env.BRIGHTDATA_KEY && !BD_ZONE)) {
@@ -676,7 +840,7 @@ async function main() {
 }
 
 // exported for unit tests; run main() only when invoked directly
-export { analyse, extractListings, isAddress, extractPrice, extractBeds, discoverListingsUrl, isUnavailable, runScrape, tD };
+export { analyse, extractListings, isAddress, extractPrice, extractBeds, discoverListingsUrl, isUnavailable, runScrape, tD, debugCards, statusUnavailable };
 export async function _loadParser() {
   if (!parseHTML) ({ parse: parseHTML } = await import('node-html-parser'));
 }
