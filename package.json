@@ -4,12 +4,13 @@
   "scripts": {
     "bench": "node --env-file=.env.local scraper-bench.mjs",
     "bench:api": "node --env-file=.env.local scraper-bench.mjs --api",
-    "bench:zones": "node --env-file=.env.local scraper-bench.mjs --zones"
+    "bench:zones": "node --env-file=.env.local scraper-bench.mjs --zones",
+    "test": "IS_IMPORTED_FOR_TEST=1 node parser-test.mjs"
   },
   "dependencies": {
     "node-html-parser": "^9.0.0"
   },
   "optionalDependencies": {
-    "playwright": "^1.49.0"
+    "playwright": "^1.55.0"
   }
 }

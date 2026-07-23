@@ -118,12 +118,59 @@ function extractPrice(text) {
   );
   return m ? m[0].replace(/\s+/g, ' ').trim() : null;
 }
-function extractBeds(text) {
-  const m =
-    text.match(/(\d{1,2})\s*(?:bed\b|beds\b|bedroom)/i) ||
-    text.match(/bed(?:room)?s?\s*[:\-]?\s*(\d{1,2})\b/i);
-  return m ? parseInt(m[1], 10) : null;
+
+// A listing is "unavailable" (sold / let-agreed / under offer) — exclude it.
+const UNAVAILABLE = /\b(sold(?:\s*s?tc)?|sstc|under\s*offer|let\s*agreed|now\s*let|tenancy\s*agreed|reserved|withdrawn|let\s*by)\b/i;
+function isUnavailable(text) {
+  return UNAVAILABLE.test(text);
 }
+
+function bedsFromText(t) {
+  let m = t.match(/(\d{1,2})\s*(?:bed(?:room)?s?\b|bed\b)/i); // "3 bed", "3 beds", "3 bedroom(s)"
+  if (m) return +m[1];
+  m = t.match(/(\d{1,2})\s*(?:double|single|dbl)\s*bed/i); // "3 double bedrooms"
+  if (m) return +m[1];
+  m = t.match(/bed(?:room)?s?\s*[:\-]?\s*(\d{1,2})\b/i); // "Bedrooms: 3", "beds 3"
+  if (m) return +m[1];
+  return null;
+}
+// Multi-strategy bed extraction: data-attrs, aria/title labels, class/icon
+// markup (e.g. <i class="icon-bed"></i> 3 with no "bed" text), then plain text.
+// Different platforms encode beds very differently, so text alone misses many.
+function extractBeds(card) {
+  if (!card || !card.querySelectorAll) return bedsFromText(cleanText(card));
+  const els = [card, ...card.querySelectorAll('*')]; // include the card node's own attrs
+  // 1) data attributes + aria/title labels
+  for (const e of els) {
+    const g = e.getAttribute ? e.getAttribute.bind(e) : () => null;
+    for (const k of ['data-bedrooms', 'data-beds', 'data-bedroom', 'data-bed']) {
+      const v = g(k);
+      if (v && /^\s*\d{1,2}\s*$/.test(v)) return +v.trim();
+    }
+    const lab = `${g('aria-label') || ''} ${g('title') || ''}`;
+    const lm = lab.match(/(\d{1,2})\s*bed/i) || lab.match(/bed[a-z]*\s*[:\-]?\s*(\d{1,2})/i);
+    if (lm) return +lm[1];
+  }
+  // 2) class/icon-based: an element whose class token starts with "bed"
+  //    (icon-bed, fa-bed, bedrooms…) → number in it or its parent/siblings
+  for (const e of els) {
+    const cls = ((e.getAttribute && e.getAttribute('class')) || '').toLowerCase();
+    const isBedEl = cls.split(/[\s_\-]+/).some((tok) => /^bed/.test(tok));
+    if (isBedEl) {
+      const scope = `${cleanText(e)} ${cleanText(e.parentNode)}`;
+      const m = scope.match(/\b(\d{1,2})\b/);
+      if (m) return +m[1];
+    }
+    if ((e.rawTagName || '').toLowerCase() === 'img') {
+      const alt = (e.getAttribute && e.getAttribute('alt')) || '';
+      const am = alt.match(/(\d{1,2})\s*bed/i);
+      if (am) return +am[1];
+    }
+  }
+  // 3) plain text of the card
+  return bedsFromText(cleanText(card));
+}
+
 function isAddress(s) {
   if (!s) return false;
   s = s.replace(/\s+/g, ' ').trim();
@@ -134,80 +181,188 @@ function isAddress(s) {
   return ROAD.test(s) || POSTCODE.test(s) || (s.includes(',') && /[A-Za-z]/.test(s));
 }
 
-function findCard(anchor) {
-  let el = anchor;
-  for (let depth = 0; el && depth < 6; depth++) {
-    const t = cleanText(el);
-    if (extractPrice(t) && t.length < 2000) return el; // tightest ancestor holding a price
-    el = el.parentNode;
-  }
-  return null;
+function isElement(n) {
+  // node-html-parser gives text nodes nodeType 3 and an EMPTY-string rawTagName,
+  // so guard on nodeType 1 / a non-empty tag name (not just "is it a string").
+  return !!n && (n.nodeType === 1 || (typeof n.rawTagName === 'string' && n.rawTagName.length > 0));
 }
-function pickAddress(card, anchor) {
+function isNavHref(h) {
+  return !h || /^(#|tel:|mailto:|javascript:|data:)/i.test(h);
+}
+
+function pickAddress(card) {
+  if (!card || !card.querySelectorAll) return null;
   const cands = [];
   for (const h of card.querySelectorAll('h1,h2,h3,h4,h5')) cands.push(cleanText(h));
   for (const e of card.querySelectorAll('*')) {
     const cls = (e.getAttribute && e.getAttribute('class')) || '';
-    if (/address|street|location|prop.*title|property.*title/i.test(cls)) cands.push(cleanText(e));
+    if (/address|street|location|prop.*title|property.*title|displayaddress/i.test(cls)) cands.push(cleanText(e));
   }
+  for (const a of card.querySelectorAll('a')) cands.push(cleanText(a));
   for (const img of card.querySelectorAll('img')) {
-    const a = img.getAttribute('alt');
-    if (a) cands.push(decodeEntities(a));
+    const alt = img.getAttribute && img.getAttribute('alt');
+    if (alt) cands.push(decodeEntities(alt));
   }
-  cands.push(cleanText(anchor));
   for (const c of cands) if (isAddress(c)) return c.replace(/\s+/g, ' ').trim();
   return null;
+}
+
+// The tightest price-bearing leaf elements (a card can hold several nested
+// nodes with the price string; keep only the innermost one).
+function priceElements(root) {
+  const out = [];
+  for (const el of root.querySelectorAll('*')) {
+    const t = cleanText(el);
+    if (t.length > 45 || !extractPrice(t)) continue;
+    const childHasPrice = (el.childNodes || []).some(
+      (c) => isElement(c) && extractPrice(cleanText(c))
+    );
+    if (!childHasPrice) out.push(el);
+  }
+  return out;
+}
+
+// Walk up from a price node to the smallest ancestor that also holds a real
+// link AND an address — that ancestor is the listing card. Link-anchored
+// detection (the old approach) missed sites whose card URLs don't match a
+// known pattern; price-anchoring is markup-agnostic.
+function cardFromPrice(priceEl) {
+  let el = priceEl;
+  let best = null;
+  for (let d = 0; el && d < 7; d++) {
+    const t = cleanText(el);
+    if (t.length > 1800) break;
+    const links = el.querySelectorAll ? el.querySelectorAll('a') : [];
+    const hasLink = links.some((a) => !isNavHref(a.getAttribute && a.getAttribute('href')));
+    const hasAddr = !!pickAddress(el);
+    if (el !== priceEl && hasLink && hasAddr) return el;
+    if (hasLink || hasAddr) best = el;
+    el = el.parentNode;
+  }
+  return best;
+}
+
+function listingUrl(card, base) {
+  if (!card || !card.querySelectorAll) return null;
+  const hrefs = card
+    .querySelectorAll('a')
+    .map((a) => a.getAttribute && a.getAttribute('href'))
+    .filter((h) => h && !isNavHref(h));
+  const host = (() => {
+    try {
+      return new URL(base).host;
+    } catch {
+      return '';
+    }
+  })();
+  let pick =
+    hrefs.find((h) => LISTING_HREF.test(h)) ||
+    hrefs.find((h) => {
+      try {
+        return new URL(h, base).host === host;
+      } catch {
+        return false;
+      }
+    }) ||
+    hrefs[0];
+  if (!pick) return null;
+  try {
+    return new URL(pick, base).href.split('#')[0];
+  } catch {
+    return null;
+  }
 }
 
 function extractListings(html, baseUrl) {
   const root = parseHTML(html);
   const seen = new Set();
   const listings = [];
-  for (const a of root.querySelectorAll('a')) {
-    const href = a.getAttribute('href');
-    if (!href || !LISTING_HREF.test(href)) continue;
-    let url;
-    try {
-      url = new URL(href, baseUrl).href.split('#')[0];
-    } catch {
-      continue;
-    }
-    if (seen.has(url)) continue;
-    const card = findCard(a);
+  let dropped = 0;
+  for (const pe of priceElements(root)) {
+    const card = cardFromPrice(pe);
     if (!card) continue;
     const ct = cleanText(card);
     const price = extractPrice(ct);
-    const beds = extractBeds(ct);
-    const address = pickAddress(card, a);
-    seen.add(url);
-    listings.push({ address, price, beds, url, full: !!(price && beds != null && address) });
+    if (!price) continue;
+    if (isUnavailable(ct)) {
+      dropped++;
+      continue;
+    }
+    const url = listingUrl(card, baseUrl);
+    const address = pickAddress(card);
+    const key = url || `${price}|${address || ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const beds = extractBeds(card);
+    listings.push({ address, price, beds, url, full: !!(price && beds != null && address && url) });
   }
-  return listings;
+  return { listings, dropped };
 }
 
-function analyse(html, baseUrl) {
-  if (!html) return { ok: false, listings: [], full: 0, count: 0, phone: null, hint: 'empty body' };
-  const flat = html.replace(/\s+/g, ' ');
-  const challenged =
-    /just a moment|attention required|cf-browser-verification|challenge-platform|enable javascript and cookies|checking your browser/i.test(
-      flat
-    );
-  const phone = (flat.match(/\b0(?:1\d{3}|2\d)\s?\d{3}\s?\d{3,4}\b/) || [])[0] || null;
-  if (challenged)
-    return { ok: false, listings: [], full: 0, count: 0, phone, hint: 'anti-bot challenge page' };
+const CHALLENGE =
+  /just a moment|attention required|cf-browser-verification|challenge-platform|enable javascript and cookies|checking your browser|cf_chl_/i;
 
-  const listings = extractListings(html, baseUrl);
-  const full = listings.filter((l) => l.full).length;
+function analyse(html, baseUrl) {
+  if (!html) return { ok: false, listings: [], full: 0, count: 0, dropped: 0, phone: null, hint: 'empty body' };
+  const flat = html.replace(/\s+/g, ' ');
+  const phone = (flat.match(/\b0(?:1\d{3}|2\d)\s?\d{3}\s?\d{3,4}\b/) || [])[0] || null;
+  const { listings, dropped } = extractListings(html, baseUrl);
   const count = listings.length;
+  // Only treat as a challenge if we found NOTHING — a rendered page with
+  // listings can still contain "enable javascript" in a cookie/noscript banner.
+  if (count === 0 && CHALLENGE.test(flat))
+    return { ok: false, listings: [], full: 0, count: 0, dropped, phone, hint: 'anti-bot challenge page' };
+
+  const full = listings.filter((l) => l.full).length;
   const ok = full >= MIN_FULL;
   const sample = (listings.find((l) => l.full) || listings[0] || {}).address;
   let hint = `${full}/${count} full cards`;
-  if (sample) hint += ` · ${sample.slice(0, 40)}`;
+  if (sample) hint += ` · ${sample.slice(0, 38)}`;
   if (count > full && full < MIN_FULL) {
     const noBeds = listings.filter((l) => l.price && l.address && l.beds == null).length;
     if (noBeds) hint += ` (${noBeds} missing beds)`;
   }
-  return { ok, listings, full, count, phone, hint };
+  if (dropped) hint += ` [${dropped} sold/agreed skipped]`;
+  return { ok, listings, full, count, dropped, phone, hint };
+}
+
+// Find the site's "properties for sale" / search page from a homepage, so we
+// can follow to it when the homepage itself carries too few listing cards.
+function discoverListingsUrl(html, base) {
+  const root = parseHTML(html);
+  const host = (() => {
+    try {
+      return new URL(base).host;
+    } catch {
+      return '';
+    }
+  })();
+  let best = null;
+  let bestScore = 0;
+  for (const a of root.querySelectorAll('a')) {
+    const href = a.getAttribute && a.getAttribute('href');
+    if (isNavHref(href)) continue;
+    let u;
+    try {
+      u = new URL(href, base);
+    } catch {
+      continue;
+    }
+    if (host && u.host && u.host !== host) continue; // same site only
+    const path = u.pathname.toLowerCase();
+    const txt = cleanText(a).toLowerCase();
+    let s = 0;
+    if (/for-?sale/.test(path)) s += 5;
+    if (/properties?\.aspx|search\.aspx/.test(path)) s += 4;
+    if (/\/properties?\b|property-search|propertysearch|\/search\b|\/buy\b|\/sales?\b|to-?let|lettings?/.test(path)) s += 3;
+    if (/for sale|properties for sale|our properties|view properties|search|buy|browse/.test(txt)) s += 2;
+    if (path === '/' || path === '') s = 0;
+    if (s > bestScore) {
+      bestScore = s;
+      best = u.href.split('#')[0];
+    }
+  }
+  return bestScore >= 3 ? best : null;
 }
 
 // ---- fetch helpers -------------------------------------------------------
@@ -217,72 +372,140 @@ function withTimeout(ms) {
   const t = setTimeout(() => c.abort(), ms);
   return { signal: c.signal, done: () => clearTimeout(t) };
 }
-async function timedFetch(url, opts, timeout = TIMEOUT_MS, baseUrl = url) {
+// A transport fetches ONE url and returns raw HTML (+ status). Extraction and
+// the homepage→listings-page follow are handled once, centrally, in runScrape.
+async function timedText(url, opts, timeout = TIMEOUT_MS) {
   const t0 = Date.now();
   const { signal, done } = withTimeout(timeout);
   try {
     const r = await fetch(url, { redirect: 'follow', signal, ...opts });
-    const body = await r.text();
+    const html = await r.text();
     done();
-    const a = analyse(body, baseUrl); // resolve listing hrefs against the TARGET site
-    return { ok: r.ok && a.ok, reachable: r.ok, status: r.status, ms: Date.now() - t0, bytes: body.length, ...a };
+    return { reachable: r.ok, status: r.status, ms: Date.now() - t0, html };
   } catch (e) {
     done();
-    return {
-      ok: false,
-      reachable: false,
-      status: e.name === 'AbortError' ? 'timeout' : e.code || e.name,
-      ms: Date.now() - t0,
-      bytes: 0,
-      listings: [],
-      full: 0,
-      count: 0,
-      phone: null,
-      hint: e.message?.slice(0, 60),
-    };
+    return { reachable: false, status: e.name === 'AbortError' ? 'timeout' : e.code || e.name, ms: Date.now() - t0, html: '' };
   }
+}
+
+const tA = (url) => timedText(url, { headers: browserHeaders(CHROME_UA) });
+const tC = (url) => timedText(url, { headers: { ...browserHeaders(GOOGLEBOT_UA), From: 'googlebot(at)googlebot.com' } });
+async function tB(url) {
+  let last = { reachable: false, status: '?', ms: 0, html: '' };
+  for (const ua of UA_POOL) {
+    last = await timedText(url, { headers: browserHeaders(ua) });
+    if (last.reachable) return last;
+  }
+  return last;
+}
+async function tD(url) {
+  let chromium;
+  try {
+    ({ chromium } = await import('playwright'));
+  } catch {
+    return { reachable: false, status: 'SKIP', ms: 0, html: '', hint: 'playwright not installed (npm i playwright)' };
+  }
+  const t0 = Date.now();
+  let browser;
+  try {
+    try {
+      browser = await chromium.launch({ headless: true });
+    } catch {
+      // preinstalled browser whose build differs from the npm package's pin
+      const ep = process.env.PLAYWRIGHT_CHROMIUM || '/opt/pw-browsers/chromium';
+      browser = await chromium.launch({ headless: true, executablePath: ep });
+    }
+    const ctx = await browser.newContext({ userAgent: CHROME_UA, locale: 'en-GB' });
+    const page = await ctx.newPage();
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
+    await page.waitForTimeout(2500);
+    const html = await page.content();
+    await browser.close();
+    return { reachable: true, status: 200, ms: Date.now() - t0, html };
+  } catch (e) {
+    if (browser) await browser.close().catch(() => {});
+    const missing = /Executable doesn't exist|Failed to launch/i.test(e.message || '');
+    return { reachable: false, status: missing ? 'SKIP' : e.name, ms: Date.now() - t0, html: '', hint: missing ? 'run: npx playwright install chromium' : e.message?.slice(0, 60) };
+  }
+}
+async function tF(url) {
+  const sd = process.env.SCRAPEDO_KEY;
+  const sa = process.env.SCRAPERAPI_KEY;
+  let api;
+  if (sd) api = `https://api.scrape.do/?token=${sd}&url=${encodeURIComponent(url)}&render=true&geoCode=gb`;
+  else if (sa) api = `https://api.scraperapi.com/?api_key=${sa}&url=${encodeURIComponent(url)}&render=true&country_code=uk`;
+  else return { reachable: false, status: 'SKIP', ms: 0, html: '', hint: 'set SCRAPEDO_KEY or SCRAPERAPI_KEY' };
+  return timedText(api, {}, API_TIMEOUT_MS);
+}
+async function tG(url) {
+  const key = process.env.BRIGHTDATA_KEY;
+  if (!key) return { reachable: false, status: 'SKIP', ms: 0, html: '', hint: 'set BRIGHTDATA_KEY' };
+  const zone = BD_ZONE || 'web_unlocker1';
+  const t0 = Date.now();
+  const { signal, done } = withTimeout(API_TIMEOUT_MS);
+  try {
+    const r = await fetch('https://api.brightdata.com/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ zone, url, format: 'raw', country: 'gb' }),
+      signal,
+    });
+    const html = await r.text();
+    done();
+    const zoneErr = !r.ok && /zone|unknown|not found|auth/i.test(html) ? `zone="${zone}"? ${html.slice(0, 50)}` : '';
+    return { reachable: r.ok, status: r.status, ms: Date.now() - t0, html, hint: zoneErr };
+  } catch (e) {
+    done();
+    return { reachable: false, status: e.name, ms: Date.now() - t0, html: '', hint: e.message?.slice(0, 60) };
+  }
+}
+
+function skipResult(hint) {
+  return { ok: false, reachable: false, status: 'SKIP', ms: 0, bytes: 0, listings: [], full: 0, count: 0, dropped: 0, phone: null, hint };
+}
+
+// Fetch the start URL; if it yields < MIN_FULL listing cards, discover the
+// site's for-sale/listings page and fetch that too, keeping whichever gave
+// more full cards. Many agent homepages only tease a few (or zero) listings.
+async function runScrape(transport, url) {
+  const t0 = Date.now();
+  const r1 = await transport(url);
+  if (r1.status === 'SKIP') return { ...skipResult(r1.hint || 'skipped'), ms: r1.ms || 0 };
+
+  let best = analyse(r1.html, url);
+  let usedHtml = r1.html;
+  let followedTo = null;
+  if (best.full < MIN_FULL && r1.html) {
+    const listingsUrl = discoverListingsUrl(r1.html, url);
+    if (listingsUrl && listingsUrl !== url) {
+      const r2 = await transport(listingsUrl);
+      if (r2.html) {
+        const a2 = analyse(r2.html, listingsUrl);
+        if (a2.full > best.full || (a2.full === best.full && a2.count > best.count)) {
+          best = a2;
+          usedHtml = r2.html;
+          followedTo = listingsUrl;
+        }
+      }
+    }
+  }
+  let hint = best.hint || '';
+  if (followedTo) {
+    try {
+      hint += ` [followed → ${new URL(followedTo).pathname}]`;
+    } catch {}
+  }
+  if (r1.hint) hint = `${r1.hint}; ${hint}`;
+  return { ok: r1.reachable && best.ok, reachable: r1.reachable, status: r1.status, ms: Date.now() - t0, bytes: (usedHtml || '').length, listings: best.listings, full: best.full, count: best.count, dropped: best.dropped, phone: best.phone, hint };
 }
 
 // ---- Methods -------------------------------------------------------------
 
 const methods = {
-  a: (url) => timedFetch(url, { headers: browserHeaders(CHROME_UA) }),
-
-  b: async (url) => {
-    let last;
-    for (const ua of UA_POOL) {
-      last = await timedFetch(url, { headers: browserHeaders(ua) });
-      if (last.ok) return { ...last, hint: `won with UA: ${ua.slice(0, 24)}…` };
-    }
-    return last;
-  },
-
-  c: (url) => timedFetch(url, { headers: { ...browserHeaders(GOOGLEBOT_UA), From: 'googlebot(at)googlebot.com' } }),
-
-  d: async (url) => {
-    let chromium;
-    try {
-      ({ chromium } = await import('playwright'));
-    } catch {
-      return { ok: false, status: 'SKIP', ms: 0, bytes: 0, listings: [], full: 0, count: 0, phone: null, hint: 'playwright not installed' };
-    }
-    const t0 = Date.now();
-    let browser;
-    try {
-      browser = await chromium.launch({ headless: true });
-      const ctx = await browser.newContext({ userAgent: CHROME_UA, locale: 'en-GB' });
-      const page = await ctx.newPage();
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
-      await page.waitForTimeout(2500);
-      const html = await page.content();
-      await browser.close();
-      const a = analyse(html, url);
-      return { ok: a.ok, reachable: true, status: 200, ms: Date.now() - t0, bytes: html.length, ...a };
-    } catch (e) {
-      if (browser) await browser.close().catch(() => {});
-      return { ok: false, reachable: false, status: e.name, ms: Date.now() - t0, bytes: 0, listings: [], full: 0, count: 0, phone: null, hint: e.message?.slice(0, 60) };
-    }
-  },
+  a: (url) => runScrape(tA, url),
+  b: (url) => runScrape(tB, url),
+  c: (url) => runScrape(tC, url),
+  d: (url) => runScrape(tD, url),
 
   // screenshot-then-parse: yields pixels, NOT structured cards → never ✅ here.
   // Reported as 🟡 (reachable) to show it clears the block; real extraction
@@ -296,47 +519,15 @@ const methods = {
       const buf = Buffer.from(await r.arrayBuffer());
       done();
       const gotImage = r.ok && buf.length > 15000;
-      return { ok: false, reachable: gotImage, status: r.status, ms: Date.now() - t0, bytes: buf.length, listings: [], full: 0, count: 0, phone: null, hint: gotImage ? 'image captured — needs vision OCR (no structured data)' : 'placeholder/failed image' };
+      return { ok: false, reachable: gotImage, status: r.status, ms: Date.now() - t0, bytes: buf.length, listings: [], full: 0, count: 0, dropped: 0, phone: null, hint: gotImage ? 'image captured — needs vision OCR (no structured data)' : 'placeholder/failed image' };
     } catch (e) {
       done();
-      return { ok: false, reachable: false, status: e.name, ms: Date.now() - t0, bytes: 0, listings: [], full: 0, count: 0, phone: null, hint: e.message?.slice(0, 60) };
+      return { ok: false, reachable: false, status: e.name, ms: Date.now() - t0, bytes: 0, listings: [], full: 0, count: 0, dropped: 0, phone: null, hint: e.message?.slice(0, 60) };
     }
   },
 
-  f: async (url) => {
-    const sd = process.env.SCRAPEDO_KEY;
-    const sa = process.env.SCRAPERAPI_KEY;
-    let api;
-    if (sd) api = `https://api.scrape.do/?token=${sd}&url=${encodeURIComponent(url)}&render=true&geoCode=gb`;
-    else if (sa) api = `https://api.scraperapi.com/?api_key=${sa}&url=${encodeURIComponent(url)}&render=true&country_code=uk`;
-    else return { ok: false, status: 'SKIP', ms: 0, bytes: 0, listings: [], full: 0, count: 0, phone: null, hint: 'set SCRAPEDO_KEY or SCRAPERAPI_KEY' };
-    // baseUrl = the real target so listing hrefs resolve to the agent site, not api.scrape.do
-    return timedFetch(api, {}, API_TIMEOUT_MS, url);
-  },
-
-  g: async (url) => {
-    const key = process.env.BRIGHTDATA_KEY;
-    if (!key) return { ok: false, status: 'SKIP', ms: 0, bytes: 0, listings: [], full: 0, count: 0, phone: null, hint: 'set BRIGHTDATA_KEY' };
-    const zone = BD_ZONE || 'web_unlocker1';
-    const t0 = Date.now();
-    const { signal, done } = withTimeout(API_TIMEOUT_MS);
-    try {
-      const r = await fetch('https://api.brightdata.com/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ zone, url, format: 'raw', country: 'gb' }),
-        signal,
-      });
-      const body = await r.text();
-      done();
-      const a = analyse(body, url);
-      const zoneErr = !r.ok && /zone|unknown|not found|auth/i.test(body) ? ` (zone="${zone}"? ${body.slice(0, 50)})` : '';
-      return { ok: r.ok && a.ok, reachable: r.ok, status: r.status, ms: Date.now() - t0, bytes: body.length, ...a, hint: (a.hint || '') + zoneErr };
-    } catch (e) {
-      done();
-      return { ok: false, reachable: false, status: e.name, ms: Date.now() - t0, bytes: 0, listings: [], full: 0, count: 0, phone: null, hint: e.message?.slice(0, 60) };
-    }
-  },
+  f: (url) => runScrape(tF, url),
+  g: (url) => runScrape(tG, url),
 };
 
 // ---- Bright Data zone discovery -----------------------------------------
@@ -443,7 +634,7 @@ async function main() {
 }
 
 // exported for unit tests; run main() only when invoked directly
-export { analyse, extractListings, isAddress, extractPrice, extractBeds };
+export { analyse, extractListings, isAddress, extractPrice, extractBeds, discoverListingsUrl, isUnavailable, runScrape, tD };
 export async function _loadParser() {
   if (!parseHTML) ({ parse: parseHTML } = await import('node-html-parser'));
 }
