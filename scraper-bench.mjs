@@ -448,7 +448,24 @@ export async function _loadParser() {
   if (!parseHTML) ({ parse: parseHTML } = await import('node-html-parser'));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Robust "is this the entry script?" check. Compares real filesystem paths
+// (not hand-built file:// URLs) so it works on Windows, with relative paths,
+// and through symlinks. `IS_IMPORTED_FOR_TEST` lets the fixture test skip main.
+import { fileURLToPath } from 'node:url';
+import { realpathSync } from 'node:fs';
+function isEntryScript() {
+  if (process.env.IS_IMPORTED_FOR_TEST) return false;
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    // fall back to basename match if realpath fails (e.g. odd launcher)
+    return entry.endsWith('scraper-bench.mjs');
+  }
+}
+
+if (isEntryScript()) {
   main().catch((e) => {
     console.error(e);
     process.exit(1);
