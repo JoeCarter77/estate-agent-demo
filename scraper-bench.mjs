@@ -162,6 +162,7 @@ function isUnavailable(text) {
   return UNAVAILABLE.test(text);
 }
 
+const WORD_NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
 function bedsFromText(t) {
   let m = t.match(/(\d{1,2})\s*(?:bed(?:room)?s?\b|bed\b)/i); // "3 bed", "3 beds", "3 bedroom(s)"
   if (m) return +m[1];
@@ -169,6 +170,10 @@ function bedsFromText(t) {
   if (m) return +m[1];
   m = t.match(/bed(?:room)?s?\s*[:\-]?\s*(\d{1,2})\b/i); // "Bedrooms: 3", "beds 3"
   if (m) return +m[1];
+  // spelled-out numbers, e.g. "Three-Bedrooms Terraced House" (Charles David Casson)
+  m = t.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[\s\-]*bed(?:room)?s?\b/i);
+  if (m) return WORD_NUM[m[1].toLowerCase()];
+  if (/\bstudio\b/i.test(t)) return 0; // studio flat = 0 bedrooms
   return null;
 }
 // Multi-strategy bed extraction: data-attrs, aria/title labels, class/icon
@@ -756,21 +761,26 @@ async function dumpSite(target) {
   console.log(`homepage: ${startUrl} → status ${r1.status}, ${(r1.html || '').length} bytes`);
   let html = r1.html;
   let page = startUrl;
-  let a = analyse(html, startUrl);
-  if (a.full < MIN_FULL && html) {
+  let cards = debugCards(html, startUrl);
+  // Only follow when the homepage has NO candidate cards — otherwise we'd chase
+  // a guessed /for-sale/ link (which 404s on some sites) and hide the homepage
+  // cards we actually need to see. When we do follow, keep whichever page has more.
+  if (cards.length === 0 && html) {
     const lu = discoverListingsUrl(html, startUrl);
     if (lu && lu !== startUrl) {
       const r2 = await tA(lu);
-      console.log(`followed → ${lu} → status ${r2.status}, ${(r2.html || '').length} bytes`);
-      if (r2.html) {
+      const c2 = debugCards(r2.html, lu);
+      console.log(`followed → ${lu} → status ${r2.status}, ${(r2.html || '').length} bytes, ${c2.length} cards`);
+      if (c2.length > cards.length) {
         html = r2.html;
         page = lu;
-        a = analyse(html, lu);
+        cards = c2;
       }
     } else {
       console.log('no listings-page link discovered from the homepage');
     }
   }
+  const a = analyse(html, page);
   const host = (() => {
     try {
       return new URL(page).host;
@@ -785,7 +795,6 @@ async function dumpSite(target) {
   console.log(`parsed page: ${page}`);
   console.log(`analyse: full=${a.full}/${a.count} dropped=${a.dropped} hint="${a.hint}"`);
   console.log(`raw HTML → ${file}`);
-  const cards = debugCards(html, page);
   console.log(`\n${cards.length} candidate card(s) — showing up to 6:\n`);
   for (const c of cards.slice(0, 6)) {
     console.log(`• price=${c.price}  beds=${c.beds}  unavailable=${c.unavailable}  addr=${JSON.stringify(c.address)}`);

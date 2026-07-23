@@ -141,6 +141,23 @@ const allAgreed = `<html><body><section class="results">
 r = analyse(allAgreed, 'https://parabar.co.uk/');
 check('Parabar: all-flagged page kept, not wiped to 0/0', r.full === 3 && r.dropped === 0, `full=${r.full}/${r.count} dropped=${r.dropped}`);
 
+// 7e. Charles David Casson: beds spelled out as "Three-Bedrooms …", no digit.
+//     (real markup from their site — the qualifier-title label.)
+const cdcCard = `<article id="17113949" class="component property property--grid">
+  <div class="property__status"><span class="property__status-text">For Sale</span></div>
+  <div class="property__image"><img src="/x.jpg" srcset="/x-320.jpg 320w"></div>
+  <div class="property__content">
+    <div class="label qualifier-title text-secondary text-transform-uppercase">Three-Bedrooms&nbsp;Terraced House</div>
+    <h2 class="h3 text-primary">&pound;350,000</h2>
+    <p class="property__content--address text-secondary">Dahlia Close, Chelmsford, CM1</p>
+  </div>
+  <a aria-label="property" href="https://www.charlesdavidcasson.co.uk/property/dahlia-close-springfield/" class="property__link"></a>
+</article>`;
+check('CDC: spelled-out "Three-Bedrooms" → beds=3', extractBeds(parseCard(cdcCard)) === 3, `got ${extractBeds(parseCard(cdcCard))}`);
+const cdcPage = `<html><body>${cdcCard}${cdcCard.replace('Three-Bedrooms', 'Two-Bedrooms').replace('17113949', '2').replace('dahlia-close-springfield', 'p2').replace('Dahlia Close, Chelmsford, CM1', 'Pochard Way, Braintree, CM77')}${cdcCard.replace('Three-Bedrooms', 'Four-Bedrooms').replace('17113949', '3').replace('dahlia-close-springfield', 'p3').replace('Dahlia Close, Chelmsford, CM1', 'Elm Road, Chelmsford, CM2')}</body></html>`;
+r = analyse(cdcPage, 'https://www.charlesdavidcasson.co.uk/');
+check('CDC: full page of spelled-out beds → 3/3 full ("For Sale" not dropped)', r.full === 3 && r.dropped === 0, `full=${r.full}/${r.count} dropped=${r.dropped}`);
+
 // 7b. Bed icon as <img src=".../bedroom.svg"> with the number as a sibling.
 const imgSrcBeds = `<div class="p"><a href="/property/1">Willow Way, Brentwood</a><span class="price">£425,000</span>
   <ul class="feat"><li><img src="/assets/icons/bedroom.svg" class="ico" alt=""> 3</li><li><img src="/assets/icons/bathroom.svg"> 2</li></ul></div>`;
