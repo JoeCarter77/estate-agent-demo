@@ -356,6 +356,7 @@
     .hero-headline { font-size: clamp(1.55rem, 2.5vw, 2.25rem); font-weight: 800; line-height: 1.12; letter-spacing: -0.03em; color: var(--text); }
     .hero-headline .company-slot { color: var(--brand-navy); }
     .hero-sub { font-size: 0.95rem; line-height: 1.65; color: var(--text-2); max-width: 460px; }
+    .hero-price { font-size: 0.82rem; color: var(--text-3); line-height: 1.5; margin-top: -4px; }
     .hero-try { display: flex; flex-direction: column; gap: 9px; }
     .hero-try-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
     .hero-chips { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
@@ -442,11 +443,21 @@
     .pain-heading { font-size: clamp(1.5rem, 2.6vw, 2.05rem); font-weight: 800; letter-spacing: -0.025em; color: var(--text); margin-bottom: 30px; line-height: 1.15; }
     .pain-line { font-size: 1rem; font-weight: 400; color: var(--text-3); line-height: 1.5; margin: 7px 0; }
     .pain-payoff { font-size: 1.18rem; font-weight: 700; color: var(--brand-navy); margin-top: 30px; letter-spacing: -0.01em; }
+    .pain-reframe { font-size: 1rem; font-weight: 400; color: var(--text-2); line-height: 1.6; margin: 18px auto 0; max-width: 560px; }
+    .pain-arith { font-size: 1.24rem; font-weight: 800; color: var(--brand-navy); line-height: 1.35; letter-spacing: -0.015em; margin: 26px auto 0; max-width: 560px; padding-top: 24px; border-top: 1px solid var(--border); }
 
     /* ── FULL BUILD GRID ── */
     .build { padding: 84px 24px; border-top: 1px solid var(--border); }
     .build-inner { max-width: 1080px; margin: 0 auto; }
+    .build-positioning { max-width: 700px; margin: 0 auto 20px; text-align: center; font-size: 1.1rem; font-weight: 700; line-height: 1.5; color: var(--text); letter-spacing: -0.01em; }
     .build-heading { text-align: center; font-size: clamp(1.5rem, 2.4vw, 2rem); font-weight: 800; letter-spacing: -0.025em; color: var(--text); margin-bottom: 48px; }
+
+    /* ── WHAT IT WON'T DO ── */
+    .wont { padding: 84px 24px; border-top: 1px solid var(--border); }
+    .wont-inner { max-width: 680px; margin: 0 auto; }
+    .wont-heading { text-align: center; font-size: clamp(1.5rem, 2.4vw, 2rem); font-weight: 800; letter-spacing: -0.025em; color: var(--text); margin-bottom: 30px; }
+    .wont-line { font-size: 1.02rem; line-height: 1.72; color: var(--text-2); margin: 0 0 20px; }
+    .wont-proof { font-size: 1.02rem; line-height: 1.72; font-weight: 600; color: var(--text); margin: 28px 0 0; padding-top: 24px; border-top: 1px solid var(--border); }
     .build-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 34px 36px; }
     .build-block { display: flex; flex-direction: column; gap: 10px; }
     .build-ico { width: 42px; height: 42px; border-radius: 11px; background: var(--panel); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--accent); }
@@ -474,7 +485,8 @@
     <div class="left hero-copy">
       <div class="hero-copy-top">
         <h1 class="hero-headline fu fu-1">The enquiry you'd have missed.</h1>
-        <p class="hero-sub fu fu-1">Live demo, trained on a handful of <span class="company-slot">Your Agency</span>'s live listings. Answers instantly, takes their details, straight to you.</p>
+        <p class="hero-sub fu fu-1">This is a live version of Novus, trained on <span class="company-slot">Your Agency</span>'s actual listings &mdash; not a generic demo. Ask it anything a buyer or vendor would.</p>
+        <p class="hero-price fu fu-1">&pound;299/mo + &pound;199 setup. No contract. 30-day money-back guarantee.</p>
       </div>
       <div class="hero-copy-actions fu fu-2">
         <button class="hero-call-line" onclick="callDemo()">📞 Call it — hear how it handles a real enquiry</button>
@@ -636,6 +648,8 @@
       <p class="pain-line">The phone ringing out while the team's on viewings.</p>
       <p class="pain-line">The leads that go cold before you call back.</p>
       <p class="pain-payoff">Every one is a booking &mdash; or an instruction &mdash; gone.</p>
+      <p class="pain-reframe">You're not losing &ldquo;leads.&rdquo; You're losing instructions to whoever picked up first.</p>
+      <p class="pain-arith">One extra instruction pays for the year. Everything after that is profit.</p>
     </div>
   </section>
 
@@ -653,46 +667,58 @@
   <!-- ══ FULL BUILD (Section D) ══ -->
   <section class="build">
     <div class="build-inner">
+      <p class="build-positioning">We're not selling you a chatbot. We're selling you the valuations you're currently losing to whoever picked up first.</p>
       <h2 class="build-heading">What the full build does</h2>
       <div class="build-grid">
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
-          <h3 class="build-block-title">Answers every call</h3>
-          <p class="build-block-text">Voice AI trained on your agency. Picks up 24/7, books straight into the diary.</p>
+          <h3 class="build-block-title">Never rings out</h3>
+          <p class="build-block-text">Voice AI trained on your listings picks up 24/7 and books straight into the diary.</p>
         </div>
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-          <h3 class="build-block-title">Handles website chat</h3>
-          <p class="build-block-text">The same brain, live on your site — exactly what you tested above.</p>
+          <h3 class="build-block-title">The same thing, on your website</h3>
+          <p class="build-block-text">Exactly what you just tested above, live for every visitor.</p>
         </div>
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></div>
-          <h3 class="build-block-title">Qualifies every lead</h3>
-          <p class="build-block-text">Budget, timeline, chain, buyer or vendor — sorted before it reaches you.</p>
+          <h3 class="build-block-title">Qualified before it reaches you</h3>
+          <p class="build-block-text">Budget, timeline, chain position, buyer or vendor &mdash; sorted before it lands in your inbox.</p>
         </div>
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
-          <h3 class="build-block-title">Never misses a valuation</h3>
-          <p class="build-block-text">The out-of-hours vendor enquiry that wins you the instruction.</p>
+          <h3 class="build-block-title">Wins you the instruction</h3>
+          <p class="build-block-text">The 9pm vendor enquiry that would otherwise have gone to whoever called back first.</p>
         </div>
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
-          <h3 class="build-block-title">Synced to your listings</h3>
-          <p class="build-block-text">Knows what's live and what's under offer. Always current.</p>
+          <h3 class="build-block-title">Always up to date</h3>
+          <p class="build-block-text">Knows what's live, what's under offer, what's just come off. No stale answers.</p>
         </div>
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div>
-          <h3 class="build-block-title">Instant handover</h3>
-          <p class="build-block-text">Full lead details to your team the moment it lands.</p>
+          <h3 class="build-block-title">Straight to your inbox and phone</h3>
+          <p class="build-block-text">Full lead details the moment the conversation ends.</p>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- ══ WHAT IT WON'T DO ══ -->
+  <section class="wont">
+    <div class="wont-inner">
+      <h2 class="wont-heading">What it won't do</h2>
+      <p class="wont-line">It won't pretend to be human. It won't guess at a price, a survey, or anything legal &mdash; if it doesn't know, it says so, takes the details and passes it to you.</p>
+      <p class="wont-line">It doesn't replace anyone on your team. It covers the hours nobody's there &mdash; evenings, weekends, when everyone's out on viewings.</p>
+      <p class="wont-line">You see every conversation. If it says something you don't like, tell me and it's fixed that day.</p>
+      <p class="wont-proof">You've just watched it handle your own listings. That's not a mockup &mdash; that's the actual system, trained on your site, built before you'd even replied.</p>
     </div>
   </section>
 
   <!-- ══ FINAL CTA (Section E) ══ -->
   <section class="final-cta" id="pricing">
     <div class="final-cta-inner">
-      <h2 class="final-cta-title">Ready to stop losing enquiries out of hours?</h2>
+      <h2 class="final-cta-title">Every week you wait is more valuation requests going to whoever calls back first.</h2>
       <div class="final-cta-actions">
         <!-- TODO: point at a real booking link once available -->
         <a class="final-cta-btn" href="#">Book a 15-min call</a>
