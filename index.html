@@ -357,6 +357,7 @@
     .hero-headline .company-slot { color: var(--brand-navy); }
     .hero-sub { font-size: 0.95rem; line-height: 1.65; color: var(--text-2); max-width: 460px; }
     .hero-price { font-size: 0.82rem; color: var(--text-3); line-height: 1.5; margin-top: -4px; }
+    .hero-arith { font-size: 0.9rem; font-weight: 700; color: var(--brand-navy); line-height: 1.4; margin-top: -4px; }
     .hero-try { display: flex; flex-direction: column; gap: 9px; }
     .hero-try-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
     .hero-chips { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
@@ -398,6 +399,7 @@
     .founder-photo img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; display: block; }
     .founder-note-name { font-size: 0.9rem; font-weight: 700; color: var(--text); margin-bottom: 8px; }
     .founder-note-body p { font-size: 0.98rem; line-height: 1.7; color: var(--text-2); }
+    .founder-note-body p + p { margin-top: 14px; }
 
     /* Section D — honest scope */
     .scope { padding: 56px 24px; border-top: 1px solid var(--border); }
@@ -511,8 +513,9 @@
     <div class="left hero-copy">
       <div class="hero-copy-top">
         <h1 class="hero-headline fu fu-1">The enquiry you'd have missed.</h1>
-        <p class="hero-sub fu fu-1">This is a live version of Novus, trained on <span class="company-slot">Your Agency</span>'s actual listings &mdash; not a generic demo. Ask it anything a buyer or vendor would.</p>
+        <p class="hero-sub fu fu-1">This is a demo of Novus, trained on a sample of <span class="company-slot">Your Agency</span>'s live listings. Ask it anything a buyer or vendor would.</p>
         <p class="hero-price fu fu-1">&pound;299/mo + &pound;199 setup. No contract. 30-day money-back guarantee.</p>
+        <p class="hero-arith fu fu-1">One extra instruction pays for the year. Everything after that is profit.</p>
       </div>
       <div class="hero-copy-actions fu fu-2">
         <button class="hero-call-line" onclick="callDemo()">📞 Call it — hear how it handles a real enquiry</button>
@@ -687,7 +690,6 @@
       <p class="pain-line">The leads that go cold before you call back.</p>
       <p class="pain-payoff">Every one is a booking &mdash; or an instruction &mdash; gone.</p>
       <p class="pain-reframe">You're not losing &ldquo;leads.&rdquo; You're losing instructions to whoever picked up first.</p>
-      <p class="pain-arith">One extra instruction pays for the year. Everything after that is profit.</p>
     </div>
   </section>
 
@@ -697,7 +699,9 @@
       <div class="founder-photo"><img src="joe.png" alt="Joe, founder of Novus" /></div>
       <div class="founder-note-body">
         <div class="founder-note-name">Joe &middot; Founder</div>
-        <p>I build and run this myself. No call centre, no offshore support desk, no faceless agency behind the login. If something's not right for <span class="company-slot">your agency</span>, you're talking to the person who wrote it &mdash; not a ticket number.</p>
+        <p>I'm Joe. For the last three years I've built and run AI front desk systems for independent UK gyms &mdash; 18 accounts and counting, in a company I still run with a business partner.</p>
+        <p>What that taught me: owner-run businesses don't need more software. They need someone who understands the problem well enough to just fix it, and who's still there when it breaks.</p>
+        <p>Novus is the same thing pointed at estate agents. No call centre, no support queue, no faceless agency behind the login &mdash; you're dealing with the person who built it.</p>
       </div>
     </div>
   </section>
@@ -749,7 +753,7 @@
       <p class="wont-line">It won't pretend to be human. It won't guess at a price, a survey, or anything legal &mdash; if it doesn't know, it says so, takes the details and passes it to you.</p>
       <p class="wont-line">It doesn't replace anyone on your team. It covers the hours nobody's there &mdash; evenings, weekends, when everyone's out on viewings.</p>
       <p class="wont-line">You see every conversation. If it says something you don't like, tell me and it's fixed that day.</p>
-      <p class="wont-proof">You've just watched it handle your own listings. That's not a mockup &mdash; that's the actual system, trained on your site, built before you'd even replied.</p>
+      <p class="wont-proof">You've just watched it handle your own listings. That's not a mockup. It's the real system, trained on a sample of your listings, built before you'd even replied.</p>
     </div>
   </section>
 
