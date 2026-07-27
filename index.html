@@ -361,6 +361,8 @@
     .hero-chips { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
     .hero-chip { font-family: 'Inter', sans-serif; background: #fff; border: 1px solid var(--border-hi); color: var(--text); border-radius: 100px; padding: 9px 15px; font-size: 0.82rem; font-weight: 500; cursor: pointer; text-align: left; transition: border-color 0.15s, color 0.15s, background 0.15s; }
     .hero-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-lo); }
+    .hero-call-line { display: inline-flex; align-items: center; gap: 7px; align-self: flex-start; background: none; border: none; padding: 0; font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600; color: var(--brand-navy); cursor: pointer; text-align: left; line-height: 1.4; transition: color 0.15s; }
+    .hero-call-line:hover { color: var(--accent); }
     .qr-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 4px 8px; }
     .qr-chip { font-family: 'Inter', sans-serif; background: #fff; border: 1px solid var(--border-hi); color: var(--accent); border-radius: 100px; padding: 7px 12px; font-size: 0.78rem; font-weight: 500; cursor: pointer; text-align: left; line-height: 1.35; transition: background 0.15s, border-color 0.15s; }
     .qr-chip:hover { background: var(--accent-lo); border-color: var(--accent); }
@@ -472,7 +474,14 @@
     <div class="left hero-copy">
       <div class="hero-copy-top">
         <h1 class="hero-headline fu fu-1">The enquiry you'd have missed.</h1>
-        <p class="hero-sub fu fu-1">Trained on <span class="company-slot">Your Agency</span>'s live listings. Try it below.</p>
+        <p class="hero-sub fu fu-1">Live demo, trained on a handful of <span class="company-slot">Your Agency</span>'s live listings. Answers instantly, takes their details, straight to you.</p>
+      </div>
+      <div class="hero-copy-actions fu fu-2">
+        <button class="hero-call-line" onclick="callDemo()">📞 Call it — hear how it handles a real enquiry</button>
+        <div class="hero-chips">
+          <button class="hero-chip" onclick="askDemo(this.textContent)">Can you value my house?</button>
+          <button class="hero-chip" onclick="askDemo(this.textContent)">Can I book a viewing?</button>
+        </div>
       </div>
     </div>
 
@@ -507,11 +516,7 @@
                   <div class="cp-online"><div class="cp-sdot"></div><span>Online now</span></div>
                 </div>
               </div>
-              <div class="screen launch-screen active" id="screen-launch">
-                <button class="launch-btn" onclick="showScreen('mode')"><span class="launch-ico">💬</span><span>Click here to call or message us</span></button>
-                <p class="launch-sub">Answers in seconds — buy, sell, rent or a valuation.</p>
-              </div>
-              <div class="screen entry-screen" id="screen-mode">
+              <div class="screen entry-screen active" id="screen-mode">
                 <button class="entry-btn entry-primary" onclick="selectMode('voice')">📞 Call <span id="entry-company">us</span> now</button>
                 <button class="entry-btn entry-secondary" onclick="selectMode('chat')">💬 Chat with us</button>
                 <p class="entry-hint">Answers in seconds — about any property, valuation or viewing.</p>
@@ -576,11 +581,7 @@
                   <div class="cp-online"><div class="cp-sdot"></div><span>Online now</span></div>
                 </div>
               </div>
-              <div class="screen launch-screen active" id="screen-launch-phone">
-                <button class="launch-btn" onclick="showScreenPhone('mode')"><span class="launch-ico">💬</span><span>Click here to call or message us</span></button>
-                <p class="launch-sub">Answers in seconds.</p>
-              </div>
-              <div class="screen entry-screen" id="screen-mode-phone">
+              <div class="screen entry-screen active" id="screen-mode-phone">
                 <button class="entry-btn entry-primary" onclick="selectModePhone('voice')">📞 Call <span id="entry-company-phone">us</span> now</button>
                 <button class="entry-btn entry-secondary" onclick="selectModePhone('chat')">💬 Chat with us</button>
                 <p class="entry-hint">Answers in seconds — property, valuation or viewing.</p>
@@ -877,6 +878,13 @@
         if (selectedMode !== 'chat') { chatSeededByChip = true; selectMode('chat'); }
         setTimeout(function() { var i = document.getElementById('cp-inp'); if (i) { i.value = q; sendMsg(); } }, 60);
       }
+    }
+
+    // Hero "Call it" line → start the live voice demo in the widget
+    function callDemo() {
+      var mobile = window.matchMedia('(max-width: 980px)').matches;
+      if (mobile) { if (selectedModePhone !== 'voice') selectModePhone('voice'); }
+      else { if (selectedMode !== 'voice') selectMode('voice'); }
     }
 
     function selectMode(mode) { selectedMode = mode; if (mode === 'voice') { showScreen('voice'); startVoiceCall(); } else { showScreen('chat'); initChat('there'); } }
