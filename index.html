@@ -3,10 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title id="page-title">Novus — AI front desk for estate agents</title>
+  <meta name="description" content="Your out-of-hours line that answers every enquiry, day or night." />
+  <title id="page-title">Novus — Your out-of-hours line that answers every enquiry, day or night</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%2711%2016%2080%2080%27%3E%3Crect%20x%3D%2711%27%20y%3D%2716%27%20width%3D%2780%27%20height%3D%2780%27%20rx%3D%2716%27%20fill%3D%27%23172D67%27/%3E%3Cpath%20d%3D%27M29%2082%20L29%2046%20C29%2030%2050%2030%2050%2046%20L73%2082%20L73%2030%27%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%2711%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet" />
+  <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
   <script type="module">
     import Vapi from 'https://esm.sh/@vapi-ai/web';
     window._VapiClass = Vapi;
@@ -71,8 +74,8 @@
       min-height: calc(100vh - 60px);
       padding: 24px 48px;
       display: grid;
-      grid-template-columns: minmax(0, 42%) 1fr;
-      gap: 48px;
+      grid-template-columns: minmax(0, 58%) 1fr;
+      gap: 44px;
       align-items: center;
     }
     .left { display: flex; flex-direction: column; gap: 36px; }
@@ -340,8 +343,8 @@
       .phone-wrap { display: flex !important; }
       .hero-copy { display: contents; }
       .hero-copy-top { order: 1; }
-      .hero-demo { order: 2; }
-      .hero-copy-actions { order: 3; }
+      .call-panel { order: 2; }
+      .hero-demo { order: 3; }
       .hero-demo .browser-content { aspect-ratio: 16 / 12; }
       .cta-full { padding: 40px 0; margin-top: 32px; }
       .cta-full-inner { padding: 0 20px; flex-direction: column; align-items: flex-start; gap: 20px; }
@@ -366,7 +369,7 @@
     .qr-chip:hover { background: var(--accent-lo); border-color: var(--accent); }
     .hero-cta { display: inline-block; align-self: flex-start; text-align: center; background: var(--accent); color: #fff; font-weight: 800; font-size: 0.9rem; padding: 14px 22px; border-radius: 10px; text-decoration: none; line-height: 1.35; transition: background 0.15s, transform 0.15s; }
     .hero-cta:hover { background: var(--accent-hi); transform: translateY(-1px); }
-    .hero-demo { position: static; padding-top: 0; display: flex; align-items: center; justify-content: center; min-width: 0; }
+    .hero-demo { position: static; padding-top: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-width: 0; }
     .hero-demo .browser-wrap { width: 100%; max-width: 640px; }
     .hero-demo .browser-content { aspect-ratio: 1280 / 900; height: auto; }
 
@@ -394,7 +397,8 @@
     .founder-photo { width: 88px; height: 88px; flex-shrink: 0; border-radius: 50%; overflow: hidden; background: var(--panel-2); }
     .founder-photo img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; display: block; }
     .founder-note-name { font-size: 0.9rem; font-weight: 700; color: var(--text); margin-bottom: 8px; }
-    .founder-note-body p { font-size: 0.98rem; line-height: 1.7; color: var(--text-2); }
+    .founder-note-body p { font-size: 0.98rem; line-height: 1.7; color: var(--text-2); margin-bottom: 14px; }
+    .founder-note-body p:last-child { margin-bottom: 0; }
 
     /* Section D — honest scope */
     .scope { padding: 56px 24px; border-top: 1px solid var(--border); }
@@ -416,11 +420,11 @@
     @media (max-width: 980px) {
       .founder-note-inner { flex-direction: column; align-items: center; text-align: center; gap: 16px; }
       .final-cta-title { font-size: 1.35rem; }
-      /* hero stack order: headline -> demo -> try/cta (must follow base .hero-copy rule) */
+      /* hero stack order: headline -> call panel -> website demo */
       .hero-copy { display: contents; }
       .hero-copy-top { order: 1; }
-      .hero-demo { order: 2; }
-      .hero-copy-actions { order: 3; margin-top: 2px; }
+      .call-panel { order: 2; }
+      .hero-demo { order: 3; }
     }
     /* ── LOGO IMAGES ── */
     .logo .logo-img { height: 26px; width: auto; display: block; }
@@ -453,6 +457,60 @@
     .build-block-text { font-size: 0.9rem; color: var(--text-2); line-height: 1.55; }
     @media (max-width: 820px) { .build-grid { grid-template-columns: 1fr; gap: 26px; } .pain { padding: 64px 20px 52px; } .build { padding: 60px 20px; } }
 
+    /* ── HERO CALL PANEL (voice-first, primary) ── */
+    .call-panel { background: linear-gradient(165deg, #0B1B3F 0%, var(--brand-navy) 60%, #1E3A8A 100%); border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 24px 60px rgba(15,23,42,0.28), inset 0 1px 0 rgba(255,255,255,0.06); padding: 26px 24px 22px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; position: relative; overflow: hidden; }
+    .call-panel::before { content: ''; position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% -10%, rgba(59,130,246,0.28), transparent 60%); pointer-events: none; }
+    .call-avatar { width: 58px; height: 58px; border-radius: 50%; background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; color: #fff; position: relative; z-index: 1; }
+    .call-avatar svg { width: 26px; height: 26px; }
+    .call-callto { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #9DB4E8; position: relative; z-index: 1; }
+    .call-dial-btn { position: relative; z-index: 1; width: 100%; max-width: 340px; display: flex; align-items: center; justify-content: center; gap: 10px; background: #fff; color: var(--brand-navy); border: none; border-radius: 100px; padding: 16px 22px; font-family: 'Inter', sans-serif; font-size: 1.05rem; font-weight: 800; letter-spacing: -0.01em; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,0.35); transition: transform 0.14s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.14s; }
+    .call-dial-btn:hover { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(0,0,0,0.45); }
+    .call-dial-btn:active { transform: translateY(0) scale(0.98); }
+    .call-dial-btn .dial-ico { width: 34px; height: 34px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .call-dial-btn .dial-ico svg { width: 17px; height: 17px; }
+    .call-subtext { position: relative; z-index: 1; font-size: 0.9rem; line-height: 1.55; color: rgba(255,255,255,0.82); max-width: 360px; }
+    .call-poweredby { position: relative; z-index: 1; font-size: 0.62rem; letter-spacing: 0.06em; color: rgba(255,255,255,0.45); margin-top: 2px; }
+    .call-idle { display: flex; flex-direction: column; align-items: center; gap: 13px; width: 100%; position: relative; z-index: 1; }
+    .call-idle .call-avatar { margin-bottom: 2px; }
+    /* active call view inside call panel */
+    .call-active { position: relative; z-index: 1; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .call-active .voice-orb { background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.22); }
+    .call-active .voice-orb.listening { background: var(--accent); border-color: var(--accent); }
+    .call-active .voice-orb.speaking { background: var(--accent-hi); border-color: var(--accent-hi); }
+    .call-active .voice-status-label { color: rgba(255,255,255,0.7); }
+    .call-active .voice-status-label.active { color: #93C5FD; }
+    .call-active .voice-status-label.speaking { color: #86EFAC; }
+    .call-active .voice-transcript { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); color: rgba(255,255,255,0.9); }
+
+    /* ── DEMO SECONDARY CAPTION (right browser mockup) ── */
+    .demo-caption { font-size: 0.78rem; font-weight: 600; color: var(--text-3); text-align: center; margin-bottom: 4px; letter-spacing: -0.005em; }
+    .demo-caption strong { color: var(--text-2); font-weight: 700; }
+
+    /* ── EVIDENCE BLOCK ── */
+    .evidence { padding: 72px 24px 60px; border-top: 1px solid var(--border); }
+    .evidence-inner { max-width: 720px; margin: 0 auto; text-align: center; }
+    .evidence-quote { font-size: clamp(1.3rem, 2.4vw, 1.75rem); font-weight: 700; line-height: 1.4; color: var(--text); letter-spacing: -0.02em; }
+    .evidence-quote strong { color: var(--brand-navy); }
+    .evidence-quote .evidence-tail { display: block; margin-top: 14px; font-size: 1rem; font-weight: 500; color: var(--accent); letter-spacing: 0; }
+    .evidence-fallback .pain-line { font-size: 1rem; font-weight: 400; color: var(--text-3); line-height: 1.5; margin: 7px 0; }
+    .evidence-fallback .pain-payoff { font-size: 1.18rem; font-weight: 700; color: var(--brand-navy); margin-top: 24px; letter-spacing: -0.01em; }
+    .evidence-fallback-heading { font-size: clamp(1.4rem, 2.4vw, 1.9rem); font-weight: 800; letter-spacing: -0.025em; color: var(--text); margin-bottom: 24px; line-height: 1.15; }
+
+    /* ── VALUE TEASER ── */
+    .value-teaser { padding: 56px 24px; border-top: 1px solid var(--border); background: var(--panel); }
+    .value-teaser-inner { max-width: 680px; margin: 0 auto; text-align: center; }
+    .value-teaser p { font-size: clamp(1.05rem, 1.9vw, 1.3rem); font-weight: 600; line-height: 1.6; color: var(--text); letter-spacing: -0.01em; }
+    .value-teaser strong { color: var(--accent); }
+
+    /* ── EXCLUSIVITY LINE ── */
+    .exclusivity-line { font-size: 1rem; font-weight: 600; color: var(--brand-navy); line-height: 1.5; }
+    .exclusivity-line strong { color: var(--accent); }
+
+    /* ── CALENDLY EMBED ── */
+    .calendly-wrap { width: 100%; max-width: 680px; margin: 8px auto 0; }
+    .calendly-inline-widget { min-width: 320px; height: 660px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: var(--panel); }
+    @media (max-width: 640px) { .calendly-inline-widget { height: 720px; } }
+
   </style>
 </head>
 <body>
@@ -467,28 +525,42 @@
 
   <div class="page">
 
-    <!-- ══ LEFT ══ -->
-    <!-- ══ LEFT (copy) ══ -->
+    <!-- ══ LEFT (voice-first call panel — primary) ══ -->
     <div class="left hero-copy">
       <div class="hero-copy-top">
         <div class="hero-eyebrow fu">LIVE DEMO — <span class="company-slot">Your Agency</span></div>
-        <h1 class="hero-headline fu fu-1"><span class="company-slot">Your Agency</span>'s front desk — open 24/7.</h1>
-        <p class="hero-sub fu fu-1">This is a working demo, trained on just a sample of your live listings. The full build learns your whole catalogue and is tuned to your area, your buyers and exactly what you want it to do — capture, qualify, book.</p>
+        <h1 class="hero-headline fu fu-1" id="hero-headline">Your phone stopped ringing out.</h1>
+        <p class="hero-sub fu fu-1">A real, dialable line — trained on just a sample of your live listings. The full build learns your whole catalogue and is tuned to your area, your buyers and exactly what you want it to do — capture, qualify, book.</p>
       </div>
-      <div class="hero-copy-actions fu fu-2">
-        <div class="hero-try">
-          <div class="hero-try-label">Try asking it:</div>
-          <div class="hero-chips" id="hero-chips">
-            <button class="hero-chip" onclick="askDemo(this.textContent)">Can I book a viewing?</button>
-            <button class="hero-chip" onclick="askDemo(this.textContent)">Can you value my house?</button>
+      <div class="call-panel fu fu-2">
+        <div class="call-idle" id="hero-call-idle">
+          <div class="call-avatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
           </div>
+          <div class="call-callto">Your out-of-hours line</div>
+          <button class="call-dial-btn" onclick="startHeroCall()">
+            <span class="dial-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
+            <span>Call <span class="company-slot">Your Agency</span></span>
+          </button>
+          <p class="call-subtext">This is what your out-of-hours line sounds like from Monday.</p>
+          <p class="call-poweredby">Powered by AI · trained on your live listings</p>
         </div>
-        <a class="hero-cta" href="#pricing">See what this costs for <span class="company-slot">Your Agency</span> →</a>
+        <div class="call-active" id="hero-call-active" style="display:none">
+          <div class="voice-orb-wrap">
+            <div class="voice-orb idle" id="hero-voice-orb">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </div>
+          </div>
+          <div class="voice-status-label" id="hero-voice-status">Connecting…</div>
+          <div class="voice-transcript" id="hero-voice-transcript">Connecting to your line…</div>
+          <button class="voice-end-btn" onclick="endHeroCall()">End Call</button>
+        </div>
       </div>
     </div>
 
-    <!-- ══ RIGHT (live demo) ══ -->
+    <!-- ══ RIGHT (website demo — secondary) ══ -->
     <div class="right hero-demo fu fu-2">
+      <p class="demo-caption">The same thing, <strong>live on your website too.</strong></p>
       <!-- Browser mockup -->
       <div class="browser-wrap fu fu-2">
         <div class="browser">
@@ -638,14 +710,22 @@
 
   </div><!-- /page -->
 
-  <!-- ══ PAIN BLOCK ══ -->
-  <section class="pain">
-    <div class="pain-inner">
-      <h2 class="pain-heading">After 6pm, where do your enquiries go?</h2>
-      <p class="pain-line">The 9pm valuation request nobody answers.</p>
-      <p class="pain-line">The phone ringing out while the team's on viewings.</p>
-      <p class="pain-line">The leads that go cold before you call back.</p>
-      <p class="pain-payoff">Every one is a booking &mdash; or an instruction &mdash; gone.</p>
+  <!-- ══ EVIDENCE BLOCK ══ -->
+  <section class="evidence">
+    <div class="evidence-inner">
+      <!-- Probe-data version — shown only when a probe address + timestamp exist for this lead -->
+      <p class="evidence-quote" id="evidence-probe" style="display:none">
+        &ldquo;I enquired on <strong id="evidence-address">this listing</strong> at <strong id="evidence-time">&mdash;</strong>. Nobody came back.
+        <span class="evidence-tail">This is what would have picked it up.</span>&rdquo;
+      </p>
+      <!-- Fallback — no probe data yet (true for links sent before a probe has run) -->
+      <div class="evidence-fallback" id="evidence-fallback">
+        <h2 class="evidence-fallback-heading">After 6pm, where do your enquiries go?</h2>
+        <p class="pain-line">The 9pm valuation request nobody answers.</p>
+        <p class="pain-line">The phone ringing out while the team's on viewings.</p>
+        <p class="pain-line">The leads that go cold before you call back.</p>
+        <p class="pain-payoff">Every one is a booking &mdash; or an instruction &mdash; gone.</p>
+      </div>
     </div>
   </section>
 
@@ -655,7 +735,9 @@
       <div class="founder-photo"><img src="joe.png" alt="Joe, founder of Novus" /></div>
       <div class="founder-note-body">
         <div class="founder-note-name">Joe &middot; Founder</div>
-        <p>I build and run this myself. No call centre, no offshore support desk, no faceless agency behind the login. If something's not right for <span class="company-slot">your agency</span>, you're talking to the person who wrote it &mdash; not a ticket number.</p>
+        <p>I'm Joe. My sister bought her first house last year, and watching her go through it was the reason I built this. Same story every time &mdash; listings not updated, calls that went nowhere, a different person picking up who didn't know what the last one had said. Nobody's fault, just what happens when a small team's out on viewings and the phone keeps ringing.</p>
+        <p>I've spent the last few years building systems that fix exactly that kind of gap for local businesses. Novus is that, pointed at estate agents.</p>
+        <p>You're not dealing with a support queue. You're dealing with the person who built it.</p>
       </div>
     </div>
   </section>
@@ -678,7 +760,7 @@
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></div>
           <h3 class="build-block-title">Qualifies every lead</h3>
-          <p class="build-block-text">Budget, timeline, chain, buyer or vendor — sorted before it reaches you.</p>
+          <p class="build-block-text">Budget, timeline, buyer or vendor — sorted before it reaches you.</p>
         </div>
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
@@ -688,7 +770,7 @@
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
           <h3 class="build-block-title">Synced to your listings</h3>
-          <p class="build-block-text">Knows what's live and what's under offer. Always current.</p>
+          <p class="build-block-text">Knows what's live across your site. Always current.</p>
         </div>
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div>
@@ -699,16 +781,27 @@
     </div>
   </section>
 
+  <!-- ══ VALUE TEASER (Section E1 — static copy, NOT a calculator) ══ -->
+  <section class="value-teaser">
+    <div class="value-teaser-inner">
+      <p>One missed valuation enquiry at an average instruction fee is a <strong>four-figure loss</strong>. Book 10 minutes and I'll run it against your actual numbers.</p>
+    </div>
+  </section>
+
   <!-- ══ FINAL CTA (Section E) ══ -->
-  <section class="final-cta" id="pricing">
+  <section class="final-cta" id="book">
     <div class="final-cta-inner">
       <h2 class="final-cta-title">Ready to stop losing enquiries out of hours?</h2>
+      <p class="exclusivity-line" id="exclusivity-line" style="display:none">I work with <strong>one agency per town</strong>. Nobody's signed in <strong id="exclusivity-town">your town</strong> yet.</p>
       <div class="final-cta-actions">
-        <!-- TODO: point at a real booking link once available -->
-        <a class="final-cta-btn" href="#">Book a 15-min call</a>
+        <a class="final-cta-btn" href="#calendly" onclick="revealCalendly(event)">Book 10 minutes — see what it's costing you</a>
         <span class="final-cta-or">or call Joe direct: <a class="joe-phone-slot final-cta-phone" href="#">{{joe_phone}}</a></span>
       </div>
-      <p class="final-cta-terms">&pound;299/mo + &pound;199 setup. No contract. 30-day money-back guarantee.</p>
+      <p class="final-cta-terms">No contract. 30-day money-back guarantee.</p>
+      <!-- Inline Calendly embed — books a fixed slot on-site, no external redirect -->
+      <div class="calendly-wrap" id="calendly" style="display:none">
+        <div class="calendly-inline-widget" data-url="https://calendly.com/joe-getnovus/10min?hide_gdpr_banner=1"></div>
+      </div>
     </div>
   </section>
 
@@ -716,7 +809,7 @@
   <footer class="site-footer">
     <div class="site-footer-inner">
       <div class="novus-lockup"><img class="footer-lockup" src="novus-lockup.png" alt="Novus — Never miss another enquiry" /></div>
-      <div class="site-footer-copy">AI front desk for independent UK estate agents · <a href="https://trynovus.co.uk">trynovus.co.uk</a></div>
+      <div class="site-footer-copy">Your out-of-hours line that answers every enquiry, day or night · <a href="https://trynovus.co.uk">trynovus.co.uk</a></div>
     </div>
   </footer>
 
@@ -724,13 +817,22 @@
   <script>
     const VAPI_PUBLIC_KEY = 'a154a7cb-a164-4fd8-bf2d-6b3aaba450a0';
 
-    const p         = new URLSearchParams(window.location.search);
-    const _fn       = p.get('first_name') || '';
-    const firstName = (_fn === 'FAILED_OWNER' || _fn === 'FAILED_SCRAPE') ? '' : _fn;
-    const company   = p.get('company') || 'Your Agency';
-    const gymUrl    = p.get('url')     || '';
+    // ── LEAD DATA ──
+    // Prospect data now resolves from a slug: trynovus.co.uk/d/{slug} → /api/lead lookup.
+    // Query params (?company=&url=&first_name=&town=&probe_address=&probe_sent=…) are kept
+    // as a fallback for testing and for any legacy links still in circulation.
+    const p = new URLSearchParams(window.location.search);
+    function cleanName(v) { return (v === 'FAILED_OWNER' || v === 'FAILED_SCRAPE') ? '' : (v || ''); }
 
-    // Brand slots — one-line swap once the name is locked (see item 5).
+    let company      = p.get('company') || 'Your Agency';
+    let gymUrl       = p.get('url')     || '';
+    let firstName    = cleanName(p.get('first_name'));
+    let town         = p.get('town')          || '';
+    let probeAddress = p.get('probe_address') || '';
+    let probeSent    = p.get('probe_sent')    || p.get('probe_timestamp') || '';
+
+    // Brand slots — company-independent, render immediately so {{joe_phone}} never
+    // shows as a raw placeholder even if the lead lookup is slow or fails (see item 8).
     const BRAND     = 'Novus';           // brand name (nav wordmark)
     const JOE_PHONE = '07455 506761';    // Joe's direct number
     document.querySelectorAll('.brand-slot').forEach(function(el) { el.textContent = BRAND; });
@@ -739,20 +841,99 @@
       if (el.tagName === 'A') el.setAttribute('href', 'tel:' + JOE_PHONE.replace(/\s+/g, ''));
     });
 
-    document.getElementById('page-title').textContent      = company + ' — Novus';
-    document.getElementById('cp-name').textContent         = company;
-    document.getElementById('cp-name-phone').textContent   = company;
-    document.getElementById('entry-company').textContent       = company;
-    document.getElementById('entry-company-phone').textContent = company;
-    document.querySelectorAll('.company-slot').forEach(function(el) { el.textContent = company; });
-
-    if (gymUrl) {
-      const clean = gymUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-      document.getElementById('url-bar-text').innerHTML = '<span class="url-domain">' + clean + '</span>';
+    // Extract slug from a /d/{slug} path.
+    function slugFromPath() {
+      const m = window.location.pathname.match(/\/d\/([^\/?#]+)/i);
+      return m ? decodeURIComponent(m[1]) : '';
     }
 
-    const fn = firstName || 'there';
-    var hfn = document.getElementById('hero-firstname'); if (hfn) hfn.textContent = fn;
+    // Resolve lead data (slug lookup → fields), then apply it to the page.
+    async function resolveLead() {
+      const slug = slugFromPath();
+      if (slug) {
+        try {
+          const res = await fetch('/api/lead?slug=' + encodeURIComponent(slug));
+          if (res.ok) {
+            const d = await res.json();
+            if (d && !d.error) {
+              if (d.company) company = d.company;
+              if (d.url)     gymUrl  = d.url;
+              town         = d.town          || town;
+              firstName    = cleanName(d.first_name) || firstName;
+              probeAddress = d.probe_address || probeAddress;
+              probeSent    = d.probe_sent    || probeSent;
+            }
+          }
+        } catch (e) { /* fall back to query-param / default values */ }
+      }
+      applyLead();
+    }
+
+    function applyLead() {
+      document.getElementById('page-title').textContent      = company + ' — Novus';
+      document.getElementById('cp-name').textContent         = company;
+      document.getElementById('cp-name-phone').textContent   = company;
+      document.getElementById('entry-company').textContent       = company;
+      document.getElementById('entry-company-phone').textContent = company;
+      document.querySelectorAll('.company-slot').forEach(function(el) { el.textContent = company; });
+
+      if (gymUrl) {
+        const clean = gymUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        document.getElementById('url-bar-text').innerHTML = '<span class="url-domain">' + clean + '</span>';
+      }
+
+      applyHeroHeadline();
+      applyEvidence();
+      applyExclusivity();
+
+      loadScreenshot();
+      loadPhoneScreenshot();
+      scrapeAndTrain();
+    }
+
+    // Item 2 — merge-field hero headline, with a no-probe-data fallback.
+    function applyHeroHeadline() {
+      const el = document.getElementById('hero-headline');
+      if (!el) return;
+      el.textContent = (probeAddress && probeSent)
+        ? 'Someone rang about ' + probeAddress + ' at ' + probeSent + '. It got answered.'
+        : 'Your phone stopped ringing out.';
+    }
+
+    // Item 3 — evidence block: probe version when data exists, fallback otherwise.
+    function applyEvidence() {
+      const probe = document.getElementById('evidence-probe');
+      const fallback = document.getElementById('evidence-fallback');
+      if (!probe || !fallback) return;
+      if (probeAddress && probeSent) {
+        document.getElementById('evidence-address').textContent = probeAddress;
+        document.getElementById('evidence-time').textContent = probeSent;
+        probe.style.display = 'block';
+        fallback.style.display = 'none';
+      } else {
+        probe.style.display = 'none';
+        fallback.style.display = 'block';
+      }
+    }
+
+    // Item 5 — exclusivity line, shown only when we know the town.
+    function applyExclusivity() {
+      const line = document.getElementById('exclusivity-line');
+      if (!line) return;
+      if (town) {
+        document.getElementById('exclusivity-town').textContent = town;
+        line.style.display = 'block';
+      } else {
+        line.style.display = 'none';
+      }
+    }
+
+    // Item 8 — reveal the inline Calendly booking widget on-site (no external redirect).
+    function revealCalendly(e) {
+      if (e) e.preventDefault();
+      const w = document.getElementById('calendly');
+      if (w) { w.style.display = 'block'; setTimeout(function() { w.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50); }
+    }
 
     // ── STATE ──
     let chatOpen = true, gymContext = '', ready = false, sending = false, selectedMode = null, leadName = '', leadEmail = '';
@@ -936,7 +1117,7 @@
       const voiceRule = mode === 'voice' ? '\n\nVOICE: Full natural sentences only, never lists or bullet points, maximum 2 short sentences per turn.' : '';
 
       const prompt =
-`You are the AI front desk for ${company}, an independent UK estate agent. You handle enquiries from buyers, sellers, tenants and landlords via chat on the agency's website. You speak as the agency ("we", "us") — warm, concise, professional British English. You are not a generic assistant; you are this agency's front desk.
+`You are the front desk for ${company}, an independent UK estate agent. You handle enquiries from buyers, sellers, tenants and landlords via chat on the agency's website. You speak as the agency ("we", "us") — warm, concise, professional British English. You are not a generic assistant; you are this agency's front desk.
 
 WHAT YOU KNOW — AND WHAT YOU DON'T
 You are given a set of the agency's current listings as structured data. This is a PARTIAL snapshot, not the full stock, and it may be out of date. The agency has more properties than you can see, and availability/prices change daily. Because of this, follow these hard rules at all times:
@@ -1070,12 +1251,36 @@ Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic
     function endVoiceCall() { if (vapi) { try { if (vapiActive) vapi.stop(); } catch(e){} vapi = null; } vapiActive = false; setTimeout(function() { showScreen('mode'); selectedMode = null; }, 800); }
     function endVoiceCallPhone() { if (vapiPhone) { try { if (vapiActivePhone) vapiPhone.stop(); } catch(e){} vapiPhone = null; } vapiActivePhone = false; setTimeout(function() { showScreenPhone('mode'); selectedModePhone = null; }, 800); }
 
+    // ── HERO CALL PANEL (primary voice-first line, item 2) ──
+    let vapiHero = null, vapiActiveHero = false;
+    function startHeroCall() {
+      document.getElementById('hero-call-idle').style.display = 'none';
+      document.getElementById('hero-call-active').style.display = 'flex';
+      const orb = document.getElementById('hero-voice-orb'), statusEl = document.getElementById('hero-voice-status'), transcript = document.getElementById('hero-voice-transcript');
+      orb.className = 'voice-orb connecting'; statusEl.textContent = 'Connecting…'; statusEl.className = 'voice-status-label'; transcript.textContent = 'Connecting to your line…';
+      try {
+        const VapiSDK = window._VapiClass;
+        if (!VapiSDK || typeof VapiSDK !== 'function') throw new Error('Voice not ready yet — try again in a moment');
+        vapiHero = new VapiSDK(VAPI_PUBLIC_KEY);
+        vapiHero.on('call-start', function() { vapiActiveHero = true; orb.className = 'voice-orb listening'; statusEl.textContent = 'Listening…'; statusEl.className = 'voice-status-label active'; transcript.textContent = 'Go ahead — ask about a property, booking a valuation or arranging a viewing.'; });
+        vapiHero.on('speech-start', function() { orb.className = 'voice-orb speaking'; statusEl.textContent = 'Speaking…'; statusEl.className = 'voice-status-label speaking'; });
+        vapiHero.on('speech-end',   function() { orb.className = 'voice-orb listening'; statusEl.textContent = 'Listening…'; statusEl.className = 'voice-status-label active'; });
+        vapiHero.on('message', function(msg) { if (msg.type === 'transcript' && msg.transcriptType === 'final') transcript.textContent = msg.transcript; });
+        vapiHero.on('call-end', function() { vapiActiveHero = false; orb.className = 'voice-orb idle'; statusEl.textContent = 'Call ended'; statusEl.className = 'voice-status-label'; transcript.textContent = 'Thanks for calling — the team will be in touch.'; });
+        vapiHero.on('error', function(e) { console.error('Vapi error:', e); vapiActiveHero = false; orb.className = 'voice-orb idle'; statusEl.textContent = 'Connection error'; statusEl.className = 'voice-status-label error'; transcript.textContent = 'Could not connect. Please try again in a moment.'; });
+        vapiHero.start({ name: company + ' Receptionist', firstMessage: 'Hi' + (firstName ? ' ' + firstName : '') + '! Thanks for calling ' + company + ' — how can I help you today?', transcriber: { provider: 'deepgram', model: 'nova-2', language: 'en-GB' }, voice: { provider: '11labs', voiceId: 'sarah' }, model: { provider: 'openai', model: 'gpt-4o-mini', messages: [{ role: 'system', content: buildSystemPrompt('voice') }] } });
+      } catch (err) { orb.className = 'voice-orb idle'; statusEl.textContent = 'Unavailable'; statusEl.className = 'voice-status-label error'; transcript.textContent = 'Voice unavailable: ' + err.message; }
+    }
+    function endHeroCall() {
+      if (vapiHero) { try { if (vapiActiveHero) vapiHero.stop(); } catch(e){} vapiHero = null; }
+      vapiActiveHero = false;
+      setTimeout(function() { document.getElementById('hero-call-active').style.display = 'none'; document.getElementById('hero-call-idle').style.display = 'flex'; }, 800);
+    }
+
     document.getElementById('cp-msgs').addEventListener('wheel', function(e) { e.stopPropagation(); }, { passive: true });
     document.getElementById('cp-msgs-phone').addEventListener('wheel', function(e) { e.stopPropagation(); }, { passive: true });
 
-    loadScreenshot();
-    loadPhoneScreenshot();
-    scrapeAndTrain();
+    resolveLead();
   </script>  <div class="page-bottom-margin"></div>
 
 </body>
