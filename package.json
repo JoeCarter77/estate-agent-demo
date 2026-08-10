@@ -9,6 +9,7 @@
     "test": "node parser-test.mjs"
   },
   "dependencies": {
+    "googleapis": "^144.0.0",
     "node-html-parser": "^9.0.0"
   },
   "optionalDependencies": {

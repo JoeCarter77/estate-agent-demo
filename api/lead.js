@@ -1,15 +1,20 @@
-// api/lead.js — Vercel Serverless Function
+// api/lead.js - Vercel Serverless Function
 // GET /api/lead?slug=ashton-white-dxfw
-// Returns ONLY the page-facing merge fields for a slug. Phone and outreach-tracking
-// columns are never returned — they stay inside api/_leads.mjs, which Vercel does not
-// serve statically.
+//
+// Stable prospect fields (company/url/town/first_name) come from the committed
+// api/_leads.mjs. Probe data is pulled LIVE from a Google Sheet per request and
+// returned as a single pre-formatted `probe_line` (or omitted when there's no
+// usable probe data). Response is not cached, so editing the sheet is reflected
+// on the next page load without a redeploy.
 import { LEADS } from './_leads.mjs';
+import { getProbeData } from '../lib/probes.mjs';
+import { buildProbeLine } from '../lib/probeCopy.mjs';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -19,12 +24,17 @@ export default async function handler(req, res) {
   const rec = LEADS[slug];
   if (!rec) return res.status(404).json({ error: 'Not found' });
 
-  return res.status(200).json({
-    company:       rec.company || '',
-    url:           rec.url || '',
-    town:          rec.town || '',
-    first_name:    rec.first_name || '',
-    probe_address: rec.probe_address || '',
-    probe_sent:    rec.probe_sent || ''
-  });
+  // Live probe lookup - null when the sheet isn't configured or has no usable row.
+  const probe = await getProbeData(slug);
+  const probeLine = buildProbeLine(probe);
+
+  const out = {
+    company:    rec.company || '',
+    url:        rec.url || '',
+    town:       rec.town || '',
+    first_name: rec.first_name || ''
+  };
+  if (probeLine) out.probe_line = probeLine;
+
+  return res.status(200).json(out);
 }
