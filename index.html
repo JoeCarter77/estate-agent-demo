@@ -74,8 +74,8 @@
       min-height: calc(100vh - 60px);
       padding: 24px 48px;
       display: grid;
-      grid-template-columns: minmax(0, 58%) 1fr;
-      gap: 44px;
+      grid-template-columns: minmax(0, 40%) minmax(0, 60%);
+      gap: 40px;
       align-items: center;
     }
     .left { display: flex; flex-direction: column; gap: 36px; }
@@ -104,7 +104,12 @@
     .browser-loading.gone { opacity: 0; pointer-events: none; }
     .spin { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
     .browser-loading p { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); }
-    .browser-screenshot { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: none; }
+    .browser-frame { width: 100%; height: 100%; border: 0; display: none; background: #FFFFFF; }
+    .browser-fail { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 32px; background: var(--panel); }
+    .browser-fail .bf-ico { font-size: 1.8rem; }
+    .browser-fail p { font-size: 0.9rem; line-height: 1.65; color: var(--text-2); max-width: 420px; }
+    .browser-fail strong { color: var(--text); font-weight: 700; }
+    .browser-fail .bf-sub { font-size: 0.82rem; color: var(--text-3); }
 
     /* ── CHAT PANEL (collapsed bubble → expands on hover / click-pin) ── */
     .chat-dock { position: absolute; bottom: 16px; right: 16px; z-index: 19; }
@@ -363,6 +368,7 @@
     .hero-headline { font-size: clamp(1.55rem, 2.5vw, 2.25rem); font-weight: 800; line-height: 1.12; letter-spacing: -0.03em; color: var(--text); }
     .hero-headline .company-slot { color: var(--brand-navy); }
     .hero-sub { font-size: 0.95rem; line-height: 1.65; color: var(--text-2); max-width: 460px; }
+    .hero-caption { font-size: 0.8rem; font-weight: 300; line-height: 1.55; color: var(--text-3); max-width: 440px; margin-top: -2px; }
     .hero-try { display: flex; flex-direction: column; gap: 9px; }
     .hero-try-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
     .hero-chips { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
@@ -374,7 +380,7 @@
     .hero-cta { display: inline-block; align-self: flex-start; text-align: center; background: var(--accent); color: #fff; font-weight: 800; font-size: 0.9rem; padding: 14px 22px; border-radius: 10px; text-decoration: none; line-height: 1.35; transition: background 0.15s, transform 0.15s; }
     .hero-cta:hover { background: var(--accent-hi); transform: translateY(-1px); }
     .hero-demo { position: static; padding-top: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-width: 0; }
-    .hero-demo .browser-wrap { width: 100%; max-width: 640px; }
+    .hero-demo .browser-wrap { width: 100%; max-width: none; }
     .hero-demo .browser-content { aspect-ratio: 1280 / 900; height: auto; }
 
     /* ── NOVUS MARK / FOOTER ── */
@@ -546,8 +552,9 @@
     <div class="left hero-copy">
       <div class="hero-copy-top">
         <div class="hero-eyebrow fu">LIVE DEMO - <span class="company-slot">Your Agency</span></div>
-        <h1 class="hero-headline fu fu-1" id="hero-headline">Your phone stopped ringing out.</h1>
-        <p class="hero-sub fu fu-1">This demo's built on a sample of your data from your website. A real build goes much deeper.</p>
+        <h1 class="hero-headline fu fu-1" id="hero-headline">You lost a valuation this week. That's the last one.</h1>
+        <p class="hero-sub fu fu-1">Answering the calls you're missing - booking valuations and viewings straight into your calendar.</p>
+        <p class="hero-caption fu fu-1">Built from a sample of your live listings - pulled straight from your website.</p>
       </div>
       <div class="call-panel fu fu-2">
         <div class="call-idle" id="hero-call-idle">
@@ -595,9 +602,10 @@
           <div class="browser-content">
             <div class="browser-loading" id="browser-loading">
               <div class="spin"></div>
-              <p>Capturing your website…</p>
+              <p>Loading your website…</p>
             </div>
-            <img id="browser-img" class="browser-screenshot" alt="Website screenshot" />
+            <iframe id="browser-frame" class="browser-frame" title="Your website preview" loading="eager" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
+            <div class="browser-fail" id="browser-fail" style="display:none"></div>
 
             <div class="chat-dock" id="chat-dock">
               <button class="chat-bubble" id="chat-bubble" onclick="pinChat()" aria-label="Chat to us">
@@ -629,11 +637,6 @@
               </div>
               <div class="screen chat-screen" id="screen-chat">
                 <div class="cp-msgs" id="cp-msgs"></div>
-                <div class="cp-suggs" id="cp-suggs">
-                  <button class="sq" onclick="sendSuggested(this)">What have you got for sale?</button>
-                  <button class="sq" onclick="sendSuggested(this)">Can I book a valuation?</button>
-                  <button class="sq" onclick="sendSuggested(this)">How do I arrange a viewing?</button>
-                </div>
                 <div class="cp-sbar" id="cp-sbar" style="display:none"><div class="sdot"></div><span id="cp-sbar-txt">Training on website content…</span></div>
                 <div class="cp-inp-row">
                   <button class="chat-back-btn" onclick="goBackToMode()" title="Back">←</button>
@@ -669,8 +672,8 @@
       <div class="founder-photo"><img src="/joe.png" alt="Joe, founder of Novus" /></div>
       <div class="founder-note-body">
         <div class="founder-note-name">Joe &middot; Founder</div>
-        <p>I'm Joe. My sister bought her first house last year, and watching her go through it was the reason I built this. Same story every time - listings not updated, calls that went nowhere, a different person picking up who didn't know what the last one had said. Nobody's fault, just what happens when a small team's out on viewings and the phone keeps ringing.</p>
-        <p>I've spent the last few years building systems that fix exactly that kind of gap for local businesses. Novus is that, pointed at estate agents.</p>
+        <p>I'm Joe. My sister was flat-hunting last year and called an agency about a place she loved - got voicemail, left her number, never heard back. She found out two days later it was still available. Nobody dropped the ball on purpose: the team was out on viewings when she called, and by the time someone got to the voicemail she'd moved on.</p>
+        <p>That's the gap Novus closes. I've spent the last few years building systems like this for local businesses - Novus is that, pointed at estate agents.</p>
         <p>You're not dealing with a support queue. You're dealing with the person who built it.</p>
       </div>
     </div>
@@ -684,32 +687,32 @@
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
           <h3 class="build-block-title">Answers every call</h3>
-          <p class="build-block-text">Voice AI trained on your agency. Picks up 24/7, books straight into the diary.</p>
+          <p class="build-block-text">24/7, trained on your agency. Books valuations and viewings straight into the diary.</p>
         </div>
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-          <h3 class="build-block-title">Handles website chat</h3>
-          <p class="build-block-text">The same brain, live on your site - exactly what you tested above.</p>
-        </div>
-        <div class="build-block">
-          <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></div>
-          <h3 class="build-block-title">Qualifies every lead</h3>
-          <p class="build-block-text">Budget, timeline, buyer or vendor - sorted before it reaches you.</p>
+          <h3 class="build-block-title">Handles your website chat</h3>
+          <p class="build-block-text">The same brain, live on your site - exactly what you just tested.</p>
         </div>
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
-          <h3 class="build-block-title">Never misses a valuation</h3>
-          <p class="build-block-text">The out-of-hours vendor enquiry that wins you the instruction.</p>
+          <h3 class="build-block-title">Knows your live listings</h3>
+          <p class="build-block-text">Prices, availability, what's under offer. Straight from your site.</p>
         </div>
         <div class="build-block">
-          <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
-          <h3 class="build-block-title">Synced to your listings</h3>
-          <p class="build-block-text">Knows what's live across your site. Always current.</p>
+          <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></div>
+          <h3 class="build-block-title">Qualifies before it reaches you</h3>
+          <p class="build-block-text">Buyer or vendor, budget, timeline - sorted before it hits your inbox.</p>
         </div>
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div>
           <h3 class="build-block-title">Instant handover</h3>
-          <p class="build-block-text">Full lead details to your team the moment it lands.</p>
+          <p class="build-block-text">Full lead details to your team the second the call ends. SMS or email.</p>
+        </div>
+        <div class="build-block">
+          <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></div>
+          <h3 class="build-block-title">Live in 5 days</h3>
+          <p class="build-block-text">No CRM change, no new phone system. Your existing number, forwarded.</p>
         </div>
       </div>
     </div>
@@ -818,7 +821,7 @@
       applyProof();
       applyExclusivity();
 
-      loadScreenshot();
+      loadSiteFrame();
       scrapeAndTrain();
     }
 
@@ -875,35 +878,32 @@
     const historyPhone = [];
     let sendingPhone = false, vapiPhone = null, vapiActivePhone = false;
 
-    // ── SCREENSHOT ──
-    function showScreenshotFallback(parent) {
-      parent.insertAdjacentHTML('afterbegin',
-        '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#F8FAFC;padding:24px;text-align:center;z-index:1;">' +
-        '<div style="font-size:1.8rem">🌐</div>' +
-        '<div style="font-size:0.62rem;font-weight:600;letter-spacing:.08em;color:var(--accent);">' + gymUrl.replace(/^https?:\/\//, '') + '</div>' +
-        '<p style="font-size:.72rem;color:#64748B;line-height:1.6;">Your AI sales assistant is fully trained on this site.</p></div>');
+    // ── LIVE SITE IFRAME ──
+    // Try to frame the agency's real site. Many sites block framing (X-Frame-Options /
+    // CSP frame-ancestors) or are slow - a 5s timeout falls back to a friendly message.
+    // The chat widget sits above this and stays usable either way.
+    function showFrameFail() {
+      const frame = document.getElementById('browser-frame');
+      const fail = document.getElementById('browser-fail');
+      if (frame) frame.style.display = 'none';
+      if (!fail) return;
+      fail.innerHTML =
+        '<div class="bf-ico">🌐</div>' +
+        '<p>We couldn\'t pull <strong>' + esc(company) + '</strong>\'s site in here - some sites block it. ' +
+        'Doesn\'t affect anything: your agents are built and working.</p>' +
+        '<p class="bf-sub">Try them on the left.</p>';
+      fail.style.display = 'flex';
     }
 
-    function loadScreenshot() {
+    function loadSiteFrame() {
       const ldr = document.getElementById('browser-loading');
-      const img = document.getElementById('browser-img');
-      if (!gymUrl) { ldr.classList.add('gone'); return; }
+      const frame = document.getElementById('browser-frame');
+      if (!gymUrl) { ldr.classList.add('gone'); showFrameFail(); return; }
       var done = false;
-      var timer = setTimeout(function() { if (done) return; done = true; img.src = ''; ldr.classList.add('gone'); showScreenshotFallback(img.parentElement); }, 7000);
-      img.onload = function() { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); img.style.display = 'block'; };
-      img.onerror = function() { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); showScreenshotFallback(img.parentElement); };
-      img.src = 'https://image.thum.io/get/width/1280/crop/900/noanimate/' + gymUrl;
-    }
-
-    function loadPhoneScreenshot() {
-      const ldr = document.getElementById('phone-loading');
-      const img = document.getElementById('phone-img');
-      if (!gymUrl) { ldr.classList.add('gone'); return; }
-      var done = false;
-      var timer = setTimeout(function() { if (done) return; done = true; ldr.classList.add('gone'); }, 7000);
-      img.onload = function() { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); img.style.display = 'block'; };
-      img.onerror = function() { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); };
-      img.src = 'https://image.thum.io/get/width/390/crop/844/noanimate/' + gymUrl;
+      var timer = setTimeout(function() { if (done) return; done = true; ldr.classList.add('gone'); showFrameFail(); }, 5000);
+      frame.onload = function() { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); frame.style.display = 'block'; };
+      frame.onerror = function() { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); showFrameFail(); };
+      frame.src = gymUrl;
     }
 
     // ── SCRAPE ──
@@ -1080,22 +1080,23 @@ THE 8 SCENARIOS
 8. Hot lead / wants a human now ("call me", "I want to make an offer", "cash buyer ready to go"): move fast - capture contact + intent, flag urgency, push to phone - "Let's get you straight through to someone. Can I grab your name and number and I'll have the team call you right away - or ring us now on ${phone}."
 
 TONE
-Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic. British English. One clear next step per message. You are the agency's front desk - sound like it.`;
+Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic. British English. One clear next step per message. You are the agency's front desk - sound like it.
+
+FORMATTING
+Never use em dashes (-) or en dashes (-). Use a plain hyphen (-) instead, or rephrase. Keep punctuation simple and human.`;
 
       return prompt + listingsJson + siteCtx + locCtx + voiceRule;
     }
 
     function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
 
-    function initChat(name) { addMsg('Hi' + (name && name !== 'there' ? ' ' + name : '') + '! You\'re through to ' + company + ' - are you looking to buy, sell, rent, or book a valuation?', 'bot'); renderQuickReplies(false); setTimeout(function() { document.getElementById('cp-inp').focus(); }, 80); }
-    function initChatPhone(name) { addMsgPhone('Hi' + (name && name !== 'there' ? ' ' + name : '') + '! You\'re through to ' + company + ' - how can we help today?', 'bot'); renderQuickReplies(true); setTimeout(function() { document.getElementById('cp-inp-phone').focus(); }, 80); }
+    function initChat(name) { addMsg("Hi! You're through to " + company + ' - are you looking to sell, buy, or both?', 'bot'); renderQuickReplies(false); setTimeout(function() { document.getElementById('cp-inp').focus(); }, 80); }
+    function initChatPhone(name) { addMsgPhone("Hi! You're through to " + company + ' - are you looking to sell, buy, or both?', 'bot'); renderQuickReplies(true); setTimeout(function() { document.getElementById('cp-inp-phone').focus(); }, 80); }
 
-    // In-chat quick replies (2, tier-dependent). Skipped when the chat was seeded
-    // by a landing-page chip (the user already asked something).
+    // Exactly three quick replies after the greeting. Everything after that happens
+    // in conversation, not as pre-set buttons.
     function renderQuickReplies(isPhone) {
-      if (chatSeededByChip) { chatSeededByChip = false; return; }
-      const labels = chatQuickReplyLabels().filter(Boolean).slice(0, 2);
-      if (!labels.length) return;
+      const labels = ["I'm looking to sell", "I'm looking to buy", "Both"];
       const c = document.getElementById(isPhone ? 'cp-msgs-phone' : 'cp-msgs');
       if (!c) return;
       const row = document.createElement('div');
