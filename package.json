@@ -9,6 +9,8 @@
     "test": "node parser-test.mjs",
     "novus:selftest": "node scripts/novus-selftest.mjs",
     "novus:comms-selftest": "node scripts/novus-comms-selftest.mjs",
+    "novus:observation-selftest": "node scripts/novus-observation-selftest.mjs",
+    "novus:phone-selftest": "node scripts/novus-phone-selftest.mjs",
     "novus:smoke": "node scripts/novus-sheets-smoke.mjs"
   },
   "dependencies": {
