@@ -1,27 +1,47 @@
 // scripts/novus-sheets-smoke.mjs — LIVE round-trip against the real workbook.
 //
-// This is the "verify against the real workbook" check. It needs real creds and
-// network, so run it where those exist (locally with .env.local, or any env that
-// has the service account). It is intentionally NOT part of the hermetic
-// selftest.
+// This is the "verify against the real workbook" check. It needs a real Vercel
+// OIDC token, so it can only run WHERE ONE EXISTS: inside an actual Vercel
+// Function invocation (Production or Preview, per the WIF provider's attribute
+// condition), not on a bare local machine — VERCEL_OIDC_TOKEN is minted and
+// injected by Vercel per-invocation and cannot be faked locally. It is
+// intentionally NOT part of the hermetic selftest.
+//
+// Easiest way to run this against a live deployment: wire it up as a temporary
+// diagnostic API route (server-side, Basic-Auth gated like the rest of
+// /api/novus) that imports and calls main() from this file, hit it once via
+// curl, then remove the route. Do not expose Sheets round-trips as a permanent
+// public endpoint.
 //
 // It writes ONE clearly-marked test probe, reads it back, flips it to observing,
 // reads again, then prints the row so you can delete it from the PROBES tab.
 //
-// Setup:
-//   1) Create a Google Cloud service account, enable the Google Sheets API.
-//   2) Share NOVUS_Data_V1_Master_v2 with the service account's client_email (Editor).
-//   3) Put GOOGLE_SERVICE_ACCOUNT_JSON + NOVUS_SHEET_ID in .env.local
-//   4) node --env-file=.env.local scripts/novus-sheets-smoke.mjs
-//
-// (Node 20+ supports --env-file. Or export the vars into your shell first.)
+// Setup (keyless — no service-account key is created or used):
+//   1) Create the Workload Identity Pool + Provider trusting Vercel's OIDC
+//      issuer, and grant novus-sheets@first-metric-505115-n3.iam.gserviceaccount.com
+//      roles/iam.workloadIdentityUser to the scoped principalSet.
+//   2) Enable sheets.googleapis.com, iamcredentials.googleapis.com, sts.googleapis.com.
+//   3) Share NOVUS_Data_V1_Master_v2 with novus-sheets@... (Editor).
+//   4) Enable OIDC Federation on the Vercel project (Settings → Security), and
+//      set GCP_WORKLOAD_IDENTITY_AUDIENCE + GCP_SERVICE_ACCOUNT_EMAIL +
+//      NOVUS_SHEET_ID as Vercel env vars.
+//   5) Run this script's main() from inside a Vercel Function invocation.
 
+import { pathToFileURL } from 'node:url';
 import { getRepo } from '../lib/sheets.mjs';
 import { newProbeId, newProbeReference } from '../lib/ids.mjs';
 
 async function main() {
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON || !process.env.NOVUS_SHEET_ID) {
-    console.error('Missing GOOGLE_SERVICE_ACCOUNT_JSON and/or NOVUS_SHEET_ID. See .env.example.');
+  if (!process.env.VERCEL_OIDC_TOKEN) {
+    console.error(
+      'Missing VERCEL_OIDC_TOKEN. This script must run inside a Vercel Function ' +
+      'invocation (OIDC Federation enabled on the project) — it cannot be run on ' +
+      'a bare local machine. See the setup notes at the top of this file.'
+    );
+    process.exit(1);
+  }
+  if (!process.env.GCP_WORKLOAD_IDENTITY_AUDIENCE || !process.env.GCP_SERVICE_ACCOUNT_EMAIL || !process.env.NOVUS_SHEET_ID) {
+    console.error('Missing GCP_WORKLOAD_IDENTITY_AUDIENCE, GCP_SERVICE_ACCOUNT_EMAIL and/or NOVUS_SHEET_ID. See .env.example.');
     process.exit(1);
   }
   const repo = getRepo();
@@ -74,4 +94,10 @@ async function main() {
   console.log(`   Delete the test row (${draft.probe_reference}, row ${rec?.rowNumber}) from PROBES when done.`);
 }
 
-main().catch((err) => { console.error('\n❌ SMOKE FAILED:\n', err); process.exit(1); });
+export { main };
+
+// Only auto-run when executed directly (`node scripts/novus-sheets-smoke.mjs`),
+// not when imported by a diagnostic route.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => { console.error('\n❌ SMOKE FAILED:\n', err); process.exit(1); });
+}
