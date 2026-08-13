@@ -1014,7 +1014,7 @@
     // no-param fall through to the Core variant untouched. Decided here so the
     // Core demo boot below can be skipped cleanly before it fires any requests.
     const _segParam   = (p.get('s') || '').toLowerCase();
-    const _gradeParam = (p.get('grade') || '').trim().toUpperCase().charAt(0);
+    const _gradeParam = (p.get('grade') || '').trim().toUpperCase().replace(/^GRADE\s+/, '').charAt(0);
     const growthActive = _segParam === 'growth' && _gradeParam !== 'D' && _gradeParam !== 'E';
     if (growthActive) document.body.classList.add('growth');
 
@@ -1383,7 +1383,7 @@ Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic
     if (seg !== 'growth') return;
 
     const gradeRaw  = (q.get('grade') || '').trim().toUpperCase();
-    const grade     = gradeRaw.charAt(0); // tolerate "A", "a", "Grade A"
+    const grade     = gradeRaw.replace(/^GRADE\s+/, '').charAt(0); // tolerate "A", "a", "Grade A"
     const company   = q.get('company') || 'Your Agency';
 
     // Grades D and E do not receive the Growth variant → fall through to Core.
