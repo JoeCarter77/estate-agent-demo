@@ -6,9 +6,14 @@
     "bench": "node scraper-bench.mjs",
     "bench:api": "node scraper-bench.mjs --api",
     "bench:zones": "node scraper-bench.mjs --zones",
-    "test": "node parser-test.mjs"
+    "test": "node parser-test.mjs",
+    "novus:selftest": "node scripts/novus-selftest.mjs",
+    "novus:comms-selftest": "node scripts/novus-comms-selftest.mjs",
+    "novus:smoke": "node scripts/novus-sheets-smoke.mjs"
   },
   "dependencies": {
+    "@vercel/oidc": "^3.8.4",
+    "google-auth-library": "^11.0.2",
     "node-html-parser": "^9.0.0"
   },
   "optionalDependencies": {
