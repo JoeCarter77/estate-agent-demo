@@ -6,7 +6,9 @@
     "bench": "node scraper-bench.mjs",
     "bench:api": "node scraper-bench.mjs --api",
     "bench:zones": "node scraper-bench.mjs --zones",
-    "test": "node parser-test.mjs"
+    "test": "node parser-test.mjs",
+    "novus:selftest": "node scripts/novus-selftest.mjs",
+    "novus:smoke": "node scripts/novus-sheets-smoke.mjs"
   },
   "dependencies": {
     "node-html-parser": "^9.0.0"
