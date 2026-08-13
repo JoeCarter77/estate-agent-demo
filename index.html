@@ -453,6 +453,92 @@
     .build-block-text { font-size: 0.9rem; color: var(--text-2); line-height: 1.55; }
     @media (max-width: 820px) { .build-grid { grid-template-columns: 1fr; gap: 26px; } .pain { padding: 64px 20px 52px; } .build { padding: 60px 20px; } }
 
+    /* ══════════════════════════════════════════════════════
+       GROWTH VARIANT  (?s=growth)  — sellers → booked appraisal
+       ══════════════════════════════════════════════════════ */
+    #growth-root { display: none; position: relative; z-index: 1; }
+    body.growth #growth-root { display: block; }
+    body.growth .core-only { display: none !important; }
+
+    .g-wrap { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+
+    /* 0/1/2 — hero: proof line + headline */
+    .g-hero { padding: 56px 0 40px; }
+    .g-eyebrow { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand-navy); margin-bottom: 22px; }
+    .g-proof { font-size: 0.92rem; line-height: 1.65; color: var(--text-3); font-weight: 400; margin-bottom: 26px; max-width: 640px; }
+    .g-h1 { font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; line-height: 1.06; letter-spacing: -0.035em; color: var(--text); margin-bottom: 20px; }
+    .g-hero-sub { font-size: 1.05rem; line-height: 1.65; color: var(--text-2); font-weight: 300; max-width: 620px; margin-bottom: 26px; }
+    .g-promise { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; color: var(--brand-navy); line-height: 1.3; padding: 16px 0 0; border-top: 1px solid var(--border); max-width: 620px; }
+    .g-builtfrom { font-size: 0.8rem; color: var(--text-3); font-weight: 500; margin-top: 14px; }
+
+    /* generic module scaffolding */
+    .g-module { padding: 40px 0; border-top: 1px solid var(--border); }
+    .g-module-label { font-size: 0.92rem; font-weight: 700; color: var(--text); line-height: 1.5; margin-bottom: 20px; letter-spacing: -0.01em; }
+    .g-caption { font-size: 0.92rem; color: var(--text-2); line-height: 1.65; margin-top: 18px; max-width: 620px; }
+    .g-caption strong { color: var(--text); font-weight: 700; }
+
+    /* connector line */
+    .g-connector { text-align: center; font-size: 1.05rem; font-weight: 600; color: var(--brand-navy); line-height: 1.5; padding: 40px 24px; max-width: 620px; margin: 0 auto; letter-spacing: -0.01em; }
+
+    /* Module one — valuation frame (reuses browser component) */
+    .g-frame-wrap { max-width: 760px; margin: 0 auto; }
+
+    /* Module two — reawakening WhatsApp thread */
+    .g-thread-shell { max-width: 360px; margin: 0 auto; background: #E5DDD5; border-radius: 22px; border: 1px solid var(--border-hi); box-shadow: 0 20px 50px rgba(15,23,42,0.14); overflow: hidden; display: flex; flex-direction: column; height: 560px; }
+    .g-thread-head { background: #075E54; color: #fff; padding: 12px 14px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .g-thread-ava { width: 38px; height: 38px; border-radius: 50%; background: #128C7E; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .g-thread-ava img { width: 22px; height: 22px; object-fit: contain; }
+    .g-thread-name { font-size: 0.82rem; font-weight: 700; line-height: 1.2; }
+    .g-thread-status { font-size: 0.64rem; opacity: 0.85; margin-top: 1px; }
+    .g-thread-msgs { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 12px; display: flex; flex-direction: column; gap: 8px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='40' height='40' fill='%23E5DDD5'/%3E%3C/svg%3E"); }
+    .g-msg { max-width: 82%; padding: 7px 10px 6px; font-size: 0.8rem; line-height: 1.45; border-radius: 8px; box-shadow: 0 1px 1px rgba(0,0,0,0.08); position: relative; word-wrap: break-word; }
+    .g-msg.them { align-self: flex-start; background: #fff; color: #111; border-top-left-radius: 2px; }
+    .g-msg.me { align-self: flex-end; background: #DCF8C6; color: #111; border-top-right-radius: 2px; }
+    .g-msg-meta { font-size: 0.56rem; color: #667781; margin-top: 3px; margin-bottom: -2px; }
+    .g-thread-typing { align-self: flex-start; background: #fff; border-radius: 8px; border-top-left-radius: 2px; padding: 9px 12px; display: flex; gap: 4px; box-shadow: 0 1px 1px rgba(0,0,0,0.08); }
+    .g-thread-typing .td { background: #94A3B8; }
+    .g-thread-replies { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; background: #F0F0F0; border-top: 1px solid #DDD; flex-shrink: 0; }
+    .g-reply-chip { background: #fff; border: 1px solid #CBD5E1; color: #075E54; border-radius: 100px; padding: 6px 12px; font-size: 0.72rem; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; transition: background 0.15s; }
+    .g-reply-chip:hover { background: #E7F3F0; }
+    .g-thread-inp-row { display: flex; gap: 6px; padding: 8px 10px; background: #F0F0F0; align-items: center; flex-shrink: 0; }
+    .g-thread-inp { flex: 1; min-width: 0; background: #fff; border: 1px solid #CBD5E1; border-radius: 100px; padding: 8px 13px; font-size: 0.78rem; font-family: 'Inter', sans-serif; outline: none; }
+    .g-thread-send { width: 34px; height: 34px; border-radius: 50%; background: #075E54; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+    .g-thread-send:disabled { opacity: 0.4; }
+
+    /* Module three — the Friday page */
+    .g-friday { max-width: 620px; margin: 0 auto; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 16px 40px rgba(15,23,42,0.08); overflow: hidden; }
+    .g-friday-head { background: var(--brand-navy); color: #fff; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .g-friday-agency { font-size: 0.98rem; font-weight: 800; letter-spacing: -0.01em; }
+    .g-friday-tag { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.75; }
+    .g-friday-body { padding: 8px 24px 20px; }
+    .g-friday-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--border); }
+    .g-friday-row:last-child { border-bottom: none; }
+    .g-friday-label { font-size: 0.92rem; color: var(--text-2); line-height: 1.45; }
+    .g-friday-fig { font-size: 2rem; font-weight: 800; letter-spacing: -0.04em; color: var(--accent); line-height: 1; flex-shrink: 0; }
+    .g-friday-fig.muted { color: var(--brand-navy); }
+
+    /* Feature cards (reuse .build-grid but scoped copy) */
+    #growth-root .build { border-top: none; }
+
+    /* What it won't do */
+    .g-wont { max-width: 620px; margin: 0 auto; padding: 4px 0 0; }
+    .g-wont p { font-size: 0.85rem; color: var(--text-3); line-height: 1.6; margin: 6px 0; }
+
+    /* CTA */
+    .g-cta { padding: 64px 0 72px; border-top: 1px solid var(--border); background: var(--panel); }
+    .g-cta-inner { max-width: 680px; margin: 0 auto; padding: 0 24px; text-align: center; }
+    .g-cta-title { font-size: clamp(1.5rem, 2.6vw, 2rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; color: var(--text); margin-bottom: 18px; }
+    .g-cta-body { font-size: 0.98rem; color: var(--text-2); line-height: 1.7; max-width: 560px; margin: 0 auto 10px; }
+    .g-cta-body.tight { margin-bottom: 26px; }
+    .g-cta-btn { display: inline-block; background: var(--accent); color: #fff; font-weight: 800; font-size: 0.98rem; padding: 15px 30px; border-radius: 10px; text-decoration: none; transition: background 0.15s, transform 0.15s; }
+    .g-cta-btn:hover { background: var(--accent-hi); transform: translateY(-1px); }
+    .g-cta-nc { font-size: 0.82rem; color: var(--text-3); font-weight: 600; margin-top: 14px; }
+
+    @media (max-width: 820px) {
+      .g-hero { padding: 40px 0 28px; }
+      .g-module { padding: 32px 0; }
+    }
+
   </style>
 </head>
 <body>
@@ -465,7 +551,7 @@
     <div class="pill-live"><div class="live-dot"></div>Live Demo</div>
   </header>
 
-  <div class="page">
+  <div class="page core-only">
 
     <!-- ══ LEFT ══ -->
     <!-- ══ LEFT (copy) ══ -->
@@ -639,7 +725,7 @@
   </div><!-- /page -->
 
   <!-- ══ PAIN BLOCK ══ -->
-  <section class="pain">
+  <section class="pain core-only">
     <div class="pain-inner">
       <h2 class="pain-heading">After 6pm, where do your enquiries go?</h2>
       <p class="pain-line">The 9pm valuation request nobody answers.</p>
@@ -650,7 +736,7 @@
   </section>
 
   <!-- ══ FOUNDER NOTE (Section C) ══ -->
-  <section class="founder-note">
+  <section class="founder-note core-only">
     <div class="founder-note-inner">
       <div class="founder-photo"><img src="joe.png" alt="Joe, founder of Novus" /></div>
       <div class="founder-note-body">
@@ -661,7 +747,7 @@
   </section>
 
   <!-- ══ FULL BUILD (Section D) ══ -->
-  <section class="build">
+  <section class="build core-only">
     <div class="build-inner">
       <h2 class="build-heading">What the full build does</h2>
       <div class="build-grid">
@@ -700,7 +786,7 @@
   </section>
 
   <!-- ══ FINAL CTA (Section E) ══ -->
-  <section class="final-cta" id="pricing">
+  <section class="final-cta core-only" id="pricing">
     <div class="final-cta-inner">
       <h2 class="final-cta-title">Ready to stop losing enquiries out of hours?</h2>
       <div class="final-cta-actions">
@@ -711,6 +797,203 @@
       <p class="final-cta-terms">&pound;299/mo + &pound;199 setup. No contract. 30-day money-back guarantee.</p>
     </div>
   </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       GROWTH VARIANT  (?s=growth)
+       Sellers taken all the way to a booked appraisal.
+       Hidden unless body.growth is set (see growth controller script).
+       ═══════════════════════════════════════════════════════════ -->
+  <div id="growth-root">
+
+    <!-- 0/1/2 — proof line + headline -->
+    <section class="g-hero">
+      <div class="g-wrap">
+        <div class="g-eyebrow">LIVE DEMO — <span class="company-slot">Your Agency</span></div>
+        <p class="g-proof" id="g-proof" style="display:none"></p>
+        <h1 class="g-h1">The 200 valuations you did and didn't win are still sitting there.</h1>
+        <p class="g-hero-sub" id="g-hero-sub"></p>
+        <p class="g-promise">Twelve extra market appraisals in ninety days, or you don't pay.</p>
+        <p class="g-builtfrom">Built from your live listings and your own valuation page.</p>
+      </div>
+    </section>
+
+    <!-- 3 — Module one: their valuation page, live -->
+    <section class="g-module">
+      <div class="g-wrap">
+        <div class="g-frame-wrap">
+          <div class="browser-wrap">
+            <div class="browser">
+              <div class="browser-chrome">
+                <div class="tl">
+                  <div class="tl-dot red"></div>
+                  <div class="tl-dot yellow"></div>
+                  <div class="tl-dot green"></div>
+                </div>
+                <div class="url-bar">
+                  <span class="url-bar-lock">🔒</span>
+                  <span class="url-bar-text" id="g1-url"><span class="url-domain">youragencywebsite.co.uk</span></span>
+                </div>
+              </div>
+              <div class="browser-content">
+                <div class="browser-loading" id="g1-loading">
+                  <div class="spin"></div>
+                  <p>Loading your valuation page…</p>
+                </div>
+                <img id="g1-img" class="browser-screenshot" alt="Valuation page screenshot" />
+
+                <div class="in-browser-panel open" id="g1-panel">
+                  <div class="cp-head">
+                    <div class="cp-ava"><img src="novus-icon-white.png" alt="" /></div>
+                    <div>
+                      <div class="cp-name" id="g1-name">Your Agency</div>
+                      <div class="cp-online"><div class="cp-sdot"></div><span>Online now</span></div>
+                    </div>
+                  </div>
+                  <div style="padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--border);font-size:0.7rem;line-height:1.4;color:var(--text-2);font-weight:500;" id="g1-widget-label">Or just tell us about it now — we'll book you in.</div>
+                  <div class="screen chat-screen active">
+                    <div class="cp-msgs" id="g1-msgs"></div>
+                    <div class="cp-inp-row">
+                      <input class="cp-inp" id="g1-inp" type="text" placeholder="Type a message…" />
+                      <button class="cp-send" id="g1-send" onclick="g1Send()">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="g-caption" id="g1-caption">This page already asks people to tell you they're selling. Right now that lands in an inbox. This books them.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9 — What it won't do (sits under module one) -->
+    <section class="g-module" style="border-top:none;padding-top:8px;">
+      <div class="g-wrap">
+        <div class="g-wont">
+          <p>It won't put a price on anyone's house. That's your job, on their sofa.</p>
+          <p>It says what it is at the start of every call. It never pretends to be a person.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 — Connector line -->
+    <div class="g-connector">And when they don't fill anything in — or they filled it in fourteen months ago.</div>
+
+    <!-- 5 — Module two: the reawakening thread -->
+    <section class="g-module">
+      <div class="g-wrap">
+        <p class="g-module-label">This is the half you don't have. Nobody's doing this because nobody has time.</p>
+        <div class="g-thread-shell">
+          <div class="g-thread-head">
+            <div class="g-thread-ava"><img src="novus-icon-white.png" alt="" /></div>
+            <div>
+              <div class="g-thread-name" id="g2-name">Novus — on behalf of Your Agency</div>
+              <div class="g-thread-status">online</div>
+            </div>
+          </div>
+          <div class="g-thread-msgs" id="g2-msgs"></div>
+          <div class="g-thread-replies" id="g2-replies"></div>
+          <div class="g-thread-inp-row">
+            <input class="g-thread-inp" id="g2-inp" type="text" placeholder="Type a message" />
+            <button class="g-thread-send" id="g2-send" onclick="g2Send()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 — Module three: the Friday page -->
+    <section class="g-module">
+      <div class="g-wrap">
+        <div class="g-friday">
+          <div class="g-friday-head">
+            <div class="g-friday-agency company-slot">Your Agency</div>
+            <div class="g-friday-tag">This week</div>
+          </div>
+          <div class="g-friday-body">
+            <div class="g-friday-row">
+              <div class="g-friday-label">Appraisals booked this week — from the old list</div>
+              <div class="g-friday-fig">3</div>
+            </div>
+            <div class="g-friday-row">
+              <div class="g-friday-label">Appraisals booked this week — from your front door</div>
+              <div class="g-friday-fig">2</div>
+            </div>
+            <div class="g-friday-row">
+              <div class="g-friday-label">People still in an open conversation</div>
+              <div class="g-friday-fig muted">41</div>
+            </div>
+          </div>
+        </div>
+        <p class="g-caption" style="text-align:center;margin-left:auto;margin-right:auto;">Most agents have never seen that last number.</p>
+      </div>
+    </section>
+
+    <!-- 7 — What the full build does (six cards) -->
+    <section class="build">
+      <div class="build-inner">
+        <h2 class="build-heading">What the full build does</h2>
+        <div class="build-grid">
+          <div class="build-block">
+            <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg></div>
+            <h3 class="build-block-title">Works your old valuation list</h3>
+            <p class="build-block-text">Every name that had a valuation and never instructed gets worked.</p>
+          </div>
+          <div class="build-block">
+            <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+            <h3 class="build-block-title">Sellers taken all the way to the appointment</h3>
+            <p class="build-block-text">Not a message passed to you — a booked appraisal.</p>
+          </div>
+          <div class="build-block">
+            <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div>
+            <h3 class="build-block-title">Two-way WhatsApp and text</h3>
+            <p class="build-block-text">They can reply three weeks later at eleven at night and get an answer in seconds.</p>
+          </div>
+          <div class="build-block">
+            <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
+            <h3 class="build-block-title">Your data, sorted by me</h3>
+            <p class="build-block-text">You send the export — that's your involvement.</p>
+          </div>
+          <div class="build-block">
+            <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+            <h3 class="build-block-title">One trip instead of three</h3>
+            <p class="build-block-text">A valuation and two viewings in the same patch get grouped.</p>
+          </div>
+          <div class="build-block">
+            <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+            <h3 class="build-block-title">The Friday page</h3>
+            <p class="build-block-text">What booked, which list it came from, how many are still open.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8 — Joe block (unchanged from Core) -->
+    <section class="founder-note">
+      <div class="founder-note-inner">
+        <div class="founder-photo"><img src="joe.png" alt="Joe, founder of Novus" /></div>
+        <div class="founder-note-body">
+          <div class="founder-note-name">Joe &middot; Founder</div>
+          <p>I build and run this myself. No call centre, no offshore support desk, no faceless agency behind the login. If something's not right for <span class="company-slot">your agency</span>, you're talking to the person who wrote it &mdash; not a ticket number.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10 — CTA -->
+    <section class="g-cta">
+      <div class="g-cta-inner">
+        <h2 class="g-cta-title">Talk to Joe. Ten minutes, no deck, just your numbers.</h2>
+        <p class="g-cta-body">Before we speak, have a look at last month's enquiries and count two things: how many said they'd got a place to sell, and how many ended up in your diary for a valuation.</p>
+        <p class="g-cta-body tight">Then you're deciding on your own numbers instead of my opinion.</p>
+        <a class="g-cta-btn" href="#">Book 10 minutes with Joe</a>
+        <p class="g-cta-nc">No contract.</p>
+      </div>
+    </section>
+
+  </div><!-- /growth-root -->
 
   <!-- ══ FOOTER (Novus lockup) ══ -->
   <footer class="site-footer">
@@ -725,6 +1008,16 @@
     const VAPI_PUBLIC_KEY = 'a154a7cb-a164-4fd8-bf2d-6b3aaba450a0';
 
     const p         = new URLSearchParams(window.location.search);
+
+    // ── SEGMENT ROUTING ──
+    // ?s=growth selects the Growth variant (grades A/B/C only). Grades D/E and
+    // no-param fall through to the Core variant untouched. Decided here so the
+    // Core demo boot below can be skipped cleanly before it fires any requests.
+    const _segParam   = (p.get('s') || '').toLowerCase();
+    const _gradeParam = (p.get('grade') || '').trim().toUpperCase().charAt(0);
+    const growthActive = _segParam === 'growth' && _gradeParam !== 'D' && _gradeParam !== 'E';
+    if (growthActive) document.body.classList.add('growth');
+
     const _fn       = p.get('first_name') || '';
     const firstName = (_fn === 'FAILED_OWNER' || _fn === 'FAILED_SCRAPE') ? '' : _fn;
     const company   = p.get('company') || 'Your Agency';
@@ -1073,10 +1366,247 @@ Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic
     document.getElementById('cp-msgs').addEventListener('wheel', function(e) { e.stopPropagation(); }, { passive: true });
     document.getElementById('cp-msgs-phone').addEventListener('wheel', function(e) { e.stopPropagation(); }, { passive: true });
 
-    loadScreenshot();
-    loadPhoneScreenshot();
-    scrapeAndTrain();
-  </script>  <div class="page-bottom-margin"></div>
+    // The growth variant runs its own init (see growth controller below).
+    // Only boot the Core demo when we're not in growth mode.
+    if (!growthActive) {
+      loadScreenshot();
+      loadPhoneScreenshot();
+      scrapeAndTrain();
+    }
+  </script>
+
+  <!-- ═══ GROWTH CONTROLLER ═══ -->
+  <script>
+  (function () {
+    const q         = new URLSearchParams(window.location.search);
+    const seg       = (q.get('s') || '').toLowerCase();
+    if (seg !== 'growth') return;
+
+    const gradeRaw  = (q.get('grade') || '').trim().toUpperCase();
+    const grade     = gradeRaw.charAt(0); // tolerate "A", "a", "Grade A"
+    const company   = q.get('company') || 'Your Agency';
+
+    // Grades D and E do not receive the Growth variant → fall through to Core.
+    // (body.growth is set by the boot script above; if it's absent, Core renders.)
+    if (!document.body.classList.contains('growth')) {
+      console.log('[growth] grade ' + (grade || '?') + ' requested growth — rendering Core instead. company:', company);
+      return;
+    }
+
+    // ── data (query-param injected per slug, same pattern as Core) ──
+    const valuationUrl = (q.get('valuation_url') || '').trim();
+    const homeUrl      = (q.get('url') || '').trim();
+    const property     = (q.get('property') || '').trim();
+    const probeTime    = (q.get('probe_time') || '').trim();
+    const probeDay     = (q.get('probe_day') || '').trim();
+    const contactName  = (q.get('contact_name') || '').trim();
+    const ackSeconds   = (q.get('ack_seconds') || '').trim();
+    const humanLag     = (q.get('human_lag') || '').trim();
+    const daysSince    = (q.get('days_since') || '').trim();
+
+    function esc(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // ── names / slots ──
+    document.getElementById('page-title').textContent = company + ' — Novus';
+    document.querySelectorAll('.company-slot').forEach(function (el) { el.textContent = company; });
+    document.getElementById('g1-name').textContent = company;
+    document.getElementById('g2-name').textContent = 'Novus — on behalf of ' + company;
+
+    // ── 1. proof line ──
+    // Base sentence needs property + probe_time + probe_day; each grade adds fields.
+    // If ANY required field is missing, omit the proof line entirely.
+    function buildGradeLine() {
+      if (grade === 'C') {
+        if (!ackSeconds || !daysSince) return null;
+        return 'Your system replied in ' + ackSeconds + '. Nobody’s been in touch since — that was ' + daysSince + ' days ago.';
+      }
+      if (grade === 'B') {
+        if (!contactName || !humanLag) return null;
+        return contactName + ' came back to me personally within ' + humanLag + ', in the evening. I didn’t reply, and that was the end of it.';
+      }
+      if (grade === 'A') {
+        if (!contactName) return null;
+        return contactName + ' came back within the hour, then chased me twice. You’re the only agency I’ve looked at who did that.';
+      }
+      return null;
+    }
+    (function renderProof() {
+      const el = document.getElementById('g-proof');
+      const gradeLine = buildGradeLine();
+      if (!property || !probeTime || !probeDay || !gradeLine) return; // omit entirely
+      el.textContent = 'I enquired on ' + property + ' at ' + probeTime + ' on ' + probeDay + '. ' + gradeLine;
+      el.style.display = '';
+    })();
+
+    // ── 2. headline sub-line (Grade A gets a different sub) ──
+    (function renderSub() {
+      const el = document.getElementById('g-hero-sub');
+      if (grade === 'A') {
+        el.textContent = 'Two questions you almost certainly can’t answer: how many market appraisals did you do last year that never turned into an instruction — and what happened to those people?';
+      } else {
+        el.textContent = 'Someone whose only job is working them. Never out on a viewing, never stuck on a chain, never has a Tuesday where they didn’t get round to it.';
+      }
+    })();
+
+    // ── 3. Module one — valuation frame (fallback chain, resolved here) ──
+    // tier 1: valuation_url · tier 2: homepage (relabel + drop caption) · tier 3: static
+    (function moduleOneFrame() {
+      let tier, frameUrl = '';
+      if (valuationUrl)      { tier = 1; frameUrl = valuationUrl; }
+      else if (homeUrl)      { tier = 2; frameUrl = homeUrl; }
+      else                   { tier = 3; }
+      console.log('[growth] module1 fallback tier ' + tier + ' for ' + (company || 'slug'));
+
+      if (tier === 2) {
+        document.getElementById('g1-widget-label').textContent = 'Chat to us';
+        const cap = document.getElementById('g1-caption'); if (cap) cap.style.display = 'none';
+      }
+
+      const ldr = document.getElementById('g1-loading');
+      const img = document.getElementById('g1-img');
+      const urlEl = document.getElementById('g1-url');
+      if (frameUrl) {
+        const clean = frameUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        urlEl.innerHTML = '<span class="url-domain">' + esc(clean) + '</span>';
+      }
+      if (tier === 3) { // static fallback — no screenshot to load
+        ldr.classList.add('gone');
+        img.parentElement.insertAdjacentHTML('afterbegin',
+          '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#F8FAFC;padding:24px;text-align:center;z-index:1;">' +
+          '<div style="font-size:1.8rem">🏡</div>' +
+          '<p style="font-size:.72rem;color:#64748B;line-height:1.6;max-width:220px;">Your free valuation page — with a booking assistant on it.</p></div>');
+        return;
+      }
+      let done = false;
+      const timer = setTimeout(function () { if (done) return; done = true; ldr.classList.add('gone'); }, 7000);
+      img.onload  = function () { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); img.style.display = 'block'; };
+      img.onerror = function () { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); };
+      img.src = 'https://image.thum.io/get/width/1280/crop/900/noanimate/' + frameUrl;
+    })();
+
+    // ── shared lean chat over /api/chat ──
+    function addBubble(container, text, role, cls) {
+      const d = document.createElement('div');
+      d.className = cls || ('msg ' + role);
+      d.innerHTML = '<div class="bubble">' + esc(text).replace(/\n/g,'<br>') + '</div>';
+      container.appendChild(d); container.scrollTop = container.scrollHeight;
+      return d;
+    }
+
+    // ── Module one vendor conversation ──
+    const VENDOR_PROMPT =
+`You are the AI booking assistant on ${company}'s "free valuation" web page, an independent UK estate agent. You speak as the agency ("we", "us") in warm, concise British English. Your ONE job is to book a market appraisal (a free valuation visit) into the diary for a homeowner who is thinking of selling.
+
+FIRST TURN: You have already introduced yourself as ${company}'s assistant in the opening message. Do not re-introduce on every turn.
+
+HARD RULES:
+- You must NEVER put a price or a value on the person's home — not a figure, not a range, not a "ballpark", not "somewhere around". Refuse warmly every time and explain that an accurate valuation needs one of the team to see the property in person. This refusal is the point — do it clearly and kindly.
+- Never quote a fee or a price for the agency's services. If asked what you charge, say the team will confirm their fee — do not invent a number.
+- Never claim a booking is finally confirmed as done. Say you'll pencil them in and the team will confirm the exact time.
+- Identify yourself as an assistant, not a person, if asked. Never pretend to be human.
+
+WHAT TO DO:
+- Qualify gently: are they thinking of selling / timeline, the address or area, and whether they've had a valuation before.
+- Steer every path toward booking a market appraisal — a visit where one of the team values the property properly.
+- Capture name, contact number, address/area and rough timeline, then offer a couple of times for the visit.
+- Keep replies short (2-4 sentences), one clear next step each turn.`;
+
+    let g1Busy = false;
+    const g1Hist = [];
+    window.g1Send = function () {
+      const inp = document.getElementById('g1-inp');
+      const text = (inp.value || '').trim();
+      if (!text || g1Busy) return;
+      const msgs = document.getElementById('g1-msgs');
+      inp.value = '';
+      addBubble(msgs, text, 'user');
+      g1Hist.push({ role: 'user', content: text });
+      g1Busy = true;
+      const typing = document.createElement('div');
+      typing.className = 'typing-row';
+      typing.innerHTML = '<div class="typing-bub"><div class="td"></div><div class="td"></div><div class="td"></div></div>';
+      msgs.appendChild(typing); msgs.scrollTop = msgs.scrollHeight;
+      fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: g1Hist, systemPrompt: VENDOR_PROMPT, agencyName: company }) })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          typing.remove();
+          const reply = data.reply || 'Sorry — could you try that again?';
+          addBubble(msgs, reply, 'bot');
+          g1Hist.push({ role: 'assistant', content: reply });
+        })
+        .catch(function () { typing.remove(); addBubble(msgs, 'Having trouble connecting — please try again.', 'bot'); })
+        .finally(function () { g1Busy = false; inp.focus(); });
+    };
+    document.getElementById('g1-inp').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) window.g1Send(); });
+    // seed opening message — identifies itself as an assistant on the first turn
+    addBubble(document.getElementById('g1-msgs'),
+      'Hi — I’m ' + company + '’s assistant, here to book you in. Are you thinking of selling? Tell me a bit about the place and I’ll get one of the team out to value it.', 'bot');
+
+    // ── Module two — the reawakening thread ──
+    const REAWAKEN_PROMPT =
+`You are Novus, a messaging assistant working ON BEHALF OF ${company}, an independent UK estate agent, over WhatsApp/text. You are re-contacting Sarah, a homeowner whom ${company} gave a valuation to on Elmfield Road in June last year, who never went on to instruct. You write in warm, brief, natural British text-message English (short messages, no corporate tone).
+
+YOUR GOAL: end every path with a market appraisal (a fresh free valuation visit) being offered and, if she's willing, pencilled in.
+
+HARD RULES:
+- Never put a price or value on her home. If she asks what it's worth, warmly explain the market has moved and the honest answer is to get someone back out to see it — offer to book that.
+- If she asks "who is this?" or similar: give a straight, non-evasive answer — you are an assistant messaging on behalf of ${company}, the agents who valued her place on Elmfield Road last June. Never pretend to be a specific person or hide that you're an assistant.
+- If she asks "what do you charge?": refer only to ${company}'s published/standard fee and say the team will confirm it — never negotiate, never offer a discount, never invent a number.
+- If she says she's decided not to move: be gracious, no pressure, and leave the door open — offer a no-obligation updated appraisal for whenever she's ready.
+- Keep each message to 1-3 short sentences.`;
+
+    let g2Busy = false, g2Started = false;
+    const g2Hist = [];
+    const g2Msgs = document.getElementById('g2-msgs');
+    function g2AddThem(text) { return addBubble(g2Msgs, text, 'them', 'g-msg them'); }
+    function g2AddMe(text)   { return addBubble(g2Msgs, text, 'me', 'g-msg me'); }
+
+    // pre-seeded first message
+    g2AddThem('Hi Sarah — ' + company + ' valued your place on Elmfield Road back in June last year. Just checking in: are you still thinking of moving, or did you park it?');
+
+    const g2Chips = ['We decided not to move', 'Who is this?', 'What do you charge?'];
+    (function renderChips() {
+      const box = document.getElementById('g2-replies');
+      box.innerHTML = g2Chips.map(function (c) {
+        return '<button class="g-reply-chip" onclick="g2Reply(this)">' + esc(c) + '</button>';
+      }).join('');
+    })();
+
+    function g2SendText(text) {
+      if (!text || g2Busy) return;
+      const box = document.getElementById('g2-replies'); if (box) box.innerHTML = '';
+      g2AddMe(text);
+      g2Hist.push({ role: 'user', content: text });
+      g2Busy = true;
+      const typing = document.createElement('div');
+      typing.className = 'g-thread-typing';
+      typing.innerHTML = '<div class="td"></div><div class="td"></div><div class="td"></div>';
+      g2Msgs.appendChild(typing); g2Msgs.scrollTop = g2Msgs.scrollHeight;
+      fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: g2Hist, systemPrompt: REAWAKEN_PROMPT, agencyName: company }) })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          typing.remove();
+          const reply = data.reply || 'Sorry — could you say that again?';
+          g2AddThem(reply);
+          g2Hist.push({ role: 'assistant', content: reply });
+        })
+        .catch(function () { typing.remove(); g2AddThem('Sorry — having trouble connecting. Try again in a sec.'); })
+        .finally(function () { g2Busy = false; });
+    }
+    window.g2Reply = function (btn) { g2SendText(btn.textContent); };
+    window.g2Send = function () {
+      const inp = document.getElementById('g2-inp');
+      const text = (inp.value || '').trim();
+      if (!text) return; inp.value = '';
+      g2SendText(text);
+    };
+    document.getElementById('g2-inp').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) window.g2Send(); });
+  })();
+  </script>
+
+  <div class="page-bottom-margin"></div>
 
 </body>
 </html>
