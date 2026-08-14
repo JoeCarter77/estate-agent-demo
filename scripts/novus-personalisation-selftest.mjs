@@ -12,6 +12,7 @@
 // Run:  npm run novus:personalisation-selftest
 
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { buildSalesStrategy } from '../lib/sales-strategy.mjs';
 import { classifyTier } from '../lib/tier.mjs';
 import {
@@ -330,7 +331,88 @@ await checkAsync('malformed AI output propagates as a rejection from generatePer
   );
 });
 
-// ── 6. AI failure never corrupts anything (no persistence exists to corrupt) ─
+// ── 6. NOVUS Email Personalisation & Outreach Reference guidance ──────────
+
+check('email_variant receives the documented six-part skeleton, in order', () => {
+  const { grade, tier, strategy, observation } = strategyFor('C');
+  const req = buildPersonalisationRequest({ grade, tier, strategy, probe: PROBE, agency: AGENCY, observation });
+  const labels = [
+    '1. WTF opening', '2. Evidence-backed interpretation', '3. Commercial pain',
+    '4. NOVUS mechanism', '5. Personalised demo', '6. CTA',
+  ];
+  let lastIndex = -1;
+  for (const label of labels) {
+    const idx = req.system.indexOf(label);
+    assert.ok(idx !== -1, `system prompt missing skeleton step "${label}"`);
+    assert.ok(idx > lastIndex, `skeleton step "${label}" out of order`);
+    lastIndex = idx;
+  }
+});
+
+check('"WTF opening" is explicitly named, not just paraphrased as the "how do they know this?" reaction', () => {
+  const { grade, tier, strategy, observation } = strategyFor('A');
+  const req = buildPersonalisationRequest({ grade, tier, strategy, probe: PROBE, agency: AGENCY, observation });
+  assert.ok(req.system.includes('WTF opening'));
+  assert.ok(req.system.includes('how do they know this?'));
+});
+
+check('strongest-facts-only non-negotiable is present', () => {
+  const { grade, tier, strategy, observation } = strategyFor('B');
+  const req = buildPersonalisationRequest({ grade, tier, strategy, probe: PROBE, agency: AGENCY, observation });
+  assert.ok(/select the strongest facts/i.test(req.system));
+  assert.ok(/not.*every available data point/i.test(req.system.replace(/\n/g, ' ')));
+});
+
+check('no generic "AI for estate agents" positioning before the problem is established', () => {
+  const { grade, tier, strategy, observation } = strategyFor('H');
+  const req = buildPersonalisationRequest({ grade, tier, strategy, probe: PROBE, agency: AGENCY, observation });
+  assert.ok(/never lead with generic "ai for estate agents" positioning/i.test(req.system));
+});
+
+check('Growth demo guidance explicitly says the demo shows work opportunities already generated', () => {
+  const { grade, tier, strategy, observation } = strategyFor('A');
+  const req = buildPersonalisationRequest({ grade, tier, strategy, probe: PROBE, agency: AGENCY, observation });
+  assert.ok(/work opportunities already generated/i.test(req.system));
+  assert.ok(/never a repeat of the front-desk demo/i.test(req.system));
+});
+
+check('Core demo guidance explicitly says the demo shows the enquiry journey from response through booking', () => {
+  const { grade, tier, strategy, observation } = strategyFor('D');
+  const req = buildPersonalisationRequest({ grade, tier, strategy, probe: PROBE, agency: AGENCY, observation });
+  assert.ok(/enquiry journey from response through to booking/i.test(req.system));
+});
+
+check('demo purpose guidance is present for every grade regardless of which one is being generated (deterministic demo_type picks the applicable half, not the AI)', () => {
+  for (const grade of Object.keys(CASES)) {
+    const { tier, strategy, observation } = strategyFor(grade);
+    const req = buildPersonalisationRequest({ grade, tier, strategy, probe: PROBE, agency: AGENCY, observation });
+    assert.ok(/work opportunities already generated/i.test(req.system));
+    assert.ok(/enquiry journey from response through to booking/i.test(req.system));
+    // The instruction not to swap between them on its own judgement must
+    // always be present too — the AI sees both halves but is told the
+    // demo_type in authoritative_decision picks which one applies.
+    assert.ok(/must not swap between them on your own judgement/i.test(req.system));
+  }
+});
+
+check('relevant_objection_response guidance is strategy/evidence-derived, and the code documents that the reference doc defines no objection framework', () => {
+  const source = readFileSync(new URL('../lib/personalisation.mjs', import.meta.url), 'utf8');
+  assert.ok(
+    /has no source in the NOVUS Email\s*\n?\/\/ Personalisation & Outreach Reference/.test(source)
+      || /contains zero mentions of "objection"/.test(source),
+    'expected a code comment documenting the reference doc has no objection-handling framework',
+  );
+  assert.ok(!/reference doc(ument)? defines (an? )?objection/i.test(source), 'must not claim the reference document defines an objection framework');
+
+  const { grade, tier, strategy, observation } = strategyFor('F');
+  const req = buildPersonalisationRequest({ grade, tier, strategy, probe: PROBE, agency: AGENCY, observation });
+  // The objection-response rule must still be present as a hard constraint
+  // (no claim that the prospect actually raised it), sourced from the
+  // PROHIBITED_CLAIMS hard rules, not from any document-derived section.
+  assert.ok(/a claim that the prospect has raised any objection/i.test(req.system));
+});
+
+// ── 7. AI failure never corrupts anything (no persistence exists to corrupt) ─
 
 await checkAsync('AI/network failure throws rather than returning a fabricated or silently-blank result', async () => {
   const { grade, tier, strategy, observation } = strategyFor('B');
