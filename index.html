@@ -3,10 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title id="page-title">Novus — AI front desk for estate agents</title>
+  <meta name="description" content="Your out-of-hours line that answers every enquiry, day or night." />
+  <title id="page-title">Novus - Your out-of-hours line that answers every enquiry, day or night</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%2711%2016%2080%2080%27%3E%3Crect%20x%3D%2711%27%20y%3D%2716%27%20width%3D%2780%27%20height%3D%2780%27%20rx%3D%2716%27%20fill%3D%27%23172D67%27/%3E%3Cpath%20d%3D%27M29%2082%20L29%2046%20C29%2030%2050%2030%2050%2046%20L73%2082%20L73%2030%27%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%2711%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet" />
+  <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
   <script type="module">
     import Vapi from 'https://esm.sh/@vapi-ai/web';
     window._VapiClass = Vapi;
@@ -71,8 +74,8 @@
       min-height: calc(100vh - 60px);
       padding: 24px 48px;
       display: grid;
-      grid-template-columns: minmax(0, 42%) 1fr;
-      gap: 48px;
+      grid-template-columns: minmax(0, 40%) minmax(0, 60%);
+      gap: 40px;
       align-items: center;
     }
     .left { display: flex; flex-direction: column; gap: 36px; }
@@ -101,11 +104,21 @@
     .browser-loading.gone { opacity: 0; pointer-events: none; }
     .spin { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
     .browser-loading p { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); }
-    .browser-screenshot { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: none; }
+    .browser-frame { width: 100%; height: 100%; border: 0; display: none; background: #FFFFFF; }
+    .browser-fail { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 32px; background: var(--panel); }
+    .browser-fail .bf-ico { font-size: 1.8rem; }
+    .browser-fail p { font-size: 0.9rem; line-height: 1.65; color: var(--text-2); max-width: 420px; }
+    .browser-fail strong { color: var(--text); font-weight: 700; }
+    .browser-fail .bf-sub { font-size: 0.82rem; color: var(--text-3); }
 
-    /* ── CHAT PANEL ── */
-    .in-browser-panel { position: absolute; bottom: 74px; right: 16px; z-index: 19; width: 300px; max-height: calc(100% - 94px); background: #FFFFFF; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: 0 24px 60px rgba(15,23,42,0.18), 0 0 0 1px var(--border); display: flex; flex-direction: column; opacity: 0; transform: translateY(16px) scale(0.95); pointer-events: none; transform-origin: bottom right; transition: opacity 0.22s ease, transform 0.26s cubic-bezier(0.34,1.56,0.64,1); }
-    .in-browser-panel.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: all; }
+    /* ── CHAT PANEL (collapsed bubble → expands on hover / click-pin) ── */
+    .chat-dock { position: absolute; bottom: 16px; right: 16px; z-index: 19; }
+    .chat-bubble { position: relative; z-index: 2; display: flex; align-items: center; gap: 7px; background: var(--accent); color: #fff; border: none; border-radius: 100px; padding: 10px 15px; font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.78rem; cursor: pointer; box-shadow: 0 10px 26px rgba(37,99,235,0.42); transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s; white-space: nowrap; }
+    .chat-bubble:hover { transform: translateY(-1px); box-shadow: 0 14px 34px rgba(37,99,235,0.55); }
+    .chat-bubble-ico { font-size: 0.95rem; }
+    .in-browser-panel { position: absolute; bottom: 0; right: 0; z-index: 1; width: 300px; max-width: calc(100vw - 48px); max-height: 360px; background: #FFFFFF; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: 0 24px 60px rgba(15,23,42,0.18), 0 0 0 1px var(--border); display: flex; flex-direction: column; opacity: 0; visibility: hidden; transform: translateY(16px) scale(0.95); pointer-events: none; transform-origin: bottom right; transition: opacity 0.22s ease, transform 0.26s cubic-bezier(0.34,1.56,0.64,1), visibility 0.22s; }
+    .chat-dock.hovering .in-browser-panel, .chat-dock.pinned .in-browser-panel { opacity: 1; visibility: visible; transform: translateY(0) scale(1); pointer-events: all; z-index: 3; }
+    .chat-dock.hovering .chat-bubble, .chat-dock.pinned .chat-bubble { opacity: 0; pointer-events: none; transform: translateY(6px); }
     .cp-head { background: var(--panel); padding: 12px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
     .cp-ava { width: 34px; height: 34px; flex-shrink: 0; background: var(--brand-navy); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; font-weight: 800; color: #fff; }
     .cp-name { font-size: 0.78rem; font-weight: 700; color: var(--text); }
@@ -115,7 +128,7 @@
     .screen { display: none; flex-direction: column; flex: 1; min-height: 0; }
     .screen.active { display: flex; }
 
-    /* entry buttons (visible immediately — no click-to-reveal) */
+    /* entry buttons (visible immediately - no click-to-reveal) */
     .entry-screen { padding: 14px; gap: 8px; align-items: stretch; justify-content: center; }
     .entry-btn { font-family: 'Inter', sans-serif; border-radius: 11px; cursor: pointer; font-weight: 700; display: block; width: 100%; text-align: center; line-height: 1.35; transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s, background 0.15s, border-color 0.15s; }
     .entry-primary { background: var(--accent); color: #fff; border: none; padding: 11px 14px; font-size: 0.8rem; box-shadow: 0 5px 16px rgba(37,99,235,0.32); }
@@ -336,12 +349,11 @@
       .page { grid-template-columns: 1fr; min-height: 0; padding: 28px 20px 40px; gap: 22px; align-items: stretch; }
       header { padding: 0 20px; }
       .right { position: static; padding-top: 0; }
-      .browser-wrap { display: none !important; }
-      .phone-wrap { display: flex !important; }
+      .call-panel { max-width: 100%; align-self: stretch; }
       .hero-copy { display: contents; }
       .hero-copy-top { order: 1; }
-      .hero-demo { order: 2; }
-      .hero-copy-actions { order: 3; }
+      .call-panel { order: 2; }
+      .hero-demo { order: 3; }
       .hero-demo .browser-content { aspect-ratio: 16 / 12; }
       .cta-full { padding: 40px 0; margin-top: 32px; }
       .cta-full-inner { padding: 0 20px; flex-direction: column; align-items: flex-start; gap: 20px; }
@@ -356,6 +368,7 @@
     .hero-headline { font-size: clamp(1.55rem, 2.5vw, 2.25rem); font-weight: 800; line-height: 1.12; letter-spacing: -0.03em; color: var(--text); }
     .hero-headline .company-slot { color: var(--brand-navy); }
     .hero-sub { font-size: 0.95rem; line-height: 1.65; color: var(--text-2); max-width: 460px; }
+    .hero-caption { font-size: 0.8rem; font-weight: 300; line-height: 1.55; color: var(--text-3); max-width: 440px; margin-top: -2px; }
     .hero-try { display: flex; flex-direction: column; gap: 9px; }
     .hero-try-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
     .hero-chips { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
@@ -366,8 +379,8 @@
     .qr-chip:hover { background: var(--accent-lo); border-color: var(--accent); }
     .hero-cta { display: inline-block; align-self: flex-start; text-align: center; background: var(--accent); color: #fff; font-weight: 800; font-size: 0.9rem; padding: 14px 22px; border-radius: 10px; text-decoration: none; line-height: 1.35; transition: background 0.15s, transform 0.15s; }
     .hero-cta:hover { background: var(--accent-hi); transform: translateY(-1px); }
-    .hero-demo { position: static; padding-top: 0; display: flex; align-items: center; justify-content: center; min-width: 0; }
-    .hero-demo .browser-wrap { width: 100%; max-width: 640px; }
+    .hero-demo { position: static; padding-top: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-width: 0; }
+    .hero-demo .browser-wrap { width: 100%; max-width: 620px; margin: 0 auto; }
     .hero-demo .browser-content { aspect-ratio: 1280 / 900; height: auto; }
 
     /* ── NOVUS MARK / FOOTER ── */
@@ -388,21 +401,22 @@
 
     /* ══ ESTATE-AGENT REBUILD SECTIONS ══ */
 
-    /* Section C — founder note */
+    /* Section C - founder note */
     .founder-note { padding: 56px 24px; border-top: 1px solid var(--border); background: var(--panel); }
     .founder-note-inner { max-width: 760px; margin: 0 auto; display: flex; gap: 22px; align-items: flex-start; }
     .founder-photo { width: 88px; height: 88px; flex-shrink: 0; border-radius: 50%; overflow: hidden; background: var(--panel-2); }
     .founder-photo img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; display: block; }
     .founder-note-name { font-size: 0.9rem; font-weight: 700; color: var(--text); margin-bottom: 8px; }
-    .founder-note-body p { font-size: 0.98rem; line-height: 1.7; color: var(--text-2); }
+    .founder-note-body p { font-size: 0.98rem; line-height: 1.7; color: var(--text-2); margin-bottom: 14px; }
+    .founder-note-body p:last-child { margin-bottom: 0; }
 
-    /* Section D — honest scope */
+    /* Section D - honest scope */
     .scope { padding: 56px 24px; border-top: 1px solid var(--border); }
     .scope-inner { max-width: 720px; margin: 0 auto; text-align: center; }
     .scope-lead { font-size: 1.15rem; font-weight: 700; color: var(--text); margin-bottom: 12px; }
     .scope-body { font-size: 0.98rem; line-height: 1.7; color: var(--text-2); }
 
-    /* Section E — final CTA */
+    /* Section E - final CTA */
     .final-cta { padding: 64px 24px; border-top: 1px solid var(--border); background: var(--panel); }
     .final-cta-inner { max-width: 640px; margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 18px; }
     .final-cta-title { font-size: 1.6rem; font-weight: 800; line-height: 1.2; color: var(--text); letter-spacing: -0.02em; }
@@ -416,11 +430,11 @@
     @media (max-width: 980px) {
       .founder-note-inner { flex-direction: column; align-items: center; text-align: center; gap: 16px; }
       .final-cta-title { font-size: 1.35rem; }
-      /* hero stack order: headline -> demo -> try/cta (must follow base .hero-copy rule) */
+      /* hero stack order: headline -> call panel -> website demo */
       .hero-copy { display: contents; }
       .hero-copy-top { order: 1; }
-      .hero-demo { order: 2; }
-      .hero-copy-actions { order: 3; margin-top: 2px; }
+      .call-panel { order: 2; }
+      .hero-demo { order: 3; }
     }
     /* ── LOGO IMAGES ── */
     .logo .logo-img { height: 26px; width: auto; display: block; }
@@ -453,42 +467,124 @@
     .build-block-text { font-size: 0.9rem; color: var(--text-2); line-height: 1.55; }
     @media (max-width: 820px) { .build-grid { grid-template-columns: 1fr; gap: 26px; } .pain { padding: 64px 20px 52px; } .build { padding: 60px 20px; } }
 
+    /* ── HERO CALL PANEL (voice-first, primary) ── */
+    .call-panel { background: linear-gradient(165deg, #0B1B3F 0%, var(--brand-navy) 60%, #1E3A8A 100%); border-radius: 18px; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 20px 48px rgba(15,23,42,0.26), inset 0 1px 0 rgba(255,255,255,0.06); padding: 20px 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 11px; text-align: center; position: relative; overflow: hidden; width: 100%; max-width: 380px; align-self: flex-start; }
+    .call-panel::before { content: ''; position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% -10%, rgba(59,130,246,0.28), transparent 60%); pointer-events: none; }
+    .call-avatar { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; color: #fff; position: relative; z-index: 1; }
+    .call-avatar svg { width: 21px; height: 21px; }
+    .call-callto { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #9DB4E8; position: relative; z-index: 1; }
+    .call-dial-btn { position: relative; z-index: 1; width: 100%; max-width: 300px; display: flex; align-items: center; justify-content: center; gap: 9px; background: #fff; color: var(--brand-navy); border: none; border-radius: 100px; padding: 12px 18px; font-family: 'Inter', sans-serif; font-size: 0.92rem; font-weight: 800; letter-spacing: -0.01em; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,0.32); transition: transform 0.14s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.14s; }
+    .call-dial-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(0,0,0,0.42); }
+    .call-dial-btn:active { transform: translateY(0) scale(0.98); }
+    .call-dial-btn .dial-ico { width: 28px; height: 28px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .call-dial-btn .dial-ico svg { width: 15px; height: 15px; }
+    .call-subtext { position: relative; z-index: 1; font-size: 0.82rem; line-height: 1.5; color: rgba(255,255,255,0.82); max-width: 300px; }
+    .call-poweredby { position: relative; z-index: 1; font-size: 0.6rem; letter-spacing: 0.06em; color: rgba(255,255,255,0.45); margin-top: 1px; }
+    .call-idle { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; position: relative; z-index: 1; }
+    .call-idle .call-avatar { margin-bottom: 2px; }
+    /* active call view inside call panel */
+    .call-active { position: relative; z-index: 1; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .call-active .voice-orb { background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.22); }
+    .call-active .voice-orb.listening { background: var(--accent); border-color: var(--accent); }
+    .call-active .voice-orb.speaking { background: var(--accent-hi); border-color: var(--accent-hi); }
+    .call-active .voice-status-label { color: rgba(255,255,255,0.7); }
+    .call-active .voice-status-label.active { color: #93C5FD; }
+    .call-active .voice-status-label.speaking { color: #86EFAC; }
+    .call-active .voice-transcript { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); color: rgba(255,255,255,0.9); }
+
+    /* ── DEMO SECONDARY CAPTION (right browser mockup) ── */
+    .demo-caption { font-size: 0.78rem; font-weight: 600; color: var(--text-3); text-align: center; margin-bottom: 4px; letter-spacing: -0.005em; }
+    .demo-caption strong { color: var(--text-2); font-weight: 700; }
+
+    /* ── EVIDENCE BLOCK ── */
+    .evidence { padding: 72px 24px 60px; border-top: 1px solid var(--border); }
+    .evidence-inner { max-width: 720px; margin: 0 auto; text-align: center; }
+    .evidence-quote { font-size: clamp(1.3rem, 2.4vw, 1.75rem); font-weight: 700; line-height: 1.4; color: var(--text); letter-spacing: -0.02em; }
+    .evidence-quote strong { color: var(--brand-navy); }
+    .evidence-quote .evidence-tail { display: block; margin-top: 14px; font-size: 1rem; font-weight: 500; color: var(--accent); letter-spacing: 0; }
+    .evidence-fallback .pain-line { font-size: 1rem; font-weight: 400; color: var(--text-3); line-height: 1.5; margin: 7px 0; }
+    .evidence-fallback .pain-payoff { font-size: 1.18rem; font-weight: 700; color: var(--brand-navy); margin-top: 24px; letter-spacing: -0.01em; }
+    .evidence-fallback-heading { font-size: clamp(1.4rem, 2.4vw, 1.9rem); font-weight: 800; letter-spacing: -0.025em; color: var(--text); margin-bottom: 24px; line-height: 1.15; }
+
+    /* ── VALUE TEASER ── */
+    .value-teaser { padding: 56px 24px; border-top: 1px solid var(--border); background: var(--panel); }
+    .value-teaser-inner { max-width: 680px; margin: 0 auto; text-align: center; }
+    .value-teaser p { font-size: clamp(1.05rem, 1.9vw, 1.3rem); font-weight: 600; line-height: 1.6; color: var(--text); letter-spacing: -0.01em; }
+    .value-teaser strong { color: var(--accent); }
+
+    /* ── EXCLUSIVITY LINE ── */
+    .exclusivity-line { font-size: 1rem; font-weight: 600; color: var(--brand-navy); line-height: 1.5; }
+    .exclusivity-line strong { color: var(--accent); }
+
+    /* ── CALENDLY EMBED ── */
+    .calendly-wrap { width: 100%; max-width: 680px; margin: 8px auto 0; }
+    .calendly-inline-widget { min-width: 320px; height: 660px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: var(--panel); }
+    @media (max-width: 640px) { .calendly-inline-widget { height: 720px; } }
+
+    /* ── PROBE PROOF BLOCK (top of page, above hero) ── */
+    .proof { position: relative; z-index: 1; background: var(--brand-navy); border-bottom: 1px solid rgba(255,255,255,0.08); padding: 34px 24px; }
+    .proof-inner { max-width: 900px; margin: 0 auto; }
+    .proof-quote { font-size: clamp(1.15rem, 2.1vw, 1.55rem); font-weight: 700; line-height: 1.45; letter-spacing: -0.015em; color: #fff; text-align: center; }
+    @media (max-width: 640px) { .proof { padding: 26px 20px; } }
+
   </style>
 </head>
 <body>
 
   <header>
     <a class="logo" href="https://trynovus.co.uk" id="brand-logo">
-      <img class="logo-img" src="novus-icon.png" alt="Novus" />
+      <img class="logo-img" src="/novus-icon.png" alt="Novus" />
       <span class="logo-wordmark">NOVUS</span>
     </a>
     <div class="pill-live"><div class="live-dot"></div>Live Demo</div>
   </header>
 
+  <!-- ══ PROBE PROOF BLOCK (live from Google Sheet; renders only when probe data exists) ══ -->
+  <section class="proof" id="proof" style="display:none">
+    <div class="proof-inner">
+      <p class="proof-quote" id="proof-quote"></p>
+    </div>
+  </section>
+
   <div class="page">
 
-    <!-- ══ LEFT ══ -->
-    <!-- ══ LEFT (copy) ══ -->
+    <!-- ══ LEFT (voice-first call panel - primary) ══ -->
     <div class="left hero-copy">
       <div class="hero-copy-top">
-        <div class="hero-eyebrow fu">LIVE DEMO — <span class="company-slot">Your Agency</span></div>
-        <h1 class="hero-headline fu fu-1"><span class="company-slot">Your Agency</span>'s front desk — open 24/7.</h1>
-        <p class="hero-sub fu fu-1">This is a working demo, trained on just a sample of your live listings. The full build learns your whole catalogue and is tuned to your area, your buyers and exactly what you want it to do — capture, qualify, book.</p>
+        <div class="hero-eyebrow fu">LIVE DEMO - <span class="company-slot">Your Agency</span></div>
+        <h1 class="hero-headline fu fu-1" id="hero-headline">You lost a valuation this week. That's the last one.</h1>
+        <p class="hero-sub fu fu-1">Answering the calls you're missing - booking valuations and viewings straight into your calendar.</p>
+        <p class="hero-caption fu fu-1">Built from a sample of your live listings - pulled straight from your website.</p>
       </div>
-      <div class="hero-copy-actions fu fu-2">
-        <div class="hero-try">
-          <div class="hero-try-label">Try asking it:</div>
-          <div class="hero-chips" id="hero-chips">
-            <button class="hero-chip" onclick="askDemo(this.textContent)">Can I book a viewing?</button>
-            <button class="hero-chip" onclick="askDemo(this.textContent)">Can you value my house?</button>
+      <div class="call-panel fu fu-2">
+        <div class="call-idle" id="hero-call-idle">
+          <div class="call-avatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
           </div>
+          <div class="call-callto">Your out-of-hours line</div>
+          <button class="call-dial-btn" onclick="startHeroCall()">
+            <span class="dial-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
+            <span>Call <span class="company-slot">Your Agency</span></span>
+          </button>
+          <p class="call-subtext">This is what your out-of-hours line sounds like from Monday.</p>
+          <p class="call-poweredby">Powered by AI · trained on your live listings</p>
         </div>
-        <a class="hero-cta" href="#pricing">See what this costs for <span class="company-slot">Your Agency</span> →</a>
+        <div class="call-active" id="hero-call-active" style="display:none">
+          <div class="voice-orb-wrap">
+            <div class="voice-orb idle" id="hero-voice-orb">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </div>
+          </div>
+          <div class="voice-status-label" id="hero-voice-status">Connecting…</div>
+          <div class="voice-transcript" id="hero-voice-transcript">Connecting to your line…</div>
+          <button class="voice-end-btn" onclick="endHeroCall()">End Call</button>
+        </div>
       </div>
     </div>
 
-    <!-- ══ RIGHT (live demo) ══ -->
+    <!-- ══ RIGHT (website demo - secondary) ══ -->
     <div class="right hero-demo fu fu-2">
+      <p class="demo-caption">The same thing, <strong>live on your website too.</strong></p>
       <!-- Browser mockup -->
       <div class="browser-wrap fu fu-2">
         <div class="browser">
@@ -506,26 +602,31 @@
           <div class="browser-content">
             <div class="browser-loading" id="browser-loading">
               <div class="spin"></div>
-              <p>Capturing your website…</p>
+              <p>Loading your website…</p>
             </div>
-            <img id="browser-img" class="browser-screenshot" alt="Website screenshot" />
+            <iframe id="browser-frame" class="browser-frame" title="Your website preview" loading="eager" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
+            <div class="browser-fail" id="browser-fail" style="display:none"></div>
 
-            <div class="in-browser-panel open" id="ibp">
+            <div class="chat-dock" id="chat-dock">
+              <button class="chat-bubble" id="chat-bubble" onclick="pinChat()" aria-label="Chat to us">
+                <span class="chat-bubble-ico">💬</span><span>Chat to us</span>
+              </button>
+              <div class="in-browser-panel" id="ibp">
               <div class="cp-head">
-                <div class="cp-ava" id="cp-ava"><img src="novus-icon-white.png" alt="" /></div>
+                <div class="cp-ava" id="cp-ava"><img src="/novus-icon-white.png" alt="" /></div>
                 <div>
                   <div class="cp-name" id="cp-name">Your Agency</div>
                   <div class="cp-online"><div class="cp-sdot"></div><span>Online now</span></div>
                 </div>
               </div>
               <div class="screen launch-screen active" id="screen-launch">
-                <button class="launch-btn" onclick="showScreen('mode')"><span class="launch-ico">💬</span><span>Click here to call or message us</span></button>
-                <p class="launch-sub">Answers in seconds — buy, sell, rent or a valuation.</p>
+                <button class="launch-btn" onclick="pinChat(); showScreen('mode')"><span class="launch-ico">💬</span><span>Click here to call or message us</span></button>
+                <p class="launch-sub">Answers in seconds - buy, sell, rent or a valuation.</p>
               </div>
               <div class="screen entry-screen" id="screen-mode">
                 <button class="entry-btn entry-primary" onclick="selectMode('voice')">📞 Call <span id="entry-company">us</span> now</button>
                 <button class="entry-btn entry-secondary" onclick="selectMode('chat')">💬 Chat with us</button>
-                <p class="entry-hint">Answers in seconds — about any property, valuation or viewing.</p>
+                <p class="entry-hint">Answers in seconds - about any property, valuation or viewing.</p>
               </div>
               <div class="screen contact-screen" id="screen-contact">
                 <p class="contact-title" id="contact-title">Before we start…</p>
@@ -536,11 +637,6 @@
               </div>
               <div class="screen chat-screen" id="screen-chat">
                 <div class="cp-msgs" id="cp-msgs"></div>
-                <div class="cp-suggs" id="cp-suggs">
-                  <button class="sq" onclick="sendSuggested(this)">What have you got for sale?</button>
-                  <button class="sq" onclick="sendSuggested(this)">Can I book a valuation?</button>
-                  <button class="sq" onclick="sendSuggested(this)">How do I arrange a viewing?</button>
-                </div>
                 <div class="cp-sbar" id="cp-sbar" style="display:none"><div class="sdot"></div><span id="cp-sbar-txt">Training on website content…</span></div>
                 <div class="cp-inp-row">
                   <button class="chat-back-btn" onclick="goBackToMode()" title="Back">←</button>
@@ -560,102 +656,25 @@
                 <div class="voice-transcript" id="voice-transcript">Connecting to AI receptionist…</div>
                 <button class="voice-end-btn" onclick="endVoiceCall()">End Call</button>
               </div>
-            </div>
+              </div><!-- /in-browser-panel -->
+            </div><!-- /chat-dock -->
 
           </div>
-        </div>
-      </div>
-
-      <!-- Phone mockup -->
-      <div class="phone-wrap fu fu-2">
-        <div class="phone-shell">
-          <div class="phone-notch">
-            <div class="phone-notch-dot"></div>
-            <div class="phone-notch-cam"></div>
-          </div>
-          <div class="phone-screen">
-            <div class="phone-loading" id="phone-loading">
-              <div class="spin"></div>
-              <p style="font-size:0.6rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);">Loading…</p>
-            </div>
-            <img id="phone-img" class="phone-screenshot" alt="Mobile website screenshot" />
-            <div class="in-browser-panel open" id="ibp-phone">
-              <div class="cp-head">
-                <div class="cp-ava"><img src="novus-icon-white.png" alt="" /></div>
-                <div>
-                  <div class="cp-name" id="cp-name-phone">Your Agency</div>
-                  <div class="cp-online"><div class="cp-sdot"></div><span>Online now</span></div>
-                </div>
-              </div>
-              <div class="screen launch-screen active" id="screen-launch-phone">
-                <button class="launch-btn" onclick="showScreenPhone('mode')"><span class="launch-ico">💬</span><span>Click here to call or message us</span></button>
-                <p class="launch-sub">Answers in seconds.</p>
-              </div>
-              <div class="screen entry-screen" id="screen-mode-phone">
-                <button class="entry-btn entry-primary" onclick="selectModePhone('voice')">📞 Call <span id="entry-company-phone">us</span> now</button>
-                <button class="entry-btn entry-secondary" onclick="selectModePhone('chat')">💬 Chat with us</button>
-                <p class="entry-hint">Answers in seconds — property, valuation or viewing.</p>
-              </div>
-              <div class="screen contact-screen" id="screen-contact-phone">
-                <p class="contact-title" id="contact-title-phone">Before we start…</p>
-                <p class="contact-sub">Just your details so we can get back to you!</p>
-                <input class="contact-input" id="contact-name-phone" type="text" placeholder="Your first name" autocomplete="given-name" />
-                <button class="contact-start-btn" id="contact-start-btn-phone" onclick="startFromContactPhone()">Start Chat →</button>
-                <button class="contact-back" onclick="goBackPhone()">← Back</button>
-              </div>
-              <div class="screen chat-screen" id="screen-chat-phone">
-                <div class="cp-msgs" id="cp-msgs-phone"></div>
-                <div class="cp-suggs" id="cp-suggs-phone">
-                  <button class="sq" onclick="sendSuggestedPhone(this)">For sale?</button>
-                  <button class="sq" onclick="sendSuggestedPhone(this)">Book a valuation?</button>
-                  <button class="sq" onclick="sendSuggestedPhone(this)">Arrange a viewing?</button>
-                </div>
-                <div class="cp-sbar" id="cp-sbar-phone" style="display:none"><div class="sdot"></div><span>Training…</span></div>
-                <div class="cp-inp-row">
-                  <button class="chat-back-btn" onclick="goBackToModePhone()" title="Back">←</button>
-                  <input class="cp-inp" id="cp-inp-phone" type="text" placeholder="Ask anything…" disabled />
-                  <button class="cp-send" id="cp-send-phone" onclick="sendMsgPhone()" disabled>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  </button>
-                </div>
-              </div>
-              <div class="screen voice-screen" id="screen-voice-phone">
-                <div class="voice-orb-wrap">
-                  <div class="voice-orb idle" id="voice-orb-phone">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-                  </div>
-                </div>
-                <div class="voice-status-label" id="voice-status-phone">Connecting…</div>
-                <div class="voice-transcript" id="voice-transcript-phone">Connecting…</div>
-                <button class="voice-end-btn" onclick="endVoiceCallPhone()">End Call</button>
-              </div>
-            </div>
-          </div>
-          <div class="phone-home-bar"></div>
         </div>
       </div>
     </div>
 
   </div><!-- /page -->
 
-  <!-- ══ PAIN BLOCK ══ -->
-  <section class="pain">
-    <div class="pain-inner">
-      <h2 class="pain-heading">After 6pm, where do your enquiries go?</h2>
-      <p class="pain-line">The 9pm valuation request nobody answers.</p>
-      <p class="pain-line">The phone ringing out while the team's on viewings.</p>
-      <p class="pain-line">The leads that go cold before you call back.</p>
-      <p class="pain-payoff">Every one is a booking &mdash; or an instruction &mdash; gone.</p>
-    </div>
-  </section>
-
   <!-- ══ FOUNDER NOTE (Section C) ══ -->
   <section class="founder-note">
     <div class="founder-note-inner">
-      <div class="founder-photo"><img src="joe.png" alt="Joe, founder of Novus" /></div>
+      <div class="founder-photo"><img src="/joe.png" alt="Joe, founder of Novus" /></div>
       <div class="founder-note-body">
         <div class="founder-note-name">Joe &middot; Founder</div>
-        <p>I build and run this myself. No call centre, no offshore support desk, no faceless agency behind the login. If something's not right for <span class="company-slot">your agency</span>, you're talking to the person who wrote it &mdash; not a ticket number.</p>
+        <p>I'm Joe. My sister was flat-hunting last year and called an agency about a place she loved - got voicemail, left her number, never heard back. She found out two days later it was still available. Nobody dropped the ball on purpose: the team was out on viewings when she called, and by the time someone got to the voicemail she'd moved on.</p>
+        <p>That's the gap Novus closes. I've spent the last few years building systems like this for local businesses - Novus is that, pointed at estate agents.</p>
+        <p>You're not dealing with a support queue. You're dealing with the person who built it.</p>
       </div>
     </div>
   </section>
@@ -668,55 +687,66 @@
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
           <h3 class="build-block-title">Answers every call</h3>
-          <p class="build-block-text">Voice AI trained on your agency. Picks up 24/7, books straight into the diary.</p>
+          <p class="build-block-text">24/7, trained on your agency. Books valuations and viewings straight into the diary.</p>
         </div>
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-          <h3 class="build-block-title">Handles website chat</h3>
-          <p class="build-block-text">The same brain, live on your site — exactly what you tested above.</p>
-        </div>
-        <div class="build-block">
-          <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></div>
-          <h3 class="build-block-title">Qualifies every lead</h3>
-          <p class="build-block-text">Budget, timeline, chain, buyer or vendor — sorted before it reaches you.</p>
+          <h3 class="build-block-title">Handles your website chat</h3>
+          <p class="build-block-text">The same brain, live on your site - exactly what you just tested.</p>
         </div>
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
-          <h3 class="build-block-title">Never misses a valuation</h3>
-          <p class="build-block-text">The out-of-hours vendor enquiry that wins you the instruction.</p>
+          <h3 class="build-block-title">Knows your live listings</h3>
+          <p class="build-block-text">Prices, availability, what's under offer. Straight from your site.</p>
         </div>
         <div class="build-block">
-          <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
-          <h3 class="build-block-title">Synced to your listings</h3>
-          <p class="build-block-text">Knows what's live and what's under offer. Always current.</p>
+          <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></div>
+          <h3 class="build-block-title">Qualifies before it reaches you</h3>
+          <p class="build-block-text">Buyer or vendor, budget, timeline - sorted before it hits your inbox.</p>
         </div>
         <div class="build-block">
           <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div>
           <h3 class="build-block-title">Instant handover</h3>
-          <p class="build-block-text">Full lead details to your team the moment it lands.</p>
+          <p class="build-block-text">Full lead details to your team the second the call ends. SMS or email.</p>
+        </div>
+        <div class="build-block">
+          <div class="build-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></div>
+          <h3 class="build-block-title">Live in 5 days</h3>
+          <p class="build-block-text">No CRM change, no new phone system. Your existing number, forwarded.</p>
         </div>
       </div>
     </div>
   </section>
 
+  <!-- ══ VALUE TEASER (Section E1 - static copy, NOT a calculator) ══ -->
+  <section class="value-teaser">
+    <div class="value-teaser-inner">
+      <p>One missed valuation enquiry at an average instruction fee is a <strong>four-figure loss</strong>.</p>
+    </div>
+  </section>
+
   <!-- ══ FINAL CTA (Section E) ══ -->
-  <section class="final-cta" id="pricing">
+  <section class="final-cta" id="book">
     <div class="final-cta-inner">
-      <h2 class="final-cta-title">Ready to stop losing enquiries out of hours?</h2>
+      <h2 class="final-cta-title">Talk to Joe. Ten minutes, no deck, just your numbers.</h2>
+      <p class="exclusivity-line" id="exclusivity-line" style="display:none">I work with <strong>one agency per town</strong>. Nobody's signed in <strong id="exclusivity-town">your town</strong> yet.</p>
       <div class="final-cta-actions">
-        <!-- TODO: point at a real booking link once available -->
-        <a class="final-cta-btn" href="#">Book a 15-min call</a>
-        <span class="final-cta-or">or call Joe direct: <a class="joe-phone-slot final-cta-phone" href="#">{{joe_phone}}</a></span>
+        <a class="final-cta-btn" href="#calendly" onclick="revealCalendly(event)">Book 10 minutes with Joe</a>
+        <span class="final-cta-or">or call him direct: <a class="joe-phone-slot final-cta-phone" href="#">{{joe_phone}}</a></span>
       </div>
-      <p class="final-cta-terms">&pound;299/mo + &pound;199 setup. No contract. 30-day money-back guarantee.</p>
+      <p class="final-cta-terms">No contract. 30-day money-back guarantee.</p>
+      <!-- Inline Calendly embed - books a fixed slot on-site, no external redirect -->
+      <div class="calendly-wrap" id="calendly" style="display:none">
+        <div class="calendly-inline-widget" data-url="https://calendly.com/joe-getnovus/10min?hide_gdpr_banner=1"></div>
+      </div>
     </div>
   </section>
 
   <!-- ══ FOOTER (Novus lockup) ══ -->
   <footer class="site-footer">
     <div class="site-footer-inner">
-      <div class="novus-lockup"><img class="footer-lockup" src="novus-lockup.png" alt="Novus — Never miss another enquiry" /></div>
-      <div class="site-footer-copy">AI front desk for independent UK estate agents · <a href="https://trynovus.co.uk">trynovus.co.uk</a></div>
+      <div class="novus-lockup"><img class="footer-lockup" src="/novus-lockup.png" alt="Novus - Never miss another enquiry" /></div>
+      <div class="site-footer-copy">Your out-of-hours line that answers every enquiry, day or night · <a href="https://trynovus.co.uk">trynovus.co.uk</a></div>
     </div>
   </footer>
 
@@ -724,13 +754,24 @@
   <script>
     const VAPI_PUBLIC_KEY = 'a154a7cb-a164-4fd8-bf2d-6b3aaba450a0';
 
-    const p         = new URLSearchParams(window.location.search);
-    const _fn       = p.get('first_name') || '';
-    const firstName = (_fn === 'FAILED_OWNER' || _fn === 'FAILED_SCRAPE') ? '' : _fn;
-    const company   = p.get('company') || 'Your Agency';
-    const gymUrl    = p.get('url')     || '';
+    // ── LEAD DATA ──
+    // Prospect data now resolves from a slug: trynovus.co.uk/d/{slug} → /api/lead lookup.
+    // Query params (?company=&url=&first_name=&town=&probe_address=&probe_sent=…) are kept
+    // as a fallback for testing and for any legacy links still in circulation.
+    const p = new URLSearchParams(window.location.search);
+    function cleanName(v) { return (v === 'FAILED_OWNER' || v === 'FAILED_SCRAPE') ? '' : (v || ''); }
 
-    // Brand slots — one-line swap once the name is locked (see item 5).
+    let company      = p.get('company') || 'Your Agency';
+    let gymUrl       = p.get('url')     || '';
+    let firstName    = cleanName(p.get('first_name'));
+    let town         = p.get('town')          || '';
+    let probeAddress = p.get('probe_address') || '';
+    let probeSent    = p.get('probe_sent')    || p.get('probe_timestamp') || '';
+    // Probe proof line comes fully-formatted from the server (live Google Sheet, per request).
+    let probeLine    = null;
+
+    // Brand slots - company-independent, render immediately so {{joe_phone}} never
+    // shows as a raw placeholder even if the lead lookup is slow or fails (see item 8).
     const BRAND     = 'Novus';           // brand name (nav wordmark)
     const JOE_PHONE = '07455 506761';    // Joe's direct number
     document.querySelectorAll('.brand-slot').forEach(function(el) { el.textContent = BRAND; });
@@ -739,20 +780,93 @@
       if (el.tagName === 'A') el.setAttribute('href', 'tel:' + JOE_PHONE.replace(/\s+/g, ''));
     });
 
-    document.getElementById('page-title').textContent      = company + ' — Novus';
-    document.getElementById('cp-name').textContent         = company;
-    document.getElementById('cp-name-phone').textContent   = company;
-    document.getElementById('entry-company').textContent       = company;
-    document.getElementById('entry-company-phone').textContent = company;
-    document.querySelectorAll('.company-slot').forEach(function(el) { el.textContent = company; });
-
-    if (gymUrl) {
-      const clean = gymUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-      document.getElementById('url-bar-text').innerHTML = '<span class="url-domain">' + clean + '</span>';
+    // Extract slug from a /d/{slug} path.
+    function slugFromPath() {
+      const m = window.location.pathname.match(/\/d\/([^\/?#]+)/i);
+      return m ? decodeURIComponent(m[1]) : '';
     }
 
-    const fn = firstName || 'there';
-    var hfn = document.getElementById('hero-firstname'); if (hfn) hfn.textContent = fn;
+    // Resolve lead data (slug lookup → fields), then apply it to the page.
+    async function resolveLead() {
+      const slug = slugFromPath();
+      if (slug) {
+        try {
+          const res = await fetch('/api/lead?slug=' + encodeURIComponent(slug), { cache: 'no-store' });
+          if (res.ok) {
+            const d = await res.json();
+            if (d && !d.error) {
+              if (d.company) company = d.company;
+              if (d.url)     gymUrl  = d.url;
+              town         = d.town          || town;
+              firstName    = cleanName(d.first_name) || firstName;
+              probeLine    = d.probe_line || null;
+            }
+          }
+        } catch (e) { /* fall back to query-param / default values */ }
+      }
+      applyLead();
+    }
+
+    function applyLead() {
+      document.getElementById('page-title').textContent      = company + ' - Novus';
+      document.getElementById('cp-name').textContent         = company;
+      document.getElementById('entry-company').textContent   = company;
+      document.querySelectorAll('.company-slot').forEach(function(el) { el.textContent = company; });
+
+      if (gymUrl) {
+        const clean = gymUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        document.getElementById('url-bar-text').innerHTML = '<span class="url-domain">' + clean + '</span>';
+      }
+
+      applyProof();
+      applyExclusivity();
+
+      loadSiteFrame();
+      scrapeAndTrain();
+    }
+
+    // Probe proof block - renders the server-built line above the hero, or nothing
+    // at all when there's no usable probe data (never a blank/broken line).
+    function applyProof() {
+      const sec = document.getElementById('proof');
+      const q = document.getElementById('proof-quote');
+      if (!sec || !q) return;
+      if (probeLine && probeLine.trim()) {
+        q.textContent = probeLine.trim();
+        sec.style.display = 'block';
+      } else {
+        sec.style.display = 'none';
+      }
+    }
+
+    // Item 5 - exclusivity line, shown only when we know the town.
+    function applyExclusivity() {
+      const line = document.getElementById('exclusivity-line');
+      if (!line) return;
+      if (town) {
+        document.getElementById('exclusivity-town').textContent = town;
+        line.style.display = 'block';
+      } else {
+        line.style.display = 'none';
+      }
+    }
+
+    // Item 8 - reveal the inline Calendly booking widget on-site (no external redirect).
+    function revealCalendly(e) {
+      if (e) e.preventDefault();
+      const w = document.getElementById('calendly');
+      if (w) { w.style.display = 'block'; setTimeout(function() { w.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50); }
+    }
+
+    // Website chat: collapsed "Chat to us" bubble that expands on hover; clicking in
+    // pins it open so it doesn't collapse mid-conversation when the cursor leaves.
+    function pinChat() { const d = document.getElementById('chat-dock'); if (d) d.classList.add('pinned'); }
+    (function initChatDock() {
+      const d = document.getElementById('chat-dock');
+      if (!d) return;
+      d.addEventListener('mouseenter', function() { d.classList.add('hovering'); });
+      d.addEventListener('mouseleave', function() { d.classList.remove('hovering'); });
+    })();
 
     // ── STATE ──
     let chatOpen = true, gymContext = '', ready = false, sending = false, selectedMode = null, leadName = '', leadEmail = '';
@@ -764,35 +878,32 @@
     const historyPhone = [];
     let sendingPhone = false, vapiPhone = null, vapiActivePhone = false;
 
-    // ── SCREENSHOT ──
-    function showScreenshotFallback(parent) {
-      parent.insertAdjacentHTML('afterbegin',
-        '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#F8FAFC;padding:24px;text-align:center;z-index:1;">' +
-        '<div style="font-size:1.8rem">🌐</div>' +
-        '<div style="font-size:0.62rem;font-weight:600;letter-spacing:.08em;color:var(--accent);">' + gymUrl.replace(/^https?:\/\//, '') + '</div>' +
-        '<p style="font-size:.72rem;color:#64748B;line-height:1.6;">Your AI sales assistant is fully trained on this site.</p></div>');
+    // ── LIVE SITE IFRAME ──
+    // Try to frame the agency's real site. Many sites block framing (X-Frame-Options /
+    // CSP frame-ancestors) or are slow - a 5s timeout falls back to a friendly message.
+    // The chat widget sits above this and stays usable either way.
+    function showFrameFail() {
+      const frame = document.getElementById('browser-frame');
+      const fail = document.getElementById('browser-fail');
+      if (frame) frame.style.display = 'none';
+      if (!fail) return;
+      fail.innerHTML =
+        '<div class="bf-ico">🌐</div>' +
+        '<p>We couldn\'t pull <strong>' + esc(company) + '</strong>\'s site in here - some sites block it. ' +
+        'Doesn\'t affect anything: your agents are built and working.</p>' +
+        '<p class="bf-sub">Try them on the left.</p>';
+      fail.style.display = 'flex';
     }
 
-    function loadScreenshot() {
+    function loadSiteFrame() {
       const ldr = document.getElementById('browser-loading');
-      const img = document.getElementById('browser-img');
-      if (!gymUrl) { ldr.classList.add('gone'); return; }
+      const frame = document.getElementById('browser-frame');
+      if (!gymUrl) { ldr.classList.add('gone'); showFrameFail(); return; }
       var done = false;
-      var timer = setTimeout(function() { if (done) return; done = true; img.src = ''; ldr.classList.add('gone'); showScreenshotFallback(img.parentElement); }, 7000);
-      img.onload = function() { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); img.style.display = 'block'; };
-      img.onerror = function() { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); showScreenshotFallback(img.parentElement); };
-      img.src = 'https://image.thum.io/get/width/1280/crop/900/noanimate/' + gymUrl;
-    }
-
-    function loadPhoneScreenshot() {
-      const ldr = document.getElementById('phone-loading');
-      const img = document.getElementById('phone-img');
-      if (!gymUrl) { ldr.classList.add('gone'); return; }
-      var done = false;
-      var timer = setTimeout(function() { if (done) return; done = true; ldr.classList.add('gone'); }, 7000);
-      img.onload = function() { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); img.style.display = 'block'; };
-      img.onerror = function() { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); };
-      img.src = 'https://image.thum.io/get/width/390/crop/844/noanimate/' + gymUrl;
+      var timer = setTimeout(function() { if (done) return; done = true; ldr.classList.add('gone'); showFrameFail(); }, 5000);
+      frame.onload = function() { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); frame.style.display = 'block'; };
+      frame.onerror = function() { if (done) return; done = true; clearTimeout(timer); ldr.classList.add('gone'); showFrameFail(); };
+      frame.src = gymUrl;
     }
 
     // ── SCRAPE ──
@@ -831,7 +942,7 @@
       return 'What have you got in ' + townLabel() + ' under £' + capK + 'k?';
     }
 
-    // Landing page: 3–4 buttons, tier-dependent.
+    // Landing page: 3-4 buttons, tier-dependent.
     function landingButtonLabels() {
       const green = siteTier === 'GREEN' || siteTier === 'ULTRA_GREEN';
       if (siteTier === 'ULTRA_GREEN') {
@@ -926,65 +1037,66 @@
     function buildSystemPrompt(mode) {
       const phone = sitePhone || 'our office number';
       const listingsJson = siteListings.length
-        ? '\n\n--- CURRENT LISTINGS (PARTIAL SNAPSHOT — a small sample of ' + company + "'s stock, NOT the full inventory, and possibly out of date) ---\n"
+        ? '\n\n--- CURRENT LISTINGS (PARTIAL SNAPSHOT - a small sample of ' + company + "'s stock, NOT the full inventory, and possibly out of date) ---\n"
           + JSON.stringify(siteListings.slice(0, 25))
           + (siteSummary ? '\nNote: ' + siteSummary : '')
           + '\n--- END LISTINGS ---'
-        : '\n\n(No listings snapshot is available right now — capture the enquiry and route to the team.)';
-      const siteCtx = gymContext ? '\n\n--- GENERAL WEBSITE INFO (branches, fees, about — secondary reference) ---\n' + gymContext.slice(0, 3500) + '\n--- END ---' : '';
-      const locCtx = siteLocation ? '\n\nThe agency operates in and around ' + siteLocation + '. You can speak confidently about ' + siteLocation + ' and the surrounding area as their patch — but never invent a specific property you cannot see.' : '';
+        : '\n\n(No listings snapshot is available right now - capture the enquiry and route to the team.)';
+      const siteCtx = gymContext ? '\n\n--- GENERAL WEBSITE INFO (branches, fees, about - secondary reference) ---\n' + gymContext.slice(0, 3500) + '\n--- END ---' : '';
+      const locCtx = siteLocation ? '\n\nThe agency operates in and around ' + siteLocation + '. You can speak confidently about ' + siteLocation + ' and the surrounding area as their patch - but never invent a specific property you cannot see.' : '';
       const voiceRule = mode === 'voice' ? '\n\nVOICE: Full natural sentences only, never lists or bullet points, maximum 2 short sentences per turn.' : '';
 
       const prompt =
-`You are the AI front desk for ${company}, an independent UK estate agent. You handle enquiries from buyers, sellers, tenants and landlords via chat on the agency's website. You speak as the agency ("we", "us") — warm, concise, professional British English. You are not a generic assistant; you are this agency's front desk.
+`You are the front desk for ${company}, an independent UK estate agent. You handle enquiries from buyers, sellers, tenants and landlords via chat on the agency's website. You speak as the agency ("we", "us") - warm, concise, professional British English. You are not a generic assistant; you are this agency's front desk.
 
-WHAT YOU KNOW — AND WHAT YOU DON'T
+WHAT YOU KNOW - AND WHAT YOU DON'T
 You are given a set of the agency's current listings as structured data. This is a PARTIAL snapshot, not the full stock, and it may be out of date. The agency has more properties than you can see, and availability/prices change daily. Because of this, follow these hard rules at all times:
 - Never state or imply a total count of properties ("we have three properties"). You don't know the total.
 - Never present the listings you can see as the complete inventory. They are examples, surfaced only when you're confident of a match.
-- Never assert a property is currently available, sold, or at a fixed price as hard fact. Your data is a snapshot — hedge and offer to have the team confirm.
+- Never assert a property is currently available, sold, or at a fixed price as hard fact. Your data is a snapshot - hedge and offer to have the team confirm.
 - Never invent a property, feature, price or detail that isn't in your data. If you don't have it, say so and capture the enquiry.
-- When you mention listings, frame them as a partial view — "here's a couple of what we've currently got listed" — never as the complete or current picture. This applies EVEN when you can see several matches: a scraped list is never treated as the agency's full stock.
+- When you mention listings, frame them as a partial view - "here's a couple of what we've currently got listed" - never as the complete or current picture. This applies EVEN when you can see several matches: a scraped list is never treated as the agency's full stock.
 - If they ask about a specific property you can't see, or ask "what else have you got" beyond what you've already mentioned, do NOT guess, invent, or claim there's nothing else. Say you don't have that one in front of you right now and offer to take their name and number so the team can check and call them back (or they can ring ${phone}).
 - Every reply moves toward a capture (name + phone + email + what they want) or a call to ${phone}. Your job is to capture and route enquiries, not to be a search engine over the listings.
 
 YOUR JOB
-You are a lead-capturing concierge. Qualify what the person wants, surface a confident match only if you have one, then capture their details and route them to a viewing, a valuation, or the phone. Capturing the enquiry is the goal — not reciting listings.
+You are a lead-capturing concierge. Qualify what the person wants, surface a confident match only if you have one, then capture their details and route them to a viewing, a valuation, or the phone. Capturing the enquiry is the goal - not reciting listings.
 
 DEMO CONSTRAINT
-This is a demonstration. You cannot actually book anything and there is no live diary or CRM behind you. So you capture the person's details in the conversation, confirm the team will follow up, and give them the number ${phone}. Never confirm a booking as done ("You're booked in for Tuesday") — that would be a lie. Instead: "I've taken your details — the team will confirm your slot shortly, or you can call ${phone} to lock it in now."
+This is a demonstration. You cannot actually book anything and there is no live diary or CRM behind you. So you capture the person's details in the conversation, confirm the team will follow up, and give them the number ${phone}. Never confirm a booking as done ("You're booked in for Tuesday") - that would be a lie. Instead: "I've taken your details - the team will confirm your slot shortly, or you can call ${phone} to lock it in now."
 
-VALUATION vs VIEWING — do not confuse these
+VALUATION vs VIEWING - do not confuse these
 - A VIEWING is a buyer/tenant wanting to see one of our listings. You need: which property, their name, phone, email, preferred times.
-- A VALUATION is a homeowner wanting us to value their OWN home to sell or let it. This is a high-value seller lead — treat it as priority. You need: their property's address, property type, their name, phone, email, and rough timeline. Do not ask "which of our properties" for a valuation — it's their home, not ours.
+- A VALUATION is a homeowner wanting us to value their OWN home to sell or let it. This is a high-value seller lead - treat it as priority. You need: their property's address, property type, their name, phone, email, and rough timeline. Do not ask "which of our properties" for a valuation - it's their home, not ours.
 
 THE 8 SCENARIOS
-1. Open-ended ("what have you got for sale?"): don't list what you can see as if it's everything. Qualify first — buying or renting, beds, budget, area — then mention up to 2-3 confident matches as "a few that might suit" and offer to send the full shortlist.
+1. Open-ended ("what have you got for sale?"): don't list what you can see as if it's everything. Qualify first - buying or renting, beds, budget, area - then mention up to 2-3 confident matches as "a few that might suit" and offer to send the full shortlist.
 2. Criteria search ("3-bed under £500k in Billericay"): present matches as examples not the full picture, then capture name + email to send the complete matching list and offer to book viewings.
 3. Known property (in your data): answer confidently on beds/area/guide price, hedge on live status ("things move quickly, I'll get the team to confirm it's still available"), pivot to a viewing and capture details.
-4. Unknown property (not in your data): never deny it exists and never invent details — "I don't have that one in front of me right now — let me take your name and number and the team will confirm the details and arrange a viewing, or call ${phone}."
-5. Book a viewing: confirm which property, capture name + phone + email + preferred times, then "I've passed this to the team to confirm — or call ${phone} to lock it in now." Never say it's booked.
-6. Book a valuation: recognise a seller lead. Capture their address, property type, contact details and timeline; route as priority — "we'd send someone out to value your property. Whereabouts is it, and what type of home? Can I take your name and number? The team will arrange a convenient time, or call ${phone}."
-7. Out of scope (mortgages, legal, tax, price predictions, complaints, off-topic or gibberish): don't advise or guess — "That's one for the team to talk you through properly — give us a call on ${phone}. Is there anything about our properties I can help with in the meantime?"
-8. Hot lead / wants a human now ("call me", "I want to make an offer", "cash buyer ready to go"): move fast — capture contact + intent, flag urgency, push to phone — "Let's get you straight through to someone. Can I grab your name and number and I'll have the team call you right away — or ring us now on ${phone}."
+4. Unknown property (not in your data): never deny it exists and never invent details - "I don't have that one in front of me right now - let me take your name and number and the team will confirm the details and arrange a viewing, or call ${phone}."
+5. Book a viewing: confirm which property, capture name + phone + email + preferred times, then "I've passed this to the team to confirm - or call ${phone} to lock it in now." Never say it's booked.
+6. Book a valuation: recognise a seller lead. Capture their address, property type, contact details and timeline; route as priority - "we'd send someone out to value your property. Whereabouts is it, and what type of home? Can I take your name and number? The team will arrange a convenient time, or call ${phone}."
+7. Out of scope (mortgages, legal, tax, price predictions, complaints, off-topic or gibberish): don't advise or guess - "That's one for the team to talk you through properly - give us a call on ${phone}. Is there anything about our properties I can help with in the meantime?"
+8. Hot lead / wants a human now ("call me", "I want to make an offer", "cash buyer ready to go"): move fast - capture contact + intent, flag urgency, push to phone - "Let's get you straight through to someone. Can I grab your name and number and I'll have the team call you right away - or ring us now on ${phone}."
 
 TONE
-Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic. British English. One clear next step per message. You are the agency's front desk — sound like it.`;
+Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic. British English. One clear next step per message. You are the agency's front desk - sound like it.
+
+FORMATTING
+Never use em dashes (-) or en dashes (-). Use a plain hyphen (-) instead, or rephrase. Keep punctuation simple and human.`;
 
       return prompt + listingsJson + siteCtx + locCtx + voiceRule;
     }
 
     function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
 
-    function initChat(name) { addMsg('Hi' + (name && name !== 'there' ? ' ' + name : '') + '! You\'re through to ' + company + ' — are you looking to buy, sell, rent, or book a valuation?', 'bot'); renderQuickReplies(false); setTimeout(function() { document.getElementById('cp-inp').focus(); }, 80); }
-    function initChatPhone(name) { addMsgPhone('Hi' + (name && name !== 'there' ? ' ' + name : '') + '! You\'re through to ' + company + ' — how can we help today?', 'bot'); renderQuickReplies(true); setTimeout(function() { document.getElementById('cp-inp-phone').focus(); }, 80); }
+    function initChat(name) { addMsg("Hi! You're through to " + company + ' - are you looking to sell, buy, or both?', 'bot'); renderQuickReplies(false); setTimeout(function() { document.getElementById('cp-inp').focus(); }, 80); }
+    function initChatPhone(name) { addMsgPhone("Hi! You're through to " + company + ' - are you looking to sell, buy, or both?', 'bot'); renderQuickReplies(true); setTimeout(function() { document.getElementById('cp-inp-phone').focus(); }, 80); }
 
-    // In-chat quick replies (2, tier-dependent). Skipped when the chat was seeded
-    // by a landing-page chip (the user already asked something).
+    // Exactly three quick replies after the greeting. Everything after that happens
+    // in conversation, not as pre-set buttons.
     function renderQuickReplies(isPhone) {
-      if (chatSeededByChip) { chatSeededByChip = false; return; }
-      const labels = chatQuickReplyLabels().filter(Boolean).slice(0, 2);
-      if (!labels.length) return;
+      const labels = ["I'm looking to sell", "I'm looking to buy", "Both"];
       const c = document.getElementById(isPhone ? 'cp-msgs-phone' : 'cp-msgs');
       if (!c) return;
       const row = document.createElement('div');
@@ -1015,7 +1127,7 @@ Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic
       sending = true; inp.value = ''; document.getElementById('cp-send').disabled = true;
       addMsg(text, 'user'); history.push({ role: 'user', content: text }); showTyping();
       try { const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: history, systemPrompt: buildSystemPrompt('chat'), agencyName: company, agencyUrl: gymUrl }) }); const data = await res.json(); removeTyping(); const reply = data.reply || "Sorry, I couldn't process that. Try again!"; addMsg(reply, 'bot'); history.push({ role: 'assistant', content: reply }); }
-      catch { removeTyping(); addMsg("Having trouble connecting right now — please try again.", 'bot'); }
+      catch { removeTyping(); addMsg("Having trouble connecting right now - please try again.", 'bot'); }
       sending = false; document.getElementById('cp-send').disabled = false; inp.focus();
     }
 
@@ -1026,7 +1138,7 @@ Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic
       sendingPhone = true; inp.value = ''; document.getElementById('cp-send-phone').disabled = true;
       addMsgPhone(text, 'user'); historyPhone.push({ role: 'user', content: text }); showTypingPhone();
       try { const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: historyPhone, systemPrompt: buildSystemPrompt('chat'), agencyName: company, agencyUrl: gymUrl }) }); const data = await res.json(); removeTypingPhone(); const reply = data.reply || "Sorry, couldn't process that. Try again!"; addMsgPhone(reply, 'bot'); historyPhone.push({ role: 'assistant', content: reply }); }
-      catch { removeTypingPhone(); addMsgPhone("Having trouble connecting — please try again.", 'bot'); }
+      catch { removeTypingPhone(); addMsgPhone("Having trouble connecting - please try again.", 'bot'); }
       sendingPhone = false; document.getElementById('cp-send-phone').disabled = false; inp.focus();
     }
 
@@ -1038,15 +1150,15 @@ Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic
       orb.className = 'voice-orb connecting'; statusEl.textContent = 'Connecting…'; statusEl.className = 'voice-status-label'; transcript.textContent = 'Connecting to AI receptionist…';
       try {
         const VapiSDK = window._VapiClass;
-        if (!VapiSDK || typeof VapiSDK !== 'function') throw new Error('Vapi SDK not loaded yet — try again in a moment');
+        if (!VapiSDK || typeof VapiSDK !== 'function') throw new Error('Vapi SDK not loaded yet - try again in a moment');
         vapi = new VapiSDK(VAPI_PUBLIC_KEY);
-        vapi.on('call-start', function() { vapiActive = true; orb.className = 'voice-orb listening'; statusEl.textContent = 'Listening…'; statusEl.className = 'voice-status-label active'; transcript.textContent = 'Go ahead — ask about our properties, booking a valuation or arranging a viewing.'; });
+        vapi.on('call-start', function() { vapiActive = true; orb.className = 'voice-orb listening'; statusEl.textContent = 'Listening…'; statusEl.className = 'voice-status-label active'; transcript.textContent = 'Go ahead - ask about our properties, booking a valuation or arranging a viewing.'; });
         vapi.on('speech-start', function() { orb.className = 'voice-orb speaking'; statusEl.textContent = 'AI Speaking…'; statusEl.className = 'voice-status-label speaking'; });
         vapi.on('speech-end',   function() { orb.className = 'voice-orb listening'; statusEl.textContent = 'Listening…'; statusEl.className = 'voice-status-label active'; });
         vapi.on('message', function(msg) { if (msg.type === 'transcript' && msg.transcriptType === 'final') transcript.textContent = msg.transcript; });
         vapi.on('call-end', function() { vapiActive = false; orb.className = 'voice-orb idle'; statusEl.textContent = 'Call ended'; statusEl.className = 'voice-status-label'; transcript.textContent = 'Thanks for chatting! The team will be in touch.'; });
         vapi.on('error', function(e) { console.error('Vapi error:', e); vapiActive = false; orb.className = 'voice-orb idle'; statusEl.textContent = 'Connection error'; statusEl.className = 'voice-status-label error'; transcript.textContent = 'Could not connect. Please try again or use Live Chat instead.'; });
-        vapi.start({ name: company + ' Receptionist', firstMessage: 'Hi' + (leadName ? ' ' + leadName : '') + '! Thanks for calling ' + company + ' — how can I help you today?', transcriber: { provider: 'deepgram', model: 'nova-2', language: 'en-GB' }, voice: { provider: '11labs', voiceId: 'sarah' }, model: { provider: 'openai', model: 'gpt-4o-mini', messages: [{ role: 'system', content: buildSystemPrompt('voice') }] } });
+        vapi.start({ name: company + ' Receptionist', firstMessage: 'Hi' + (leadName ? ' ' + leadName : '') + '! Thanks for calling ' + company + ' - how can I help you today?', transcriber: { provider: 'deepgram', model: 'nova-2', language: 'en-GB' }, voice: { provider: '11labs', voiceId: 'sarah' }, model: { provider: 'openai', model: 'gpt-4o-mini', messages: [{ role: 'system', content: buildSystemPrompt('voice') }] } });
       } catch (err) { orb.className = 'voice-orb idle'; statusEl.textContent = 'Unavailable'; statusEl.className = 'voice-status-label error'; transcript.textContent = 'Voice unavailable: ' + err.message + '. Please use Live Chat instead.'; }
     }
 
@@ -1057,25 +1169,48 @@ Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic
         const VapiSDK = window._VapiClass;
         if (!VapiSDK || typeof VapiSDK !== 'function') throw new Error('Vapi SDK not loaded yet');
         vapiPhone = new VapiSDK(VAPI_PUBLIC_KEY);
-        vapiPhone.on('call-start', function() { vapiActivePhone = true; orb.className = 'voice-orb listening'; statusEl.textContent = 'Listening…'; statusEl.className = 'voice-status-label active'; transcript.textContent = 'Go ahead — ask anything!'; });
+        vapiPhone.on('call-start', function() { vapiActivePhone = true; orb.className = 'voice-orb listening'; statusEl.textContent = 'Listening…'; statusEl.className = 'voice-status-label active'; transcript.textContent = 'Go ahead - ask anything!'; });
         vapiPhone.on('speech-start', function() { orb.className = 'voice-orb speaking'; statusEl.textContent = 'AI Speaking…'; statusEl.className = 'voice-status-label speaking'; });
         vapiPhone.on('speech-end',   function() { orb.className = 'voice-orb listening'; statusEl.textContent = 'Listening…'; statusEl.className = 'voice-status-label active'; });
         vapiPhone.on('message', function(msg) { if (msg.type === 'transcript' && msg.transcriptType === 'final') transcript.textContent = msg.transcript; });
         vapiPhone.on('call-end', function() { vapiActivePhone = false; orb.className = 'voice-orb idle'; statusEl.textContent = 'Call ended'; statusEl.className = 'voice-status-label'; transcript.textContent = 'Thanks for chatting!'; });
         vapiPhone.on('error', function(e) { console.error(e); vapiActivePhone = false; orb.className = 'voice-orb idle'; statusEl.textContent = 'Connection error'; statusEl.className = 'voice-status-label error'; transcript.textContent = 'Could not connect. Please use Live Chat instead.'; });
-        vapiPhone.start({ name: company + ' Receptionist', firstMessage: 'Hi' + (leadNamePhone ? ' ' + leadNamePhone : '') + '! Thanks for calling ' + company + ' — how can I help you today?', transcriber: { provider: 'deepgram', model: 'nova-2', language: 'en-GB' }, voice: { provider: '11labs', voiceId: 'sarah' }, model: { provider: 'openai', model: 'gpt-4o-mini', messages: [{ role: 'system', content: buildSystemPrompt('voice') }] } });
+        vapiPhone.start({ name: company + ' Receptionist', firstMessage: 'Hi' + (leadNamePhone ? ' ' + leadNamePhone : '') + '! Thanks for calling ' + company + ' - how can I help you today?', transcriber: { provider: 'deepgram', model: 'nova-2', language: 'en-GB' }, voice: { provider: '11labs', voiceId: 'sarah' }, model: { provider: 'openai', model: 'gpt-4o-mini', messages: [{ role: 'system', content: buildSystemPrompt('voice') }] } });
       } catch (err) { orb.className = 'voice-orb idle'; statusEl.textContent = 'Unavailable'; statusEl.className = 'voice-status-label error'; transcript.textContent = 'Voice unavailable: ' + err.message; }
     }
 
     function endVoiceCall() { if (vapi) { try { if (vapiActive) vapi.stop(); } catch(e){} vapi = null; } vapiActive = false; setTimeout(function() { showScreen('mode'); selectedMode = null; }, 800); }
     function endVoiceCallPhone() { if (vapiPhone) { try { if (vapiActivePhone) vapiPhone.stop(); } catch(e){} vapiPhone = null; } vapiActivePhone = false; setTimeout(function() { showScreenPhone('mode'); selectedModePhone = null; }, 800); }
 
-    document.getElementById('cp-msgs').addEventListener('wheel', function(e) { e.stopPropagation(); }, { passive: true });
-    document.getElementById('cp-msgs-phone').addEventListener('wheel', function(e) { e.stopPropagation(); }, { passive: true });
+    // ── HERO CALL PANEL (primary voice-first line, item 2) ──
+    let vapiHero = null, vapiActiveHero = false;
+    function startHeroCall() {
+      document.getElementById('hero-call-idle').style.display = 'none';
+      document.getElementById('hero-call-active').style.display = 'flex';
+      const orb = document.getElementById('hero-voice-orb'), statusEl = document.getElementById('hero-voice-status'), transcript = document.getElementById('hero-voice-transcript');
+      orb.className = 'voice-orb connecting'; statusEl.textContent = 'Connecting…'; statusEl.className = 'voice-status-label'; transcript.textContent = 'Connecting to your line…';
+      try {
+        const VapiSDK = window._VapiClass;
+        if (!VapiSDK || typeof VapiSDK !== 'function') throw new Error('Voice not ready yet - try again in a moment');
+        vapiHero = new VapiSDK(VAPI_PUBLIC_KEY);
+        vapiHero.on('call-start', function() { vapiActiveHero = true; orb.className = 'voice-orb listening'; statusEl.textContent = 'Listening…'; statusEl.className = 'voice-status-label active'; transcript.textContent = 'Go ahead - ask about a property, booking a valuation or arranging a viewing.'; });
+        vapiHero.on('speech-start', function() { orb.className = 'voice-orb speaking'; statusEl.textContent = 'Speaking…'; statusEl.className = 'voice-status-label speaking'; });
+        vapiHero.on('speech-end',   function() { orb.className = 'voice-orb listening'; statusEl.textContent = 'Listening…'; statusEl.className = 'voice-status-label active'; });
+        vapiHero.on('message', function(msg) { if (msg.type === 'transcript' && msg.transcriptType === 'final') transcript.textContent = msg.transcript; });
+        vapiHero.on('call-end', function() { vapiActiveHero = false; orb.className = 'voice-orb idle'; statusEl.textContent = 'Call ended'; statusEl.className = 'voice-status-label'; transcript.textContent = 'Thanks for calling - the team will be in touch.'; });
+        vapiHero.on('error', function(e) { console.error('Vapi error:', e); vapiActiveHero = false; orb.className = 'voice-orb idle'; statusEl.textContent = 'Connection error'; statusEl.className = 'voice-status-label error'; transcript.textContent = 'Could not connect. Please try again in a moment.'; });
+        vapiHero.start({ name: company + ' Receptionist', firstMessage: 'Hi' + (firstName ? ' ' + firstName : '') + '! Thanks for calling ' + company + ' - how can I help you today?', transcriber: { provider: 'deepgram', model: 'nova-2', language: 'en-GB' }, voice: { provider: '11labs', voiceId: 'sarah' }, model: { provider: 'openai', model: 'gpt-4o-mini', messages: [{ role: 'system', content: buildSystemPrompt('voice') }] } });
+      } catch (err) { orb.className = 'voice-orb idle'; statusEl.textContent = 'Unavailable'; statusEl.className = 'voice-status-label error'; transcript.textContent = 'Voice unavailable: ' + err.message; }
+    }
+    function endHeroCall() {
+      if (vapiHero) { try { if (vapiActiveHero) vapiHero.stop(); } catch(e){} vapiHero = null; }
+      vapiActiveHero = false;
+      setTimeout(function() { document.getElementById('hero-call-active').style.display = 'none'; document.getElementById('hero-call-idle').style.display = 'flex'; }, 800);
+    }
 
-    loadScreenshot();
-    loadPhoneScreenshot();
-    scrapeAndTrain();
+    document.getElementById('cp-msgs').addEventListener('wheel', function(e) { e.stopPropagation(); }, { passive: true });
+
+    resolveLead();
   </script>  <div class="page-bottom-margin"></div>
 
 </body>
