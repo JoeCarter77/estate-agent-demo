@@ -1,9 +1,10 @@
 // scripts/novus-observation-selftest.mjs — hermetic Observation & Evidence
 // Engine test (no network, no creds).
 //
-// Exercises the REAL code paths — lib/classification.mjs, lib/observation.mjs,
-// lib/grading.mjs, and the recompute endpoint — against an in-memory fake that
-// mimics the Google Sheets values API and the live workbook's confirmed
+// Exercises the REAL code paths — lib/classification.mjs, lib/observation.mjs
+// (including the 30-minute contact-attempt grouping rule), lib/grading.mjs
+// (the A-H engine), and the recompute endpoint — against an in-memory fake
+// that mimics the Google Sheets values API and the live workbook's confirmed
 // headers, for PROBES, COMMUNICATIONS and INTELLIGENCE.
 //
 // Run:  npm run novus:observation-selftest  (or: node scripts/novus-observation-selftest.mjs)
@@ -11,7 +12,7 @@
 import assert from 'node:assert';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { classifyCommunication } from '../lib/classification.mjs';
-import { computeObservation } from '../lib/observation.mjs';
+import { computeObservation, groupContactAttempts } from '../lib/observation.mjs';
 import { gradeObservation } from '../lib/grading.mjs';
 
 const PROBES_HEADER = [
@@ -123,7 +124,8 @@ function iso(offsetMsFromEpochBase, baseIso) {
   return new Date(new Date(baseIso).getTime() + offsetMsFromEpochBase).toISOString();
 }
 
-const HOUR = 60 * 60 * 1000;
+const MIN = 60 * 1000;
+const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 const PROBE_SENT = '2026-08-01T21:00:00.000Z'; // ~9pm, per Source Master §7
 
@@ -146,7 +148,18 @@ async function run() {
     };
   }
 
-  // ── lib/classification.mjs — narrow deterministic rules ──
+  async function runProbeGrade(probeId, comms) {
+    const { store, valuesApi } = makeFakeSheet();
+    __setRepoForTests(createRepo(valuesApi));
+    seedProbe(store, { probe_id: probeId, probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) });
+    for (const c of comms) seedCommunication(store, { probe_id: probeId, ...c });
+    const res = mockRes();
+    await recompute(mockReq({ probe_id: probeId }), res);
+    __setRepoForTests(null);
+    return res.body;
+  }
+
+  // ── lib/classification.mjs — narrow deterministic rules (unchanged by this update) ──
   console.log('\nclassification.mjs');
   {
     const auto = classifyCommunication({ source_identifier_raw: 'no-reply@agency.co.uk', subject: 'Auto-reply', body_text: 'This is an automated message.' });
@@ -168,113 +181,189 @@ async function run() {
     ok('known auto-sender/phrase -> automated + auto_acknowledgement; unmatched -> human; degenerate -> unknown; bounce is automated but not an ack');
   }
 
-  // ── Test A: human contact <=1h, 2+ follow-ups ──
-  console.log('\nTest A — human contact inside 1h + 2+ follow-ups');
+  // ── 30-minute contact-attempt grouping — unit-level, direct against groupContactAttempts ──
+  console.log('\n30-minute contact-attempt grouping (lib/observation.mjs groupContactAttempts)');
   {
-    const { store, valuesApi } = makeFakeSheet();
-    __setRepoForTests(createRepo(valuesApi));
-    seedProbe(store, { probe_id: 'prb_a', probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) });
-    seedCommunication(store, { probe_id: 'prb_a', occurred_at: iso(30 * 60 * 1000, PROBE_SENT), body_text: 'Thanks, calling you now.' });
-    seedCommunication(store, { probe_id: 'prb_a', occurred_at: iso(2 * DAY, PROBE_SENT), body_text: 'Just checking in again.' });
-    seedCommunication(store, { probe_id: 'prb_a', occurred_at: iso(4 * DAY, PROBE_SENT), body_text: 'One more follow up, still interested?' });
+    function touches(offsetsMin) {
+      return offsetsMin.map((m) => ({ label: `${m}m`, _occurredAt: new Date(PROBE_SENT).getTime() + m * MIN }))
+        .map((t) => ({ ...t, _occurredAt: new Date(t._occurredAt) }));
+    }
+    function attemptSizes(offsetsMin) {
+      return groupContactAttempts(touches(offsetsMin)).map((a) => a.length);
+    }
 
-    const res = mockRes();
-    await recompute(mockReq({ probe_id: 'prb_a' }), res);
-    assert.strictEqual(res.statusCode, 200);
-    assert.strictEqual(res.body.grade, 'A', `expected A, got ${res.body.grade}: ${res.body.grade_reason}`);
-    assert.strictEqual(res.body.observation.follow_up_count, 2, 'two follow-ups counted');
-    ok('grade A produced for fast contact + 2 follow-ups');
-    __setRepoForTests(null);
+    // 1. call -> voicemail immediately
+    assert.deepStrictEqual(attemptSizes([0, 1]), [2], '1) call+voicemail immediately = 1 attempt');
+    // 2. call -> voicemail -> SMS within 30 mins
+    assert.deepStrictEqual(attemptSizes([0, 1, 25]), [3], '2) call+voicemail+SMS within 30min = 1 attempt');
+    // 3. call -> email within 30 mins
+    assert.deepStrictEqual(attemptSizes([0, 29]), [2], '3) call + email at 29min = 1 attempt (within window)');
+    // 4. call -> email at 31 mins
+    assert.deepStrictEqual(attemptSizes([0, 31]), [1, 1], '4) call + email at 31min = 2 attempts (crosses window)');
+    // 5. call -> several communications over 30 mins (some inside, one crosses)
+    assert.deepStrictEqual(attemptSizes([0, 5, 20, 45]), [3, 1], '5) several comms: 0/5/20 grouped, 45 starts new attempt');
+    // 6. multiple channels within the same attempt
+    assert.deepStrictEqual(
+      groupContactAttempts([
+        { channel: 'voice', _occurredAt: new Date(new Date(PROBE_SENT).getTime()) },
+        { channel: 'email', _occurredAt: new Date(new Date(PROBE_SENT).getTime() + 10 * MIN) },
+        { channel: 'sms', _occurredAt: new Date(new Date(PROBE_SENT).getTime() + 20 * MIN) },
+      ]).length,
+      1,
+      '6) voice+email+sms all within 30min of attempt start = 1 attempt regardless of channel mix',
+    );
+    // 7. two genuinely separate attempts
+    assert.deepStrictEqual(attemptSizes([0, 2 * 60]), [1, 1], '7) two touches 2h apart = 2 genuinely separate attempts');
+    // 8. 3+ genuine follow-ups (4 attempts total)
+    assert.deepStrictEqual(attemptSizes([0, 60, 120, 180]), [1, 1, 1, 1], '8) four touches 1h apart each = 4 attempts (3 follow-ups)');
+
+    // Anchor-does-not-reset check: attempt starting at 0 stays anchored to 0,
+    // not to the 25min touch — a touch at 50min (20min after the 25min touch,
+    // but 50min after attempt start) must start a NEW attempt.
+    assert.deepStrictEqual(attemptSizes([0, 25, 50]), [2, 1], 'window anchored to attempt START, not the previous communication');
+
+    ok('30-minute grouping matches all 8 required scenarios + anchor-does-not-reset rule');
   }
 
-  // ── Test B: fast human contact (<=16h), zero follow-up ──
-  console.log('\nTest B — fast human contact, zero follow-up');
+  // ── Grade A: very fast (<=1h) + persistent (1+ genuine follow-up attempts) ──
+  console.log('\nGrade A — very fast + persistent');
   {
-    const { store, valuesApi } = makeFakeSheet();
-    __setRepoForTests(createRepo(valuesApi));
-    seedProbe(store, { probe_id: 'prb_b', probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) });
-    seedCommunication(store, { probe_id: 'prb_b', occurred_at: iso(10 * HOUR, PROBE_SENT), body_text: 'Thanks for your interest, someone will be in touch.' });
-
-    const res = mockRes();
-    await recompute(mockReq({ probe_id: 'prb_b' }), res);
-    assert.strictEqual(res.body.grade, 'B', `expected B, got ${res.body.grade}: ${res.body.grade_reason}`);
-    ok('grade B produced for <=16h contact + zero follow-up');
-    __setRepoForTests(null);
+    const body = await runProbeGrade('prb_a', [
+      { occurred_at: iso(30 * MIN, PROBE_SENT), body_text: 'Thanks, calling you now.' },
+      { occurred_at: iso(2 * DAY, PROBE_SENT), body_text: 'Just checking in again.' },
+    ]);
+    assert.strictEqual(body.grade, 'A', `expected A, got ${body.grade}: ${body.grade_reason}`);
+    assert.strictEqual(body.observation.follow_up_count, 1, 'one genuine follow-up attempt (2 days later, well outside 30min)');
+    ok('grade A: <=1h contact + 1 genuine follow-up attempt');
   }
 
-  // ── Test C: automated acknowledgement only ──
-  console.log('\nTest C — automated acknowledgement only, no human contact, window closed');
+  // ── Grade B: fast (>1h, <=16h) + persistent ──
+  console.log('\nGrade B — fast + persistent');
   {
-    const { store, valuesApi } = makeFakeSheet();
-    __setRepoForTests(createRepo(valuesApi));
-    seedProbe(store, { probe_id: 'prb_c', probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) });
-    seedCommunication(store, {
-      probe_id: 'prb_c', occurred_at: iso(5 * 60 * 1000, PROBE_SENT), from: 'no-reply@agency.co.uk',
-      subject: 'We have received your enquiry', body_text: 'This is an automated response.',
-    });
-
-    const res = mockRes();
-    await recompute(mockReq({ probe_id: 'prb_c' }), res);
-    assert.strictEqual(res.body.grade, 'C', `expected C, got ${res.body.grade}: ${res.body.grade_reason}`);
-    assert.strictEqual(res.body.observation.first_human_touch, 'no', 'no human contact');
-    ok('grade C produced for auto-ack only, no human contact');
-    __setRepoForTests(null);
+    const body = await runProbeGrade('prb_b', [
+      { occurred_at: iso(10 * HOUR, PROBE_SENT), body_text: 'Sorry for the delay, calling now.' },
+      { occurred_at: iso(10 * HOUR + 45 * MIN, PROBE_SENT), body_text: 'Following up again.' },
+    ]);
+    assert.strictEqual(body.grade, 'B', `expected B, got ${body.grade}: ${body.grade_reason}`);
+    assert.strictEqual(body.observation.follow_up_count, 1);
+    ok('grade B: >1h,<=16h contact + 1 genuine follow-up attempt');
   }
 
-  // ── Test D: slow human contact (>16h), zero follow-up ──
-  console.log('\nTest D — slow human contact, zero follow-up');
+  // ── Grade C: very fast (<=1h) + non-persistent (0 genuine follow-ups) ──
+  // This is the exact shape of prb_msstv7xg_nksnc0: a call/voicemail and an
+  // SMS both inside the 30-minute window of the first attempt.
+  console.log('\nGrade C — very fast + non-persistent (regression case: prb_msstv7xg_nksnc0 shape)');
   {
-    const { store, valuesApi } = makeFakeSheet();
-    __setRepoForTests(createRepo(valuesApi));
-    seedProbe(store, { probe_id: 'prb_d', probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) });
-    seedCommunication(store, { probe_id: 'prb_d', occurred_at: iso(20 * HOUR, PROBE_SENT), body_text: 'Sorry for the delay, calling now.' });
-
-    const res = mockRes();
-    await recompute(mockReq({ probe_id: 'prb_d' }), res);
-    assert.strictEqual(res.body.grade, 'D', `expected D, got ${res.body.grade}: ${res.body.grade_reason}`);
-    ok('grade D produced for >16h contact + zero follow-up');
-    __setRepoForTests(null);
+    const body = await runProbeGrade('prb_c', [
+      { occurred_at: iso(9 * MIN, PROBE_SENT), channel: 'voice', body_text: 'voicemail: It.' },
+      { occurred_at: iso(10 * MIN, PROBE_SENT), channel: 'sms', body_text: 'Please call me back to arrange a viewing.' },
+    ]);
+    assert.strictEqual(body.grade, 'C', `expected C, got ${body.grade}: ${body.grade_reason}`);
+    assert.strictEqual(body.observation.follow_up_count, 0, 'the SMS 1 minute after the call is the SAME attempt, not a follow-up');
+    assert.strictEqual(body.observation.contact_attempt_count, 1);
+    ok('grade C: <=1h contact + 0 genuine follow-ups (voicemail + SMS grouped into one attempt)');
   }
 
-  // ── Test E: nothing on any channel, window closed ──
-  console.log('\nTest E — nothing on any channel after 7 days');
+  // ── Grade D: fast (>1h, <=16h) + non-persistent ──
+  console.log('\nGrade D — fast + non-persistent');
   {
-    const { store, valuesApi } = makeFakeSheet();
-    __setRepoForTests(createRepo(valuesApi));
-    seedProbe(store, { probe_id: 'prb_e', probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) });
-
-    const res = mockRes();
-    await recompute(mockReq({ probe_id: 'prb_e' }), res);
-    assert.strictEqual(res.body.grade, 'E', `expected E, got ${res.body.grade}: ${res.body.grade_reason}`);
-    ok('grade E produced for zero evidence after window closes');
-    __setRepoForTests(null);
+    const body = await runProbeGrade('prb_d', [
+      { occurred_at: iso(10 * HOUR, PROBE_SENT), body_text: 'Sorry for the delay, calling now.' },
+    ]);
+    assert.strictEqual(body.grade, 'D', `expected D, got ${body.grade}: ${body.grade_reason}`);
+    assert.strictEqual(body.observation.follow_up_count, 0);
+    ok('grade D: >1h,<=16h contact + 0 genuine follow-ups');
   }
 
-  // ── Test ungraded: fast contact + 1 follow-up (undefined combination) ──
-  console.log('\nTest ungraded — fast contact with exactly 1 follow-up (Source Master does not define this)');
+  // ── Grade E: slow (>16h) + persistent ──
+  console.log('\nGrade E — slow + persistent');
   {
-    const { store, valuesApi } = makeFakeSheet();
-    __setRepoForTests(createRepo(valuesApi));
-    seedProbe(store, { probe_id: 'prb_u', probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) });
-    seedCommunication(store, { probe_id: 'prb_u', occurred_at: iso(30 * 60 * 1000, PROBE_SENT), body_text: 'Calling now.' });
-    seedCommunication(store, { probe_id: 'prb_u', occurred_at: iso(2 * DAY, PROBE_SENT), body_text: 'Checking in.' });
-
-    const res = mockRes();
-    await recompute(mockReq({ probe_id: 'prb_u' }), res);
-    assert.strictEqual(res.body.grade, 'ungraded', `expected ungraded, got ${res.body.grade}`);
-    assert.strictEqual(res.body.observation.follow_up_count, 1);
-    ok('undefined A/B/D combination resolves to ungraded, not invented');
-    __setRepoForTests(null);
+    const body = await runProbeGrade('prb_e', [
+      { occurred_at: iso(20 * HOUR, PROBE_SENT), body_text: 'Sorry for the delay, calling now.' },
+      { occurred_at: iso(3 * DAY, PROBE_SENT), body_text: 'Checking in again.' },
+    ]);
+    assert.strictEqual(body.grade, 'E', `expected E, got ${body.grade}: ${body.grade_reason}`);
+    assert.strictEqual(body.observation.follow_up_count, 1);
+    ok('grade E: >16h contact + 1 genuine follow-up attempt');
   }
 
-  // ── Idempotency + raw/matching field preservation ──
+  // ── Grade F: slow (>16h) + non-persistent ──
+  console.log('\nGrade F — slow + non-persistent');
+  {
+    const body = await runProbeGrade('prb_f', [
+      { occurred_at: iso(20 * HOUR, PROBE_SENT), body_text: 'Sorry for the delay, calling now.' },
+    ]);
+    assert.strictEqual(body.grade, 'F', `expected F, got ${body.grade}: ${body.grade_reason}`);
+    assert.strictEqual(body.observation.follow_up_count, 0);
+    ok('grade F: >16h contact + 0 genuine follow-ups');
+  }
+
+  // ── Grade G: automated acknowledgement only, no human contact ──
+  console.log('\nGrade G — automated acknowledgement only');
+  {
+    const body = await runProbeGrade('prb_g', [
+      { occurred_at: iso(5 * MIN, PROBE_SENT), from: 'no-reply@agency.co.uk', subject: 'We have received your enquiry', body_text: 'This is an automated response.' },
+    ]);
+    assert.strictEqual(body.grade, 'G', `expected G, got ${body.grade}: ${body.grade_reason}`);
+    assert.strictEqual(body.observation.first_human_touch, 'no', 'no human contact');
+    ok('grade G: auto-ack only, no human contact');
+  }
+
+  // ── Grade H: nothing on any channel, window closed ──
+  console.log('\nGrade H — no meaningful response after 7 days');
+  {
+    const body = await runProbeGrade('prb_h', []);
+    assert.strictEqual(body.grade, 'H', `expected H, got ${body.grade}: ${body.grade_reason}`);
+    ok('grade H: zero evidence after window closes');
+  }
+
+  // ── Exhaustiveness: the old "ungraded" gap (fast contact + exactly 1
+  // follow-up) must now resolve cleanly to a real grade, not fall through. ──
+  console.log('\nExhaustiveness — former A-E "ungraded" gap now resolves to a real grade');
+  {
+    const body = await runProbeGrade('prb_gap', [
+      { occurred_at: iso(30 * MIN, PROBE_SENT), body_text: 'Calling now.' },
+      { occurred_at: iso(2 * DAY, PROBE_SENT), body_text: 'Checking in.' },
+    ]);
+    assert.notStrictEqual(body.grade, 'ungraded', 'the old A-E system left this combination ungraded; A-H must not');
+    assert.strictEqual(body.grade, 'A', 'very fast contact + 1 genuine follow-up attempt is Grade A under A-H');
+    ok('former ungraded gap (fast contact + exactly 1 follow-up) now resolves to Grade A, not ungraded');
+  }
+
+  // ── G/H must never overlap with A-F, and grading engine must not read
+  // unrelated intelligence fields (callback_attempts, persistence_profile,
+  // contact_quality, voicemail_count, booking_attempt). ──
+  console.log('\nG/H isolation from A-F + grading engine field isolation');
+  {
+    // Human contact present alongside a spoofed high callback_attempts /
+    // booking_attempt / persistence_profile must still grade purely on
+    // lag + follow_up_count — never on those unrelated fields.
+    const observation = {
+      first_human_touch: 'yes',
+      human_lag_hours: 0.5,
+      follow_up_count: 0,
+      auto_acknowledgement: true, // even if true, hasHumanContact must take priority over G
+      last_touch_at: iso(30 * MIN, PROBE_SENT),
+      callback_attempts: 99,
+      persistence_profile: 'high',
+      contact_quality: 'Booking attempt',
+      voicemail_count: 99,
+      booking_attempt: true,
+    };
+    const probe = { probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) };
+    const { grade } = gradeObservation({ probe, observation, now: new Date(iso(1 * DAY, PROBE_SENT)) });
+    assert.strictEqual(grade, 'C', 'human contact takes priority over auto_acknowledgement=true (G never fires when a human touch exists)');
+    ok('human-contact grades (A-F) always take priority over G, regardless of auto_acknowledgement or unrelated intelligence fields');
+  }
+
+  // ── Idempotency + raw/matching field preservation (unchanged behaviour) ──
   console.log('\nIdempotent recomputation + raw/matching field preservation');
   {
     const { store, valuesApi } = makeFakeSheet();
     __setRepoForTests(createRepo(valuesApi));
     seedProbe(store, { probe_id: 'prb_i', probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) });
     seedCommunication(store, {
-      probe_id: 'prb_i', occurred_at: iso(30 * 60 * 1000, PROBE_SENT),
+      probe_id: 'prb_i', occurred_at: iso(30 * MIN, PROBE_SENT),
       from: 'Jane@Agency-One.co.uk', subject: 'Original subject', body_text: 'Original body, calling now.',
     });
     seedCommunication(store, { probe_id: 'prb_i', occurred_at: iso(2 * DAY, PROBE_SENT), body_text: 'Follow up 1.' });
@@ -285,8 +374,12 @@ async function run() {
     const res1 = mockRes();
     await recompute(mockReq({ probe_id: 'prb_i' }), res1);
     assert.strictEqual(res1.body.grade, 'A');
+    assert.strictEqual(res1.body.observation.follow_up_count, 2, 'two genuinely separate follow-up attempts (2 days, 4 days apart)');
     assert.strictEqual(res1.body.communications_updated, 3, 'first run classifies all 3 rows');
     assert.strictEqual(store.INTELLIGENCE.length, 3, 'exactly one INTELLIGENCE data row created');
+    // API response shape: communications_updated is a SIBLING of observation, not nested inside it.
+    assert.ok('communications_updated' in res1.body, 'communications_updated present at top level');
+    assert.ok(!('communications_updated' in res1.body.observation), 'communications_updated NOT nested inside observation');
     const intelligenceIdAfterFirst = res1.body.intelligence_id;
 
     const res2 = mockRes();
@@ -297,7 +390,7 @@ async function run() {
     assert.strictEqual(res2.body.communications_updated, 0, 'second run does not reclassify already-classified rows');
 
     // Raw evidence + deterministic matching columns must be byte-for-byte
-    // unchanged by recompute — only classification columns were writable.
+    // unchanged by recompute — only classification/follow_up columns writable.
     const RAW_MATCH_COLUMNS = [
       'communication_id', 'occurred_at', 'received_at', 'channel', 'direction',
       'source_identifier_raw', 'source_identifier_normalized', 'subject', 'body_text',

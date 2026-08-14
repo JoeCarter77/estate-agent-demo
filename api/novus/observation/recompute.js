@@ -21,7 +21,7 @@
 //      (Source Master §19 override rule).
 //   3. EVIDENCE ROLLUP — lib/observation.mjs turns the classified
 //      communications into the Source Master §9/§11/§18 metrics.
-//   4. DECISION — lib/grading.mjs applies the official, deterministic A-E
+//   4. DECISION — lib/grading.mjs applies the official, deterministic A-H
 //      rules (§10). AI never determines the grade.
 //   5. Upsert exactly one INTELLIGENCE row for this probe — idempotent: a
 //      second run updates the same row rather than duplicating it, and a
@@ -141,6 +141,11 @@ export default async function handler(req, res) {
       callback_attempts: observation.callback_attempts,
       successful_conversations: observation.successful_conversations,
       voicemail_count: observation.voicemail_count,
+      // Not yet a column in the live INTELLIGENCE sheet — repo.appendRecord/
+      // updateById silently drop keys the sheet header doesn't have, so this
+      // is forward-compatible (starts persisting the moment the column is
+      // added) without needing a code change or breaking anything today.
+      contact_attempt_count: observation.contact_attempt_count,
       follow_up_count: observation.follow_up_count,
       follow_up_channels: observation.follow_up_channels,
       last_touch_at: observation.last_touch_at,
