@@ -142,7 +142,7 @@ async function run() {
     await repo.appendRecord('PROBES', {
       probe_id: 'prb_c1', probe_reference: 'RM-0001', agency_id: 'ashton-white-dxfw',
       portal: 'rightmove', property_address: '12 Example Street', property_url: 'https://example.com/1',
-      property_price: '£350,000', property_status: 'For Sale',
+      property_price: '£350,000', property_status: 'For Sale', enquiry_text: '',
       probe_timestamp: '2026-08-01T09:00:00.000Z', observation_deadline: '2026-08-05T09:00:00.000Z',
       probe_status: 'observing', created_at: '2026-08-01T08:00:00.000Z', updated_at: 'X',
     });
@@ -174,7 +174,21 @@ async function run() {
     assert.strictEqual(state1.grade.value, 'C');
     assert.strictEqual(state1.problem.key, 'fast_response_no_follow_up');
     assert.strictEqual(state1.journey.key, 'C1');
+    assert.strictEqual(state1.probe.enquiry, '', 'no enquiry text captured yet -> empty string, not fabricated');
     ok('grade C end-to-end: real observation numbers -> grade -> matching problem, nothing invented');
+
+    // Milestone 2: probe.enquiry passes through PROBES.enquiry_text verbatim
+    // when it IS populated - the C1 journey UI must never invent this text.
+    await repo.appendRecord('PROBES', {
+      probe_id: 'prb_c1_with_text', probe_reference: 'RM-0004', agency_id: 'has-enquiry-text',
+      portal: 'rightmove', property_address: '18 Oak Road', enquiry_text: "I'd like to arrange a viewing for this weekend if possible.",
+      probe_timestamp: '2026-08-10T09:00:00.000Z', observation_deadline: '2026-08-14T09:00:00.000Z',
+      probe_status: 'observing', created_at: '2026-08-10T08:00:00.000Z', updated_at: 'X',
+    });
+    const { probe: pText } = await getProbeIntelligenceForSlug(repo, 'has-enquiry-text');
+    const stateText = buildDemoOsState({ slug: 'has-enquiry-text', lead: { company: 'Has Enquiry Text Ltd' }, probe: pText, intelligence: null });
+    assert.strictEqual(stateText.probe.enquiry, "I'd like to arrange a viewing for this weekend if possible.");
+    ok('probe.enquiry passes PROBES.enquiry_text through verbatim when populated');
 
     // A second known agency: no observation yet (probe exists, not yet recomputed).
     await repo.appendRecord('PROBES', {
