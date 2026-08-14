@@ -768,7 +768,17 @@
     let probeAddress = p.get('probe_address') || '';
     let probeSent    = p.get('probe_sent')    || p.get('probe_timestamp') || '';
     // Probe proof line comes fully-formatted from the server (live Google Sheet, per request).
+    // This is the legacy path (lib/probes.mjs) — kept only as a fallback for slugs that
+    // don't yet have a linked probe in the real NOVUS engine (see demoOsState below).
     let probeLine    = null;
+
+    // Demo OS state (lib/demoOs.mjs via /api/novus/demo-state) — the authoritative
+    // PROBE → EVIDENCE → GRADE → PROBLEM data from the real NOVUS intelligence engine,
+    // when this agency has a linked probe. null until resolved / if none exists yet.
+    // Kept on window for now so later milestones (hero journey, personalised copy) can
+    // read it without a second network round-trip; nothing else in this milestone
+    // consumes it beyond the proof strip below.
+    let demoOsState  = null;
 
     // Brand slots - company-independent, render immediately so {{joe_phone}} never
     // shows as a raw placeholder even if the lead lookup is slow or fails (see item 8).
@@ -805,6 +815,22 @@
         } catch (e) { /* fall back to query-param / default values */ }
       }
       applyLead();
+      if (slug) fetchDemoOsState(slug); // fire-and-forget: upgrades the proof strip when it resolves
+    }
+
+    // Real NOVUS intelligence (grade, evidence, specific problem) for this agency,
+    // via the Demo OS adapter (lib/demoOs.mjs). Independent of /api/lead so a slow or
+    // unconfigured NOVUS engine never blocks the rest of the page.
+    async function fetchDemoOsState(slug) {
+      try {
+        const res = await fetch('/api/novus/demo-state?slug=' + encodeURIComponent(slug), { cache: 'no-store' });
+        if (!res.ok) return;
+        const d = await res.json();
+        if (d && !d.error) {
+          demoOsState = d;
+          applyProof();
+        }
+      } catch (e) { /* keep legacy proof line / no proof block */ }
     }
 
     function applyLead() {
@@ -825,13 +851,19 @@
       scrapeAndTrain();
     }
 
-    // Probe proof block - renders the server-built line above the hero, or nothing
-    // at all when there's no usable probe data (never a blank/broken line).
+    // Probe proof block - renders the authoritative Demo OS problem statement when
+    // available (real grade + evidence, via demoOsState), falling back to the legacy
+    // single-line probe proof for agencies with no linked probe yet, or nothing at all
+    // (never a blank/broken line).
     function applyProof() {
       const sec = document.getElementById('proof');
       const q = document.getElementById('proof-quote');
       if (!sec || !q) return;
-      if (probeLine && probeLine.trim()) {
+      const problemStatement = demoOsState && demoOsState.problem && demoOsState.problem.statement;
+      if (problemStatement && problemStatement.trim()) {
+        q.textContent = problemStatement.trim();
+        sec.style.display = 'block';
+      } else if (probeLine && probeLine.trim()) {
         q.textContent = probeLine.trim();
         sec.style.display = 'block';
       } else {
