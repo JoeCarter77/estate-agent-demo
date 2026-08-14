@@ -151,7 +151,7 @@ async function run() {
   async function runProbeGrade(probeId, comms) {
     const { store, valuesApi } = makeFakeSheet();
     __setRepoForTests(createRepo(valuesApi));
-    seedProbe(store, { probe_id: probeId, probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) });
+    seedProbe(store, { probe_id: probeId, probe_timestamp: PROBE_SENT, observation_deadline: iso(4 * DAY, PROBE_SENT) });
     for (const c of comms) seedCommunication(store, { probe_id: probeId, ...c });
     const res = mockRes();
     await recompute(mockReq({ probe_id: probeId }), res);
@@ -310,11 +310,33 @@ async function run() {
   }
 
   // ── Grade H: nothing on any channel, window closed ──
-  console.log('\nGrade H — no meaningful response after 7 days');
+  console.log('\nGrade H — no meaningful response after 4 days');
   {
     const body = await runProbeGrade('prb_h', []);
     assert.strictEqual(body.grade, 'H', `expected H, got ${body.grade}: ${body.grade_reason}`);
     ok('grade H: zero evidence after window closes');
+  }
+
+  // ── 4-day window boundary — deterministic (controlled `now`, not real
+  // wall-clock), proving the window is exactly 4 days, not 7. ──
+  console.log('\n4-day observation window boundary (deterministic)');
+  {
+    const probe = { probe_timestamp: PROBE_SENT, observation_deadline: iso(4 * DAY, PROBE_SENT) };
+    const observation = computeObservation(probe, []);
+
+    const justBeforeClose = gradeObservation({ probe, observation, now: new Date(iso(4 * DAY - 1 * MIN, PROBE_SENT)) });
+    assert.strictEqual(justBeforeClose.grade, 'pending', 'window still open 1 minute before the 4-day deadline -> pending, not H');
+
+    const justAfterClose = gradeObservation({ probe, observation, now: new Date(iso(4 * DAY + 1 * MIN, PROBE_SENT)) });
+    assert.strictEqual(justAfterClose.grade, 'H', 'window closed 1 minute after the 4-day deadline -> H');
+
+    // A 7-day-old probe evidence-free at the OLD deadline must already be H
+    // under the new 4-day policy — proves the window is genuinely 4 days,
+    // not a leftover 7-day value that happens to still read as "closed".
+    const atOldSevenDayMark = gradeObservation({ probe, observation, now: new Date(iso(5 * DAY, PROBE_SENT)) });
+    assert.strictEqual(atOldSevenDayMark.grade, 'H', 'still closed well past 4 days (5 days), consistent with the 4-day policy');
+
+    ok('observation window closes at exactly 4 days (pending just before, H just after) — not 7');
   }
 
   // ── Exhaustiveness: the old "ungraded" gap (fast contact + exactly 1
@@ -350,7 +372,7 @@ async function run() {
       voicemail_count: 99,
       booking_attempt: true,
     };
-    const probe = { probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) };
+    const probe = { probe_timestamp: PROBE_SENT, observation_deadline: iso(4 * DAY, PROBE_SENT) };
     const { grade } = gradeObservation({ probe, observation, now: new Date(iso(1 * DAY, PROBE_SENT)) });
     assert.strictEqual(grade, 'C', 'human contact takes priority over auto_acknowledgement=true (G never fires when a human touch exists)');
     ok('human-contact grades (A-F) always take priority over G, regardless of auto_acknowledgement or unrelated intelligence fields');
@@ -361,13 +383,13 @@ async function run() {
   {
     const { store, valuesApi } = makeFakeSheet();
     __setRepoForTests(createRepo(valuesApi));
-    seedProbe(store, { probe_id: 'prb_i', probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) });
+    seedProbe(store, { probe_id: 'prb_i', probe_timestamp: PROBE_SENT, observation_deadline: iso(4 * DAY, PROBE_SENT) });
     seedCommunication(store, {
       probe_id: 'prb_i', occurred_at: iso(30 * MIN, PROBE_SENT),
       from: 'Jane@Agency-One.co.uk', subject: 'Original subject', body_text: 'Original body, calling now.',
     });
-    seedCommunication(store, { probe_id: 'prb_i', occurred_at: iso(2 * DAY, PROBE_SENT), body_text: 'Follow up 1.' });
-    seedCommunication(store, { probe_id: 'prb_i', occurred_at: iso(4 * DAY, PROBE_SENT), body_text: 'Follow up 2.' });
+    seedCommunication(store, { probe_id: 'prb_i', occurred_at: iso(1 * DAY, PROBE_SENT), body_text: 'Follow up 1.' });
+    seedCommunication(store, { probe_id: 'prb_i', occurred_at: iso(2 * DAY, PROBE_SENT), body_text: 'Follow up 2.' });
 
     const beforeRaw = store.COMMUNICATIONS.slice(2).map((r) => r.slice());
 
@@ -417,7 +439,7 @@ async function run() {
   {
     const { store, valuesApi } = makeFakeSheet();
     __setRepoForTests(createRepo(valuesApi));
-    seedProbe(store, { probe_id: 'prb_recalc', probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) });
+    seedProbe(store, { probe_id: 'prb_recalc', probe_timestamp: PROBE_SENT, observation_deadline: iso(4 * DAY, PROBE_SENT) });
     seedCommunication(store, { probe_id: 'prb_recalc', occurred_at: iso(9 * MIN, PROBE_SENT), channel: 'voice', body_text: 'voicemail: It.' });
     seedCommunication(store, { probe_id: 'prb_recalc', occurred_at: iso(10 * MIN, PROBE_SENT), channel: 'sms', body_text: 'Please call me back to arrange a viewing.' });
 

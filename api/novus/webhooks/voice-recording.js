@@ -17,11 +17,17 @@
 //
 // AUTH: Twilio request signature, same as voice-inbound.js.
 // Not wired up in the Twilio console by this change.
+//
+// After patching the COMMUNICATIONS row, triggers an automatic observation/
+// intelligence recompute for the call's probe_id (if any) — the recording/
+// transcript can change voicemail_present, recording_reference, transcript,
+// and (on the transcription callback) classification.
 
 import { getRepo } from '../../../lib/sheets.mjs';
 import { newRawEventId } from '../../../lib/ids.mjs';
 import { classifyCommunication } from '../../../lib/classification.mjs';
 import { requireTwilioSignature, parseTwilioBody } from '../../../lib/twilio-webhook.mjs';
+import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 
 export const maxDuration = 20;
 
@@ -117,6 +123,18 @@ export default async function handler(req, res) {
       processing_status: 'processed',
       processed_communication_id: comm.communication_id,
     });
+
+    // Automatic recompute: only when the call this recording/transcription
+    // belongs to was matched to an active probe. Covers both callbacks —
+    // the recording landing (voicemail_present/recording_reference) and the
+    // transcript landing (which can also change classification above).
+    if (comm.probe_id) {
+      try {
+        await recomputeProbeObservation(repo, comm.probe_id);
+      } catch (err) {
+        console.error('voice-recording: auto-recompute failed:', err);
+      }
+    }
 
     return res.status(200).json({ matched: true, communication_id: comm.communication_id, raw_event_id: rawEventId });
   } catch (err) {

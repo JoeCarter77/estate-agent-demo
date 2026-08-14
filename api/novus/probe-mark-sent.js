@@ -7,7 +7,10 @@
 //
 //   probe_status         = "observing"
 //   probe_timestamp      = server now (ISO)
-//   observation_deadline = probe_timestamp + 7 days (ISO)
+//   observation_deadline = probe_timestamp + 4 days (ISO)
+//
+// Observation window is 4 days (Source Master 2026-08-14 FINAL methodology
+// change from the original 7-day window — see lib/grading.mjs Grade H).
 //
 // Idempotent: if the probe is already observing, the original timestamp/deadline
 // are preserved and returned unchanged.
@@ -15,7 +18,7 @@
 import { getRepo } from '../../lib/sheets.mjs';
 import { requireAuth } from './_auth.mjs';
 
-const OBSERVATION_DAYS = 7;
+const OBSERVATION_DAYS = 4;
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();

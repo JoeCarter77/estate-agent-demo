@@ -12,7 +12,8 @@
 //
 // Flow: RAW_EVENTS (idempotent on provider+MessageSid) -> deterministic
 // Agency match by phone -> deterministic Probe match (only if Agency matched)
-// -> COMMUNICATIONS -> empty TwiML.
+// -> COMMUNICATIONS -> automatic observation/intelligence recompute (only if
+// matched to an active probe) -> empty TwiML.
 
 import { getRepo } from '../../../lib/sheets.mjs';
 import { newRawEventId, newCommunicationId } from '../../../lib/ids.mjs';
@@ -20,6 +21,7 @@ import { normalizePhone, canonicalTimestamp } from '../../../lib/normalize.mjs';
 import { matchAgencyByPhone, matchActiveProbe } from '../../../lib/phone-matching.mjs';
 import { classifyCommunication } from '../../../lib/classification.mjs';
 import { requireTwilioSignature, parseTwilioBody, sendTwiml } from '../../../lib/twilio-webhook.mjs';
+import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 
 export const maxDuration = 20;
 
@@ -141,6 +143,18 @@ export default async function handler(req, res) {
       processing_status: 'processed',
       processed_communication_id: communicationId,
     });
+
+    // Automatic recompute: only when this communication deterministically
+    // matched an active probe (probeId is non-empty only when matchStatus is
+    // 'matched', never for ambiguous/unmatched). Never blocks the Twilio
+    // response — a recompute failure is logged, not surfaced to the caller.
+    if (probeId) {
+      try {
+        await recomputeProbeObservation(repo, probeId);
+      } catch (err) {
+        console.error('sms-inbound: auto-recompute failed:', err);
+      }
+    }
 
     return emptyTwiml(res);
   } catch (err) {

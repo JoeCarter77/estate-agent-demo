@@ -20,8 +20,10 @@
 //
 // Flow: RAW_EVENTS (idempotent on provider+CallSid) -> deterministic Agency
 // match by phone -> deterministic Probe match (only if Agency matched) ->
-// COMMUNICATIONS -> TwiML instructing Twilio to record a voicemail. The
-// recording/transcript arrive later via voice-recording.js.
+// COMMUNICATIONS -> automatic observation/intelligence recompute (only if
+// matched to an active probe) -> TwiML instructing Twilio to record a
+// voicemail. The recording/transcript arrive later via voice-recording.js,
+// which triggers its own recompute once the transcript patches this row.
 
 import { getRepo } from '../../../lib/sheets.mjs';
 import { newRawEventId, newCommunicationId } from '../../../lib/ids.mjs';
@@ -29,6 +31,7 @@ import { normalizePhone, canonicalTimestamp } from '../../../lib/normalize.mjs';
 import { matchAgencyByPhone, matchActiveProbe } from '../../../lib/phone-matching.mjs';
 import { classifyCommunication } from '../../../lib/classification.mjs';
 import { requireTwilioSignature, parseTwilioBody, sendTwiml, escapeXml } from '../../../lib/twilio-webhook.mjs';
+import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 
 export const maxDuration = 20;
 
@@ -168,6 +171,16 @@ export default async function handler(req, res) {
       processing_status: 'processed',
       processed_communication_id: communicationId,
     });
+
+    // Automatic recompute: only when this call deterministically matched an
+    // active probe. Never blocks the TwiML response Twilio needs back.
+    if (probeId) {
+      try {
+        await recomputeProbeObservation(repo, probeId);
+      } catch (err) {
+        console.error('voice-inbound: auto-recompute failed:', err);
+      }
+    }
 
     return voicemailTwiml(res);
   } catch (err) {

@@ -7,8 +7,8 @@
 //
 // Flow: RAW_EVENTS (idempotent on provider+provider_event_id) → deterministic
 // Agency match → deterministic Probe match (only if Agency matched) →
-// COMMUNICATIONS. AI classification/summarisation/Intelligence/Actions are
-// explicitly out of scope for this milestone and are not touched here.
+// COMMUNICATIONS → automatic observation/intelligence recompute (only if
+// matched to an active probe).
 //
 // AUTH: this lives under /api/novus/webhooks/*, which middleware.js already
 // excludes from the human NOVUS_BASIC_AUTH — webhooks are verified by a
@@ -33,6 +33,7 @@ import { getRepo } from '../../../lib/sheets.mjs';
 import { newRawEventId, newCommunicationId } from '../../../lib/ids.mjs';
 import { normalizeEmail, canonicalTimestamp } from '../../../lib/normalize.mjs';
 import { matchAgency, matchProbe } from '../../../lib/matching.mjs';
+import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 
 export const maxDuration = 20;
 
@@ -183,6 +184,16 @@ export default async function handler(req, res) {
       processing_status: 'processed',
       processed_communication_id: communicationId,
     });
+
+    // Automatic recompute: only when this email deterministically matched an
+    // active probe. Never blocks the adapter's response.
+    if (probeId) {
+      try {
+        await recomputeProbeObservation(repo, probeId);
+      } catch (err) {
+        console.error('email-inbound: auto-recompute failed:', err);
+      }
+    }
 
     return res.status(200).json({
       duplicate: false,

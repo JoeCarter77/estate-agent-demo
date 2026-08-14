@@ -76,8 +76,8 @@ async function main() {
   console.log('  status:', rec?.obj.probe_status, '| row:', rec?.rowNumber);
 
   const sentAt = new Date();
-  const deadline = new Date(sentAt.getTime() + 7 * 24 * 60 * 60 * 1000);
-  console.log('→ Marking as sent (observing, +7 days)…');
+  const deadline = new Date(sentAt.getTime() + 4 * 24 * 60 * 60 * 1000);
+  console.log('→ Marking as sent (observing, +4 days)…');
   await repo.updateById('PROBES', 'probe_id', id, {
     probe_status: 'observing',
     probe_timestamp: sentAt.toISOString(),

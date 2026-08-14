@@ -177,8 +177,8 @@ async function run() {
     assert.ok(ts >= before - 1000 && ts <= after + 1000, 'timestamp is server "now"');
     const dl = new Date(sent.observation_deadline).getTime();
     const days = (dl - ts) / (24 * 60 * 60 * 1000);
-    assert.strictEqual(days, 7, 'deadline is exactly +7 days');
-    ok('mark-sent sets observing + server timestamp + exact +7 day deadline');
+    assert.strictEqual(days, 4, 'deadline is exactly +4 days');
+    ok('mark-sent sets observing + server timestamp + exact +4 day deadline');
 
     // Persisted to the sheet.
     assert.strictEqual(store.PROBES[2][13], 'observing', 'sheet cell shows observing');

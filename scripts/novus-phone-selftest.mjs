@@ -43,6 +43,16 @@ const RAW_EVENTS_HEADER = [
   'source_identifier','destination_identifier','payload_reference','processing_status',
   'processed_communication_id','error_message','created_at',
 ];
+const INTELLIGENCE_HEADER = [
+  'intelligence_id','agency_id','probe_id','observation_status','observation_deadline',
+  'auto_acknowledgement','auto_ack_timestamp','crm_detected','crm_name','crm_evidence',
+  'first_human_touch','first_human_touch_at','human_lag_hours','callback_attempts',
+  'successful_conversations','voicemail_count','inbound_sms_count','email_touch_count',
+  'follow_up_count','follow_up_channels','last_touch_at','days_chased','booking_attempt',
+  'contact_quality','proactive_reactive','persistence_profile','channels_used','grade',
+  'grade_reason','tier','tier_reason','sales_angle','segment','ai_evidence_summary','ai_confidence',
+  'manual_override','override_reason','observation_closed_at','created_at','updated_at',
+];
 
 function makeFakeSheet() {
   const store = {
@@ -50,6 +60,7 @@ function makeFakeSheet() {
     PROBES: [PROBES_HEADER.slice(), ['SCHEMA NOTE', 'One row per actual probe.']],
     COMMUNICATIONS: [COMMUNICATIONS_HEADER.slice(), ['SCHEMA NOTE', 'One row per meaningful communication.']],
     RAW_EVENTS: [RAW_EVENTS_HEADER.slice(), ['SCHEMA NOTE', 'Immutable provider webhook/event audit trail.']],
+    INTELLIGENCE: [INTELLIGENCE_HEADER.slice(), ['SCHEMA NOTE', 'Derived behaviour and official decisions.']],
   };
   function tabOf(range) { return String(range).split('!')[0]; }
   function startRowOf(range) {
@@ -123,6 +134,10 @@ function mockRes() {
     setHeader(k, v) { this.headers[k] = v; },
     end() { return this; },
   };
+}
+
+function intelligenceRows(store) {
+  return store.INTELLIGENCE.slice(2).map((row) => Object.fromEntries(INTELLIGENCE_HEADER.map((k, i) => [k, row[i]])));
 }
 
 let passed = 0;
@@ -306,6 +321,122 @@ async function run() {
     assert.strictEqual(comm.probe_id, 'prb_1');
     assert.strictEqual(comm.callback_attempt, 'FALSE', 'SMS is not counted as a phone callback attempt');
     ok('signed inbound SMS: RAW_EVENTS + COMMUNICATIONS written, matched, empty TwiML reply');
+    __setRepoForTests(null);
+  }
+
+  // ── Architecture change 1: automatic recompute after webhook ingestion ──
+  // webhook -> COMMUNICATIONS -> observation/intelligence recompute, with NO
+  // manual call to /api/novus/observation/recompute anywhere in these tests.
+  console.log('\nsms-inbound — automatic intelligence recompute (no manual recompute call)');
+  {
+    const { store, valuesApi } = makeFakeSheet();
+    seedAgency(store, { agency_id: 'ag_1', main_phone: '+447700900123' });
+    seedProbe(store, { probe_id: 'prb_1', agency_id: 'ag_1', ...inWindow(-10 * 60 * 1000, 1000 * 60 * 60 * 24) });
+    __setRepoForTests(createRepo(valuesApi));
+
+    assert.strictEqual(store.INTELLIGENCE.length, 2, 'no INTELLIGENCE rows before any communication arrives');
+
+    const params = { MessageSid: 'SM_auto', From: '+447700900123', To: '+447575333064', Body: 'Thanks for your interest, someone will call you back.' };
+    await smsInbound(signedReq({ path: '/api/novus/webhooks/sms-inbound', params }), mockRes());
+
+    const rows = intelligenceRows(store);
+    assert.strictEqual(rows.length, 1, 'INTELLIGENCE row created automatically by the webhook itself');
+    assert.strictEqual(rows[0].probe_id, 'prb_1');
+    assert.strictEqual(rows[0].agency_id, 'ag_1');
+    assert.strictEqual(rows[0].grade, 'C', 'single fast touch, 0 follow-ups -> Grade C, computed automatically');
+    ok('a communication arriving during the observation window updates INTELLIGENCE automatically — no manual recompute call');
+    __setRepoForTests(null);
+  }
+
+  console.log('\nunmatched SMS — no INTELLIGENCE row created (trigger only fires on a deterministic probe match)');
+  {
+    const { store, valuesApi } = makeFakeSheet();
+    seedAgency(store, { agency_id: 'ag_1', main_phone: '+447700900123' });
+    __setRepoForTests(createRepo(valuesApi)); // no probe seeded — agency exists but no active probe
+
+    const params = { MessageSid: 'SM_unmatched', From: '+447700900123', To: '+447575333064', Body: 'Random message.' };
+    await smsInbound(signedReq({ path: '/api/novus/webhooks/sms-inbound', params }), mockRes());
+
+    assert.strictEqual(store.INTELLIGENCE.length, 2, 'no INTELLIGENCE row when there is no active probe to attach to');
+    ok('a communication with no active probe match never triggers a recompute (nothing to recompute for)');
+    __setRepoForTests(null);
+  }
+
+  console.log('\nvoice-inbound then genuine SMS follow-up >30min later — automatic recompute recalculates Grade C -> A');
+  {
+    const { store, valuesApi } = makeFakeSheet();
+    seedAgency(store, { agency_id: 'ag_1', main_phone: '+447700900123' });
+    // Probe window brackets real "now" (required for matchActiveProbe), but
+    // the actual grading timestamps below are independent, controlled
+    // offsets — deterministic, not dependent on how long the test takes to run.
+    const probeStart = new Date(Date.now() - 60 * 60 * 1000); // probe sent 1h before "now"
+    seedProbe(store, {
+      probe_id: 'prb_1', agency_id: 'ag_1',
+      probe_timestamp: probeStart.toISOString(),
+      observation_deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 4).toISOString(),
+    });
+    __setRepoForTests(createRepo(valuesApi));
+
+    // Contact attempt 1: a call ~10 minutes after the probe was sent (well
+    // <=1h, so a fast/very-fast human touch), unanswered, voicemail left.
+    const attempt1Start = new Date(probeStart.getTime() + 10 * 60 * 1000);
+    await voiceInbound(signedReq({
+      path: '/api/novus/webhooks/voice-inbound',
+      params: { CallSid: 'CA_recalc', From: '+447700900123', To: '+447575333064', CallStatus: 'ringing', Timestamp: attempt1Start.toISOString() },
+    }), mockRes());
+
+    const afterFirst = intelligenceRows(store);
+    assert.strictEqual(afterFirst.length, 1, 'INTELLIGENCE row created automatically after the call');
+    assert.strictEqual(afterFirst[0].grade, 'C', 'single contact attempt, 0 follow-ups -> Grade C');
+    assert.strictEqual(afterFirst[0].follow_up_count, 0);
+    const intelligenceIdBeforeFollowUp = afterFirst[0].intelligence_id;
+
+    // A genuinely separate follow-up SMS, 31 minutes after attempt 1's
+    // START (not 31 minutes after the call, but definitionally "well past
+    // the 30-minute window") — this is contact attempt 2.
+    const followUpAt = new Date(attempt1Start.getTime() + 31 * 60 * 1000);
+    await smsInbound(signedReq({
+      path: '/api/novus/webhooks/sms-inbound',
+      params: { MessageSid: 'SM_recalc', From: '+447700900123', To: '+447575333064', Body: 'Any time this week for a viewing?', Timestamp: followUpAt.toISOString() },
+    }), mockRes());
+
+    const afterSecond = intelligenceRows(store);
+    assert.strictEqual(afterSecond.length, 1, 'still exactly one INTELLIGENCE row — updated in place, not duplicated');
+    assert.strictEqual(afterSecond[0].intelligence_id, intelligenceIdBeforeFollowUp, 'same intelligence_id after automatic recalculation');
+    assert.strictEqual(afterSecond[0].grade, 'A', `expected A after genuine follow-up, got ${afterSecond[0].grade}: ${afterSecond[0].grade_reason}`);
+    assert.strictEqual(afterSecond[0].follow_up_count, 1, 'contact-attempt count +1, follow-up count +1 — the 31-minute-later SMS is a genuine new attempt');
+
+    ok('a genuine follow-up communication automatically recalculates INTELLIGENCE from Grade C to Grade A, in the same row, via the webhook trigger alone');
+    __setRepoForTests(null);
+  }
+
+  console.log('\nvoice-recording callbacks also trigger automatic recompute');
+  {
+    const { store, valuesApi } = makeFakeSheet();
+    seedAgency(store, { agency_id: 'ag_1', main_phone: '+447700900123' });
+    seedProbe(store, { probe_id: 'prb_1', agency_id: 'ag_1', ...inWindow(-10 * 60 * 1000, 1000 * 60 * 60 * 24) });
+    __setRepoForTests(createRepo(valuesApi));
+
+    await voiceInbound(signedReq({
+      path: '/api/novus/webhooks/voice-inbound',
+      params: { CallSid: 'CA_rec', From: '+447700900123', To: '+447575333064', CallStatus: 'ringing' },
+    }), mockRes());
+    const afterCall = intelligenceRows(store);
+    assert.strictEqual(afterCall.length, 1, 'INTELLIGENCE row created automatically after the call');
+    const intelligenceIdAfterCall = afterCall[0].intelligence_id;
+    assert.strictEqual(afterCall[0].voicemail_count, 0, 'no recording exists yet at ringing time');
+
+    await voiceRecording(signedReq({
+      path: '/api/novus/webhooks/voice-recording',
+      params: { CallSid: 'CA_rec', RecordingSid: 'RE_rec', RecordingUrl: 'https://api.twilio.com/rec/RE_rec', RecordingDuration: '12' },
+    }), mockRes());
+
+    const afterRecording = intelligenceRows(store);
+    assert.strictEqual(afterRecording.length, 1, 'still exactly one INTELLIGENCE row — recalculated in place');
+    assert.strictEqual(afterRecording[0].intelligence_id, intelligenceIdAfterCall, 'same intelligence_id after the recording callback');
+    assert.strictEqual(afterRecording[0].voicemail_count, 1, 'voicemail_count reflects the newly landed recording, via automatic recompute');
+
+    ok('a recording callback (not just a new COMMUNICATIONS row) also triggers automatic recompute for its probe_id');
     __setRepoForTests(null);
   }
 
