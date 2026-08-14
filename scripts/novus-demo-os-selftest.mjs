@@ -247,6 +247,37 @@ async function run() {
     await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/2' } }), cRes2);
     assert.strictEqual(cRes2.body.probe.agency_id, '', 'unlinked probes still work exactly as before');
     ok('slug remains optional — existing unlinked-probe flow is unchanged');
+
+    // ── Part D: the dev-only /d/test-c1-fast-response fixture ──
+    // Reuses the SAME fake repo/__setRepoForTests from Part C (still active),
+    // deliberately, to prove the fixture slug never touches it while a real
+    // linked slug (ashton-white-dxfw, created above) still goes through the
+    // normal Sheets-backed path untouched by the fixture's existence.
+    console.log('\nPart D — dev-only C1 test fixture (/d/test-c1-fast-response)');
+    const { default: demoStateHandler } = await import('../api/novus/demo-state.js');
+
+    const fixtureRes = mockRes();
+    await demoStateHandler(mockReq({ method: 'GET', query: { slug: 'test-c1-fast-response' } }), fixtureRes);
+    assert.strictEqual(fixtureRes.statusCode, 200);
+    assert.strictEqual(fixtureRes.body.agency.slug, 'test-c1-fast-response');
+    assert.ok(/DEV ONLY/.test(fixtureRes.body.agency.company), 'company name makes the fixture obviously a test agency');
+    assert.strictEqual(fixtureRes.body.grade.value, 'C');
+    assert.strictEqual(fixtureRes.body.evidence.followUpCount, 0);
+    assert.ok(Math.abs(fixtureRes.body.evidence.humanLagHours - 0.1) < 1e-9, '~6 minutes, same numbers as the Part B/self-test fixture');
+    assert.strictEqual(fixtureRes.body.problem.key, 'fast_response_no_follow_up');
+    assert.strictEqual(fixtureRes.body.journey.key, 'C1');
+    ok('/d/test-c1-fast-response resolves grade C / fast_response_no_follow_up via a self-contained fixture');
+
+    const realRes = mockRes();
+    await demoStateHandler(mockReq({ method: 'GET', query: { slug: 'ashton-white-dxfw' } }), realRes);
+    assert.strictEqual(realRes.statusCode, 200);
+    assert.strictEqual(realRes.body.probe.id, cRes.body.probe.probe_id, 'the REAL agency still resolves its own probe via the normal Sheets-backed path, unaffected by the fixture');
+    ok('the dev fixture does not intercept or contaminate any other slug, including a real linked agency');
+
+    const unknownRes = mockRes();
+    await demoStateHandler(mockReq({ method: 'GET', query: { slug: 'not-a-real-slug' } }), unknownRes);
+    assert.strictEqual(unknownRes.statusCode, 404, 'an unknown slug is still a 404, fixture or not');
+    ok('unknown slugs are unaffected (still 404)');
   }
 
   console.log(`\n${passed} checks passed.\n`);
