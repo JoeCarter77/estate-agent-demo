@@ -492,6 +492,45 @@
     .call-active .voice-status-label.speaking { color: #86EFAC; }
     .call-active .voice-transcript { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); color: rgba(255,255,255,0.9); }
 
+    /* ── C1 HERO JOURNEY (fast response, no follow-up) — lives inside the same
+       dark .call-panel surface as the default dial UI; reuses its tokens
+       rather than introducing a second visual language. ── */
+    .c1-progress { display: none; gap: 5px; position: relative; z-index: 1; margin-bottom: 2px; }
+    .c1-progress.active { display: flex; }
+    .c1-progress-dot { width: 5px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.22); transition: background 0.2s, width 0.2s; }
+    .c1-progress-dot.done { background: rgba(255,255,255,0.65); }
+    .c1-progress-dot.current { background: var(--accent-hi); width: 14px; }
+    .c1-step { position: relative; z-index: 1; width: 100%; display: none; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+    .c1-step.active { display: flex; }
+    .c1-eyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #9DB4E8; }
+    .c1-card { width: 100%; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14); border-radius: 12px; padding: 12px 15px; text-align: left; display: flex; flex-direction: column; }
+    .c1-card-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 0.78rem; color: rgba(255,255,255,0.88); padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .c1-card-row:last-child { border-bottom: none; }
+    .c1-card-row .c1-label { color: rgba(255,255,255,0.5); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.6rem; flex-shrink: 0; }
+    .c1-quote { font-size: 0.86rem; line-height: 1.55; color: #fff; font-style: italic; }
+    .c1-link { font-size: 0.72rem; color: #93C5FD; text-decoration: none; align-self: center; }
+    .c1-link:hover { text-decoration: underline; }
+    .c1-flow { display: flex; flex-direction: column; gap: 4px; width: 100%; align-items: flex-start; }
+    .c1-flow-step { display: flex; align-items: center; gap: 9px; font-size: 0.8rem; color: rgba(255,255,255,0.9); }
+    .c1-flow-arrow { color: rgba(255,255,255,0.3); font-size: 0.75rem; padding-left: 3px; }
+    .c1-flow-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .c1-flow-dot.ok { background: var(--green); }
+    .c1-flow-dot.gap { background: var(--red); }
+    .c1-stat-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+    .c1-stat { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 12px 10px; }
+    .c1-stat-n { font-size: 1.35rem; font-weight: 800; color: #fff; letter-spacing: -0.02em; line-height: 1; }
+    .c1-stat-l { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-top: 4px; }
+    .c1-body { font-size: 0.86rem; line-height: 1.62; color: rgba(255,255,255,0.88); }
+    .c1-body strong { color: #fff; }
+    .c1-transition { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.02em; color: rgba(255,255,255,0.6); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    .c1-transition .no { text-decoration: line-through; color: rgba(255,255,255,0.35); }
+    .c1-transition .yes { color: #86EFAC; }
+    .c1-btn { position: relative; z-index: 1; width: 100%; max-width: 300px; background: #fff; color: var(--brand-navy); border: none; border-radius: 100px; padding: 12px 18px; font-family: 'Inter', sans-serif; font-size: 0.86rem; font-weight: 800; letter-spacing: -0.01em; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,0.28); transition: transform 0.14s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.14s; }
+    .c1-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(0,0,0,0.4); }
+    .c1-btn:active { transform: translateY(0) scale(0.98); }
+    .c1-outcome-badge { display: inline-flex; align-items: center; gap: 7px; background: rgba(34,197,94,0.14); border: 1px solid rgba(34,197,94,0.4); color: #86EFAC; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 7px 14px; border-radius: 100px; }
+    .c1-outcome-note { font-size: 0.68rem; color: rgba(255,255,255,0.45); line-height: 1.55; }
+
     /* ── DEMO SECONDARY CAPTION (right browser mockup) ── */
     .demo-caption { font-size: 0.78rem; font-weight: 600; color: var(--text-3); text-align: center; margin-bottom: 4px; letter-spacing: -0.005em; }
     .demo-caption strong { color: var(--text-2); font-weight: 700; }
@@ -557,16 +596,29 @@
         <p class="hero-caption fu fu-1">Built from a sample of your live listings - pulled straight from your website.</p>
       </div>
       <div class="call-panel fu fu-2">
+        <!-- C1 journey progress (hidden unless a real fast-response/no-follow-up
+             probe is linked to this agency - see maybeActivateC1Journey()) -->
+        <div class="c1-progress" id="c1-progress"></div>
+
+        <!-- C1 HERO JOURNEY STEPS — populated from real Demo OS state
+             (lib/demoOs.mjs) by renderC1Content(); hidden/no-op for every
+             agency without a matching linked probe. -->
+        <div class="c1-step" id="c1-step-enquiry"></div>
+        <div class="c1-step" id="c1-step-evidence"></div>
+        <div class="c1-step" id="c1-step-problem"></div>
+        <div class="c1-step" id="c1-step-opportunity"></div>
+        <div class="c1-step" id="c1-step-outcome"></div>
+
         <div class="call-idle" id="hero-call-idle">
           <div class="call-avatar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
           </div>
-          <div class="call-callto">Your out-of-hours line</div>
+          <div class="call-callto" id="hero-call-callto">Your out-of-hours line</div>
           <button class="call-dial-btn" onclick="startHeroCall()">
             <span class="dial-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
             <span>Call <span class="company-slot">Your Agency</span></span>
           </button>
-          <p class="call-subtext">This is what your out-of-hours line sounds like from Monday.</p>
+          <p class="call-subtext" id="hero-call-subtext">This is what your out-of-hours line sounds like from Monday.</p>
           <p class="call-poweredby">Powered by AI · trained on your live listings</p>
         </div>
         <div class="call-active" id="hero-call-active" style="display:none">
@@ -768,7 +820,17 @@
     let probeAddress = p.get('probe_address') || '';
     let probeSent    = p.get('probe_sent')    || p.get('probe_timestamp') || '';
     // Probe proof line comes fully-formatted from the server (live Google Sheet, per request).
+    // This is the legacy path (lib/probes.mjs) — kept only as a fallback for slugs that
+    // don't yet have a linked probe in the real NOVUS engine (see demoOsState below).
     let probeLine    = null;
+
+    // Demo OS state (lib/demoOs.mjs via /api/novus/demo-state) — the authoritative
+    // PROBE → EVIDENCE → GRADE → PROBLEM data from the real NOVUS intelligence engine,
+    // when this agency has a linked probe. null until resolved / if none exists yet.
+    // Kept on window for now so later milestones (hero journey, personalised copy) can
+    // read it without a second network round-trip; nothing else in this milestone
+    // consumes it beyond the proof strip below.
+    let demoOsState  = null;
 
     // Brand slots - company-independent, render immediately so {{joe_phone}} never
     // shows as a raw placeholder even if the lead lookup is slow or fails (see item 8).
@@ -805,6 +867,23 @@
         } catch (e) { /* fall back to query-param / default values */ }
       }
       applyLead();
+      if (slug) fetchDemoOsState(slug); // fire-and-forget: upgrades the proof strip when it resolves
+    }
+
+    // Real NOVUS intelligence (grade, evidence, specific problem) for this agency,
+    // via the Demo OS adapter (lib/demoOs.mjs). Independent of /api/lead so a slow or
+    // unconfigured NOVUS engine never blocks the rest of the page.
+    async function fetchDemoOsState(slug) {
+      try {
+        const res = await fetch('/api/novus/demo-state?slug=' + encodeURIComponent(slug), { cache: 'no-store' });
+        if (!res.ok) return;
+        const d = await res.json();
+        if (d && !d.error) {
+          demoOsState = d;
+          applyProof();
+          maybeActivateC1Journey();
+        }
+      } catch (e) { /* keep legacy proof line / no proof block */ }
     }
 
     function applyLead() {
@@ -825,13 +904,19 @@
       scrapeAndTrain();
     }
 
-    // Probe proof block - renders the server-built line above the hero, or nothing
-    // at all when there's no usable probe data (never a blank/broken line).
+    // Probe proof block - renders the authoritative Demo OS problem statement when
+    // available (real grade + evidence, via demoOsState), falling back to the legacy
+    // single-line probe proof for agencies with no linked probe yet, or nothing at all
+    // (never a blank/broken line).
     function applyProof() {
       const sec = document.getElementById('proof');
       const q = document.getElementById('proof-quote');
       if (!sec || !q) return;
-      if (probeLine && probeLine.trim()) {
+      const problemStatement = demoOsState && demoOsState.problem && demoOsState.problem.statement;
+      if (problemStatement && problemStatement.trim()) {
+        q.textContent = problemStatement.trim();
+        sec.style.display = 'block';
+      } else if (probeLine && probeLine.trim()) {
         q.textContent = probeLine.trim();
         sec.style.display = 'block';
       } else {
@@ -1045,6 +1130,12 @@
       const siteCtx = gymContext ? '\n\n--- GENERAL WEBSITE INFO (branches, fees, about - secondary reference) ---\n' + gymContext.slice(0, 3500) + '\n--- END ---' : '';
       const locCtx = siteLocation ? '\n\nThe agency operates in and around ' + siteLocation + '. You can speak confidently about ' + siteLocation + ' and the surrounding area as their patch - but never invent a specific property you cannot see.' : '';
       const voiceRule = mode === 'voice' ? '\n\nVOICE: Full natural sentences only, never lists or bullet points, maximum 2 short sentences per turn.' : '';
+      // C1 journey: grounds this specific call in the real stalled enquiry (real
+      // property/evidence from demoOsState, via lib/demoOs.mjs) rather than a
+      // generic front-desk call - only active for an agency with a linked C1 probe.
+      const c1Ctx = (c1.active && demoOsState && demoOsState.property && demoOsState.property.address)
+        ? '\n\nCONTEXT FOR THIS SPECIFIC CALL: this demo is showing what happens when Novus follows up on a real enquiry that got a fast first reply but no genuine follow-up after that - the enquiry was about ' + demoOsState.property.address + '. Open by acknowledging that enquiry warmly ("great to catch you about ' + demoOsState.property.address + '"), quickly re-qualify what the caller still needs, and move firmly toward booking a viewing or valuation rather than starting a generic conversation.'
+        : '';
 
       const prompt =
 `You are the front desk for ${company}, an independent UK estate agent. You handle enquiries from buyers, sellers, tenants and landlords via chat on the agency's website. You speak as the agency ("we", "us") - warm, concise, professional British English. You are not a generic assistant; you are this agency's front desk.
@@ -1085,7 +1176,7 @@ Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic
 FORMATTING
 Never use em dashes (-) or en dashes (-). Use a plain hyphen (-) instead, or rephrase. Keep punctuation simple and human.`;
 
-      return prompt + listingsJson + siteCtx + locCtx + voiceRule;
+      return prompt + listingsJson + siteCtx + locCtx + voiceRule + c1Ctx;
     }
 
     function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
@@ -1199,14 +1290,185 @@ Never use em dashes (-) or en dashes (-). Use a plain hyphen (-) instead, or rep
         vapiHero.on('message', function(msg) { if (msg.type === 'transcript' && msg.transcriptType === 'final') transcript.textContent = msg.transcript; });
         vapiHero.on('call-end', function() { vapiActiveHero = false; orb.className = 'voice-orb idle'; statusEl.textContent = 'Call ended'; statusEl.className = 'voice-status-label'; transcript.textContent = 'Thanks for calling - the team will be in touch.'; });
         vapiHero.on('error', function(e) { console.error('Vapi error:', e); vapiActiveHero = false; orb.className = 'voice-orb idle'; statusEl.textContent = 'Connection error'; statusEl.className = 'voice-status-label error'; transcript.textContent = 'Could not connect. Please try again in a moment.'; });
-        vapiHero.start({ name: company + ' Receptionist', firstMessage: 'Hi' + (firstName ? ' ' + firstName : '') + '! Thanks for calling ' + company + ' - how can I help you today?', transcriber: { provider: 'deepgram', model: 'nova-2', language: 'en-GB' }, voice: { provider: '11labs', voiceId: 'sarah' }, model: { provider: 'openai', model: 'gpt-4o-mini', messages: [{ role: 'system', content: buildSystemPrompt('voice') }] } });
+        const heroAddr = c1.active && demoOsState && demoOsState.property && demoOsState.property.address;
+        const heroFirstMessage = heroAddr
+          ? 'Hi' + (firstName ? ' ' + firstName : '') + '! It’s ' + company + ' here, following up on your enquiry about ' + heroAddr + ' - is now still a good time?'
+          : 'Hi' + (firstName ? ' ' + firstName : '') + '! Thanks for calling ' + company + ' - how can I help you today?';
+        vapiHero.start({ name: company + ' Receptionist', firstMessage: heroFirstMessage, transcriber: { provider: 'deepgram', model: 'nova-2', language: 'en-GB' }, voice: { provider: '11labs', voiceId: 'sarah' }, model: { provider: 'openai', model: 'gpt-4o-mini', messages: [{ role: 'system', content: buildSystemPrompt('voice') }] } });
       } catch (err) { orb.className = 'voice-orb idle'; statusEl.textContent = 'Unavailable'; statusEl.className = 'voice-status-label error'; transcript.textContent = 'Voice unavailable: ' + err.message; }
     }
     function endHeroCall() {
       if (vapiHero) { try { if (vapiActiveHero) vapiHero.stop(); } catch(e){} vapiHero = null; }
       vapiActiveHero = false;
-      setTimeout(function() { document.getElementById('hero-call-active').style.display = 'none'; document.getElementById('hero-call-idle').style.display = 'flex'; }, 800);
+      setTimeout(function() {
+        document.getElementById('hero-call-active').style.display = 'none';
+        // C1 journey: ending the call is the "attempt booking" beat - move on to
+        // the demonstrated outcome instead of resetting to the idle dial screen.
+        if (c1.active) { goToC1Step(C1_STEPS.length - 1); }
+        else { document.getElementById('hero-call-idle').style.display = 'flex'; }
+      }, 800);
     }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // C1 HERO JOURNEY — "Fast response, no follow-up" (NOVUS Demo OS Milestone 2)
+    //
+    // Activates only when this agency's linked probe evidence matches the C1
+    // story (demoOsState.problem.key === 'fast_response_no_follow_up', i.e.
+    // real grade C or D from lib/grading.mjs). Every other agency - no linked
+    // probe yet, still pending, or a different grade - sees the existing
+    // default hero call panel completely unchanged. This intentionally does
+    // NOT generalise into a journey framework: only C1 is implemented.
+    //
+    // The journey lives entirely inside the existing .call-panel (left column)
+    // and reuses the existing hero-call-idle/hero-call-active dial+voice UI
+    // unchanged for its "NOVUS intervention" step - no second chat/voice widget
+    // is built. The right-hand browser/website panel is untouched throughout.
+    // ══════════════════════════════════════════════════════════════════════
+    const C1_STEPS = ['enquiry', 'evidence', 'problem', 'opportunity', 'intervention', 'outcome'];
+    const c1 = { active: false, stepIndex: 0 };
+
+    function maybeActivateC1Journey() {
+      if (c1.active) return; // idempotent - fetchDemoOsState can only improve on itself, never re-fires this
+      if (!demoOsState || !demoOsState.evidence || !demoOsState.probe) return;
+      if (!demoOsState.problem || demoOsState.problem.key !== 'fast_response_no_follow_up') return;
+      c1.active = true;
+      renderC1Content();
+      applyC1HeroCopy();
+      goToC1Step(0);
+    }
+
+    // Swaps the hero headline/subhead/call-panel copy to the C1 framing. Only
+    // ever called when a real C1 probe is linked - the default marketing copy
+    // (set in the static HTML) is left untouched for every other agency.
+    function applyC1HeroCopy() {
+      const eyebrow = document.querySelector('.hero-eyebrow');
+      const headline = document.getElementById('hero-headline');
+      const sub = document.querySelector('.hero-sub');
+      const caption = document.querySelector('.hero-caption');
+      const callto = document.getElementById('hero-call-callto');
+      const subtext = document.getElementById('hero-call-subtext');
+      if (eyebrow)  eyebrow.textContent  = 'NOVUS TESTED ' + company.toUpperCase();
+      if (headline) headline.textContent = 'We sent ' + company + ' a real enquiry. Here’s exactly what happened.';
+      if (sub)      sub.textContent      = 'Not a script - a live test of your enquiry-to-appointment process, running now.';
+      if (caption)  caption.textContent  = 'Scroll through at your own pace, or jump straight to talking to NOVUS below.';
+      if (callto)   callto.textContent   = 'Pick up where the follow-up stopped';
+      if (subtext)  subtext.textContent  = 'This is NOVUS following up on the enquiry that never got a second reply.';
+    }
+
+    function fmtHoursC1(hrs) {
+      if (typeof hrs !== 'number' || isNaN(hrs)) return null;
+      if (hrs < 1) return Math.round(hrs * 60) + ' min';
+      const rounded = Math.round(hrs * 10) / 10;
+      return rounded === 1 ? '1 hour' : rounded + ' hours';
+    }
+
+    function fmtDateTimeC1(iso) {
+      if (!iso) return null;
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return null;
+      return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Builds all five step panels once, from real demoOsState fields only.
+    // Never fabricates a value that isn't present - falls back to a neutral,
+    // still-true sentence instead (e.g. no captured enquiry text).
+    function renderC1Content() {
+      const ev = demoOsState.evidence, pr = demoOsState.probe, prop = demoOsState.property || {}, prob = demoOsState.problem;
+
+      // STEP 1 — ENQUIRY: the real probe/property context, nothing invented.
+      const when = fmtDateTimeC1(pr.timestamp);
+      const addr = prop.address || '';
+      const enquiryText = pr.enquiry && pr.enquiry.trim();
+      document.getElementById('c1-step-enquiry').innerHTML =
+        '<div class="c1-eyebrow">Novus tested your process</div>' +
+        '<div class="c1-card">' +
+          (when ? '<div class="c1-card-row"><span class="c1-label">Received</span><span>' + esc(when) + '</span></div>' : '') +
+          (addr ? '<div class="c1-card-row"><span class="c1-label">Property</span><span>' + esc(addr) + '</span></div>' : '') +
+          '<div class="c1-card-row"><span class="c1-label">Reference</span><span>' + esc(pr.reference || pr.id || '') + '</span></div>' +
+        '</div>' +
+        (enquiryText
+          ? '<p class="c1-quote">“' + esc(enquiryText) + '”</p>'
+          : '<p class="c1-body">We submitted a genuine enquiry about this property through your own website - exactly as a real buyer would.</p>') +
+        (prop.url ? '<a class="c1-link" href="' + esc(prop.url) + '" target="_blank" rel="noopener">View this listing ↗</a>' : '') +
+        '<button class="c1-btn" onclick="c1Next()">See what happened →</button>';
+
+      // STEP 2 — EVIDENCE: real observation numbers only.
+      const lag = fmtHoursC1(ev.humanLagHours);
+      const followUps = ev.followUpCount || 0;
+      document.getElementById('c1-step-evidence').innerHTML =
+        '<div class="c1-eyebrow">What actually happened</div>' +
+        '<div class="c1-flow">' +
+          '<div class="c1-flow-step"><div class="c1-flow-dot ok"></div>Enquiry received</div>' +
+          '<div class="c1-flow-arrow">↓</div>' +
+          '<div class="c1-flow-step"><div class="c1-flow-dot ok"></div>Human replied' + (lag ? ' in ' + esc(lag) : '') + '</div>' +
+          '<div class="c1-flow-arrow">↓</div>' +
+          '<div class="c1-flow-step"><div class="c1-flow-dot gap"></div>' + (followUps > 0 ? esc(String(followUps)) + ' follow-up(s) logged' : 'No follow-up after that') + '</div>' +
+        '</div>' +
+        '<div class="c1-stat-pair">' +
+          '<div class="c1-stat"><div class="c1-stat-n">' + (lag ? esc(lag) : '—') + '</div><div class="c1-stat-l">Response time</div></div>' +
+          '<div class="c1-stat"><div class="c1-stat-n">' + followUps + '</div><div class="c1-stat-l">Follow-ups</div></div>' +
+        '</div>' +
+        '<button class="c1-btn" onclick="c1Next()">What does this mean? →</button>';
+
+      // STEP 3 — PROBLEM: the Demo OS problem statement (lib/problem.mjs), verbatim.
+      document.getElementById('c1-step-problem').innerHTML =
+        '<div class="c1-eyebrow">The real problem</div>' +
+        '<p class="c1-body">Novus isn’t saying ' + esc(company) + ' responded badly - the reply itself was fast.</p>' +
+        '<p class="c1-body"><strong>' + esc(prob.statement) + '</strong></p>' +
+        '<button class="c1-btn" onclick="c1Next()">See the opportunity Novus found →</button>';
+
+      // STEP 4 — OPPORTUNITY: the acknowledgement-vs-completion reframe.
+      document.getElementById('c1-step-opportunity').innerHTML =
+        '<div class="c1-eyebrow">Novus identified an open opportunity</div>' +
+        '<div class="c1-transition"><span class="no">Response complete</span><span>≠</span><span class="yes">Opportunity complete</span></div>' +
+        '<p class="c1-body">The enquiry was answered. It was never progressed to the next step - a viewing, a valuation, an appointment.</p>' +
+        '<button class="c1-btn" onclick="c1Next()">See what Novus would do →</button>';
+
+      // STEP 6 — OUTCOME: filled in once here; shown when the intervention call ends.
+      document.getElementById('c1-step-outcome').innerHTML =
+        '<div class="c1-eyebrow">Demonstrated outcome</div>' +
+        '<div class="c1-card">' +
+          '<div class="c1-card-row"><span class="c1-label">Before</span><span>Fast reply, no follow-up → opportunity stalled</span></div>' +
+          '<div class="c1-card-row"><span class="c1-label">After</span><span>Novus follows up, qualifies, progresses</span></div>' +
+        '</div>' +
+        '<div class="c1-outcome-badge">● Viewing follow-up secured</div>' +
+        '<p class="c1-outcome-note">This is a demonstration of what Novus would do with this exact enquiry - no real appointment was booked just now.</p>' +
+        '<button class="c1-btn" onclick="c1Restart()">Watch it again →</button>';
+    }
+
+    function renderC1Progress() {
+      const box = document.getElementById('c1-progress');
+      if (!box) return;
+      box.classList.add('active');
+      box.innerHTML = C1_STEPS.map(function(s, i) {
+        const cls = 'c1-progress-dot' + (i < c1.stepIndex ? ' done' : '') + (i === c1.stepIndex ? ' current' : '');
+        return '<div class="' + cls + '"></div>';
+      }).join('');
+    }
+
+    // Shows exactly one child of .call-panel: either a c1-step-* pane (class-
+    // controlled) or the pre-existing hero-call-idle/hero-call-active dial UI
+    // (inline-style-controlled, unchanged mechanism - startHeroCall()/
+    // endHeroCall() keep working on it exactly as before).
+    function showCallPanelChild(target) {
+      ['enquiry', 'evidence', 'problem', 'opportunity', 'outcome'].forEach(function(name) {
+        const el = document.getElementById('c1-step-' + name);
+        if (el) el.classList.toggle('active', target === name);
+      });
+      const idle = document.getElementById('hero-call-idle');
+      const activeCall = document.getElementById('hero-call-active');
+      if (idle) idle.style.display = (target === 'intervention') ? 'flex' : 'none';
+      if (activeCall && target !== 'intervention') activeCall.style.display = 'none';
+    }
+
+    function goToC1Step(index) {
+      c1.stepIndex = index;
+      renderC1Progress();
+      showCallPanelChild(C1_STEPS[index]);
+    }
+
+    function c1Next() { if (c1.stepIndex < C1_STEPS.length - 1) goToC1Step(c1.stepIndex + 1); }
+    function c1Restart() { goToC1Step(0); }
 
     document.getElementById('cp-msgs').addEventListener('wheel', function(e) { e.stopPropagation(); }, { passive: true });
 

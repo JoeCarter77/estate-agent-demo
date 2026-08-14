@@ -1,5 +1,5 @@
 // api/novus/probe-create.js — POST /api/novus/probe-create
-// Body: { url }   (the pasted Rightmove listing URL — the ONLY required input)
+// Body: { url, slug? }   (url is the only required input)
 //
 // Creates a DRAFT probe:
 //   • generates probe_id + human-readable probe_reference
@@ -8,6 +8,13 @@
 //   • writes one PROBES row with probe_status = "draft"
 //
 // It does NOT start the observation window. Only MARK AS SENT does that.
+//
+// `slug`, when supplied, is written verbatim into PROBES.agency_id. This is
+// the Demo OS linkage (lib/demoOs.mjs): the demo frontend looks a probe up
+// by matching PROBES.agency_id against its api/_leads.mjs slug. This is a
+// deliberate, minimal bridge for this milestone, not a claim that a demo
+// slug and a real lib/matching.mjs-resolved AGENCIES.agency_id are the same
+// identity space — see lib/demoOs.mjs for the full note.
 
 import { getRepo } from '../../lib/sheets.mjs';
 import { newProbeId, newProbeReference } from '../../lib/ids.mjs';
@@ -23,6 +30,7 @@ export default async function handler(req, res) {
 
   const body = typeof req.body === 'string' ? safeParse(req.body) : req.body || {};
   const url = (body.url || '').trim();
+  const slug = (body.slug || '').trim().toLowerCase();
   if (!url) return res.status(400).json({ error: 'Missing url' });
   if (!/^https?:\/\/|^www\./i.test(url) && !url.includes('.')) {
     return res.status(400).json({ error: 'That does not look like a valid URL' });
@@ -46,7 +54,7 @@ export default async function handler(req, res) {
     const probe = {
       probe_id: newProbeId(),
       probe_reference: newProbeReference(sequence, portal),
-      agency_id: '',
+      agency_id: slug,
       portal,
       property_address: meta.address || '',
       property_url: url,
