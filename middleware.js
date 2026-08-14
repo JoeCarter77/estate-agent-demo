@@ -8,9 +8,13 @@
 // The public demo (/, /capture, /api/chat, /api/scrape) is NOT matched here and
 // is completely unaffected.
 //
-// Future webhooks (/api/novus/webhooks/*) are explicitly skipped — they must be
-// verified by provider signature, not by this human password. Keeping the two
-// auth schemes separate is deliberate.
+// Two routes are explicitly skipped below despite matching /api/novus/:path*:
+//   - /api/novus/webhooks/* — verified by provider signature, not this password.
+//   - /api/novus/demo-state — the customer-facing Demo OS read endpoint
+//     (api/novus/demo-state.js). It's fetched anonymously by every /d/{slug}
+//     page load; gating it here would 401 the public demo for every visitor,
+//     silently breaking the C1 case before it ever activates.
+// Keeping these auth schemes separate is deliberate.
 //
 // Env: NOVUS_BASIC_AUTH_USER, NOVUS_BASIC_AUTH_PASS
 
@@ -32,6 +36,9 @@ export default function middleware(req) {
 
   // Future webhook endpoints authenticate by provider signature, not Basic Auth.
   if (pathname.startsWith('/api/novus/webhooks')) return;
+
+  // Public, anonymous, customer-facing read endpoint — see the comment above.
+  if (pathname === '/api/novus/demo-state') return;
 
   const user = process.env.NOVUS_BASIC_AUTH_USER;
   const pass = process.env.NOVUS_BASIC_AUTH_PASS;

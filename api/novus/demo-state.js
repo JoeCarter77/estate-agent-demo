@@ -37,7 +37,10 @@ import { getProbeIntelligenceForSlug, buildDemoOsState } from '../../lib/demoOs.
 const DEV_TEST_SLUG_C1 = 'test-c1-fast-response';
 
 function devFixtureProbeIntelligence() {
-  const probeTimestamp = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000); // "2 days ago", always fresh-looking
+  // Fixed, not relative-to-now: a dev fixture that silently changes its
+  // "received" timestamp on every request isn't actually deterministic, even
+  // though the numbers that matter (grade/lag/follow-ups) were already fixed.
+  const probeTimestamp = new Date('2026-08-12T09:14:00.000Z');
   const humanTouchAt = new Date(probeTimestamp.getTime() + 6 * 60 * 1000); // +6 minutes
   const probe = {
     probe_id: 'prb_dev_test_c1',

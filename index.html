@@ -492,18 +492,42 @@
     .call-active .voice-status-label.speaking { color: #86EFAC; }
     .call-active .voice-transcript { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); color: rgba(255,255,255,0.9); }
 
-    /* ── C1 HERO JOURNEY (fast response, no follow-up) — lives inside the same
-       dark .call-panel surface as the default dial UI; reuses its tokens
-       rather than introducing a second visual language. ── */
+    /* ── HERO LOADING VEIL — covers the left column until we know whether this
+       agency resolves to the C1 case or the default marketing copy, so the
+       old default headline never paints and then gets swapped (see FIFTH). ── */
+    .hero-copy { position: relative; }
+    .hero-copy.is-loading > *:not(.hero-loading-veil) { visibility: hidden; }
+    .hero-loading-veil { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: var(--page); opacity: 1; transition: opacity 0.3s ease; }
+    .hero-copy:not(.is-loading) .hero-loading-veil { opacity: 0; pointer-events: none; }
+    .hero-loading-mark { width: 30px; height: 30px; animation: novus-pulse 1.4s ease-in-out infinite; }
+    .hero-loading-mark img { width: 100%; height: 100%; display: block; }
+    .hero-loading-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; color: var(--text-3); }
+    @keyframes novus-pulse { 0%,100% { opacity: 0.35; transform: scale(0.92); } 50% { opacity: 1; transform: scale(1); } }
+
+    /* ── C1 CASE (fast response, no follow-up) — lives inside the same dark
+       .call-panel surface as the default dial UI; reuses its tokens rather
+       than introducing a second visual language. Stages: case → gap →
+       intervention → outcome, each a single continuous surface the next
+       state resolves into (not independent slides). ── */
     .c1-progress { display: none; gap: 5px; position: relative; z-index: 1; margin-bottom: 2px; }
     .c1-progress.active { display: flex; }
     .c1-progress-dot { width: 5px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.22); transition: background 0.2s, width 0.2s; }
     .c1-progress-dot.done { background: rgba(255,255,255,0.65); }
     .c1-progress-dot.current { background: var(--accent-hi); width: 14px; }
-    .c1-step { position: relative; z-index: 1; width: 100%; display: none; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
-    .c1-step.active { display: flex; }
+
+    .c1-stage { position: relative; z-index: 1; width: 100%; display: none; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+    .c1-stage.active { display: flex; }
+    /* .c1-anim: shared fade/rise choreography for whichever surface is showing
+       right now — a c1-stage pane OR the reused hero-call-idle/active dial UI —
+       so moving between them (case → gap → intervention → outcome) reads as
+       one system transforming, not independent slides swapping. */
+    .c1-anim { opacity: 0; transform: translateY(8px); transition: opacity 0.26s ease, transform 0.26s ease; }
+    .c1-anim.entered { opacity: 1; transform: translateY(0); }
+    .c1-anim.leaving { opacity: 0; transform: translateY(-6px); }
+
     .c1-eyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #9DB4E8; }
-    .c1-card { width: 100%; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14); border-radius: 12px; padding: 12px 15px; text-align: left; display: flex; flex-direction: column; }
+    .c1-card { width: 100%; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14); border-radius: 12px; padding: 12px 15px; text-align: left; display: flex; flex-direction: column; transition: background 0.3s ease, padding 0.3s ease; }
+    .c1-card.compact { padding: 9px 13px; background: rgba(255,255,255,0.05); }
     .c1-card-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 0.78rem; color: rgba(255,255,255,0.88); padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
     .c1-card-row:last-child { border-bottom: none; }
     .c1-card-row .c1-label { color: rgba(255,255,255,0.5); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.6rem; flex-shrink: 0; }
@@ -515,25 +539,44 @@
     .c1-flow-arrow { color: rgba(255,255,255,0.3); font-size: 0.75rem; padding-left: 3px; }
     .c1-flow-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .c1-flow-dot.ok { background: var(--green); }
-    .c1-flow-dot.gap { background: var(--red); }
+    .c1-flow-dot.gap { background: var(--red); animation: c1-gap-pulse 1.6s ease infinite; }
+    @keyframes c1-gap-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); } 60% { box-shadow: 0 0 0 6px rgba(239,68,68,0); } }
     .c1-stat-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
     .c1-stat { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 12px 10px; }
     .c1-stat-n { font-size: 1.35rem; font-weight: 800; color: #fff; letter-spacing: -0.02em; line-height: 1; }
     .c1-stat-l { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-top: 4px; }
     .c1-body { font-size: 0.86rem; line-height: 1.62; color: rgba(255,255,255,0.88); }
     .c1-body strong { color: #fff; }
-    .c1-transition { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.02em; color: rgba(255,255,255,0.6); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
-    .c1-transition .no { text-decoration: line-through; color: rgba(255,255,255,0.35); }
-    .c1-transition .yes { color: #86EFAC; }
+    .c1-kicker { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; color: rgba(255,255,255,0.4); }
+    .c1-kicker .hi { color: #86EFAC; }
+    .c1-kicker-arrow { font-size: 0.6rem; color: rgba(255,255,255,0.25); }
     .c1-btn { position: relative; z-index: 1; width: 100%; max-width: 300px; background: #fff; color: var(--brand-navy); border: none; border-radius: 100px; padding: 12px 18px; font-family: 'Inter', sans-serif; font-size: 0.86rem; font-weight: 800; letter-spacing: -0.01em; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,0.28); transition: transform 0.14s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.14s; }
     .c1-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(0,0,0,0.4); }
     .c1-btn:active { transform: translateY(0) scale(0.98); }
-    .c1-outcome-badge { display: inline-flex; align-items: center; gap: 7px; background: rgba(34,197,94,0.14); border: 1px solid rgba(34,197,94,0.4); color: #86EFAC; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 7px 14px; border-radius: 100px; }
+    .c1-btn-ghost { background: transparent; color: rgba(255,255,255,0.55); box-shadow: none; border: 1px solid rgba(255,255,255,0.18); font-weight: 700; padding: 9px 16px; font-size: 0.74rem; }
+    .c1-btn-ghost:hover { transform: none; box-shadow: none; border-color: rgba(255,255,255,0.32); color: #fff; }
+    .c1-status { display: inline-flex; align-items: center; gap: 7px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 7px 14px; border-radius: 100px; transition: background 0.25s, color 0.25s, border-color 0.25s; }
+    .c1-status.ready    { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.6); }
+    .c1-status.running  { background: rgba(37,99,235,0.18); border: 1px solid rgba(59,130,246,0.4); color: #93C5FD; }
+    .c1-status.complete { background: rgba(34,197,94,0.14); border: 1px solid rgba(34,197,94,0.4); color: #86EFAC; }
+    .c1-status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .c1-status.running .c1-status-dot { animation: blink 1s ease infinite; }
     .c1-outcome-note { font-size: 0.68rem; color: rgba(255,255,255,0.45); line-height: 1.55; }
 
     /* ── DEMO SECONDARY CAPTION (right browser mockup) ── */
-    .demo-caption { font-size: 0.78rem; font-weight: 600; color: var(--text-3); text-align: center; margin-bottom: 4px; letter-spacing: -0.005em; }
+    .demo-caption { font-size: 0.78rem; font-weight: 600; color: var(--text-3); text-align: center; margin-bottom: 4px; letter-spacing: -0.005em; transition: color 0.25s ease; min-height: 1.1em; }
     .demo-caption strong { color: var(--text-2); font-weight: 700; }
+
+    /* ── RIGHT PANEL REACTING TO THE C1 CASE (SECOND) — the website is context,
+       not a competing surface: it gets a quiet "this is the property in
+       question" tag while the case/gap are on screen, and recedes visually
+       once attention should be on NOVUS taking action. No fake interactions
+       with the real site are ever simulated — this only annotates it. ── */
+    .hero-demo { transition: opacity 0.4s ease, filter 0.4s ease, transform 0.4s ease; }
+    .hero-demo.c1-recede { opacity: 0.55; filter: saturate(0.5) blur(0.5px); transform: scale(0.985); }
+    .c1-property-tag { display: none; align-items: center; gap: 7px; align-self: center; background: var(--brand-navy); color: #fff; font-size: 0.68rem; font-weight: 700; padding: 6px 13px 6px 10px; border-radius: 100px; margin-bottom: -2px; opacity: 0; transform: translateY(-4px); transition: opacity 0.3s ease, transform 0.3s ease; }
+    .c1-property-tag.show { display: inline-flex; opacity: 1; transform: translateY(0); }
+    .c1-property-tag-dot { width: 5px; height: 5px; border-radius: 50%; background: #86EFAC; flex-shrink: 0; animation: blink 2s ease infinite; }
 
     /* ── EVIDENCE BLOCK ── */
     .evidence { padding: 72px 24px 60px; border-top: 1px solid var(--border); }
@@ -588,7 +631,16 @@
   <div class="page">
 
     <!-- ══ LEFT (voice-first call panel - primary) ══ -->
-    <div class="left hero-copy">
+    <div class="left hero-copy is-loading" id="hero-copy">
+      <!-- Loading veil: covers the left column until we know whether this
+           agency resolves to the C1 case or the default marketing copy, so
+           the old default headline never paints and then swaps (see FIFTH
+           in the redesign brief). Removed via revealHero(). -->
+      <div class="hero-loading-veil" id="hero-loading-veil">
+        <div class="hero-loading-mark"><img src="/novus-icon.png" alt="" /></div>
+        <div class="hero-loading-label">Loading your live demo…</div>
+      </div>
+
       <div class="hero-copy-top">
         <div class="hero-eyebrow fu">LIVE DEMO - <span class="company-slot">Your Agency</span></div>
         <h1 class="hero-headline fu fu-1" id="hero-headline">You lost a valuation this week. That's the last one.</h1>
@@ -600,28 +652,29 @@
              probe is linked to this agency - see maybeActivateC1Journey()) -->
         <div class="c1-progress" id="c1-progress"></div>
 
-        <!-- C1 HERO JOURNEY STEPS — populated from real Demo OS state
-             (lib/demoOs.mjs) by renderC1Content(); hidden/no-op for every
-             agency without a matching linked probe. -->
-        <div class="c1-step" id="c1-step-enquiry"></div>
-        <div class="c1-step" id="c1-step-evidence"></div>
-        <div class="c1-step" id="c1-step-problem"></div>
-        <div class="c1-step" id="c1-step-opportunity"></div>
-        <div class="c1-step" id="c1-step-outcome"></div>
+        <!-- C1 CASE STAGES — populated from real Demo OS state (lib/demoOs.mjs)
+             by renderC1Content(); hidden/no-op for every agency without a
+             matching linked probe. Four stages, not six: case → gap →
+             intervention (reuses the dial UI below) → outcome. -->
+        <div class="c1-stage c1-anim" id="c1-stage-case"></div>
+        <div class="c1-stage c1-anim" id="c1-stage-gap"></div>
+        <div class="c1-stage c1-anim" id="c1-stage-outcome"></div>
 
         <div class="call-idle" id="hero-call-idle">
+          <div class="c1-status ready" id="c1-status" style="display:none"><span class="c1-status-dot"></span><span id="c1-status-text">Ready</span></div>
           <div class="call-avatar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
           </div>
           <div class="call-callto" id="hero-call-callto">Your out-of-hours line</div>
           <button class="call-dial-btn" onclick="startHeroCall()">
             <span class="dial-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
-            <span>Call <span class="company-slot">Your Agency</span></span>
+            <span id="hero-call-btn-label">Call <span class="company-slot">Your Agency</span></span>
           </button>
           <p class="call-subtext" id="hero-call-subtext">This is what your out-of-hours line sounds like from Monday.</p>
           <p class="call-poweredby">Powered by AI · trained on your live listings</p>
         </div>
         <div class="call-active" id="hero-call-active" style="display:none">
+          <div class="c1-status running" id="c1-status-active" style="display:none"><span class="c1-status-dot"></span><span id="c1-status-active-text">Running</span></div>
           <div class="voice-orb-wrap">
             <div class="voice-orb idle" id="hero-voice-orb">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
@@ -635,8 +688,9 @@
     </div>
 
     <!-- ══ RIGHT (website demo - secondary) ══ -->
-    <div class="right hero-demo fu fu-2">
-      <p class="demo-caption">The same thing, <strong>live on your website too.</strong></p>
+    <div class="right hero-demo fu fu-2" id="hero-demo">
+      <div class="c1-property-tag" id="c1-property-tag"><span class="c1-property-tag-dot"></span><span id="c1-property-tag-text"></span></div>
+      <p class="demo-caption" id="demo-caption">The same thing, <strong>live on your website too.</strong></p>
       <!-- Browser mockup -->
       <div class="browser-wrap fu fu-2">
         <div class="browser">
@@ -848,7 +902,13 @@
       return m ? decodeURIComponent(m[1]) : '';
     }
 
-    // Resolve lead data (slug lookup → fields), then apply it to the page.
+    // Resolve lead data (slug lookup → fields) AND the Demo OS state together
+    // before the hero paints anything real. This is what stops the old default
+    // headline ever being visible for a C1 agency and then getting swapped for
+    // the real one (see FIFTH in the redesign brief) — the left column stays
+    // behind a loading veil (index.html .hero-loading-veil) until both calls
+    // have settled or a hard timeout is hit, then reveals the correct state in
+    // one paint. Neither fetch failing is swallowed silently — both log.
     async function resolveLead() {
       const slug = slugFromPath();
       if (slug) {
@@ -863,27 +923,52 @@
               firstName    = cleanName(d.first_name) || firstName;
               probeLine    = d.probe_line || null;
             }
+          } else {
+            console.error('resolveLead: /api/lead responded', res.status, 'for slug', slug);
           }
-        } catch (e) { /* fall back to query-param / default values */ }
+        } catch (e) {
+          console.error('resolveLead: /api/lead fetch failed for slug', slug, e);
+        }
       }
+      // demoOsState resolution is capped so an unconfigured/slow NOVUS engine
+      // can never hold the page hostage — it degrades to the default hero,
+      // which is the correct, honest state for "no probe linked", not a bug.
+      if (slug) await fetchDemoOsState(slug);
       applyLead();
-      if (slug) fetchDemoOsState(slug); // fire-and-forget: upgrades the proof strip when it resolves
+      maybeActivateC1Journey();
+      revealHero();
     }
 
     // Real NOVUS intelligence (grade, evidence, specific problem) for this agency,
-    // via the Demo OS adapter (lib/demoOs.mjs). Independent of /api/lead so a slow or
-    // unconfigured NOVUS engine never blocks the rest of the page.
+    // via the Demo OS adapter (lib/demoOs.mjs).
     async function fetchDemoOsState(slug) {
+      const controller = new AbortController();
+      const timeout = setTimeout(function() { controller.abort(); }, 3000);
       try {
-        const res = await fetch('/api/novus/demo-state?slug=' + encodeURIComponent(slug), { cache: 'no-store' });
-        if (!res.ok) return;
+        const res = await fetch('/api/novus/demo-state?slug=' + encodeURIComponent(slug), { cache: 'no-store', signal: controller.signal });
+        if (!res.ok) {
+          console.error('fetchDemoOsState: /api/novus/demo-state responded', res.status, 'for slug', slug);
+          return;
+        }
         const d = await res.json();
         if (d && !d.error) {
           demoOsState = d;
-          applyProof();
-          maybeActivateC1Journey();
+        } else if (d && d.error) {
+          console.error('fetchDemoOsState: /api/novus/demo-state returned an error for slug', slug, d.error);
         }
-      } catch (e) { /* keep legacy proof line / no proof block */ }
+      } catch (e) {
+        console.error('fetchDemoOsState: could not load Demo OS state for slug', slug, e);
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    // Reveals the left column once we know which state applies (C1 case or the
+    // default marketing hero already sitting in the DOM) — a single paint, no
+    // visible transition between "wrong" and "right" content.
+    function revealHero() {
+      const el = document.getElementById('hero-copy');
+      if (el) el.classList.remove('is-loading');
     }
 
     function applyLead() {
@@ -1278,6 +1363,20 @@ Never use em dashes (-) or en dashes (-). Use a plain hyphen (-) instead, or rep
     function startHeroCall() {
       document.getElementById('hero-call-idle').style.display = 'none';
       document.getElementById('hero-call-active').style.display = 'flex';
+      // C1 case: this dial press IS the "Run follow-up" action — flip the
+      // status badge from READY to RUNNING so the causality is visible
+      // (because you clicked this, NOVUS is now doing this).
+      if (c1.active) {
+        const badge = document.getElementById('c1-status-active');
+        const badgeText = document.getElementById('c1-status-active-text');
+        if (badge) badge.style.display = 'inline-flex';
+        if (badgeText) badgeText.textContent = 'Running';
+        updateRightPanelForStage('intervention');
+        const el = document.getElementById('hero-call-active');
+        el.classList.add('c1-anim');
+        void el.offsetWidth;
+        requestAnimationFrame(function() { el.classList.add('entered'); });
+      }
       const orb = document.getElementById('hero-voice-orb'), statusEl = document.getElementById('hero-voice-status'), transcript = document.getElementById('hero-voice-transcript');
       orb.className = 'voice-orb connecting'; statusEl.textContent = 'Connecting…'; statusEl.className = 'voice-status-label'; transcript.textContent = 'Connecting to your line…';
       try {
@@ -1300,17 +1399,24 @@ Never use em dashes (-) or en dashes (-). Use a plain hyphen (-) instead, or rep
     function endHeroCall() {
       if (vapiHero) { try { if (vapiActiveHero) vapiHero.stop(); } catch(e){} vapiHero = null; }
       vapiActiveHero = false;
+      if (c1.active) {
+        const badgeText = document.getElementById('c1-status-active-text');
+        if (badgeText) badgeText.textContent = 'Complete';
+      }
       setTimeout(function() {
-        document.getElementById('hero-call-active').style.display = 'none';
-        // C1 journey: ending the call is the "attempt booking" beat - move on to
-        // the demonstrated outcome instead of resetting to the idle dial screen.
-        if (c1.active) { goToC1Step(C1_STEPS.length - 1); }
-        else { document.getElementById('hero-call-idle').style.display = 'flex'; }
+        // C1 case: ending the call is the causal "NOVUS acted" beat - move on
+        // to the demonstrated outcome instead of resetting to the idle dial
+        // screen. Everything else (non-C1 agencies) keeps the original reset.
+        if (c1.active) { goToC1Stage(C1_STAGES.length - 1); }
+        else {
+          document.getElementById('hero-call-active').style.display = 'none';
+          document.getElementById('hero-call-idle').style.display = 'flex';
+        }
       }, 800);
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // C1 HERO JOURNEY — "Fast response, no follow-up" (NOVUS Demo OS Milestone 2)
+    // C1 CASE — "Fast response, no follow-up" (NOVUS Demo OS)
     //
     // Activates only when this agency's linked probe evidence matches the C1
     // story (demoOsState.problem.key === 'fast_response_no_follow_up', i.e.
@@ -1319,13 +1425,18 @@ Never use em dashes (-) or en dashes (-). Use a plain hyphen (-) instead, or rep
     // default hero call panel completely unchanged. This intentionally does
     // NOT generalise into a journey framework: only C1 is implemented.
     //
-    // The journey lives entirely inside the existing .call-panel (left column)
-    // and reuses the existing hero-call-idle/hero-call-active dial+voice UI
-    // unchanged for its "NOVUS intervention" step - no second chat/voice widget
-    // is built. The right-hand browser/website panel is untouched throughout.
+    // Four causal stages, not six independent slides:
+    //   CASE (probe + evidence, shown together) — "Show me the gap"
+    //   GAP (problem + opportunity resolve into view)  — "Show me what NOVUS would do"
+    //   INTERVENTION (reuses the existing dial UI) — "Run follow-up" (a real call)
+    //   OUTCOME (the call ending is what reveals it, not another click)
+    //
+    // Lives inside the existing .call-panel (left column); the right-hand
+    // browser/website panel reacts (property tag, recede-on-intervention) but
+    // is never made to fake an interaction it isn't really having.
     // ══════════════════════════════════════════════════════════════════════
-    const C1_STEPS = ['enquiry', 'evidence', 'problem', 'opportunity', 'intervention', 'outcome'];
-    const c1 = { active: false, stepIndex: 0 };
+    const C1_STAGES = ['case', 'gap', 'intervention', 'outcome'];
+    const c1 = { active: false, stageIndex: 0 };
 
     function maybeActivateC1Journey() {
       if (c1.active) return; // idempotent - fetchDemoOsState can only improve on itself, never re-fires this
@@ -1334,7 +1445,10 @@ Never use em dashes (-) or en dashes (-). Use a plain hyphen (-) instead, or rep
       c1.active = true;
       renderC1Content();
       applyC1HeroCopy();
-      goToC1Step(0);
+      document.getElementById('hero-call-idle').classList.add('c1-anim');
+      document.getElementById('hero-call-active').classList.add('c1-anim');
+      c1ShowStage('case');
+      renderC1Progress();
     }
 
     // Swaps the hero headline/subhead/call-panel copy to the C1 framing. Only
@@ -1347,12 +1461,14 @@ Never use em dashes (-) or en dashes (-). Use a plain hyphen (-) instead, or rep
       const caption = document.querySelector('.hero-caption');
       const callto = document.getElementById('hero-call-callto');
       const subtext = document.getElementById('hero-call-subtext');
+      const btnLabel = document.getElementById('hero-call-btn-label');
       if (eyebrow)  eyebrow.textContent  = 'NOVUS TESTED ' + company.toUpperCase();
-      if (headline) headline.textContent = 'We sent ' + company + ' a real enquiry. Here’s exactly what happened.';
-      if (sub)      sub.textContent      = 'Not a script - a live test of your enquiry-to-appointment process, running now.';
-      if (caption)  caption.textContent  = 'Scroll through at your own pace, or jump straight to talking to NOVUS below.';
+      if (headline) headline.textContent = 'We sent ' + company + ' a real enquiry.';
+      if (sub)      sub.textContent      = 'Not a script — a live test of your enquiry-to-appointment process.';
+      if (caption)  caption.textContent  = 'Advance it yourself, at your own pace.';
       if (callto)   callto.textContent   = 'Pick up where the follow-up stopped';
-      if (subtext)  subtext.textContent  = 'This is NOVUS following up on the enquiry that never got a second reply.';
+      if (subtext)  subtext.textContent  = 'NOVUS follows up on the enquiry that never got a second reply.';
+      if (btnLabel) btnLabel.innerHTML   = 'Run follow-up';
     }
 
     function fmtHoursC1(hrs) {
@@ -1369,106 +1485,151 @@ Never use em dashes (-) or en dashes (-). Use a plain hyphen (-) instead, or rep
       return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
     }
 
-    // Builds all five step panels once, from real demoOsState fields only.
-    // Never fabricates a value that isn't present - falls back to a neutral,
-    // still-true sentence instead (e.g. no captured enquiry text).
+    // Builds the three real (non-dial) stage panels once, from real demoOsState
+    // fields only. Never fabricates a value that isn't present - falls back to
+    // a neutral, still-true sentence instead (e.g. no captured enquiry text).
+    // Copy is deliberately terse: REAL EVIDENCE → NOVUS FOUND THE GAP → HERE'S
+    // WHAT HAPPENS NEXT, not paragraphs explaining the demo to itself.
     function renderC1Content() {
       const ev = demoOsState.evidence, pr = demoOsState.probe, prop = demoOsState.property || {}, prob = demoOsState.problem;
-
-      // STEP 1 — ENQUIRY: the real probe/property context, nothing invented.
       const when = fmtDateTimeC1(pr.timestamp);
       const addr = prop.address || '';
       const enquiryText = pr.enquiry && pr.enquiry.trim();
-      document.getElementById('c1-step-enquiry').innerHTML =
-        '<div class="c1-eyebrow">Novus tested your process</div>' +
+      const lag = fmtHoursC1(ev.humanLagHours);
+      const followUps = ev.followUpCount || 0;
+
+      // STAGE 1 — CASE: the probe and the evidence together, as one file. This
+      // is proof, not a story beat, so it's shown in full immediately rather
+      // than gated behind a click.
+      document.getElementById('c1-stage-case').innerHTML =
+        '<div class="c1-kicker">REAL EVIDENCE</div>' +
         '<div class="c1-card">' +
           (when ? '<div class="c1-card-row"><span class="c1-label">Received</span><span>' + esc(when) + '</span></div>' : '') +
           (addr ? '<div class="c1-card-row"><span class="c1-label">Property</span><span>' + esc(addr) + '</span></div>' : '') +
-          '<div class="c1-card-row"><span class="c1-label">Reference</span><span>' + esc(pr.reference || pr.id || '') + '</span></div>' +
+          '<div class="c1-card-row"><span class="c1-label">Ref</span><span>' + esc(pr.reference || pr.id || '') + '</span></div>' +
         '</div>' +
         (enquiryText
           ? '<p class="c1-quote">“' + esc(enquiryText) + '”</p>'
-          : '<p class="c1-body">We submitted a genuine enquiry about this property through your own website - exactly as a real buyer would.</p>') +
-        (prop.url ? '<a class="c1-link" href="' + esc(prop.url) + '" target="_blank" rel="noopener">View this listing ↗</a>' : '') +
-        '<button class="c1-btn" onclick="c1Next()">See what happened →</button>';
-
-      // STEP 2 — EVIDENCE: real observation numbers only.
-      const lag = fmtHoursC1(ev.humanLagHours);
-      const followUps = ev.followUpCount || 0;
-      document.getElementById('c1-step-evidence').innerHTML =
-        '<div class="c1-eyebrow">What actually happened</div>' +
+          : '<p class="c1-body">A genuine enquiry, submitted through ' + esc(company) + '’s own website — exactly as a real buyer would.</p>') +
         '<div class="c1-flow">' +
           '<div class="c1-flow-step"><div class="c1-flow-dot ok"></div>Enquiry received</div>' +
           '<div class="c1-flow-arrow">↓</div>' +
           '<div class="c1-flow-step"><div class="c1-flow-dot ok"></div>Human replied' + (lag ? ' in ' + esc(lag) : '') + '</div>' +
           '<div class="c1-flow-arrow">↓</div>' +
-          '<div class="c1-flow-step"><div class="c1-flow-dot gap"></div>' + (followUps > 0 ? esc(String(followUps)) + ' follow-up(s) logged' : 'No follow-up after that') + '</div>' +
+          '<div class="c1-flow-step"><div class="c1-flow-dot gap"></div>' + (followUps > 0 ? esc(String(followUps)) + ' follow-up(s) logged' : 'Nothing after that') + '</div>' +
         '</div>' +
-        '<div class="c1-stat-pair">' +
-          '<div class="c1-stat"><div class="c1-stat-n">' + (lag ? esc(lag) : '—') + '</div><div class="c1-stat-l">Response time</div></div>' +
-          '<div class="c1-stat"><div class="c1-stat-n">' + followUps + '</div><div class="c1-stat-l">Follow-ups</div></div>' +
-        '</div>' +
-        '<button class="c1-btn" onclick="c1Next()">What does this mean? →</button>';
+        '<button class="c1-btn" onclick="c1Next()">Show me the gap →</button>';
 
-      // STEP 3 — PROBLEM: the Demo OS problem statement (lib/problem.mjs), verbatim.
-      document.getElementById('c1-step-problem').innerHTML =
-        '<div class="c1-eyebrow">The real problem</div>' +
-        '<p class="c1-body">Novus isn’t saying ' + esc(company) + ' responded badly - the reply itself was fast.</p>' +
+      // STAGE 2 — GAP: evidence compresses to a one-line summary, the problem
+      // (lib/problem.mjs, verbatim) and the opportunity reframe resolve in.
+      document.getElementById('c1-stage-gap').innerHTML =
+        '<div class="c1-kicker"><span class="hi">NOVUS FOUND THE GAP</span></div>' +
+        '<div class="c1-card compact">' +
+          '<div class="c1-card-row"><span class="c1-label">Response</span><span>' + (lag ? esc(lag) : '—') + '</span></div>' +
+          '<div class="c1-card-row"><span class="c1-label">Follow-up</span><span>' + (followUps > 0 ? followUps : 'None') + '</span></div>' +
+        '</div>' +
         '<p class="c1-body"><strong>' + esc(prob.statement) + '</strong></p>' +
-        '<button class="c1-btn" onclick="c1Next()">See the opportunity Novus found →</button>';
+        '<p class="c1-body">Answered ≠ progressed. It never moved to a viewing, a valuation, an appointment.</p>' +
+        '<button class="c1-btn" onclick="c1Next()">Show me what NOVUS would do →</button>';
 
-      // STEP 4 — OPPORTUNITY: the acknowledgement-vs-completion reframe.
-      document.getElementById('c1-step-opportunity').innerHTML =
-        '<div class="c1-eyebrow">Novus identified an open opportunity</div>' +
-        '<div class="c1-transition"><span class="no">Response complete</span><span>≠</span><span class="yes">Opportunity complete</span></div>' +
-        '<p class="c1-body">The enquiry was answered. It was never progressed to the next step - a viewing, a valuation, an appointment.</p>' +
-        '<button class="c1-btn" onclick="c1Next()">See what Novus would do →</button>';
-
-      // STEP 6 — OUTCOME: filled in once here; shown when the intervention call ends.
-      document.getElementById('c1-step-outcome').innerHTML =
-        '<div class="c1-eyebrow">Demonstrated outcome</div>' +
+      // STAGE 4 — OUTCOME: filled in once here; revealed when the intervention
+      // call ends (a real state change, not another click-through).
+      document.getElementById('c1-stage-outcome').innerHTML =
+        '<div class="c1-kicker">HERE’S WHAT HAPPENED NEXT</div>' +
+        '<div class="c1-status complete"><span class="c1-status-dot"></span>Follow-up complete</div>' +
         '<div class="c1-card">' +
-          '<div class="c1-card-row"><span class="c1-label">Before</span><span>Fast reply, no follow-up → opportunity stalled</span></div>' +
-          '<div class="c1-card-row"><span class="c1-label">After</span><span>Novus follows up, qualifies, progresses</span></div>' +
+          '<div class="c1-card-row"><span class="c1-label">Before</span><span>Fast reply, no follow-up</span></div>' +
+          '<div class="c1-card-row"><span class="c1-label">After</span><span>NOVUS followed up and progressed it</span></div>' +
         '</div>' +
-        '<div class="c1-outcome-badge">● Viewing follow-up secured</div>' +
-        '<p class="c1-outcome-note">This is a demonstration of what Novus would do with this exact enquiry - no real appointment was booked just now.</p>' +
-        '<button class="c1-btn" onclick="c1Restart()">Watch it again →</button>';
+        '<p class="c1-outcome-note">Demonstrated on this exact enquiry — no real appointment was booked.</p>' +
+        '<button class="c1-btn c1-btn-ghost" onclick="c1Restart()">Watch it again</button>';
     }
 
     function renderC1Progress() {
       const box = document.getElementById('c1-progress');
       if (!box) return;
       box.classList.add('active');
-      box.innerHTML = C1_STEPS.map(function(s, i) {
-        const cls = 'c1-progress-dot' + (i < c1.stepIndex ? ' done' : '') + (i === c1.stepIndex ? ' current' : '');
+      box.innerHTML = C1_STAGES.map(function(s, i) {
+        const cls = 'c1-progress-dot' + (i < c1.stageIndex ? ' done' : '') + (i === c1.stageIndex ? ' current' : '');
         return '<div class="' + cls + '"></div>';
       }).join('');
     }
 
-    // Shows exactly one child of .call-panel: either a c1-step-* pane (class-
-    // controlled) or the pre-existing hero-call-idle/hero-call-active dial UI
-    // (inline-style-controlled, unchanged mechanism - startHeroCall()/
-    // endHeroCall() keep working on it exactly as before).
-    function showCallPanelChild(target) {
-      ['enquiry', 'evidence', 'problem', 'opportunity', 'outcome'].forEach(function(name) {
-        const el = document.getElementById('c1-step-' + name);
-        if (el) el.classList.toggle('active', target === name);
+    // The right-hand browser panel reacts to the case rather than sitting
+    // inert beside it: a quiet property tag while the case/gap are the
+    // subject, and it recedes (dims/desaturates, never fakes an interaction)
+    // once attention should be on NOVUS taking action.
+    function updateRightPanelForStage(key) {
+      const demo = document.getElementById('hero-demo');
+      const tag = document.getElementById('c1-property-tag');
+      const tagText = document.getElementById('c1-property-tag-text');
+      const caption = document.getElementById('demo-caption');
+      const addr = demoOsState && demoOsState.property && demoOsState.property.address;
+      if (demo) demo.classList.toggle('c1-recede', key === 'intervention' || key === 'outcome');
+      if (tag && tagText) {
+        if (addr && (key === 'case' || key === 'gap')) { tagText.textContent = addr; tag.classList.add('show'); }
+        else { tag.classList.remove('show'); }
+      }
+      if (caption) {
+        caption.innerHTML = (key === 'intervention' || key === 'outcome')
+          ? 'NOVUS is acting on this enquiry <strong>right now.</strong>'
+          : 'The site the enquiry <strong>actually came through.</strong>';
+      }
+    }
+
+    // Returns the element currently occupying a given stage slot — either a
+    // c1-stage pane, or (for 'intervention') whichever of the reused dial
+    // views is on screen right now.
+    function c1StageEl(key) {
+      if (key === 'intervention') {
+        const active = document.getElementById('hero-call-active');
+        return (active && active.style.display !== 'none') ? active : document.getElementById('hero-call-idle');
+      }
+      return document.getElementById('c1-stage-' + key);
+    }
+
+    // Shows exactly one stage's surface. hero-call-idle/hero-call-active keep
+    // their existing display-toggle mechanism (startHeroCall()/endHeroCall()
+    // still control them exactly as before) - this only adds the fade-in.
+    function c1ShowStage(key) {
+      ['case', 'gap', 'outcome'].forEach(function(name) {
+        const el = document.getElementById('c1-stage-' + name);
+        if (!el) return;
+        el.classList.toggle('active', name === key);
+        el.classList.remove('entered', 'leaving');
       });
       const idle = document.getElementById('hero-call-idle');
       const activeCall = document.getElementById('hero-call-active');
-      if (idle) idle.style.display = (target === 'intervention') ? 'flex' : 'none';
-      if (activeCall && target !== 'intervention') activeCall.style.display = 'none';
+      const status = document.getElementById('c1-status');
+      if (idle) idle.style.display = (key === 'intervention') ? 'flex' : 'none';
+      if (activeCall && key !== 'intervention') activeCall.style.display = 'none';
+      if (status) status.style.display = (key === 'intervention') ? 'inline-flex' : 'none';
+      updateRightPanelForStage(key);
+      const el = c1StageEl(key);
+      if (el) {
+        el.classList.add('c1-anim');
+        void el.offsetWidth; // force reflow so the fade-in actually runs
+        requestAnimationFrame(function() { el.classList.add('entered'); });
+      }
     }
 
-    function goToC1Step(index) {
-      c1.stepIndex = index;
+    // Advances the case one causal beat: the current surface resolves out,
+    // then the next one resolves in — never an instant swap.
+    function goToC1Stage(index) {
+      const prevEl = c1StageEl(C1_STAGES[c1.stageIndex]);
+      c1.stageIndex = index;
       renderC1Progress();
-      showCallPanelChild(C1_STEPS[index]);
+      if (prevEl) {
+        prevEl.classList.remove('entered');
+        prevEl.classList.add('leaving');
+        setTimeout(function() { c1ShowStage(C1_STAGES[index]); }, 180);
+      } else {
+        c1ShowStage(C1_STAGES[index]);
+      }
     }
 
-    function c1Next() { if (c1.stepIndex < C1_STEPS.length - 1) goToC1Step(c1.stepIndex + 1); }
-    function c1Restart() { goToC1Step(0); }
+    function c1Next() { if (c1.stageIndex < C1_STAGES.length - 1) goToC1Stage(c1.stageIndex + 1); }
+    function c1Restart() { goToC1Stage(0); }
 
     document.getElementById('cp-msgs').addEventListener('wheel', function(e) { e.stopPropagation(); }, { passive: true });
 
