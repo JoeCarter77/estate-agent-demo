@@ -3,7 +3,9 @@
 //
 // Exercises lib/tier.mjs directly: all 10 INTELLIGENCE.grade/compromised
 // states, plus proof that AGENCIES metadata (present, absent, or varied)
-// never changes the tier/segment classification for a given grade.
+// never changes the tier classification for a given grade, and that
+// `segment` is never derived from grade — only ever passed through
+// unchanged from whatever authoritative value (if any) the caller supplies.
 //
 // Run:  npm run novus:tier-selftest  (or: node scripts/novus-tier-selftest.mjs)
 
@@ -27,7 +29,6 @@ for (const grade of GROWTH_GRADES) {
   check(`grade ${grade} -> Growth`, () => {
     const result = classifyTier({ grade });
     assert.strictEqual(result.tier, 'Growth');
-    assert.strictEqual(result.segment, 'A');
     assert.ok(result.tier_reason && result.tier_reason.length > 0);
     assert.ok(result.sales_angle && result.sales_angle.length > 0);
   });
@@ -37,7 +38,6 @@ for (const grade of CORE_GRADES) {
   check(`grade ${grade} -> Core`, () => {
     const result = classifyTier({ grade });
     assert.strictEqual(result.tier, 'Core');
-    assert.strictEqual(result.segment, 'B');
     assert.ok(result.tier_reason && result.tier_reason.length > 0);
     assert.ok(result.sales_angle && result.sales_angle.length > 0);
   });
@@ -46,7 +46,6 @@ for (const grade of CORE_GRADES) {
 check('grade pending -> unclassified', () => {
   const result = classifyTier({ grade: 'pending' });
   assert.strictEqual(result.tier, 'unclassified');
-  assert.strictEqual(result.segment, 'unclassified');
   assert.strictEqual(result.sales_angle, '');
   assert.notStrictEqual(result.tier, 'Core');
   assert.notStrictEqual(result.tier, 'Growth');
@@ -57,10 +56,36 @@ check('compromised probe -> unclassified regardless of grade', () => {
   for (const grade of ['A', 'H', 'pending', undefined]) {
     const result = classifyTier({ grade, compromised: 'TRUE' });
     assert.strictEqual(result.tier, 'unclassified');
-    assert.strictEqual(result.segment, 'unclassified');
     assert.notStrictEqual(result.tier, 'Core');
     assert.notStrictEqual(result.tier, 'Growth');
   }
+});
+
+// ── segment is NEVER derived from grade — only ever passed through ────────
+check('segment defaults to blank when no authoritative value is supplied, for every state', () => {
+  for (const grade of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'pending', undefined, 'garbage']) {
+    const result = classifyTier({ grade });
+    assert.strictEqual(result.segment, '', `grade ${grade} invented a segment instead of staying blank`);
+  }
+  const compromisedResult = classifyTier({ grade: 'A', compromised: 'TRUE' });
+  assert.strictEqual(compromisedResult.segment, '');
+});
+
+check('an existing authoritative segment value passes through unchanged for every grade/state', () => {
+  for (const grade of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'pending', undefined]) {
+    const result = classifyTier({ grade, segment: 'some-authoritative-value' });
+    assert.strictEqual(result.segment, 'some-authoritative-value', `grade ${grade} overwrote the existing segment`);
+  }
+  // Even a compromised probe must not clear or alter it.
+  const compromisedResult = classifyTier({ grade: 'A', compromised: 'TRUE', segment: 'some-authoritative-value' });
+  assert.strictEqual(compromisedResult.segment, 'some-authoritative-value');
+});
+
+check('segment passthrough is independent of tier — A and C never diverge on segment given the same input', () => {
+  const growthResult = classifyTier({ grade: 'A', segment: 'whatever' });
+  const coreResult = classifyTier({ grade: 'C', segment: 'whatever' });
+  assert.strictEqual(growthResult.segment, 'whatever');
+  assert.strictEqual(coreResult.segment, 'whatever');
 });
 
 check('unknown/garbage grade value -> unclassified (never falls through to Core)', () => {
@@ -84,7 +109,6 @@ check('grade A remains Growth with metadata present or absent', () => {
   for (const agency of AGENCY_VARIANTS) {
     const result = classifyTier({ grade: 'A', agency });
     assert.strictEqual(result.tier, 'Growth');
-    assert.strictEqual(result.segment, 'A');
   }
 });
 
@@ -92,7 +116,6 @@ check('grade C remains Core with metadata present or absent', () => {
   for (const agency of AGENCY_VARIANTS) {
     const result = classifyTier({ grade: 'C', agency });
     assert.strictEqual(result.tier, 'Core');
-    assert.strictEqual(result.segment, 'B');
   }
 });
 
@@ -100,7 +123,13 @@ check('grade H remains Core regardless of qualification metadata', () => {
   for (const agency of AGENCY_VARIANTS) {
     const result = classifyTier({ grade: 'H', agency });
     assert.strictEqual(result.tier, 'Core');
-    assert.strictEqual(result.segment, 'B');
+  }
+});
+
+check('agency metadata never changes segment, with or without an authoritative segment supplied', () => {
+  for (const agency of AGENCY_VARIANTS) {
+    assert.strictEqual(classifyTier({ grade: 'A', agency }).segment, '');
+    assert.strictEqual(classifyTier({ grade: 'A', agency, segment: 'kept' }).segment, 'kept');
   }
 });
 
