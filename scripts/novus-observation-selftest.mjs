@@ -407,6 +407,53 @@ async function run() {
     __setRepoForTests(null);
   }
 
+  // ── Recompute is manual, not webhook-triggered (production regression):
+  // a genuine second contact attempt lands in COMMUNICATIONS via the normal
+  // webhook path, but INTELLIGENCE only reflects it once recompute is
+  // re-run for that probe_id. This mirrors exactly what happened with
+  // prb_msstv7xg_nksnc0 in production — same INTELLIGENCE row (upserted, not
+  // duplicated), grade recalculates C -> A the moment recompute runs again. ──
+  console.log('\nRecompute recalculation — genuine second attempt moves Grade C -> A (prb_msstv7xg_nksnc0 shape)');
+  {
+    const { store, valuesApi } = makeFakeSheet();
+    __setRepoForTests(createRepo(valuesApi));
+    seedProbe(store, { probe_id: 'prb_recalc', probe_timestamp: PROBE_SENT, observation_deadline: iso(7 * DAY, PROBE_SENT) });
+    seedCommunication(store, { probe_id: 'prb_recalc', occurred_at: iso(9 * MIN, PROBE_SENT), channel: 'voice', body_text: 'voicemail: It.' });
+    seedCommunication(store, { probe_id: 'prb_recalc', occurred_at: iso(10 * MIN, PROBE_SENT), channel: 'sms', body_text: 'Please call me back to arrange a viewing.' });
+
+    // First recompute — matches production's actual result before the
+    // follow-up arrived: Grade C, 1 contact attempt, 0 follow-ups.
+    const res1 = mockRes();
+    await recompute(mockReq({ probe_id: 'prb_recalc' }), res1);
+    assert.strictEqual(res1.body.grade, 'C', `expected C before follow-up, got ${res1.body.grade}`);
+    assert.strictEqual(res1.body.observation.contact_attempt_count, 1);
+    assert.strictEqual(res1.body.observation.follow_up_count, 0);
+    const intelligenceIdBeforeFollowUp = res1.body.intelligence_id;
+
+    // A genuine follow-up communication arrives via the normal webhook path
+    // (simulated here by seeding a COMMUNICATIONS row directly, same as a
+    // real inbound SMS webhook would) — 74 minutes after the FIRST attempt's
+    // start (9min mark), well past the 30-minute window, so it is NOT part
+    // of attempt 1. Raw communication events remain individually stored:
+    // this is a brand new COMMUNICATIONS row, not an edit of the first two.
+    seedCommunication(store, { probe_id: 'prb_recalc', occurred_at: iso(9 * MIN + 74 * MIN, PROBE_SENT), channel: 'sms', body_text: 'Do you have any time this week?' });
+    assert.strictEqual(store.COMMUNICATIONS.length, 5, 'three raw COMMUNICATIONS rows now exist (2 header/schema rows + 3 data rows)');
+
+    // Recompute is NOT automatically triggered by ingestion — this manual
+    // re-run is standing in for the still-missing production trigger.
+    const res2 = mockRes();
+    await recompute(mockReq({ probe_id: 'prb_recalc' }), res2);
+    assert.strictEqual(res2.body.grade, 'A', `expected A after genuine follow-up, got ${res2.body.grade}: ${res2.body.grade_reason}`);
+    assert.strictEqual(res2.body.observation.contact_attempt_count, 2, 'the 74-minute-later SMS starts contact attempt 2');
+    assert.strictEqual(res2.body.observation.follow_up_count, 1, 'exactly one genuine follow-up attempt');
+    assert.strictEqual(res2.body.observation.human_lag_hours, res1.body.observation.human_lag_hours, 'human_lag_hours unchanged — still measured from the first human touch');
+    assert.strictEqual(res2.body.intelligence_id, intelligenceIdBeforeFollowUp, 'same INTELLIGENCE row recalculated in place, not duplicated');
+    assert.strictEqual(store.INTELLIGENCE.length, 3, 'still exactly one INTELLIGENCE data row after recalculation');
+
+    ok('a genuine second contact attempt (>30min after attempt 1 start) recalculates Grade C -> A on the next recompute, same INTELLIGENCE row, raw events preserved individually');
+    __setRepoForTests(null);
+  }
+
   console.log(`\n✅ All ${passed} checks passed.\n`);
 }
 
