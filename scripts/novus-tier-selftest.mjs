@@ -30,7 +30,9 @@ for (const grade of GROWTH_GRADES) {
     const result = classifyTier({ grade });
     assert.strictEqual(result.tier, 'Growth');
     assert.ok(result.tier_reason && result.tier_reason.length > 0);
-    assert.ok(result.sales_angle && result.sales_angle.length > 0);
+    // sales_angle is no longer produced here — the Sales Strategy Engine is
+    // its single producer (see lib/tier.mjs header note).
+    assert.ok(!('sales_angle' in result), 'tier engine must not emit sales_angle');
   });
 }
 
@@ -39,14 +41,16 @@ for (const grade of CORE_GRADES) {
     const result = classifyTier({ grade });
     assert.strictEqual(result.tier, 'Core');
     assert.ok(result.tier_reason && result.tier_reason.length > 0);
-    assert.ok(result.sales_angle && result.sales_angle.length > 0);
+    // sales_angle is no longer produced here — the Sales Strategy Engine is
+    // its single producer (see lib/tier.mjs header note).
+    assert.ok(!('sales_angle' in result), 'tier engine must not emit sales_angle');
   });
 }
 
 check('grade pending -> unclassified', () => {
   const result = classifyTier({ grade: 'pending' });
   assert.strictEqual(result.tier, 'unclassified');
-  assert.strictEqual(result.sales_angle, '');
+  assert.ok(!('sales_angle' in result), 'tier engine must not emit sales_angle');
   assert.notStrictEqual(result.tier, 'Core');
   assert.notStrictEqual(result.tier, 'Growth');
 });
@@ -141,7 +145,6 @@ check('agency context enriches tier_reason without changing tier/segment', () =>
   });
   assert.strictEqual(bare.tier, enriched.tier);
   assert.strictEqual(bare.segment, enriched.segment);
-  assert.strictEqual(bare.sales_angle, enriched.sales_angle);
   assert.notStrictEqual(bare.tier_reason, enriched.tier_reason);
   assert.ok(enriched.tier_reason.includes('12 years trading'));
   assert.ok(enriched.tier_reason.includes('CRM: Reapit'));

@@ -14,6 +14,7 @@ import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { classifyCommunication } from '../lib/classification.mjs';
 import { computeObservation, groupContactAttempts } from '../lib/observation.mjs';
 import { gradeObservation } from '../lib/grading.mjs';
+import { INTELLIGENCE_HEADER } from '../lib/schema.mjs';
 
 const PROBES_HEADER = [
   'probe_id','probe_reference','agency_id','portal','property_address','property_url',
@@ -31,16 +32,6 @@ const COMMUNICATIONS_HEADER = [
   'successful_conversation','follow_up','booking_attempt','communication_classification','intent',
   'contact_quality','ai_summary','ai_confidence','ai_model','manual_review_status','manual_override',
   'override_reason','created_at','updated_at',
-];
-const INTELLIGENCE_HEADER = [
-  'intelligence_id','agency_id','probe_id','observation_status','observation_deadline',
-  'auto_acknowledgement','auto_ack_timestamp','crm_detected','crm_name','crm_evidence',
-  'first_human_touch','first_human_touch_at','human_lag_hours','callback_attempts',
-  'successful_conversations','voicemail_count','inbound_sms_count','email_touch_count',
-  'follow_up_count','follow_up_channels','last_touch_at','days_chased','booking_attempt',
-  'contact_quality','proactive_reactive','persistence_profile','channels_used','grade',
-  'grade_reason','tier','tier_reason','sales_angle','segment','ai_evidence_summary','ai_confidence',
-  'manual_override','override_reason','observation_closed_at','created_at','updated_at',
 ];
 
 // ── In-memory fake of the Google Sheets values API ────────────────────────────
@@ -473,6 +464,37 @@ async function run() {
     assert.strictEqual(store.INTELLIGENCE.length, 3, 'still exactly one INTELLIGENCE data row after recalculation');
 
     ok('a genuine second contact attempt (>30min after attempt 1 start) recalculates Grade C -> A on the next recompute, same INTELLIGENCE row, raw events preserved individually');
+
+    // ── Sales Strategy Engine: the eight strategy fields must actually
+    // PERSIST to the INTELLIGENCE row (lib/sheets.mjs silently drops keys the
+    // header lacks, so this proves the schema path end-to-end), and must be
+    // recomputed rather than frozen when the grade moves C -> A. ──
+    const intelRow = () => Object.fromEntries(
+      INTELLIGENCE_HEADER.map((k, i) => [k, store.INTELLIGENCE[2][i]]),
+    );
+    const afterRegrade = intelRow();
+
+    const STRATEGY_COLUMNS = [
+      'observed_problem', 'commercial_implication', 'sales_angle', 'discovery_focus',
+      'demo_type', 'email_strategy', 'phone_strategy', 'next_action',
+    ];
+    for (const col of STRATEGY_COLUMNS) {
+      assert.ok(
+        typeof afterRegrade[col] === 'string' && afterRegrade[col].length > 0,
+        `INTELLIGENCE.${col} did not persist (silently dropped by the header mapping?)`,
+      );
+    }
+    // Tier moved Core -> Growth with the grade, and the strategy moved with it.
+    assert.strictEqual(afterRegrade.grade, 'A');
+    assert.strictEqual(afterRegrade.tier, 'Growth');
+    assert.strictEqual(afterRegrade.demo_type, 'growth_database', 'demo_type must follow the regrade, not stay frozen at the Core value');
+    assert.ok(afterRegrade.next_action.includes('Growth'), afterRegrade.next_action);
+    // The three previously-dead columns now carry real values too.
+    assert.strictEqual(afterRegrade.contact_attempt_count, 2, 'contact_attempt_count now persists');
+    assert.strictEqual(afterRegrade.inbound_sms_count, 2, 'inbound_sms_count now persists (2 SMS)');
+    assert.strictEqual(afterRegrade.proactive_reactive, 'Proactive', 'proactive_reactive now persists');
+    ok('the eight strategy fields + the previously-dead columns persist to INTELLIGENCE and follow the C -> A regrade');
+
     __setRepoForTests(null);
   }
 
