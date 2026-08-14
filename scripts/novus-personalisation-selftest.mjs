@@ -20,6 +20,7 @@ import {
   buildPersonalisationRequest,
   buildEvidencePacket,
   validatePersonalisationOutput,
+  defaultCallAi,
   PersonalisationValidationError,
   PersonalisationGenerationError,
   PERSONALISATION_FIELDS,
@@ -411,6 +412,117 @@ check('relevant_objection_response guidance is strategy/evidence-derived, and th
   // PROHIBITED_CLAIMS hard rules, not from any document-derived section.
   assert.ok(/a claim that the prospect has raised any objection/i.test(req.system));
 });
+
+// ── 6b. Bounded repair path for a malformed/incomplete tool call ──────────
+// Anthropic's tool-use `required` array is a strong hint, not a
+// server-enforced validator — observed in the live deployment: a real call
+// dropped relevant_objection_response. defaultCallAi() gets exactly one
+// corrective follow-up turn before validatePersonalisationOutput() (called
+// from generatePersonalisation(), never weakened) has the final say.
+
+const VALID_FIELDS = Object.fromEntries(PERSONALISATION_FIELDS.map((f) => [f, `${f}-value`]));
+
+function toolUseBlock(id, input) {
+  return { type: 'tool_use', id, name: 'emit_personalisation', input };
+}
+function fakeAnthropicResponse(content, model = 'mock-model') {
+  return { ok: true, json: async () => ({ model, content }) };
+}
+
+// process.env.ANTHROPIC_API_KEY only needs to be present for defaultCallAi's
+// own early guard — fetchImpl is always mocked below, so no real network
+// call is ever made regardless of its value.
+const savedApiKey = process.env.ANTHROPIC_API_KEY;
+process.env.ANTHROPIC_API_KEY = 'test-key-not-used-fetchImpl-is-mocked';
+
+await checkAsync('defaultCallAi repairs a missing relevant_objection_response with exactly one corrective turn', async () => {
+  const { relevant_objection_response, ...missingObjection } = VALID_FIELDS;
+  let calls = 0;
+  const fetchImpl = async (url, init) => {
+    calls += 1;
+    if (calls === 1) {
+      return fakeAnthropicResponse([toolUseBlock('tu_1', missingObjection)]);
+    }
+    // Second call must be a repair turn: replayed assistant tool_use +
+    // an error tool_result naming the missing field, still forcing the tool.
+    const body = JSON.parse(init.body);
+    const lastTwo = body.messages.slice(-2);
+    assert.strictEqual(lastTwo[0].role, 'assistant');
+    assert.strictEqual(lastTwo[1].role, 'user');
+    assert.strictEqual(lastTwo[1].content[0].type, 'tool_result');
+    assert.strictEqual(lastTwo[1].content[0].is_error, true);
+    assert.ok(/relevant_objection_response/.test(lastTwo[1].content[0].content), 'repair message must name the missing field');
+    return fakeAnthropicResponse([toolUseBlock('tu_2', VALID_FIELDS)]);
+  };
+
+  const request = buildPersonalisationRequest({ grade: 'A', tier: 'Growth', strategy: strategyFor('A').strategy, probe: PROBE, agency: AGENCY, observation: strategyFor('A').observation });
+  const result = await defaultCallAi(request, { fetchImpl });
+  assert.strictEqual(calls, 2, 'expected exactly one repair attempt (two total calls)');
+  const validated = validatePersonalisationOutput(result.raw);
+  assert.strictEqual(validated.relevant_objection_response, 'relevant_objection_response-value');
+});
+
+await checkAsync('the repair budget is bounded to exactly one retry — a still-malformed repair is returned as-is, not retried again', async () => {
+  const { why_novus, ...alwaysMissing } = VALID_FIELDS;
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    return fakeAnthropicResponse([toolUseBlock(`tu_${calls}`, alwaysMissing)]);
+  };
+  const request = buildPersonalisationRequest({ grade: 'C', tier: 'Core', strategy: strategyFor('C').strategy, probe: PROBE, agency: AGENCY, observation: strategyFor('C').observation });
+  const result = await defaultCallAi(request, { fetchImpl });
+  assert.strictEqual(calls, 2, 'must attempt at most one repair (two calls total), never loop indefinitely');
+  assert.ok(!('why_novus' in result.raw), 'still-malformed repair result is returned as-is, not silently patched');
+});
+
+await checkAsync('a repair that fixes the omission produces a fully valid package through generatePersonalisation (end to end, real defaultCallAi)', async () => {
+  const { relevant_objection_response, ...missingObjection } = VALID_FIELDS;
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    return calls === 1
+      ? fakeAnthropicResponse([toolUseBlock('tu_1', missingObjection)])
+      : fakeAnthropicResponse([toolUseBlock('tu_2', VALID_FIELDS)]);
+  };
+  const { grade, tier, strategy, observation } = strategyFor('H');
+  const result = await generatePersonalisation({
+    grade, tier, strategy, probe: PROBE, agency: AGENCY, observation,
+    callAi: (request) => defaultCallAi(request, { fetchImpl }),
+  });
+  assert.strictEqual(result.meta.generated, true);
+  assert.strictEqual(result.relevant_objection_response, 'relevant_objection_response-value');
+  assert.strictEqual(calls, 2);
+});
+
+await checkAsync('a repair that never fixes the omission is still rejected by generatePersonalisation — the repair path never weakens final validation', async () => {
+  const { relevant_objection_response, ...alwaysMissing } = VALID_FIELDS;
+  const fetchImpl = async () => fakeAnthropicResponse([toolUseBlock('tu', alwaysMissing)]);
+  const { grade, tier, strategy, observation } = strategyFor('F');
+  await assert.rejects(
+    () => generatePersonalisation({
+      grade, tier, strategy, probe: PROBE, agency: AGENCY, observation,
+      callAi: (request) => defaultCallAi(request, { fetchImpl }),
+    }),
+    PersonalisationValidationError,
+  );
+});
+
+check('the tool schema description flags every field, including relevant_objection_response, as mandatory', () => {
+  const { grade, tier, strategy, observation } = strategyFor('B');
+  const request = buildPersonalisationRequest({ grade, tier, strategy, probe: PROBE, agency: AGENCY, observation });
+  const tool = request.tools[0];
+  assert.ok(/mandatory/i.test(tool.description));
+  assert.ok(/REQUIRED — do not omit/.test(tool.input_schema.properties.relevant_objection_response.description));
+  assert.deepStrictEqual(tool.input_schema.required, PERSONALISATION_FIELDS);
+});
+
+check('the system prompt explicitly calls out relevant_objection_response as non-optional', () => {
+  const { grade, tier, strategy, observation } = strategyFor('G');
+  const request = buildPersonalisationRequest({ grade, tier, strategy, probe: PROBE, agency: AGENCY, observation });
+  assert.ok(/relevant_objection_response.*(is not|frequently and incorrectly treated as skippable)/is.test(request.system) || /frequently and incorrectly treated as skippable/i.test(request.system));
+});
+
+process.env.ANTHROPIC_API_KEY = savedApiKey;
 
 // ── 7. AI failure never corrupts anything (no persistence exists to corrupt) ─
 
