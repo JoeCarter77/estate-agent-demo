@@ -13,6 +13,7 @@ import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { computeTwilioSignature } from '../lib/twilio-signature.mjs';
 import { matchAgencyByPhone } from '../lib/phone-matching.mjs';
 import { classifyCommunication } from '../lib/classification.mjs';
+import { INTELLIGENCE_HEADER } from '../lib/schema.mjs';
 
 const AGENCIES_HEADER = [
   'agency_id','agency_name','website','domain','location','branch_count','main_phone',
@@ -42,16 +43,6 @@ const RAW_EVENTS_HEADER = [
   'raw_event_id','provider','provider_event_id','channel','event_type','received_at','occurred_at',
   'source_identifier','destination_identifier','payload_reference','processing_status',
   'processed_communication_id','error_message','created_at',
-];
-const INTELLIGENCE_HEADER = [
-  'intelligence_id','agency_id','probe_id','observation_status','observation_deadline',
-  'auto_acknowledgement','auto_ack_timestamp','crm_detected','crm_name','crm_evidence',
-  'first_human_touch','first_human_touch_at','human_lag_hours','callback_attempts',
-  'successful_conversations','voicemail_count','inbound_sms_count','email_touch_count',
-  'follow_up_count','follow_up_channels','last_touch_at','days_chased','booking_attempt',
-  'contact_quality','proactive_reactive','persistence_profile','channels_used','grade',
-  'grade_reason','tier','tier_reason','sales_angle','segment','ai_evidence_summary','ai_confidence',
-  'manual_override','override_reason','observation_closed_at','created_at','updated_at',
 ];
 
 function makeFakeSheet() {
