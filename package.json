@@ -13,6 +13,7 @@
     "novus:phone-selftest": "node scripts/novus-phone-selftest.mjs",
     "novus:tier-selftest": "node scripts/novus-tier-selftest.mjs",
     "novus:sales-strategy-selftest": "node scripts/novus-sales-strategy-selftest.mjs",
+    "novus:personalisation-selftest": "node scripts/novus-personalisation-selftest.mjs",
     "novus:smoke": "node scripts/novus-sheets-smoke.mjs"
   },
   "dependencies": {
