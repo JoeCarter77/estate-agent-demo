@@ -67,12 +67,12 @@
   .scene{
     position:relative; min-height:100vh; width:100%;
     display:none; flex-direction:column; align-items:center; justify-content:center;
-    padding:68px 22px 38px; opacity:0;
+    padding:68px 22px 34px; opacity:0;
   }
   .scene.active{ display:flex; animation:scene-in .5s cubic-bezier(.22,1,.36,1) both; }
   @keyframes scene-in{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
   .scene-inner{ width:100%; max-width:510px; display:flex; flex-direction:column; gap:11px; align-items:center; text-align:center; }
-  .scene-inner.wide{ max-width:820px; }
+  .scene-inner.wide{ max-width:900px; gap:10px; }
 
   .eyebrow{ font-size:.6rem; font-weight:700; letter-spacing:.17em; text-transform:uppercase; color:#93C5FD; display:flex; align-items:center; gap:9px; }
   .eyebrow::before{ content:''; width:18px; height:1px; background:#93C5FD; }
@@ -165,25 +165,81 @@
   @keyframes msg-in{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
 
   /* ═══ SCENE 5 — THE SYSTEM ═══ */
-  .system-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%; text-align:left; align-items:start; }
-  .sys-panel{ background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); border-radius:13px; padding:12px 12px 11px; display:flex; flex-direction:column; gap:6px; }
+  .system-grid{ display:grid; grid-template-columns:1fr 1fr; gap:9px; width:100%; text-align:left; align-items:start; }
+  .sys-panel{ background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); border-radius:13px; padding:11px 12px 10px; display:flex; flex-direction:column; gap:5px; }
   .sys-panel-head{ display:flex; align-items:center; gap:8px; }
   .sys-panel-num{ font-size:.55rem; font-weight:800; letter-spacing:.06em; color:rgba(255,255,255,.35); }
   .sys-panel-name{ font-size:.58rem; font-weight:700; letter-spacing:.11em; text-transform:uppercase; color:#93C5FD; }
-  .sys-panel-title{ font-size:.88rem; font-weight:800; color:#fff; letter-spacing:-.01em; line-height:1.3; }
-  .sys-panel-sub{ font-size:.71rem; color:rgba(255,255,255,.55); line-height:1.5; }
+  .sys-panel-title{ font-size:.855rem; font-weight:800; color:#fff; letter-spacing:-.01em; line-height:1.3; }
+  .sys-panel-sub{ font-size:.69rem; color:rgba(255,255,255,.55); line-height:1.45; }
   .sys-panel-open{ align-self:flex-start; font-family:'Inter',sans-serif; font-size:.66rem; font-weight:700; color:var(--navy-2); background:#fff; border:none; border-radius:100px; padding:6px 12px; cursor:pointer; transition:transform .12s; margin-top:1px; }
   .sys-panel-open:hover{ transform:translateY(-1px); }
   .sys-panel-body{ display:none; }
   .sys-panel-body.open{ display:block; animation:msg-in .3s ease both; }
 
-  .sys-closing{ width:100%; border-top:1px solid rgba(255,255,255,.12); padding-top:12px; display:flex; flex-direction:column; gap:8px; align-items:center; }
-  .sys-closing-h{ font-family:var(--serif); font-size:1rem; font-weight:600; color:#fff; }
-  .loop{ display:flex; align-items:center; justify-content:center; gap:7px; flex-wrap:wrap; }
-  .loop-node{ font-size:.57rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:rgba(255,255,255,.72); background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.16); padding:5px 10px; border-radius:100px; }
-  .loop-arrow{ color:rgba(255,255,255,.3); font-size:.75rem; }
-  .sys-tail{ font-size:.66rem; color:rgba(255,255,255,.36); line-height:1.5; max-width:430px; }
-  .sys-tail b{ color:rgba(255,255,255,.6); font-weight:700; }
+  /* ── OPPORTUNITY FLOW BAND (the system, at a glance) ── */
+  .flow-band{ width:100%; display:grid; grid-template-columns:auto 40px auto 40px auto; justify-content:center; align-items:center; padding:2px 0 1px; }
+  .fb-col{ display:flex; flex-direction:column; gap:4px; }
+  .fb-cap{ font-size:.5rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-bottom:2px; text-align:left; }
+  .fb-item{ font-size:.65rem; font-weight:600; letter-spacing:-.005em; padding:3.5px 10px; border-radius:100px; border:1px solid; white-space:nowrap; text-align:left; }
+  .fb-item.src{ color:rgba(255,255,255,.62); border-color:rgba(255,255,255,.14); background:rgba(255,255,255,.04); }
+  .fb-item.out{ color:#fff; border-color:rgba(147,197,253,.4); background:rgba(147,197,253,.11); }
+  .fb-link{ width:40px; height:62px; }
+  .fb-link path{ fill:none; stroke:rgba(147,197,253,.32); stroke-width:1.1; }
+  .fb-core{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .fb-ring{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at 50% 30%, rgba(59,130,246,.42), rgba(23,45,103,.6)); border:1px solid rgba(147,197,253,.5); box-shadow:0 0 0 5px rgba(147,197,253,.07), 0 8px 24px rgba(0,0,0,.3); }
+  .fb-ring img{ height:18px; width:auto; filter:brightness(0) invert(1); }
+  .fb-ring.noimg::after{ content:'N'; font-family:var(--serif); font-size:1.15rem; font-weight:600; color:#fff; }
+  .fb-core-word{ font-size:.58rem; font-weight:800; letter-spacing:.13em; color:#fff; }
+  .fb-core-sub{ font-size:.53rem; font-weight:600; letter-spacing:.05em; color:rgba(147,197,253,.75); }
+
+  /* ── IN-CARD VISUALS ── */
+  .mini-vis{ margin-top:1px; }
+  .sys-panel.opened .mini-vis{ display:none; }
+
+  /* 01 database scan */
+  .db-grid{ position:relative; display:grid; grid-template-columns:repeat(12,1fr); gap:3px; overflow:hidden; border-radius:5px; }
+  .db-cell{ height:7px; border-radius:2px; background:rgba(255,255,255,.09); }
+  .db-cell.hit{ background:rgba(147,197,253,.85); box-shadow:0 0 7px rgba(147,197,253,.6); }
+  .db-cell.hit.amber{ background:rgba(253,230,138,.9); box-shadow:0 0 7px rgba(245,158,11,.55); }
+  .db-grid.scan::after{ content:''; position:absolute; top:0; bottom:0; width:34%; background:linear-gradient(90deg, transparent, rgba(147,197,253,.22), transparent); animation:scan 1.5s ease-in-out 1; }
+  @keyframes scan{ from{ transform:translateX(-120%);} to{ transform:translateX(400%);} }
+  .vis-tags{ display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+  .vis-tag{ font-size:.53rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; padding:3px 8px; border-radius:100px; border:1px solid rgba(147,197,253,.34); background:rgba(147,197,253,.1); color:#93C5FD; }
+  .vis-tag.amber{ border-color:rgba(245,158,11,.36); background:rgba(245,158,11,.11); color:#FDE68A; }
+  .vis-note{ font-size:.55rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-top:7px; }
+
+  /* 02 conversation tracks */
+  .track{ display:flex; align-items:center; gap:6px; margin-top:5px; }
+  .tk-from{ font-size:.53rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; width:42px; flex-shrink:0; }
+  .tk-from.b{ color:#93C5FD; } .tk-from.s{ color:#FDE68A; }
+  .tk-dots{ flex:1; display:flex; align-items:center; gap:4px; min-width:0; }
+  .tk-dot{ width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,.3); flex-shrink:0; }
+  .tk-line{ flex:1; height:1px; background:rgba(255,255,255,.16); }
+  .tk-end{ font-size:.53rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:100px; white-space:nowrap; background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.36); color:#86EFAC; }
+
+  /* 03 reactivation records */
+  .rec{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:3px 0; border-bottom:1px solid rgba(255,255,255,.07); }
+  .rec:last-of-type{ border-bottom:none; }
+  .rec-name{ font-size:.635rem; color:rgba(255,255,255,.38); }
+  .rec.on .rec-name{ color:#fff; font-weight:600; }
+  .rec-flag{ font-size:.5rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:#FDE68A; background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.32); padding:2px 7px; border-radius:100px; white-space:nowrap; }
+  .rec-out{ display:flex; align-items:center; gap:6px; margin-top:6px; }
+  .rec-out span{ font-size:.53rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; padding:3px 8px; border-radius:100px; background:rgba(147,197,253,.1); border:1px solid rgba(147,197,253,.32); color:#93C5FD; }
+  .rec-out span.final{ background:rgba(34,197,94,.14); border-color:rgba(34,197,94,.36); color:#86EFAC; }
+  .rec-out i{ font-style:normal; color:rgba(255,255,255,.28); font-size:.62rem; }
+
+  /* 04 out-of-hours call */
+  .call-when{ display:flex; align-items:center; gap:7px; }
+  .call-day{ font-size:.53rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.4); }
+  .call-live{ font-size:.5rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#FCA5A5; background:rgba(239,68,68,.11); border:1px solid rgba(239,68,68,.32); padding:2px 7px; border-radius:100px; }
+  .call-quote{ font-size:.655rem; line-height:1.4; color:rgba(255,255,255,.8); font-style:italic; margin-top:5px; padding-left:9px; border-left:2px solid rgba(147,197,253,.4); }
+
+  /* punchline */
+  .punch{ width:100%; border-top:1px solid rgba(255,255,255,.12); padding-top:9px; display:flex; flex-direction:column; gap:4px; align-items:center; }
+  .punch-h{ font-family:var(--serif); font-size:clamp(1rem,2vw,1.24rem); font-weight:600; line-height:1.35; color:#fff; }
+  .punch-h .hl{ color:#93C5FD; }
+  .punch-sub{ font-size:.68rem; line-height:1.45; color:rgba(255,255,255,.46); max-width:460px; }
 
   /* mini chat */
   .mini-chat{ display:flex; flex-direction:column; height:212px; background:var(--paper-2); border-radius:10px; overflow:hidden; margin-top:3px; }
@@ -229,12 +285,6 @@
   .sig-detail-row:last-child{ margin-bottom:0; }
   .sig-detail-row b{ display:block; font-size:.55rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:#93C5FD; margin-bottom:2px; }
 
-  .db-stats{ display:flex; gap:5px; margin-top:3px; }
-  .db-stat{ flex:1; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); border-radius:9px; padding:7px 5px; text-align:center; }
-  .db-stat-n{ font-family:var(--serif); font-size:.95rem; font-weight:600; color:#fff; line-height:1; }
-  .db-stat-n.hot{ color:#FDE68A; }
-  .db-stat-l{ font-size:.5rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:rgba(255,255,255,.42); margin-top:4px; line-height:1.3; }
-  .db-note{ font-size:.55rem; color:rgba(255,255,255,.3); text-align:center; margin-top:5px; letter-spacing:.04em; }
   .contact-list{ display:flex; flex-direction:column; gap:4px; margin-top:7px; }
   .contact-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.13); border-radius:9px; padding:7px 10px; cursor:pointer; transition:background .15s,border-color .15s; }
   .contact-row:hover{ background:rgba(255,255,255,.11); }
@@ -278,11 +328,14 @@
     .calendly-inline-widget{ height:520px; }
     .system-grid{ grid-template-columns:1fr; }
     .opp-cards{ flex-direction:column; }
+    .flow-band{ grid-template-columns:1fr; justify-items:center; gap:4px; }
+    .fb-col{ align-items:center; }
+    .fb-cap{ text-align:center; }
+    .fb-link{ width:20px; height:22px; transform:rotate(90deg); }
+    .db-grid{ grid-template-columns:repeat(10,1fr); }
     .silence{ gap:18px; }
     .sil-n{ font-size:1.3rem; }
     .bub{ max-width:100%; }
-    .db-stats{ flex-wrap:wrap; }
-    .db-stat{ flex:1 1 44%; }
   }
 </style>
 </head>
@@ -512,27 +565,76 @@
     <section class="scene" data-scene="5">
       <div class="scene-inner wide">
         <div class="eyebrow">The Full System</div>
-        <h1 class="scene-h">One enquiry can create four opportunities.</h1>
+        <h1 class="scene-h">Every opportunity. One system.</h1>
+
+        <!-- the whole proposition, at a glance -->
+        <div class="flow-band">
+          <div class="fb-col">
+            <div class="fb-cap">What you already have</div>
+            <div class="fb-item src">New enquiries</div>
+            <div class="fb-item src">Your database</div>
+            <div class="fb-item src">Missed &amp; out-of-hours calls</div>
+          </div>
+          <svg class="fb-link" viewBox="0 0 40 78" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M0 14 C 22 14, 18 39, 40 39" /><path d="M0 39 H 40" /><path d="M0 64 C 22 64, 18 39, 40 39" />
+          </svg>
+          <div class="fb-core">
+            <div class="fb-ring"><img src="/novus-icon.png" alt="" onerror="this.style.display='none';this.parentNode.classList.add('noimg')" /></div>
+            <div class="fb-core-word">NOVUS</div>
+            <div class="fb-core-sub">finds · answers · progresses</div>
+          </div>
+          <svg class="fb-link" viewBox="0 0 40 78" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M0 39 C 22 39, 18 14, 40 14" /><path d="M0 39 H 40" /><path d="M0 39 C 22 39, 18 64, 40 64" />
+          </svg>
+          <div class="fb-col">
+            <div class="fb-cap">Where it ends up</div>
+            <div class="fb-item out">Valuations</div>
+            <div class="fb-item out">Viewings</div>
+            <div class="fb-item out">Instructions</div>
+          </div>
+        </div>
 
         <div class="system-grid">
 
           <!-- 1 — NOVUS INTELLIGENCE -->
-          <div class="sys-panel">
+          <div class="sys-panel" id="sp-intel">
             <div class="sys-panel-head"><span class="sys-panel-num">01</span><span class="sys-panel-name">NOVUS Intelligence</span></div>
-            <div class="sys-panel-title">Know what needs attention.</div>
-            <div class="sys-panel-sub">Spots the opportunities your team might otherwise miss.</div>
+            <div class="sys-panel-title">Your entire database, working for you.</div>
+            <div class="sys-panel-sub">Finds the people worth speaking to, why now, and what should happen next.</div>
+            <div class="mini-vis">
+              <div class="db-grid" id="db-grid-preview"></div>
+              <div class="vis-tags">
+                <span class="vis-tag amber">Seller opportunity</span>
+                <span class="vis-tag">High intent</span>
+                <span class="vis-tag">Follow-up due</span>
+              </div>
+            </div>
             <button class="sys-panel-open" onclick="openPanel('intel')">See the signals →</button>
             <div class="sys-panel-body" id="panel-intel">
+              <div class="db-grid" id="db-grid-live"></div>
+              <div class="vis-note">Opportunities found — tap one</div>
               <div class="chip-row" id="intel-chips"></div>
               <div class="sig-detail" id="intel-detail"></div>
             </div>
           </div>
 
           <!-- 2 — CONVERSATIONAL AI -->
-          <div class="sys-panel">
+          <div class="sys-panel" id="sp-chat">
             <div class="sys-panel-head"><span class="sys-panel-num">02</span><span class="sys-panel-name">Conversational AI</span></div>
             <div class="sys-panel-title">Keep every conversation moving.</div>
-            <div class="sys-panel-sub">Replies, follows up and keeps buyers and sellers engaged.</div>
+            <div class="sys-panel-sub">Replies, follows up and keeps buyers and sellers engaged until they're ready for the next step.</div>
+            <div class="mini-vis">
+              <div class="track">
+                <span class="tk-from b">Buyer</span>
+                <span class="tk-dots"><i class="tk-dot"></i><i class="tk-line"></i><i class="tk-dot"></i><i class="tk-line"></i><i class="tk-dot"></i><i class="tk-line"></i></span>
+                <span class="tk-end">Viewing booked</span>
+              </div>
+              <div class="track">
+                <span class="tk-from s">Seller</span>
+                <span class="tk-dots"><i class="tk-dot"></i><i class="tk-line"></i><i class="tk-dot"></i><i class="tk-line"></i><i class="tk-dot"></i><i class="tk-line"></i></span>
+                <span class="tk-end">Valuation booked</span>
+              </div>
+            </div>
             <button class="sys-panel-open" onclick="openPanel('chat')">Message the agency →</button>
             <div class="sys-panel-body" id="panel-chat">
               <div class="mini-chat">
@@ -547,29 +649,34 @@
           </div>
 
           <!-- 3 — SELLER REACTIVATION -->
-          <div class="sys-panel">
+          <div class="sys-panel" id="sp-react">
             <div class="sys-panel-head"><span class="sys-panel-num">03</span><span class="sys-panel-name">Seller Reactivation</span></div>
-            <div class="sys-panel-title">Find your next instructions.</div>
-            <div class="sys-panel-sub">Turns forgotten database contacts into new conversations.</div>
+            <div class="sys-panel-title">Turn forgotten contacts into new instructions.</div>
+            <div class="sys-panel-sub">Finds people in your database who may now be ready to move — and starts the right conversation.</div>
+            <div class="mini-vis">
+              <div class="rec on"><span class="rec-name">Past valuation — 14 months ago</span><span class="rec-flag">Worth contacting now</span></div>
+              <div class="rec"><span class="rec-name">Vendor — previously sold</span></div>
+              <div class="rec"><span class="rec-name">Applicant — mentioned moving</span></div>
+              <div class="rec-out"><span>Conversation</span><i>→</i><span>Valuation</span><i>→</i><span class="final">Instruction</span></div>
+            </div>
             <button class="sys-panel-open" onclick="openPanel('react')">See the opportunities →</button>
             <div class="sys-panel-body" id="panel-react">
-              <div class="db-stats">
-                <div class="db-stat"><div class="db-stat-n">412</div><div class="db-stat-l">Dormant contacts</div></div>
-                <div class="db-stat"><div class="db-stat-n hot">27</div><div class="db-stat-l">Likely sellers</div></div>
-                <div class="db-stat"><div class="db-stat-n">9</div><div class="db-stat-l">Valuation openings</div></div>
-                <div class="db-stat"><div class="db-stat-n">4</div><div class="db-stat-l">In conversation</div></div>
-              </div>
-              <div class="db-note">Illustrative sample — not real agency data</div>
+              <div class="vis-note">Dormant contacts NOVUS would raise — tap one</div>
               <div class="contact-list" id="react-list"></div>
               <div class="contact-detail" id="react-detail"></div>
             </div>
           </div>
 
           <!-- 4 — AI FRONT DESK -->
-          <div class="sys-panel">
+          <div class="sys-panel" id="sp-voice">
             <div class="sys-panel-head"><span class="sys-panel-num">04</span><span class="sys-panel-name">AI Front Desk</span></div>
             <div class="sys-panel-title">Never miss the next conversation.</div>
-            <div class="sys-panel-sub">Answers buyers and sellers when your team can't.</div>
+            <div class="sys-panel-sub">Answers buyers and sellers when your team can't — then feeds the opportunity back into NOVUS.</div>
+            <div class="mini-vis">
+              <div class="call-when"><span class="call-day">Sunday · 8:14pm</span><span class="call-live">Incoming call</span></div>
+              <div class="call-quote">"I'm thinking of selling — could someone come and value the property?"</div>
+              <div class="rec-out"><span>Answered</span><i>→</i><span>Seller opportunity</span><i>→</i><span class="final">Valuation</span></div>
+            </div>
             <button class="sys-panel-open" onclick="openPanel('voice')">Call the agency →</button>
             <div class="sys-panel-body" id="panel-voice">
               <div class="mini-voice">
@@ -584,19 +691,9 @@
 
         </div>
 
-        <div class="sys-closing">
-          <div class="sys-closing-h">Four systems. One intelligence layer.</div>
-          <div class="loop">
-            <span class="loop-node">Intelligence identifies</span>
-            <span class="loop-arrow">→</span>
-            <span class="loop-node">Conversation handles</span>
-            <span class="loop-arrow">→</span>
-            <span class="loop-node">Reactivation creates</span>
-            <span class="loop-arrow">→</span>
-            <span class="loop-node">Front desk captures</span>
-          </div>
-          <p class="scene-sub">Together, they make sure opportunities don't disappear between enquiries, conversations and follow-ups.</p>
-          <p class="sys-tail"><b>And this is only what you can see.</b></p>
+        <div class="punch">
+          <div class="punch-h">From first enquiry to instruction,<br/><span class="hl">nothing left behind.</span></div>
+          <p class="punch-sub">NOVUS works across the opportunities your agency already has — and makes sure more of them reach the next step.</p>
         </div>
 
         <button class="stepper-btn" onclick="nextScene()">See the next step <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
@@ -710,13 +807,40 @@
     const body = document.getElementById('panel-' + id);
     const willOpen = !body.classList.contains('open');
     document.querySelectorAll('.sys-panel-body').forEach((b) => b.classList.remove('open'));
+    document.querySelectorAll('.sys-panel').forEach((p) => p.classList.remove('opened'));
     if (!willOpen) return;
     body.classList.add('open');
+    document.getElementById('sp-' + id).classList.add('opened');
     if (id === 'chat' && !mcInited) initMiniChat();
     if (id === 'intel' && !intelInited) initIntel();
     if (id === 'react' && !reactInited) initReact();
+    if (id === 'intel') runDbScan();
   }
   window.openPanel = openPanel;
+
+  // ── Record grids: a database with a handful of opportunities inside it ──
+  // Fixed hit positions so the visual is deterministic, never randomised noise.
+  const GRID_CELLS = 48;
+  const GRID_HITS = { 9: 'amber', 22: '', 37: '' };
+  function paintGrid(el) {
+    if (!el || el.dataset.painted) return;
+    el.dataset.painted = '1';
+    let html = '';
+    for (let i = 0; i < GRID_CELLS; i++) {
+      const hit = Object.prototype.hasOwnProperty.call(GRID_HITS, i);
+      html += '<div class="db-cell' + (hit ? ' hit ' + GRID_HITS[i] : '') + '"></div>';
+    }
+    el.innerHTML = html;
+  }
+  paintGrid(document.getElementById('db-grid-preview'));
+
+  function runDbScan() {
+    const g = document.getElementById('db-grid-live');
+    paintGrid(g);
+    g.classList.remove('scan');
+    void g.offsetWidth; // restart the sweep on every open
+    g.classList.add('scan');
+  }
 
   const AGENCY_NAME = 'The Modern House';
   const AGENCY_URL = 'https://themodernhouse.com';
