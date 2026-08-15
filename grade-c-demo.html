@@ -48,7 +48,7 @@
   .system-btn.hide{ opacity:0; pointer-events:none; }
   .sb-short{ display:none; }
 
-  /* ── JOURNEY RAIL (persistent top progress) ── */
+  /* ── JOURNEY RAIL ── */
   .journey{ justify-self:center; display:flex; align-items:center; gap:0; min-width:0; }
   .jstep{ display:flex; align-items:center; gap:7px; background:none; border:none; font-family:'Inter',sans-serif; cursor:pointer; padding:4px 2px; }
   .jstep-tick{ width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,.25); flex-shrink:0; transition:background .35s ease, transform .35s ease, box-shadow .35s ease; }
@@ -67,116 +67,102 @@
   .scene{
     position:relative; min-height:100vh; width:100%;
     display:none; flex-direction:column; align-items:center; justify-content:center;
-    padding:70px 22px 40px; opacity:0;
+    padding:68px 22px 38px; opacity:0;
   }
   .scene.active{ display:flex; animation:scene-in .5s cubic-bezier(.22,1,.36,1) both; }
   @keyframes scene-in{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
-  .scene-inner{ width:100%; max-width:540px; display:flex; flex-direction:column; gap:13px; align-items:center; text-align:center; }
+  .scene-inner{ width:100%; max-width:510px; display:flex; flex-direction:column; gap:11px; align-items:center; text-align:center; }
   .scene-inner.wide{ max-width:820px; }
 
-  .eyebrow{ font-size:.62rem; font-weight:700; letter-spacing:.17em; text-transform:uppercase; color:#93C5FD; display:flex; align-items:center; gap:9px; }
+  .eyebrow{ font-size:.6rem; font-weight:700; letter-spacing:.17em; text-transform:uppercase; color:#93C5FD; display:flex; align-items:center; gap:9px; }
   .eyebrow::before{ content:''; width:18px; height:1px; background:#93C5FD; }
-  h1.scene-h{ font-family:var(--serif); font-size:clamp(1.32rem,2.6vw,1.82rem); font-weight:600; line-height:1.2; letter-spacing:-.01em; color:#fff; }
-  p.scene-sub{ font-size:.86rem; line-height:1.55; color:rgba(255,255,255,.72); max-width:440px; }
-  .micro-note{ font-size:.66rem; line-height:1.5; color:rgba(255,255,255,.38); max-width:440px; }
+  h1.scene-h{ font-family:var(--serif); font-size:clamp(1.24rem,2.4vw,1.68rem); font-weight:600; line-height:1.22; letter-spacing:-.01em; color:#fff; }
+  p.scene-sub{ font-size:.82rem; line-height:1.5; color:rgba(255,255,255,.7); max-width:420px; }
+  .micro-note{ font-size:.63rem; line-height:1.45; color:rgba(255,255,255,.34); max-width:420px; }
 
-  .stepper-btn{ display:inline-flex; align-items:center; gap:8px; background:#fff; color:var(--navy-2); border:none; border-radius:100px; padding:11px 20px; font-family:'Inter',sans-serif; font-size:.82rem; font-weight:800; letter-spacing:-.005em; cursor:pointer; box-shadow:0 8px 22px rgba(0,0,0,.26); transition:transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s, opacity .15s; }
+  .stepper-btn{ display:inline-flex; align-items:center; gap:8px; background:#fff; color:var(--navy-2); border:none; border-radius:100px; padding:11px 20px; font-family:'Inter',sans-serif; font-size:.81rem; font-weight:800; letter-spacing:-.005em; cursor:pointer; box-shadow:0 8px 22px rgba(0,0,0,.26); transition:transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s, opacity .15s; }
   .stepper-btn:hover{ transform:translateY(-2px); box-shadow:0 13px 30px rgba(0,0,0,.32); }
   .stepper-btn:active{ transform:translateY(0) scale(.98); }
-  .stepper-btn[disabled]{ opacity:.3; cursor:not-allowed; transform:none; box-shadow:none; }
   .stepper-btn svg{ width:12px; height:12px; }
 
   /* ═══ SCENE 1 — THE PROPERTY ═══ */
-  .property-card{ width:100%; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 22px 52px rgba(0,0,0,.3); text-align:left; }
-  .property-visual{ position:relative; aspect-ratio:16/6.4; overflow:hidden; background:linear-gradient(155deg,#101A33 0%,#1C2D5C 45%,#233B7A 100%); }
+  .property-card{ width:100%; background:#fff; border-radius:15px; overflow:hidden; box-shadow:0 20px 46px rgba(0,0,0,.3); text-align:left; }
+  .property-visual{ position:relative; aspect-ratio:16/5.6; overflow:hidden; background:linear-gradient(155deg,#101A33 0%,#1C2D5C 45%,#233B7A 100%); }
   .property-visual svg{ position:absolute; inset:0; width:100%; height:100%; }
   .property-visual .grain{ position:absolute; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E"); opacity:.06; mix-blend-mode:overlay; }
-  .property-status{ position:absolute; top:11px; left:12px; font-size:.58rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#0F172A; background:rgba(255,255,255,.92); padding:4px 10px; border-radius:100px; }
-  .property-price-tag{ position:absolute; bottom:11px; left:12px; font-family:var(--serif); font-size:1.2rem; font-weight:600; color:#fff; letter-spacing:-.01em; }
-  .property-body{ padding:14px 16px 15px; display:flex; flex-direction:column; gap:8px; }
-  .property-addr{ font-size:.92rem; font-weight:800; color:var(--ink); letter-spacing:-.01em; }
-  .property-meta{ display:flex; flex-wrap:wrap; gap:6px; }
-  .property-meta span{ font-size:.65rem; font-weight:600; color:var(--ink-2); background:var(--paper-2); border:1px solid var(--line); padding:3px 9px; border-radius:100px; }
-  .property-agency-row{ display:flex; align-items:center; justify-content:space-between; padding-top:9px; border-top:1px solid var(--line); gap:10px; flex-wrap:wrap; }
-  .property-agency{ font-size:.7rem; color:var(--ink-3); }
+  .property-status{ position:absolute; top:10px; left:11px; font-size:.55rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#0F172A; background:rgba(255,255,255,.92); padding:4px 9px; border-radius:100px; }
+  .property-price-tag{ position:absolute; bottom:10px; left:11px; font-family:var(--serif); font-size:1.1rem; font-weight:600; color:#fff; letter-spacing:-.01em; }
+  .property-body{ padding:12px 14px 13px; display:flex; flex-direction:column; gap:7px; }
+  .property-addr{ font-size:.87rem; font-weight:800; color:var(--ink); letter-spacing:-.01em; }
+  .property-meta{ display:flex; flex-wrap:wrap; gap:5px; }
+  .property-meta span{ font-size:.62rem; font-weight:600; color:var(--ink-2); background:var(--paper-2); border:1px solid var(--line); padding:3px 8px; border-radius:100px; }
+  .property-agency-row{ display:flex; align-items:center; justify-content:space-between; padding-top:8px; border-top:1px solid var(--line); gap:10px; flex-wrap:wrap; }
+  .property-agency{ font-size:.67rem; color:var(--ink-3); }
   .property-agency strong{ color:var(--ink); font-weight:700; }
-  .property-link{ font-size:.68rem; font-weight:600; color:var(--accent); text-decoration:none; white-space:nowrap; }
+  .property-link{ font-size:.65rem; font-weight:600; color:var(--accent); text-decoration:none; white-space:nowrap; }
   .property-link:hover{ text-decoration:underline; }
 
-  /* ═══ SCENE 2 — EVIDENCE ═══ */
-  .trail{ width:100%; display:flex; flex-direction:column; align-items:stretch; text-align:left; }
-  .trail-item{ position:relative; padding:0 0 10px 28px; }
-  .trail-item::before{ content:''; position:absolute; left:4px; top:2px; width:9px; height:9px; border-radius:50%; background:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.13); }
-  .trail-item::after{ content:''; position:absolute; left:8px; top:13px; bottom:-3px; width:1.5px; background:rgba(255,255,255,.2); }
-  .trail-item:last-child::after{ display:none; }
-  .trail-item.gap::before{ background:transparent; border:1.5px dashed rgba(255,255,255,.35); }
-  .trail-item.gap::after{ background:repeating-linear-gradient(180deg, rgba(255,255,255,.25) 0 4px, transparent 4px 9px); }
-  .trail-label{ font-size:.6rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:#93C5FD; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .trail-time{ font-size:.6rem; font-weight:600; color:rgba(255,255,255,.45); }
-  .trail-item.gap .trail-label{ color:rgba(255,255,255,.5); }
-  .trail-msg{ margin-top:4px; font-size:.78rem; line-height:1.5; color:rgba(255,255,255,.82); background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:9px 11px; }
-  .trail-msg .who{ display:block; font-size:.62rem; font-weight:700; color:rgba(255,255,255,.5); margin-bottom:3px; letter-spacing:.02em; }
-  .trail-item.gap .trail-msg{ background:transparent; border-style:dashed; border-color:rgba(255,255,255,.18); color:rgba(255,255,255,.45); font-style:italic; }
-  .signal-hl{ background:rgba(245,158,11,.26); color:#FDE68A; border-radius:3px; padding:0 2px; font-style:normal; font-weight:600; box-shadow:inset 0 -1px 0 rgba(245,158,11,.5); }
-  .opp-markers{ display:flex; gap:6px; margin-top:5px; flex-wrap:wrap; }
-  .opp-marker{ display:inline-flex; align-items:baseline; gap:6px; font-size:.58rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; padding:4px 9px; border-radius:100px; border:1px solid; }
-  .opp-marker span{ font-size:.58rem; font-weight:500; letter-spacing:.01em; text-transform:none; opacity:.72; }
-  .opp-marker.buyer{ color:#93C5FD; border-color:rgba(147,197,253,.34); background:rgba(147,197,253,.09); }
-  .opp-marker.seller{ color:#FDE68A; border-color:rgba(245,158,11,.36); background:rgba(245,158,11,.1); }
-  .trail-badge{ display:inline-block; margin-top:5px; margin-right:8px; font-size:.6rem; font-weight:700; color:var(--green); }
-  .trail-badge.bad{ color:#FCA5A5; }
+  /* ═══ SHARED — MESSAGE BUBBLES ═══ */
+  .moment-time{ font-size:.55rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.42); display:flex; align-items:center; gap:7px; margin-bottom:4px; }
+  .moment-time::after{ content:''; flex:1; height:1px; background:rgba(255,255,255,.1); }
+  .msg-row{ display:flex; }
+  .msg-row.right{ justify-content:flex-end; }
+  .bub{ max-width:92%; padding:8px 10px; font-size:.745rem; line-height:1.47; text-align:left; }
+  .bub-who{ display:block; font-size:.57rem; font-weight:700; letter-spacing:.02em; margin-bottom:3px; opacity:.62; }
+  .bub.them{ background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14); color:rgba(255,255,255,.88); border-radius:4px 12px 12px 12px; }
+  .bub.us{ background:#fff; color:var(--ink); border-radius:12px 4px 12px 12px; box-shadow:0 8px 20px rgba(0,0,0,.16); }
+  .bub.us .bub-who{ color:var(--ink-3); opacity:1; }
+  .bub.novus{ background:linear-gradient(150deg, rgba(37,99,235,.34), rgba(30,58,138,.34)); border:1px solid rgba(147,197,253,.45); color:#fff; border-radius:12px 4px 12px 12px; }
+  .bub.novus .bub-who{ color:#93C5FD; opacity:1; }
+  .signal-hl{ background:rgba(245,158,11,.26); color:#FDE68A; border-radius:3px; padding:0 2px; font-weight:600; box-shadow:inset 0 -1px 0 rgba(245,158,11,.5); }
 
-  /* metric strip */
-  .metrics{ display:flex; width:100%; border:1px solid rgba(255,255,255,.13); border-radius:12px; overflow:hidden; background:rgba(255,255,255,.04); }
-  .metric{ flex:1; padding:8px 6px; text-align:center; border-right:1px solid rgba(255,255,255,.1); }
-  .metric:last-child{ border-right:none; }
-  .metric-n{ font-family:var(--serif); font-size:1.05rem; font-weight:600; line-height:1; color:#fff; }
-  .metric-n.good{ color:#86EFAC; }
-  .metric-n.bad{ color:#FCA5A5; }
-  .metric-l{ font-size:.54rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:rgba(255,255,255,.45); margin-top:4px; }
-  .verdict{ font-family:var(--serif); font-size:clamp(.98rem,2vw,1.2rem); font-weight:600; line-height:1.4; color:#fff; }
+  /* opportunity tags */
+  .opp-tags{ display:flex; gap:6px; margin-top:5px; flex-wrap:wrap; }
+  .opp-tag{ display:inline-flex; align-items:center; gap:6px; font-size:.56rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; padding:4px 9px; border-radius:100px; border:1px solid; }
+  .opp-tag em{ font-style:normal; font-size:.56rem; font-weight:500; letter-spacing:.01em; text-transform:none; opacity:.75; }
+  .opp-tag.buyer{ color:#93C5FD; border-color:rgba(147,197,253,.36); background:rgba(147,197,253,.1); }
+  .opp-tag.seller{ color:#FDE68A; border-color:rgba(245,158,11,.38); background:rgba(245,158,11,.11); }
+
+  /* ═══ SCENE 2 — EVIDENCE ═══ */
+  .moments{ width:100%; display:flex; flex-direction:column; gap:10px; }
+  .ticks{ display:flex; gap:13px; margin-top:7px; flex-wrap:wrap; }
+  .tick{ font-size:.635rem; font-weight:600; }
+  .tick.ok{ color:#86EFAC; }
+  .tick.no{ color:#FCA5A5; }
+  .silence{ width:100%; border:1.5px dashed rgba(252,165,165,.34); border-radius:13px; background:rgba(239,68,68,.05); padding:11px 14px; display:flex; align-items:center; justify-content:center; gap:26px; }
+  .sil-item{ text-align:center; }
+  .sil-n{ font-family:var(--serif); font-size:1.5rem; font-weight:600; line-height:1; color:#FCA5A5; }
+  .sil-l{ font-size:.55rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.45); margin-top:5px; }
+  .sil-div{ width:1px; align-self:stretch; background:rgba(252,165,165,.22); }
+  .verdict{ font-family:var(--serif); font-size:clamp(.96rem,1.9vw,1.15rem); font-weight:600; line-height:1.38; color:#fff; }
   .verdict .bad{ color:#FCA5A5; }
-  .grade-pill{ display:inline-flex; align-items:center; gap:7px; font-size:.66rem; font-weight:700; letter-spacing:.05em; color:rgba(255,255,255,.85); background:rgba(245,158,11,.14); border:1px solid rgba(245,158,11,.34); padding:5px 12px; border-radius:100px; }
-  .grade-pill .g{ font-family:var(--serif); font-weight:700; font-size:.85rem; color:var(--amber); }
 
   /* ═══ SCENE 3 — THE GAP ═══ */
-  .gap-lead{ font-family:var(--serif); font-size:clamp(1rem,2vw,1.2rem); font-weight:600; line-height:1.45; color:#fff; }
-  .gap-lead .dim{ color:rgba(255,255,255,.5); }
-  .opp-row{ display:flex; gap:11px; width:100%; }
-  .opp-chip{ flex:1; font-family:'Inter',sans-serif; background:rgba(255,255,255,.05); border:1.5px solid rgba(255,255,255,.18); color:#fff; border-radius:13px; padding:13px 12px; cursor:pointer; text-align:left; display:flex; flex-direction:column; gap:3px; transition:background .18s, border-color .18s, transform .14s; }
-  .opp-chip:hover{ background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.36); transform:translateY(-1px); }
-  .opp-chip .oc-kind{ font-size:.58rem; font-weight:700; letter-spacing:.11em; text-transform:uppercase; color:rgba(255,255,255,.5); }
-  .opp-chip .oc-title{ font-size:.79rem; font-weight:700; line-height:1.35; }
-  .opp-chip .oc-hint{ font-size:.62rem; color:rgba(255,255,255,.4); margin-top:2px; }
-  .opp-chip.open{ background:rgba(37,99,235,.2); border-color:#93C5FD; }
-  .opp-chip.open .oc-hint{ display:none; }
-  .oc-answer{ display:none; margin-top:7px; padding-top:7px; border-top:1px solid rgba(255,255,255,.16); font-size:.7rem; line-height:1.5; color:rgba(255,255,255,.85); }
-  .opp-chip.open .oc-answer{ display:block; animation:msg-in .28s ease both; }
-  .oc-answer b{ display:block; font-size:.55rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#93C5FD; margin-bottom:3px; }
-  .gap-converge{ font-size:.88rem; line-height:1.55; color:rgba(255,255,255,.85); max-width:460px; display:none; }
-  .gap-converge.show{ display:block; animation:msg-in .35s ease both; }
-  .gap-converge strong{ color:#fff; }
-  @keyframes msg-in{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+  .opp-cards{ display:flex; gap:11px; width:100%; }
+  .opp-card{ flex:1; border-radius:14px; padding:14px 13px; text-align:left; border:1.5px solid; display:flex; flex-direction:column; gap:5px; }
+  .opp-card.buyer{ border-color:rgba(147,197,253,.4); background:rgba(147,197,253,.07); }
+  .opp-card.seller{ border-color:rgba(245,158,11,.42); background:rgba(245,158,11,.07); }
+  .oc-kind{ font-size:.58rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
+  .opp-card.buyer .oc-kind{ color:#93C5FD; }
+  .opp-card.seller .oc-kind{ color:#FDE68A; }
+  .oc-head{ font-size:.92rem; font-weight:800; color:#fff; letter-spacing:-.01em; line-height:1.3; }
+  .oc-points{ list-style:none; display:flex; flex-direction:column; gap:3px; margin-top:2px; }
+  .oc-points li{ font-size:.72rem; line-height:1.45; color:rgba(255,255,255,.68); padding-left:12px; position:relative; }
+  .oc-points li::before{ content:''; position:absolute; left:0; top:8px; width:4px; height:4px; border-radius:50%; background:currentColor; opacity:.5; }
+  .oc-state{ margin-top:6px; padding-top:7px; border-top:1px solid rgba(255,255,255,.14); font-size:.63rem; font-weight:700; color:#FCA5A5; }
 
-  /* ═══ SCENE 4 — NOVUS RESOLVES ═══ */
-  .reason-flow{ width:100%; display:flex; flex-direction:column; gap:6px; text-align:left; }
-  .reason-block{ border:1px solid rgba(255,255,255,.13); background:rgba(255,255,255,.04); border-radius:12px; padding:9px 12px; opacity:0; transform:translateY(6px); transition:opacity .45s ease, transform .45s ease; }
-  .reason-block.on{ opacity:1; transform:translateY(0); }
-  .reason-head{ font-size:.55rem; font-weight:700; letter-spacing:.11em; text-transform:uppercase; color:#93C5FD; margin-bottom:6px; }
-  .reason-line{ display:flex; align-items:baseline; gap:8px; font-size:.74rem; line-height:1.45; color:rgba(255,255,255,.82); padding:2px 0; }
-  .reason-line .rk{ font-size:.58rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:rgba(255,255,255,.45); min-width:96px; flex-shrink:0; }
-  .reason-line.act .rk{ color:#86EFAC; }
-  .flow-arrow{ text-align:center; color:rgba(255,255,255,.28); font-size:.8rem; line-height:1; }
-  .gen-card{ width:100%; background:#fff; border-radius:13px; padding:13px 15px; text-align:left; box-shadow:0 18px 44px rgba(0,0,0,.26); opacity:0; transform:translateY(6px); transition:opacity .45s ease, transform .45s ease; }
-  .gen-card.on{ opacity:1; transform:translateY(0); }
-  .gen-card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid var(--line); gap:8px; }
-  .gen-card-when{ font-size:.6rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3); }
-  .gen-card-tag{ font-size:.56rem; font-weight:700; color:var(--accent); background:var(--accent-lo); padding:3px 8px; border-radius:100px; white-space:nowrap; }
-  .gen-card-body{ font-size:.81rem; line-height:1.6; color:var(--ink); }
-  .payoff-line{ font-family:var(--serif); font-size:clamp(.98rem,2vw,1.2rem); font-weight:600; line-height:1.42; color:#fff; max-width:470px; }
+  /* ═══ SCENE 4 — NOVUS ═══ */
+  .flow{ width:100%; display:flex; flex-direction:column; gap:7px; }
+  .fstep{ opacity:0; transform:translateY(7px); transition:opacity .45s ease, transform .45s ease; }
+  .fstep.on{ opacity:1; transform:translateY(0); }
+  .novus-cut{ display:flex; align-items:center; gap:10px; padding:3px 0; }
+  .novus-cut::before, .novus-cut::after{ content:''; flex:1; height:1px; background:rgba(147,197,253,.32); }
+  .novus-cut span{ font-size:.58rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#93C5FD; white-space:nowrap; }
+  .good-note{ font-size:.62rem; font-weight:700; color:#86EFAC; margin-top:5px; }
+  .payoff-line{ font-family:var(--serif); font-size:clamp(.96rem,1.9vw,1.15rem); font-weight:600; line-height:1.4; color:#fff; max-width:450px; }
   .payoff-line .highlight{ color:#93C5FD; }
-  .payoff-sub{ font-size:.8rem; line-height:1.6; color:rgba(255,255,255,.6); max-width:450px; }
-  .payoff-sub strong{ color:rgba(255,255,255,.9); font-weight:600; }
+  .payoff-sub{ font-size:.72rem; line-height:1.5; color:rgba(255,255,255,.5); max-width:420px; }
+  @keyframes msg-in{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
 
   /* ═══ SCENE 5 — THE SYSTEM ═══ */
   .system-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%; text-align:left; align-items:start; }
@@ -184,8 +170,8 @@
   .sys-panel-head{ display:flex; align-items:center; gap:8px; }
   .sys-panel-num{ font-size:.55rem; font-weight:800; letter-spacing:.06em; color:rgba(255,255,255,.35); }
   .sys-panel-name{ font-size:.58rem; font-weight:700; letter-spacing:.11em; text-transform:uppercase; color:#93C5FD; }
-  .sys-panel-title{ font-size:.86rem; font-weight:800; color:#fff; letter-spacing:-.01em; line-height:1.3; }
-  .sys-panel-sub{ font-size:.7rem; color:rgba(255,255,255,.55); line-height:1.5; }
+  .sys-panel-title{ font-size:.88rem; font-weight:800; color:#fff; letter-spacing:-.01em; line-height:1.3; }
+  .sys-panel-sub{ font-size:.71rem; color:rgba(255,255,255,.55); line-height:1.5; }
   .sys-panel-open{ align-self:flex-start; font-family:'Inter',sans-serif; font-size:.66rem; font-weight:700; color:var(--navy-2); background:#fff; border:none; border-radius:100px; padding:6px 12px; cursor:pointer; transition:transform .12s; margin-top:1px; }
   .sys-panel-open:hover{ transform:translateY(-1px); }
   .sys-panel-body{ display:none; }
@@ -196,7 +182,8 @@
   .loop{ display:flex; align-items:center; justify-content:center; gap:7px; flex-wrap:wrap; }
   .loop-node{ font-size:.57rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:rgba(255,255,255,.72); background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.16); padding:5px 10px; border-radius:100px; }
   .loop-arrow{ color:rgba(255,255,255,.3); font-size:.75rem; }
-  .loop-arrow.back{ color:rgba(147,197,253,.55); }
+  .sys-tail{ font-size:.66rem; color:rgba(255,255,255,.36); line-height:1.5; max-width:430px; }
+  .sys-tail b{ color:rgba(255,255,255,.6); font-weight:700; }
 
   /* mini chat */
   .mini-chat{ display:flex; flex-direction:column; height:212px; background:var(--paper-2); border-radius:10px; overflow:hidden; margin-top:3px; }
@@ -285,17 +272,15 @@
   @media (max-width:640px){
     .chrome{ padding:10px 13px; gap:8px; }
     .jsep{ width:10px; margin:0 4px; }
-    .scene{ padding:64px 14px 42px; }
-    .scene-inner{ gap:14px; }
-    .property-price-tag{ font-size:1.05rem; }
-    .property-visual{ aspect-ratio:16/8; }
+    .scene{ padding:62px 14px 40px; }
+    .property-price-tag{ font-size:1rem; }
+    .property-visual{ aspect-ratio:16/7.4; }
     .calendly-inline-widget{ height:520px; }
     .system-grid{ grid-template-columns:1fr; }
-    .opp-row{ flex-direction:column; }
-    .metric-n{ font-size:1rem; }
-    .metric-l{ font-size:.5rem; }
-    .reason-line{ flex-direction:column; gap:1px; }
-    .reason-line .rk{ min-width:0; }
+    .opp-cards{ flex-direction:column; }
+    .silence{ gap:18px; }
+    .sil-n{ font-size:1.3rem; }
+    .bub{ max-width:100%; }
     .db-stats{ flex-wrap:wrap; }
     .db-stat{ flex:1 1 44%; }
   }
@@ -317,29 +302,29 @@
     <section class="scene active" data-scene="1">
       <div class="scene-inner">
         <div class="eyebrow">One of your properties</div>
-        <h1 class="scene-h">We started with one<br/>of your properties.</h1>
-        <p class="scene-sub">We followed what happened after a buyer got in touch about it — and found a gap worth looking at.</p>
+        <h1 class="scene-h">We looked at what happened after someone enquired about one of your properties.</h1>
+        <p class="scene-sub">The property is real. The enquiry is a test. What we found is worth seeing.</p>
 
         <div class="property-card">
           <div class="property-visual">
-            <svg viewBox="0 0 400 160" preserveAspectRatio="xMidYMid slice">
-              <rect width="400" height="160" fill="none"/>
+            <svg viewBox="0 0 400 140" preserveAspectRatio="xMidYMid slice">
+              <rect width="400" height="140" fill="none"/>
               <g stroke="rgba(255,255,255,.16)" stroke-width="1">
-                <line x1="0" y1="128" x2="400" y2="128"/>
-                <line x1="60" y1="128" x2="60" y2="30"/>
-                <line x1="340" y1="128" x2="340" y2="30"/>
-                <line x1="60" y1="30" x2="340" y2="30"/>
-                <line x1="60" y1="79" x2="340" y2="79"/>
-                <line x1="150" y1="30" x2="150" y2="128"/>
-                <line x1="250" y1="30" x2="250" y2="128"/>
+                <line x1="0" y1="116" x2="400" y2="116"/>
+                <line x1="60" y1="116" x2="60" y2="24"/>
+                <line x1="340" y1="116" x2="340" y2="24"/>
+                <line x1="60" y1="24" x2="340" y2="24"/>
+                <line x1="60" y1="70" x2="340" y2="70"/>
+                <line x1="150" y1="24" x2="150" y2="116"/>
+                <line x1="250" y1="24" x2="250" y2="116"/>
               </g>
               <g fill="rgba(255,255,255,.10)">
-                <rect x="72" y="41" width="66" height="24" rx="1"/>
-                <rect x="162" y="41" width="76" height="24" rx="1"/>
-                <rect x="262" y="41" width="66" height="24" rx="1"/>
-                <rect x="72" y="90" width="66" height="24" rx="1"/>
-                <rect x="162" y="90" width="76" height="24" rx="1"/>
-                <rect x="262" y="90" width="66" height="24" rx="1"/>
+                <rect x="72" y="34" width="66" height="24" rx="1"/>
+                <rect x="162" y="34" width="76" height="24" rx="1"/>
+                <rect x="262" y="34" width="66" height="24" rx="1"/>
+                <rect x="72" y="81" width="66" height="24" rx="1"/>
+                <rect x="162" y="81" width="76" height="24" rx="1"/>
+                <rect x="262" y="81" width="66" height="24" rx="1"/>
               </g>
             </svg>
             <div class="grain"></div>
@@ -362,7 +347,7 @@
 
         <button class="stepper-btn" onclick="nextScene()">Here's what happened <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
 
-        <p class="micro-note">Built around a real, publicly listed property. The enquiry and agency interaction shown here are fictional — this is a test scenario, not a live probe.</p>
+        <p class="micro-note">The enquiry and agency replies shown are a fictional test scenario, not a live probe.</p>
       </div>
     </section>
 
@@ -370,40 +355,53 @@
     <section class="scene" data-scene="2">
       <div class="scene-inner">
         <div class="eyebrow">The Evidence</div>
-        <h1 class="scene-h">What the enquiry actually contained.</h1>
+        <h1 class="scene-h">What actually happened.</h1>
 
-        <div class="trail">
-          <div class="trail-item">
-            <div class="trail-label">Enquiry <span class="trail-time">Tue 4 Aug · 18:52</span></div>
-            <div class="trail-msg"><span class="who">Priya Shah · via themodernhouse.com</span>"Hi — really love the look of the Centaur Street apartment, the split-level layout especially. Is it still available? Would love to see it this weekend. <span class="signal-hl">Also, we're planning to sell our current place before we buy — do you do valuations?</span>"</div>
-            <div class="opp-markers">
-              <div class="opp-marker buyer">Buyer <span>viewing requested</span></div>
-              <div class="opp-marker seller">Seller <span>valuation opportunity</span></div>
+        <div class="moments">
+
+          <div>
+            <div class="moment-time">Enquiry · 18:52</div>
+            <div class="msg-row">
+              <div class="bub them">
+                <span class="bub-who">Priya Shah</span>
+                "Love the Centaur Street apartment. Is it still available? Would love to see it this weekend. <span class="signal-hl">Also, we're planning to sell our current place before we buy — do you do valuations?</span>"
+              </div>
+            </div>
+            <div class="opp-tags">
+              <div class="opp-tag buyer">Buyer opportunity</div>
+              <div class="opp-tag seller">Seller opportunity</div>
             </div>
           </div>
-          <div class="trail-item">
-            <div class="trail-label">Human response <span class="trail-time">19:15 · 23 minutes later</span></div>
-            <div class="trail-msg"><span class="who">Rosa · The Modern House</span>"Hi Priya — thanks for your interest, it's still available! I'd love to arrange a viewing — would Saturday morning or Sunday afternoon work? Let me know and I'll lock in a time."</div>
-            <span class="trail-badge">✓ Fast, warm, specific</span>
-            <span class="trail-badge bad">✕ Valuation question never answered</span>
+
+          <div>
+            <div class="moment-time">Human response · 19:15</div>
+            <div class="msg-row right">
+              <div class="bub us">
+                <span class="bub-who">Rosa · The Modern House</span>
+                "Hi Priya — it's still available! Would Saturday morning or Sunday afternoon work for a viewing?"
+              </div>
+            </div>
+            <div class="ticks">
+              <span class="tick ok">✓ Fast response</span>
+              <span class="tick ok">✓ Viewing offered</span>
+              <span class="tick no">✕ Valuation question missed</span>
+            </div>
           </div>
-          <div class="trail-item gap">
-            <div class="trail-label">Then nothing <span class="trail-time">Wed 5 – Sat 8 Aug</span></div>
-            <div class="trail-msg">Priya didn't reply. Nobody went back — not on the viewing, not on the valuation. Four days later the observation window closed.</div>
+
+          <div>
+            <div class="moment-time">Then nothing</div>
+            <div class="silence">
+              <div class="sil-item"><div class="sil-n">4</div><div class="sil-l">Days</div></div>
+              <div class="sil-div"></div>
+              <div class="sil-item"><div class="sil-n">0</div><div class="sil-l">Follow-ups</div></div>
+            </div>
           </div>
+
         </div>
 
-        <div class="metrics">
-          <div class="metric"><div class="metric-n good">23 min</div><div class="metric-l">To respond</div></div>
-          <div class="metric"><div class="metric-n bad">4 days</div><div class="metric-l">Of silence</div></div>
-          <div class="metric"><div class="metric-n bad">0</div><div class="metric-l">Follow-ups</div></div>
-          <div class="metric"><div class="metric-n bad">2</div><div class="metric-l">Opportunities lost</div></div>
-        </div>
+        <p class="verdict">Two opportunities. One enquiry.<br/><span class="bad">Neither was pursued.</span></p>
 
-        <p class="verdict">One enquiry. Two potential transactions.<br/><span class="bad">Zero follow-up.</span></p>
-        <div class="grade-pill"><span class="g">Grade C</span> — very fast response, no persistence</div>
-
-        <button class="stepper-btn" onclick="nextScene()">What should have happened next <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+        <button class="stepper-btn" onclick="nextScene()">Show me the opportunities <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
       </div>
     </section>
 
@@ -411,28 +409,32 @@
     <section class="scene" data-scene="3">
       <div class="scene-inner">
         <div class="eyebrow">The Gap</div>
-        <h1 class="scene-h">What should have<br/>happened next?</h1>
-        <p class="gap-lead">The response was good.<br/><span class="dim">The follow-through wasn't.</span></p>
-        <p class="scene-sub">Four days have passed and the buyer hasn't replied. But this isn't a dead lead yet — there are still two live opportunities sitting inside it.</p>
+        <h1 class="scene-h">There were actually two<br/>opportunities here.</h1>
 
-        <div class="opp-row" id="opp-row">
-          <button class="opp-chip" data-opp="buyer">
-            <span class="oc-kind">Buyer</span>
-            <span class="oc-title">Still interested in Centaur Street</span>
-            <span class="oc-hint">Tap to see what was owed</span>
-            <span class="oc-answer"><b>What should have happened</b>A second contact offering concrete viewing times, referencing the weekend she originally asked for.</span>
-          </button>
-          <button class="opp-chip" data-opp="seller">
-            <span class="oc-kind">Seller</span>
-            <span class="oc-title">Asked about a valuation</span>
-            <span class="oc-hint">Tap to see what was owed</span>
-            <span class="oc-answer"><b>What should have happened</b>A direct answer on valuations, and an offer to look at her current property. This question was never addressed at all.</span>
-          </button>
+        <div class="opp-cards">
+          <div class="opp-card buyer">
+            <div class="oc-kind">Buyer</div>
+            <div class="oc-head">Centaur Street viewing</div>
+            <ul class="oc-points">
+              <li>Interested in the property</li>
+              <li>Asked to view this weekend</li>
+            </ul>
+            <div class="oc-state">✕ Never confirmed</div>
+          </div>
+          <div class="opp-card seller">
+            <div class="oc-kind">Seller</div>
+            <div class="oc-head">Valuation opportunity</div>
+            <ul class="oc-points">
+              <li>They're selling before they buy</li>
+              <li>Asked whether you do valuations</li>
+            </ul>
+            <div class="oc-state">✕ Never answered</div>
+          </div>
         </div>
 
-        <p class="gap-converge" id="gap-converge">Neither happened. <strong>The enquiry was answered, but it was never carried forward.</strong></p>
+        <p class="verdict">Neither conversation was followed through.</p>
 
-        <button class="stepper-btn" id="btn-scene3-next" onclick="nextScene()" disabled>See what NOVUS would have done <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+        <button class="stepper-btn" onclick="nextScene()">Show me what NOVUS would have done <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
       </div>
     </section>
 
@@ -440,33 +442,67 @@
     <section class="scene" data-scene="4">
       <div class="scene-inner">
         <div class="eyebrow">NOVUS</div>
-        <h1 class="scene-h">Same enquiry.<br/>Nothing left behind.</h1>
+        <h1 class="scene-h">Same enquiry. Different outcome.</h1>
 
-        <div class="reason-flow">
-          <div class="reason-block" data-rb="1">
-            <div class="reason-head">What NOVUS reads</div>
-            <div class="reason-line"><span class="rk">Buyer intent</span><span>Interested in Centaur Street, asked for a weekend viewing</span></div>
-            <div class="reason-line"><span class="rk">Seller intent</span><span>Planning to sell her current property before buying</span></div>
-            <div class="reason-line"><span class="rk">No response</span><span>4 days since the agent's reply, no reply back</span></div>
+        <div class="flow">
+
+          <!-- STEP 1 — enquiry arrives -->
+          <div class="fstep" data-fs="1">
+            <div class="moment-time">18:52 · Enquiry arrives</div>
+            <div class="msg-row">
+              <div class="bub them">
+                <span class="bub-who">Priya Shah</span>
+                "Love the Centaur Street apartment. Would love to see it this weekend. <span class="signal-hl">Also, we're planning to sell our current place before we buy — do you do valuations?</span>"
+              </div>
+            </div>
+            <div class="opp-tags">
+              <div class="opp-tag buyer">Buyer <em>wants to view</em></div>
+              <div class="opp-tag seller">Seller <em>needs a valuation</em></div>
+            </div>
           </div>
-          <div class="flow-arrow">↓</div>
-          <div class="reason-block" data-rb="2">
-            <div class="reason-head">What NOVUS decides</div>
-            <div class="reason-line act"><span class="rk">Follow up buyer</span><span>Reference Centaur Street and the weekend she asked for</span></div>
-            <div class="reason-line act"><span class="rk">Open seller</span><span>Answer the valuation question and offer a conversation</span></div>
+
+          <!-- STEP 2 — human responds -->
+          <div class="fstep" data-fs="2">
+            <div class="moment-time">19:15 · Human responds</div>
+            <div class="msg-row right">
+              <div class="bub us">
+                <span class="bub-who">Rosa · The Modern House</span>
+                "Hi Priya — it's still available! Would Saturday morning or Sunday afternoon work for a viewing?"
+              </div>
+            </div>
+            <div class="good-note">✓ Fast, warm, exactly right on the viewing</div>
           </div>
+
+          <!-- STEP 3 — NOVUS catches the seller -->
+          <div class="fstep" data-fs="3">
+            <div class="novus-cut"><span>NOVUS spots what was missed</span></div>
+          </div>
+
+          <div class="fstep" data-fs="4">
+            <div class="moment-time">19:16 · Seller answered too</div>
+            <div class="msg-row right">
+              <div class="bub novus">
+                <span class="bub-who">NOVUS · on the agency's behalf</span>
+                "You mentioned you're selling your current home first — yes, we do valuations. I can arrange that alongside the viewing."
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 4 — follow-up -->
+          <div class="fstep" data-fs="5">
+            <div class="moment-time">Day 2 · Follow-up</div>
+            <div class="msg-row right">
+              <div class="bub novus">
+                <span class="bub-who">NOVUS · on the agency's behalf</span>
+                "Hi Priya, just following up on Centaur Street — Saturday 10am or Sunday 2pm both still work if either suits?"
+              </div>
+            </div>
+          </div>
+
         </div>
 
-        <div class="gen-card" id="gen-card">
-          <div class="gen-card-head">
-            <span class="gen-card-when">Day 2 · 10:04am — sent on the agency's behalf</span>
-            <span class="gen-card-tag">Generated</span>
-          </div>
-          <div class="gen-card-body">"Hi Priya, following up on Centaur Street — Saturday 10am or Sunday 2pm are both still free if either suits, and I'm happy to work around you. You also mentioned you're selling your current place first: yes, we do valuations, and it's usually worth getting that number early so you know what you're working with. Want me to sort both?"</div>
-        </div>
-
-        <p class="payoff-line">The human response was good.<br/><span class="highlight">The system failed to finish the job.</span></p>
-        <p class="payoff-sub">NOVUS doesn't replace the person who answered the enquiry. <strong>It makes sure the opportunity doesn't disappear after they do.</strong></p>
+        <p class="payoff-line">The agent answered the enquiry.<br/><span class="highlight">NOVUS makes sure the opportunity doesn't end there.</span></p>
+        <p class="payoff-sub">It doesn't replace the person who answered. It makes sure the rest of the opportunity doesn't disappear.</p>
 
         <button class="stepper-btn" onclick="nextScene()">And that's one enquiry <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
       </div>
@@ -477,15 +513,14 @@
       <div class="scene-inner wide">
         <div class="eyebrow">The Full System</div>
         <h1 class="scene-h">One enquiry can create four opportunities.</h1>
-        <p class="scene-sub">NOVUS connects the systems that make sure none of them get lost.</p>
 
         <div class="system-grid">
 
           <!-- 1 — NOVUS INTELLIGENCE -->
           <div class="sys-panel">
             <div class="sys-panel-head"><span class="sys-panel-num">01</span><span class="sys-panel-name">NOVUS Intelligence</span></div>
-            <div class="sys-panel-title">The brain behind everything.</div>
-            <div class="sys-panel-sub">Reads what's happening across your agency, spots opportunities and risks, and decides what needs attention next.</div>
+            <div class="sys-panel-title">Know what needs attention.</div>
+            <div class="sys-panel-sub">Spots the opportunities your team might otherwise miss.</div>
             <button class="sys-panel-open" onclick="openPanel('intel')">See the signals →</button>
             <div class="sys-panel-body" id="panel-intel">
               <div class="chip-row" id="intel-chips"></div>
@@ -496,8 +531,8 @@
           <!-- 2 — CONVERSATIONAL AI -->
           <div class="sys-panel">
             <div class="sys-panel-head"><span class="sys-panel-num">02</span><span class="sys-panel-name">Conversational AI</span></div>
-            <div class="sys-panel-title">Every conversation keeps moving.</div>
-            <div class="sys-panel-sub">Responds to enquiries, answers questions, follows up and keeps conversations alive — without your team having to remember who needs chasing.</div>
+            <div class="sys-panel-title">Keep every conversation moving.</div>
+            <div class="sys-panel-sub">Replies, follows up and keeps buyers and sellers engaged.</div>
             <button class="sys-panel-open" onclick="openPanel('chat')">Message the agency →</button>
             <div class="sys-panel-body" id="panel-chat">
               <div class="mini-chat">
@@ -514,8 +549,8 @@
           <!-- 3 — SELLER REACTIVATION -->
           <div class="sys-panel">
             <div class="sys-panel-head"><span class="sys-panel-num">03</span><span class="sys-panel-name">Seller Reactivation</span></div>
-            <div class="sys-panel-title">Turn your old database into new opportunities.</div>
-            <div class="sys-panel-sub">Finds the people already sitting in your database who may be ready to move, then starts the right conversations with them.</div>
+            <div class="sys-panel-title">Find your next instructions.</div>
+            <div class="sys-panel-sub">Turns forgotten database contacts into new conversations.</div>
             <button class="sys-panel-open" onclick="openPanel('react')">See the opportunities →</button>
             <div class="sys-panel-body" id="panel-react">
               <div class="db-stats">
@@ -534,7 +569,7 @@
           <div class="sys-panel">
             <div class="sys-panel-head"><span class="sys-panel-num">04</span><span class="sys-panel-name">AI Front Desk</span></div>
             <div class="sys-panel-title">Never miss the next conversation.</div>
-            <div class="sys-panel-sub">Gives buyers and sellers an immediate, intelligent response when your team is busy or unavailable — then feeds the opportunity into the wider NOVUS system.</div>
+            <div class="sys-panel-sub">Answers buyers and sellers when your team can't.</div>
             <button class="sys-panel-open" onclick="openPanel('voice')">Call the agency →</button>
             <div class="sys-panel-body" id="panel-voice">
               <div class="mini-voice">
@@ -550,7 +585,7 @@
         </div>
 
         <div class="sys-closing">
-          <div class="sys-closing-h">Four parts. One system.</div>
+          <div class="sys-closing-h">Four systems. One intelligence layer.</div>
           <div class="loop">
             <span class="loop-node">Intelligence identifies</span>
             <span class="loop-arrow">→</span>
@@ -559,12 +594,9 @@
             <span class="loop-node">Reactivation creates</span>
             <span class="loop-arrow">→</span>
             <span class="loop-node">Front desk captures</span>
-            <span class="loop-arrow back">↩</span>
           </div>
-          <p class="scene-sub">From the first conversation to the forgotten contact in your database, NOVUS keeps opportunities moving — and everything it learns feeds back into the same intelligence layer.</p>
-
-          <div class="sys-closing-h" style="margin-top:4px;">And this is only what you can see.</div>
-          <p class="scene-sub">NOVUS sits across the customer journey, continuously finding where opportunities are being lost and deciding what should happen next.</p>
+          <p class="scene-sub">Together, they make sure opportunities don't disappear between enquiries, conversations and follow-ups.</p>
+          <p class="sys-tail"><b>And this is only what you can see.</b></p>
         </div>
 
         <button class="stepper-btn" onclick="nextScene()">See the next step <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
@@ -600,6 +632,7 @@
   // by which point every stage is complete.
   const STAGES = ['Property', 'Evidence', 'The Gap', 'NOVUS', 'The System'];
   let scene = 1;
+  let furthest = 1;
 
   // ── JOURNEY RAIL ──
   const journeyEl = document.getElementById('journey');
@@ -616,14 +649,10 @@
     b.dataset.i = i;
     b.title = label;
     b.innerHTML = '<span class="jstep-tick"></span><span class="jstep-label">' + label + '</span>';
-    b.addEventListener('click', () => {
-      // Only allow jumping to stages already reached, so the reveal order holds.
-      if (i <= furthest) goTo(i);
-    });
+    // Only allow jumping to stages already reached, so the reveal order holds.
+    b.addEventListener('click', () => { if (i <= furthest) goTo(i); });
     journeyEl.appendChild(b);
   });
-
-  let furthest = 1;
 
   function renderJourney() {
     const stageNow = Math.min(scene, STAGES.length);
@@ -647,33 +676,20 @@
     renderJourney();
     window.scrollTo({ top: 0, behavior: 'auto' });
     document.getElementById('system-btn').classList.toggle('hide', n >= 5);
-    if (n === 4) animateReasoning();
+    if (n === 4) animateFlow();
   }
   function nextScene() { goTo(scene + 1); }
   window.goTo = goTo; window.nextScene = nextScene;
   renderJourney();
 
-  // ── Scene 3: reveal what each opportunity was owed ──
-  const oppOpened = { buyer: false, seller: false };
-  document.getElementById('opp-row').addEventListener('click', (e) => {
-    const btn = e.target.closest('.opp-chip');
-    if (!btn) return;
-    btn.classList.add('open');
-    oppOpened[btn.dataset.opp] = true;
-    if (oppOpened.buyer && oppOpened.seller) {
-      document.getElementById('gap-converge').classList.add('show');
-      document.getElementById('btn-scene3-next').removeAttribute('disabled');
-    }
-  });
-
-  // ── Scene 4: staged reasoning reveal ──
-  let reasoningDone = false;
-  function animateReasoning() {
-    if (reasoningDone) return;
-    reasoningDone = true;
-    const blocks = [...document.querySelectorAll('.reason-block')];
-    blocks.forEach((b, i) => setTimeout(() => b.classList.add('on'), 260 * i));
-    setTimeout(() => document.getElementById('gen-card').classList.add('on'), 260 * blocks.length + 160);
+  // ── Scene 4: staged conversation reveal ──
+  let flowAnimated = false;
+  function animateFlow() {
+    if (flowAnimated) return;
+    flowAnimated = true;
+    [...document.querySelectorAll('.fstep')].forEach((s, i) => {
+      setTimeout(() => s.classList.add('on'), 240 * i);
+    });
   }
 
   function revealCalendly() {
@@ -682,10 +698,8 @@
   }
   window.revealCalendly = revealCalendly;
 
-  // Keyboard nav — respects the scene 3 gate
   document.addEventListener('keydown', (e) => {
     if (e.target.matches('input, textarea')) return;
-    if (scene === 3 && document.getElementById('btn-scene3-next').hasAttribute('disabled')) return;
     if (e.key === 'ArrowRight') nextScene();
     if (e.key === 'ArrowLeft') goTo(scene - 1);
   });
