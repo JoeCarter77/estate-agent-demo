@@ -27,11 +27,23 @@ const INTELLIGENCE_HEADER = [
   'grade_reason', 'tier', 'tier_reason', 'sales_angle', 'segment', 'ai_evidence_summary', 'ai_confidence',
   'manual_override', 'override_reason', 'observation_closed_at', 'created_at', 'updated_at',
 ];
+const COMMUNICATIONS_HEADER = [
+  'communication_id', 'agency_id', 'probe_id', 'interaction_id', 'occurred_at', 'received_at', 'channel',
+  'direction', 'communication_type', 'provider', 'provider_event_id', 'source_identifier_raw',
+  'source_identifier_normalized', 'destination_identifier', 'display_name', 'call_status',
+  'duration_seconds', 'voicemail_present', 'recording_reference', 'transcript', 'email_message_id',
+  'email_thread_id', 'subject', 'body_text', 'raw_content', 'raw_payload_reference', 'matching_method',
+  'match_score', 'match_status', 'automated_or_human', 'human_contact', 'callback_attempt',
+  'successful_conversation', 'follow_up', 'booking_attempt', 'communication_classification', 'intent',
+  'contact_quality', 'ai_summary', 'ai_confidence', 'ai_model', 'manual_review_status', 'manual_override',
+  'override_reason', 'created_at', 'updated_at',
+];
 
 function makeFakeSheet() {
   const store = {
     PROBES: [PROBES_HEADER.slice(), ['SCHEMA NOTE', 'probes']],
     INTELLIGENCE: [INTELLIGENCE_HEADER.slice(), ['SCHEMA NOTE', 'intelligence']],
+    COMMUNICATIONS: [COMMUNICATIONS_HEADER.slice(), ['SCHEMA NOTE', 'communications']],
   };
   function tabOf(range) { return String(range).split('!')[0]; }
   function startRowOf(range) {
@@ -127,7 +139,7 @@ async function run() {
 
     // No probe linked to this slug at all.
     const none = await getProbeIntelligenceForSlug(repo, 'nobody-here');
-    assert.deepStrictEqual(none, { probe: null, intelligence: null });
+    assert.deepStrictEqual(none, { probe: null, intelligence: null, communications: [] });
     const noneState = buildDemoOsState({ slug: 'nobody-here', lead: { company: 'Nobody Ltd' }, probe: null, intelligence: null });
     assert.strictEqual(noneState.probe, null);
     assert.strictEqual(noneState.grade, null);
@@ -248,12 +260,12 @@ async function run() {
     assert.strictEqual(cRes2.body.probe.agency_id, '', 'unlinked probes still work exactly as before');
     ok('slug remains optional — existing unlinked-probe flow is unchanged');
 
-    // ── Part D: the dev-only /d/test-c1-fast-response fixture ──
+    // ── Part D: the dev-only test fixtures (both C/G seller-ask branches) ──
     // Reuses the SAME fake repo/__setRepoForTests from Part C (still active),
-    // deliberately, to prove the fixture slug never touches it while a real
+    // deliberately, to prove the fixture slugs never touch it while a real
     // linked slug (ashton-white-dxfw, created above) still goes through the
-    // normal Sheets-backed path untouched by the fixture's existence.
-    console.log('\nPart D — dev-only C1 test fixture (/d/test-c1-fast-response)');
+    // normal Sheets-backed path untouched by either fixture's existence.
+    console.log('\nPart D — dev-only test fixtures (/d/test-c1-fast-response, /d/test-g-no-ask)');
     const { default: demoStateHandler } = await import('../api/novus/demo-state.js');
 
     const fixtureRes = mockRes();
@@ -266,7 +278,21 @@ async function run() {
     assert.ok(Math.abs(fixtureRes.body.evidence.humanLagHours - 0.1) < 1e-9, '~6 minutes, same numbers as the Part B/self-test fixture');
     assert.strictEqual(fixtureRes.body.problem.key, 'fast_response_no_follow_up');
     assert.strictEqual(fixtureRes.body.journey.key, 'C1');
-    ok('/d/test-c1-fast-response resolves grade C / fast_response_no_follow_up via a self-contained fixture');
+    assert.strictEqual(fixtureRes.body.acknowledgement.exists, true);
+    assert.strictEqual(fixtureRes.body.acknowledgement.sellerAsk, true, 'this fixture\'s auto-ack text genuinely asks the seller question');
+    assert.ok(/sell/i.test(fixtureRes.body.acknowledgement.sellerAskEvidence || ''), 'evidence quote is the real matched sentence, not invented');
+    assert.strictEqual(fixtureRes.body.journeyVariant, 'C_G_SELLER_ASK');
+    ok('/d/test-c1-fast-response resolves grade C + a genuine seller-ask acknowledgement -> C_G_SELLER_ASK');
+
+    const gFixtureRes = mockRes();
+    await demoStateHandler(mockReq({ method: 'GET', query: { slug: 'test-g-no-ask' } }), gFixtureRes);
+    assert.strictEqual(gFixtureRes.statusCode, 200);
+    assert.strictEqual(gFixtureRes.body.grade.value, 'G');
+    assert.strictEqual(gFixtureRes.body.acknowledgement.exists, true);
+    assert.strictEqual(gFixtureRes.body.acknowledgement.sellerAsk, false, 'this fixture\'s auto-ack text genuinely does NOT ask the seller question');
+    assert.strictEqual(gFixtureRes.body.acknowledgement.sellerAskEvidence, null, 'no fabricated evidence quote when nothing matched');
+    assert.strictEqual(gFixtureRes.body.journeyVariant, 'C_G_SELLER_NO_ASK');
+    ok('/d/test-g-no-ask resolves grade G + an acknowledgement with no seller question -> C_G_SELLER_NO_ASK');
 
     const realRes = mockRes();
     await demoStateHandler(mockReq({ method: 'GET', query: { slug: 'ashton-white-dxfw' } }), realRes);
@@ -278,6 +304,203 @@ async function run() {
     await demoStateHandler(mockReq({ method: 'GET', query: { slug: 'not-a-real-slug' } }), unknownRes);
     assert.strictEqual(unknownRes.statusCode, 404, 'an unknown slug is still a 404, fixture or not');
     ok('unknown slugs are unaffected (still 404)');
+  }
+
+  // ── Part E: lib/sellerIntent.mjs — narrow, deterministic phrase detection ──
+  console.log('\nPart E — lib/sellerIntent.mjs seller-intent question detection');
+  {
+    const { detectSellerIntentQuestion } = await import('../lib/sellerIntent.mjs');
+
+    const hit = detectSellerIntentQuestion('Thanks for your enquiry. Do you have a property to sell?');
+    assert.strictEqual(hit.asked, true);
+    assert.ok(/property to sell/i.test(hit.evidence), 'evidence is the real matched sentence');
+    ok('recognises a confirmed seller-intent phrase');
+
+    const miss = detectSellerIntentQuestion('Thanks for your enquiry, one of our team will be in touch shortly.');
+    assert.strictEqual(miss.asked, false);
+    assert.strictEqual(miss.evidence, null, 'no evidence fabricated when nothing matched');
+    ok('does not invent a match when the phrase is genuinely absent');
+
+    const empty = detectSellerIntentQuestion('');
+    assert.deepStrictEqual(empty, { asked: false, evidence: null });
+    ok('empty/missing text -> safe default, not a guess');
+
+    const curly = detectSellerIntentQuestion("We got your message! Do you have a property you’d like to sell too?");
+    assert.strictEqual(curly.asked, true, 'curly apostrophe variants are still recognised');
+    ok('normalises curly apostrophes before matching');
+  }
+
+  // ── Part F: lib/demoOs.mjs — deriveAcknowledgement / deriveJourneyVariant / deriveTimeline ──
+  console.log('\nPart F — deriveAcknowledgement / deriveJourneyVariant / deriveTimeline (unit)');
+  {
+    const { deriveAcknowledgement, deriveJourneyVariant, deriveTimeline } = await import('../lib/demoOs.mjs');
+
+    // No communications at all -> safe "doesn't exist" state, no fabricated question.
+    const noAck = deriveAcknowledgement([]);
+    assert.deepStrictEqual(noAck, { exists: false, text: null, timestamp: null, sellerAsk: null, sellerAskEvidence: null });
+    ok('deriveAcknowledgement: no communications -> exists:false, nothing invented');
+
+    // An auto-ack row that DOES ask.
+    const askComms = [{ communication_classification: 'auto_acknowledgement', occurred_at: '2026-08-01T09:00:00.000Z', body_text: 'Thanks! Do you have a property to sell?' }];
+    const askAck = deriveAcknowledgement(askComms);
+    assert.strictEqual(askAck.exists, true);
+    assert.strictEqual(askAck.sellerAsk, true);
+    assert.ok(askAck.sellerAskEvidence.includes('property to sell'));
+    ok('deriveAcknowledgement: real seller-ask text -> sellerAsk:true with real quoted evidence');
+
+    // An auto-ack row that exists but does NOT ask.
+    const noAskComms = [{ communication_classification: 'auto_acknowledgement', occurred_at: '2026-08-01T09:00:00.000Z', body_text: 'Thanks for your enquiry, we will be in touch.' }];
+    const noAskAck = deriveAcknowledgement(noAskComms);
+    assert.strictEqual(noAskAck.exists, true);
+    assert.strictEqual(noAskAck.sellerAsk, false);
+    assert.strictEqual(noAskAck.sellerAskEvidence, null);
+    ok('deriveAcknowledgement: ack exists but no seller question -> sellerAsk:false, no fabricated evidence');
+
+    // Earliest auto_acknowledgement row wins when several communications exist.
+    const multiComms = [
+      { communication_classification: 'human_reply', occurred_at: '2026-08-01T09:10:00.000Z', body_text: 'Hi, calling now.' },
+      { communication_classification: 'auto_acknowledgement', occurred_at: '2026-08-01T09:00:00.000Z', body_text: 'Do you have a property to sell?' },
+    ];
+    assert.strictEqual(deriveAcknowledgement(multiComms).sellerAsk, true, 'only the classified auto_acknowledgement row is inspected, not a human reply');
+
+    // deriveJourneyVariant: grade gate.
+    assert.strictEqual(deriveJourneyVariant({ grade: 'C', acknowledgement: askAck }), 'C_G_SELLER_ASK');
+    assert.strictEqual(deriveJourneyVariant({ grade: 'G', acknowledgement: askAck }), 'C_G_SELLER_ASK');
+    assert.strictEqual(deriveJourneyVariant({ grade: 'C', acknowledgement: noAskAck }), 'C_G_SELLER_NO_ASK');
+    assert.strictEqual(deriveJourneyVariant({ grade: 'G', acknowledgement: noAskAck }), 'C_G_SELLER_NO_ASK');
+    ok('deriveJourneyVariant: grade C or G + real acknowledgement -> the correct variant');
+
+    for (const grade of ['A', 'B', 'D', 'E', 'F', 'H', 'pending', null, undefined]) {
+      assert.strictEqual(deriveJourneyVariant({ grade, acknowledgement: askAck }), null, `grade ${grade} must never activate the case journey`);
+    }
+    ok('deriveJourneyVariant: every non-C/G grade (A,B,D,E,F,H,pending) -> null, unchanged behaviour');
+
+    assert.strictEqual(deriveJourneyVariant({ grade: 'C', acknowledgement: noAck }), null, 'a C-grade probe with NO acknowledgement evidence at all has no premise for this journey');
+    assert.strictEqual(deriveJourneyVariant({ grade: 'C', acknowledgement: null }), null);
+    ok('deriveJourneyVariant: missing seller-intent evidence -> safe fallback (null), never forces the story');
+
+    // deriveTimeline: only real events, correctly ordered, no "— nothing —" rows invented as data.
+    const tl = deriveTimeline({
+      probe: { probe_timestamp: '2026-08-01T09:00:00.000Z' },
+      evidence: { firstHumanTouch: 'yes', firstHumanTouchAt: '2026-08-01T09:06:00.000Z' },
+      acknowledgement: askAck,
+    });
+    assert.strictEqual(tl.length, 3);
+    assert.deepStrictEqual(tl.map((e) => e.kind), ['received', 'auto_ack', 'human']);
+    assert.ok(tl.every((e) => !/nothing/i.test(e.label)), 'no fabricated placeholder rows — only real events');
+    ok('deriveTimeline: real events only, correctly ordered');
+
+    const tlNoHuman = deriveTimeline({ probe: { probe_timestamp: '2026-08-01T09:00:00.000Z' }, evidence: { firstHumanTouch: 'no' }, acknowledgement: noAskAck });
+    assert.strictEqual(tlNoHuman.length, 2, 'no human touch -> no human row invented');
+    ok('deriveTimeline: absent evidence produces fewer rows, never a guessed one');
+  }
+
+  // ── Part G: buildDemoOsState end-to-end for both C/G variants via a fake repo ──
+  console.log('\nPart G — buildDemoOsState end-to-end, both journey variants + graceful degradation');
+  {
+    const { valuesApi } = makeFakeSheet();
+    const repo = createRepo(valuesApi);
+
+    // Grade C, seller-ask, full property fields.
+    await repo.appendRecord('PROBES', {
+      probe_id: 'prb_ask', probe_reference: 'RM-0010', agency_id: 'seller-ask-agency',
+      property_address: '9 Test Street', property_url: 'https://example.com/9', property_price: '£300,000',
+      property_status: 'For Sale', probe_timestamp: '2026-08-01T09:00:00.000Z',
+      observation_deadline: '2026-08-05T09:00:00.000Z', probe_status: 'observing', created_at: '2026-08-01T08:00:00.000Z', updated_at: 'X',
+    });
+    await seedIntelligence(repo, {
+      probe_id: 'prb_ask', agency_id: 'seller-ask-agency', auto_acknowledgement: 'TRUE', auto_ack_timestamp: '2026-08-01T09:00:00.000Z',
+      first_human_touch: 'yes', first_human_touch_at: '2026-08-01T09:06:00.000Z', human_lag_hours: '0.1',
+      follow_up_count: '0', grade: 'C', grade_reason: 'Very fast human contact (≤1h) with 0 genuine follow-up attempts (Source Master §10).',
+    });
+    const commRows = [{
+      communication_id: 'com_ask_1', probe_id: 'prb_ask', occurred_at: '2026-08-01T09:00:00.000Z',
+      communication_classification: 'auto_acknowledgement', body_text: 'Do you have a property to sell?',
+    }];
+    for (const c of commRows) await repo.appendRecord('COMMUNICATIONS', c);
+
+    const { probe: pAsk, intelligence: iAsk, communications: cAsk } = await getProbeIntelligenceForSlug(repo, 'seller-ask-agency');
+    assert.strictEqual(cAsk.length, 1, 'communications for this probe are fetched');
+    const stateAsk = buildDemoOsState({ slug: 'seller-ask-agency', lead: { company: 'Seller Ask Agency' }, probe: pAsk, intelligence: iAsk, communications: cAsk });
+    assert.strictEqual(stateAsk.journeyVariant, 'C_G_SELLER_ASK');
+    assert.strictEqual(stateAsk.acknowledgement.sellerAsk, true);
+    assert.strictEqual(stateAsk.property.address, '9 Test Street');
+    ok('grade C + seller-ask acknowledgement -> C_G_SELLER_ASK, real property intact');
+
+    // Grade G, no seller question, missing price/status (graceful degradation — Part 8 test 4).
+    await repo.appendRecord('PROBES', {
+      probe_id: 'prb_noask', probe_reference: 'RM-0011', agency_id: 'seller-noask-agency',
+      property_address: '', property_url: '', property_price: '', property_status: '',
+      probe_timestamp: '2026-08-01T21:04:00.000Z', observation_deadline: '2026-08-05T21:04:00.000Z',
+      probe_status: 'observing', created_at: '2026-08-01T20:00:00.000Z', updated_at: 'X',
+    });
+    await seedIntelligence(repo, {
+      probe_id: 'prb_noask', agency_id: 'seller-noask-agency', auto_acknowledgement: 'TRUE', auto_ack_timestamp: '2026-08-01T21:04:00.000Z',
+      first_human_touch: 'no', follow_up_count: '0', grade: 'G',
+      grade_reason: 'Automated acknowledgement only; no human contact observed (Source Master §10).',
+    });
+    await repo.appendRecord('COMMUNICATIONS', {
+      communication_id: 'com_noask_1', probe_id: 'prb_noask',
+      occurred_at: '2026-08-01T21:04:00.000Z', communication_classification: 'auto_acknowledgement',
+      body_text: 'We have received your enquiry and will be in touch.',
+    });
+    const { probe: pNoAsk, intelligence: iNoAsk, communications: cNoAsk } = await getProbeIntelligenceForSlug(repo, 'seller-noask-agency');
+    const stateNoAsk = buildDemoOsState({ slug: 'seller-noask-agency', lead: { company: 'Seller No-Ask Agency' }, probe: pNoAsk, intelligence: iNoAsk, communications: cNoAsk });
+    assert.strictEqual(stateNoAsk.journeyVariant, 'C_G_SELLER_NO_ASK');
+    assert.strictEqual(stateNoAsk.acknowledgement.sellerAsk, false);
+    assert.strictEqual(stateNoAsk.property.address, '', 'missing address stays empty, never invented');
+    assert.strictEqual(stateNoAsk.property.price, '', 'missing price stays empty, never invented');
+    assert.strictEqual(stateNoAsk.property.status, '', 'missing status stays empty, never invented');
+    ok('grade G + no seller question -> C_G_SELLER_NO_ASK; missing property fields degrade to empty, never fabricated');
+
+    // A grade-C probe with human contact but genuinely NO acknowledgement at all
+    // (independent booleans in lib/observation.mjs) -> no premise for this
+    // journey, safe fallback, existing default hero behaviour untouched.
+    const { probe: pOldC1 } = await getProbeIntelligenceForSlug(repo, 'ashton-white-dxfw').catch(() => ({ probe: null }));
+    void pOldC1; // (already covered in Part B; this block only needs the no-ack case)
+    await repo.appendRecord('PROBES', {
+      probe_id: 'prb_c_no_ack', probe_reference: 'RM-0012', agency_id: 'fast-human-no-ack-agency',
+      property_address: '5 Quiet Close', probe_timestamp: '2026-08-01T09:00:00.000Z',
+      observation_deadline: '2026-08-05T09:00:00.000Z', probe_status: 'observing', created_at: '2026-08-01T08:00:00.000Z', updated_at: 'X',
+    });
+    await seedIntelligence(repo, {
+      probe_id: 'prb_c_no_ack', agency_id: 'fast-human-no-ack-agency', auto_acknowledgement: 'FALSE',
+      first_human_touch: 'yes', first_human_touch_at: '2026-08-01T09:06:00.000Z', human_lag_hours: '0.1',
+      follow_up_count: '0', grade: 'C', grade_reason: 'Very fast human contact (≤1h) with 0 genuine follow-up attempts (Source Master §10).',
+    });
+    const { probe: pNone, intelligence: iNone, communications: cNone } = await getProbeIntelligenceForSlug(repo, 'fast-human-no-ack-agency');
+    const stateNone = buildDemoOsState({ slug: 'fast-human-no-ack-agency', lead: { company: 'No Ack Agency' }, probe: pNone, intelligence: iNone, communications: cNone });
+    assert.strictEqual(stateNone.grade.value, 'C');
+    assert.strictEqual(stateNone.journeyVariant, null, 'grade C with zero acknowledgement evidence never forces the seller-ask story');
+    assert.strictEqual(stateNone.problem.key, 'fast_response_no_follow_up', 'the existing grade->problem mapping is untouched');
+    ok('grade C with no acknowledgement at all -> journeyVariant null, safe fallback (existing non-C/G behaviour unchanged)');
+  }
+
+  // ── Part H: interaction decision copy (index.html's caseDecisionResponse) ──
+  // Pure function, no DOM — extracted the same way the inline script's syntax
+  // is checked elsewhere in this project, so it's tested without a browser.
+  console.log('\nPart H — interaction decision copy (Ring / Email / Leave)');
+  {
+    const fs = await import('node:fs');
+    const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+    const m = html.match(/function caseDecisionResponse\(choice\) \{[\s\S]*?\n    \}/);
+    assert.ok(m, 'caseDecisionResponse() must exist in index.html');
+    // eslint-disable-next-line no-new-func
+    const caseDecisionResponse = new Function('choice', m[0].replace(/^function caseDecisionResponse\(choice\) \{/, '').replace(/\}$/, ''));
+
+    const ring = caseDecisionResponse('ring');
+    const email = caseDecisionResponse('email');
+    const leave = caseDecisionResponse('leave');
+    assert.ok(ring && email && leave, 'all three choices produce a response');
+    assert.notStrictEqual(ring, email);
+    assert.notStrictEqual(email, leave);
+    assert.notStrictEqual(ring, leave);
+    ok('Ring / Email / Leave each produce distinct, real copy — not a progress control');
+
+    assert.ok(!/shame|wrong|bad/i.test(caseDecisionResponse('leave')), '"Leave it" must not shame the prospect (per the brief)');
+    ok('"Leave it" response does not shame the prospect');
+
+    assert.strictEqual(caseDecisionResponse('nonsense'), null, 'unknown choice -> null, not a guess');
   }
 
   console.log(`\n${passed} checks passed.\n`);

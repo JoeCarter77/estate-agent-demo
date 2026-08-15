@@ -6,19 +6,29 @@
 
 export const LEADS = {
   // ═══════════════════════════════════════════════════════════════════════
-  // TEMPORARY DEV-ONLY TEST FIXTURE — NOT a real lead/agency.
-  // Added manually (not by scripts/import-leads.mjs) so /d/test-c1-fast-response
-  // resolves an identity for manual review of the C1 Demo OS journey. Its
-  // probe/evidence/grade data is a self-contained fixture served entirely by
-  // api/novus/demo-state.js (see DEV_TEST_SLUG_C1 there) — it never touches
-  // the real PROBES/INTELLIGENCE Google Sheet, so it cannot contaminate any
-  // real agency, including the real Grade A agency currently linked there.
-  // TO REMOVE: delete this entry AND the matching block in
-  // api/novus/demo-state.js. A future re-run of scripts/import-leads.mjs will
-  // also silently drop this entry (it only writes real CSV-sourced leads) —
-  // re-add it by hand if that happens before this fixture is retired.
+  // TEMPORARY DEV-ONLY TEST FIXTURES — NOT real leads/agencies.
+  // Added manually (not by scripts/import-leads.mjs) so the two C/G
+  // seller-ask journey branches resolve an identity for manual review. Their
+  // probe/evidence/grade/communications data is self-contained, served
+  // entirely by api/novus/demo-state.js (see DEV_TEST_SLUG_C_ASK /
+  // DEV_TEST_SLUG_G_NO_ASK there) — neither touches the real
+  // PROBES/INTELLIGENCE/COMMUNICATIONS Google Sheet, so they cannot
+  // contaminate any real agency. TO REMOVE: delete both entries AND the
+  // matching blocks in api/novus/demo-state.js. A future re-run of
+  // scripts/import-leads.mjs will also silently drop these (it only writes
+  // real CSV-sourced leads) — re-add by hand if that happens first.
   "test-c1-fast-response": {
-    "company": "NOVUS Test Agency — C1 Fast Response (DEV ONLY)",
+    "company": "NOVUS Test Agency — Seller Ask (DEV ONLY)",
+    "url": "",
+    "town": "Demo Town",
+    "first_name": "",
+    "phone": "",
+    "probe_address": "",
+    "probe_sent": "",
+    "listing_url": ""
+  },
+  "test-g-no-ask": {
+    "company": "NOVUS Test Agency — Seller No-Ask (DEV ONLY)",
     "url": "",
     "town": "Demo Town",
     "first_name": "",
