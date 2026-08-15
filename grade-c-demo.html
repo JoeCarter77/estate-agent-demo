@@ -72,7 +72,7 @@
   .scene.active{ display:flex; animation:scene-in .5s cubic-bezier(.22,1,.36,1) both; }
   @keyframes scene-in{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
   .scene-inner{ width:100%; max-width:510px; display:flex; flex-direction:column; gap:11px; align-items:center; text-align:center; }
-  .scene-inner.wide{ max-width:900px; gap:10px; }
+  .scene-inner.wide{ max-width:1180px; gap:10px; }
 
   .eyebrow{ font-size:.6rem; font-weight:700; letter-spacing:.17em; text-transform:uppercase; color:#93C5FD; display:flex; align-items:center; gap:9px; }
   .eyebrow::before{ content:''; width:18px; height:1px; background:#93C5FD; }
@@ -177,69 +177,105 @@
   .sys-panel-body{ display:none; }
   .sys-panel-body.open{ display:block; animation:msg-in .3s ease both; }
 
-  /* ── OPPORTUNITY FLOW BAND (the system, at a glance) ── */
-  .flow-band{ width:100%; display:grid; grid-template-columns:auto 40px auto 40px auto; justify-content:center; align-items:center; padding:2px 0 1px; }
-  .fb-col{ display:flex; flex-direction:column; gap:4px; }
-  .fb-cap{ font-size:.5rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-bottom:2px; text-align:left; }
-  .fb-item{ font-size:.65rem; font-weight:600; letter-spacing:-.005em; padding:3.5px 10px; border-radius:100px; border:1px solid; white-space:nowrap; text-align:left; }
-  .fb-item.src{ color:rgba(255,255,255,.62); border-color:rgba(255,255,255,.14); background:rgba(255,255,255,.04); }
-  .fb-item.out{ color:#fff; border-color:rgba(147,197,253,.4); background:rgba(147,197,253,.11); }
-  .fb-link{ width:40px; height:62px; }
-  .fb-link path{ fill:none; stroke:rgba(147,197,253,.32); stroke-width:1.1; }
-  .fb-core{ display:flex; flex-direction:column; align-items:center; gap:4px; }
-  .fb-ring{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at 50% 30%, rgba(59,130,246,.42), rgba(23,45,103,.6)); border:1px solid rgba(147,197,253,.5); box-shadow:0 0 0 5px rgba(147,197,253,.07), 0 8px 24px rgba(0,0,0,.3); }
-  .fb-ring img{ height:18px; width:auto; filter:brightness(0) invert(1); }
-  .fb-ring.noimg::after{ content:'N'; font-family:var(--serif); font-size:1.15rem; font-weight:600; color:#fff; }
-  .fb-core-word{ font-size:.58rem; font-weight:800; letter-spacing:.13em; color:#fff; }
-  .fb-core-sub{ font-size:.53rem; font-weight:600; letter-spacing:.05em; color:rgba(147,197,253,.75); }
+  /* ── SYSTEM MAP: inputs → NOVUS hub → outputs ── */
+  .sysmap{ width:100%; display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:20px; align-items:center; }
+  .io-col{ display:flex; flex-direction:column; gap:6px; }
+  .io-cap{ font-size:.49rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-bottom:2px; }
+  .io-chip{ font-size:.655rem; font-weight:600; padding:5px 11px; border-radius:100px; border:1px solid; white-space:nowrap; }
+  .io-chip.in{ color:rgba(255,255,255,.62); border-color:rgba(255,255,255,.14); background:rgba(255,255,255,.04); }
+  .io-chip.out{ color:#fff; border-color:rgba(125,211,252,.4); background:rgba(56,189,248,.11); }
+
+  /* the hub: 2x2 systems with NOVUS at the crossing point */
+  .hub{ position:relative; }
+  .hub-grid{ display:grid; grid-template-columns:1fr 1fr; gap:66px 74px; text-align:left; }
+  .hub-line{ position:absolute; pointer-events:none; }
+  .hub-line.h{ left:-26px; right:-26px; top:50%; height:1px; background:linear-gradient(90deg, rgba(125,211,252,.05), rgba(125,211,252,.34) 22%, rgba(125,211,252,.34) 78%, rgba(125,211,252,.05)); }
+  .hub-line.v{ top:0; bottom:0; left:50%; width:1px; background:linear-gradient(180deg, rgba(125,211,252,.05), rgba(125,211,252,.34) 22%, rgba(125,211,252,.34) 78%, rgba(125,211,252,.05)); }
+  .pulse{ position:absolute; width:5px; height:5px; border-radius:50%; background:#7DD3FC; box-shadow:0 0 9px rgba(56,189,248,.95); opacity:0; }
+  .hub-line.h .pulse{ top:-2px; }
+  .hub-line.v .pulse{ left:-2px; }
+  .pulse.pl{ animation:run-l 5s ease-in-out infinite; }
+  .pulse.pr{ animation:run-r 5s ease-in-out infinite .6s; }
+  .pulse.pu{ animation:run-u 5s ease-in-out infinite 1.2s; }
+  .pulse.pd{ animation:run-d 5s ease-in-out infinite 1.8s; }
+  @keyframes run-l{ 0%{left:50%;opacity:0;} 8%{opacity:.95;} 34%{left:4%;opacity:0;} 100%{left:4%;opacity:0;} }
+  @keyframes run-r{ 0%{left:50%;opacity:0;} 8%{opacity:.95;} 34%{left:96%;opacity:0;} 100%{left:96%;opacity:0;} }
+  @keyframes run-u{ 0%{top:50%;opacity:0;} 8%{opacity:.95;} 34%{top:5%;opacity:0;} 100%{top:5%;opacity:0;} }
+  @keyframes run-d{ 0%{top:50%;opacity:0;} 8%{opacity:.95;} 34%{top:95%;opacity:0;} 100%{top:95%;opacity:0;} }
+
+  .hub-core{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:3px; z-index:2; }
+  .core-ring{ position:relative; width:54px; height:54px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 32%, rgba(56,189,248,.4), rgba(13,26,61,.96) 72%);
+    border:1px solid rgba(125,211,252,.6);
+    box-shadow:0 0 0 6px rgba(11,27,63,1), 0 0 0 7px rgba(125,211,252,.16), 0 0 26px rgba(56,189,248,.35); }
+  .core-ring::after{ content:''; position:absolute; inset:-7px; border-radius:50%; border:1px solid rgba(125,211,252,.22); animation:core-breathe 4.5s ease-in-out infinite; }
+  @keyframes core-breathe{ 0%,100%{ transform:scale(1); opacity:.5; } 50%{ transform:scale(1.09); opacity:.13; } }
+  .core-ring img{ height:20px; width:auto; filter:brightness(0) invert(1); }
+  .core-ring.noimg::after{ content:'N'; inset:auto; border:none; animation:none; font-family:var(--serif); font-size:1.35rem; font-weight:600; color:#fff; }
+  .core-word{ font-size:.57rem; font-weight:800; letter-spacing:.14em; color:#fff; background:rgba(11,27,63,.94); padding:1px 7px; border-radius:100px; }
+  .core-sub{ font-size:.5rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(125,211,252,.8); background:rgba(11,27,63,.94); padding:0 6px; }
 
   /* ── IN-CARD VISUALS ── */
   .mini-vis{ margin-top:1px; }
   .sys-panel.opened .mini-vis{ display:none; }
+  .sys-panel{ transition:border-color .2s, background .2s; }
+  .sys-panel:hover{ border-color:rgba(125,211,252,.38); background:rgba(56,189,248,.05); }
+  .sys-panel.opened{ border-color:rgba(125,211,252,.45); }
 
   /* 01 database scan */
   .db-grid{ position:relative; display:grid; grid-template-columns:repeat(12,1fr); gap:3px; overflow:hidden; border-radius:5px; }
   .db-cell{ height:7px; border-radius:2px; background:rgba(255,255,255,.09); }
-  .db-cell.hit{ background:rgba(147,197,253,.85); box-shadow:0 0 7px rgba(147,197,253,.6); }
-  .db-cell.hit.amber{ background:rgba(253,230,138,.9); box-shadow:0 0 7px rgba(245,158,11,.55); }
-  .db-grid.scan::after{ content:''; position:absolute; top:0; bottom:0; width:34%; background:linear-gradient(90deg, transparent, rgba(147,197,253,.22), transparent); animation:scan 1.5s ease-in-out 1; }
+  .db-cell.hit{ background:#7DD3FC; box-shadow:0 0 7px rgba(56,189,248,.7); }
+  .db-cell.hit.amber{ background:rgba(253,230,138,.92); box-shadow:0 0 7px rgba(245,158,11,.5); }
+  .db-grid.scan::after{ content:''; position:absolute; top:0; bottom:0; width:34%; background:linear-gradient(90deg, transparent, rgba(125,211,252,.26), transparent); animation:scan 1.5s ease-in-out 1; }
   @keyframes scan{ from{ transform:translateX(-120%);} to{ transform:translateX(400%);} }
   .vis-tags{ display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
-  .vis-tag{ font-size:.53rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; padding:3px 8px; border-radius:100px; border:1px solid rgba(147,197,253,.34); background:rgba(147,197,253,.1); color:#93C5FD; }
+  .vis-tag{ font-size:.52rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; padding:3px 8px; border-radius:100px; border:1px solid rgba(125,211,252,.36); background:rgba(56,189,248,.1); color:#7DD3FC; }
   .vis-tag.amber{ border-color:rgba(245,158,11,.36); background:rgba(245,158,11,.11); color:#FDE68A; }
-  .vis-note{ font-size:.55rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-top:7px; }
+  .vis-note{ font-size:.54rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-top:7px; }
 
-  /* 02 conversation tracks */
-  .track{ display:flex; align-items:center; gap:6px; margin-top:5px; }
-  .tk-from{ font-size:.53rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; width:42px; flex-shrink:0; }
-  .tk-from.b{ color:#93C5FD; } .tk-from.s{ color:#FDE68A; }
-  .tk-dots{ flex:1; display:flex; align-items:center; gap:4px; min-width:0; }
-  .tk-dot{ width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,.3); flex-shrink:0; }
-  .tk-line{ flex:1; height:1px; background:rgba(255,255,255,.16); }
-  .tk-end{ font-size:.53rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:100px; white-space:nowrap; background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.36); color:#86EFAC; }
+  /* 02 conversation progression */
+  .steps{ display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin-top:5px; }
+  .steps .lane{ font-size:.5rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; width:38px; flex-shrink:0; }
+  .steps .lane.b{ color:#7DD3FC; } .steps .lane.s{ color:#FDE68A; }
+  .steps em{ font-style:normal; font-size:.575rem; font-weight:600; color:rgba(255,255,255,.62); padding:3px 7px; border-radius:5px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); white-space:nowrap; }
+  .steps i{ font-style:normal; font-size:.55rem; color:rgba(255,255,255,.26); }
+  .steps b{ font-size:.53rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; padding:3px 8px; border-radius:100px; white-space:nowrap; background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.36); color:#86EFAC; }
 
   /* 03 reactivation records */
-  .rec{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:3px 0; border-bottom:1px solid rgba(255,255,255,.07); }
-  .rec:last-of-type{ border-bottom:none; }
-  .rec-name{ font-size:.635rem; color:rgba(255,255,255,.38); }
-  .rec.on .rec-name{ color:#fff; font-weight:600; }
-  .rec-flag{ font-size:.5rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:#FDE68A; background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.32); padding:2px 7px; border-radius:100px; white-space:nowrap; }
-  .rec-out{ display:flex; align-items:center; gap:6px; margin-top:6px; }
-  .rec-out span{ font-size:.53rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; padding:3px 8px; border-radius:100px; background:rgba(147,197,253,.1); border:1px solid rgba(147,197,253,.32); color:#93C5FD; }
-  .rec-out span.final{ background:rgba(34,197,94,.14); border-color:rgba(34,197,94,.36); color:#86EFAC; }
-  .rec-out i{ font-style:normal; color:rgba(255,255,255,.28); font-size:.62rem; }
+  .rec{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 0; border-bottom:1px solid rgba(255,255,255,.07); }
+  .rec-who{ display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .rec-name{ font-size:.665rem; font-weight:700; color:#fff; }
+  .rec-meta{ font-size:.54rem; color:rgba(255,255,255,.38); }
+  .rec-flag{ font-size:.5rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; padding:2px 7px; border-radius:100px; white-space:nowrap; color:#FDE68A; background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.32); }
+  .rec-flag.cool{ color:#7DD3FC; background:rgba(56,189,248,.1); border-color:rgba(125,211,252,.32); }
+  .rec-act{ display:inline-flex; align-items:center; gap:5px; margin-top:7px; font-size:.53rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:#7DD3FC; }
+  .rec-act::before{ content:''; width:4px; height:4px; border-radius:50%; background:#7DD3FC; box-shadow:0 0 6px rgba(56,189,248,.8); }
 
   /* 04 out-of-hours call */
   .call-when{ display:flex; align-items:center; gap:7px; }
-  .call-day{ font-size:.53rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.4); }
   .call-live{ font-size:.5rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#FCA5A5; background:rgba(239,68,68,.11); border:1px solid rgba(239,68,68,.32); padding:2px 7px; border-radius:100px; }
-  .call-quote{ font-size:.655rem; line-height:1.4; color:rgba(255,255,255,.8); font-style:italic; margin-top:5px; padding-left:9px; border-left:2px solid rgba(147,197,253,.4); }
+  .call-day{ font-size:.53rem; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:rgba(255,255,255,.42); }
+  .call-quote{ font-size:.645rem; line-height:1.4; color:rgba(255,255,255,.8); font-style:italic; margin-top:5px; padding-left:9px; border-left:2px solid rgba(125,211,252,.45); }
+  .call-acts{ display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+  .call-acts span{ font-size:.52rem; font-weight:700; letter-spacing:.05em; padding:3px 8px; border-radius:100px; background:rgba(56,189,248,.1); border:1px solid rgba(125,211,252,.3); color:#7DD3FC; }
+  .call-acts span.back{ background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.16); color:rgba(255,255,255,.6); }
+
+  /* the loop strip */
+  .loopstrip{ display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:wrap; }
+  .loopstrip span{ font-size:.54rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.6); }
+  .loopstrip i{ font-style:normal; font-size:.6rem; color:rgba(125,211,252,.55); }
+  .loopstrip .back{ color:#7DD3FC; }
 
   /* punchline */
-  .punch{ width:100%; border-top:1px solid rgba(255,255,255,.12); padding-top:9px; display:flex; flex-direction:column; gap:4px; align-items:center; }
-  .punch-h{ font-family:var(--serif); font-size:clamp(1rem,2vw,1.24rem); font-weight:600; line-height:1.35; color:#fff; }
-  .punch-h .hl{ color:#93C5FD; }
-  .punch-sub{ font-size:.68rem; line-height:1.45; color:rgba(255,255,255,.46); max-width:460px; }
+  .punch{ width:100%; border-top:1px solid rgba(255,255,255,.12); padding-top:11px; display:flex; flex-direction:column; gap:4px; align-items:center; }
+  .punch-h{ font-family:var(--serif); font-size:clamp(1.05rem,2.1vw,1.3rem); font-weight:600; line-height:1.3; color:#fff; }
+  .punch-sub{ font-size:.68rem; line-height:1.45; color:rgba(255,255,255,.46); max-width:520px; }
+
+  @media (prefers-reduced-motion: reduce){
+    .pulse, .core-ring::after, .db-grid.scan::after{ animation:none; }
+    .pulse{ opacity:0; }
+  }
 
   /* mini chat */
   .mini-chat{ display:flex; flex-direction:column; height:212px; background:var(--paper-2); border-radius:10px; overflow:hidden; margin-top:3px; }
@@ -319,6 +355,21 @@
     .sb-long{ display:none; }
     .sb-short{ display:inline; }
   }
+  @media (max-width:1150px){
+    .sysmap{ grid-template-columns:1fr; gap:12px; justify-items:center; }
+    .io-col{ flex-direction:row; flex-wrap:wrap; justify-content:center; align-items:center; gap:5px; }
+    .io-cap{ width:100%; text-align:center; margin-bottom:0; }
+    .hub{ width:100%; }
+    /* the reach toward the side columns only makes sense while they are beside the hub */
+    .hub-line.h{ left:0; right:0; }
+  }
+  @media (max-width:820px){
+    .hub-grid{ grid-template-columns:1fr; gap:10px; }
+    .hub-line, .pulse{ display:none; }
+    .hub{ display:flex; flex-direction:column; }
+    .hub-core{ position:static; transform:none; order:-1; margin-bottom:10px; }
+    .steps .lane{ width:auto; }
+  }
   @media (max-width:640px){
     .chrome{ padding:10px 13px; gap:8px; }
     .jsep{ width:10px; margin:0 4px; }
@@ -328,10 +379,6 @@
     .calendly-inline-widget{ height:520px; }
     .system-grid{ grid-template-columns:1fr; }
     .opp-cards{ flex-direction:column; }
-    .flow-band{ grid-template-columns:1fr; justify-items:center; gap:4px; }
-    .fb-col{ align-items:center; }
-    .fb-cap{ text-align:center; }
-    .fb-link{ width:20px; height:22px; transform:rotate(90deg); }
     .db-grid{ grid-template-columns:repeat(10,1fr); }
     .silence{ gap:18px; }
     .sil-n{ font-size:1.3rem; }
@@ -566,134 +613,146 @@
       <div class="scene-inner wide">
         <div class="eyebrow">The Full System</div>
         <h1 class="scene-h">Every opportunity. One system.</h1>
+        <p class="scene-sub">Four systems. One intelligence layer.</p>
 
-        <!-- the whole proposition, at a glance -->
-        <div class="flow-band">
-          <div class="fb-col">
-            <div class="fb-cap">What you already have</div>
-            <div class="fb-item src">New enquiries</div>
-            <div class="fb-item src">Your database</div>
-            <div class="fb-item src">Missed &amp; out-of-hours calls</div>
-          </div>
-          <svg class="fb-link" viewBox="0 0 40 78" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M0 14 C 22 14, 18 39, 40 39" /><path d="M0 39 H 40" /><path d="M0 64 C 22 64, 18 39, 40 39" />
-          </svg>
-          <div class="fb-core">
-            <div class="fb-ring"><img src="/novus-icon.png" alt="" onerror="this.style.display='none';this.parentNode.classList.add('noimg')" /></div>
-            <div class="fb-core-word">NOVUS</div>
-            <div class="fb-core-sub">finds · answers · progresses</div>
-          </div>
-          <svg class="fb-link" viewBox="0 0 40 78" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M0 39 C 22 39, 18 14, 40 14" /><path d="M0 39 H 40" /><path d="M0 39 C 22 39, 18 64, 40 64" />
-          </svg>
-          <div class="fb-col">
-            <div class="fb-cap">Where it ends up</div>
-            <div class="fb-item out">Valuations</div>
-            <div class="fb-item out">Viewings</div>
-            <div class="fb-item out">Instructions</div>
-          </div>
-        </div>
+        <div class="sysmap">
 
-        <div class="system-grid">
-
-          <!-- 1 — NOVUS INTELLIGENCE -->
-          <div class="sys-panel" id="sp-intel">
-            <div class="sys-panel-head"><span class="sys-panel-num">01</span><span class="sys-panel-name">NOVUS Intelligence</span></div>
-            <div class="sys-panel-title">Your entire database, working for you.</div>
-            <div class="sys-panel-sub">Finds the people worth speaking to, why now, and what should happen next.</div>
-            <div class="mini-vis">
-              <div class="db-grid" id="db-grid-preview"></div>
-              <div class="vis-tags">
-                <span class="vis-tag amber">Seller opportunity</span>
-                <span class="vis-tag">High intent</span>
-                <span class="vis-tag">Follow-up due</span>
-              </div>
-            </div>
-            <button class="sys-panel-open" onclick="openPanel('intel')">See the signals →</button>
-            <div class="sys-panel-body" id="panel-intel">
-              <div class="db-grid" id="db-grid-live"></div>
-              <div class="vis-note">Opportunities found — tap one</div>
-              <div class="chip-row" id="intel-chips"></div>
-              <div class="sig-detail" id="intel-detail"></div>
-            </div>
+          <!-- INPUTS -->
+          <div class="io-col">
+            <div class="io-cap">What you already have</div>
+            <div class="io-chip in">New enquiries</div>
+            <div class="io-chip in">Your entire database</div>
+            <div class="io-chip in">Missed &amp; out-of-hours calls</div>
           </div>
 
-          <!-- 2 — CONVERSATIONAL AI -->
-          <div class="sys-panel" id="sp-chat">
-            <div class="sys-panel-head"><span class="sys-panel-num">02</span><span class="sys-panel-name">Conversational AI</span></div>
-            <div class="sys-panel-title">Keep every conversation moving.</div>
-            <div class="sys-panel-sub">Replies, follows up and keeps buyers and sellers engaged until they're ready for the next step.</div>
-            <div class="mini-vis">
-              <div class="track">
-                <span class="tk-from b">Buyer</span>
-                <span class="tk-dots"><i class="tk-dot"></i><i class="tk-line"></i><i class="tk-dot"></i><i class="tk-line"></i><i class="tk-dot"></i><i class="tk-line"></i></span>
-                <span class="tk-end">Viewing booked</span>
-              </div>
-              <div class="track">
-                <span class="tk-from s">Seller</span>
-                <span class="tk-dots"><i class="tk-dot"></i><i class="tk-line"></i><i class="tk-dot"></i><i class="tk-line"></i><i class="tk-dot"></i><i class="tk-line"></i></span>
-                <span class="tk-end">Valuation booked</span>
-              </div>
-            </div>
-            <button class="sys-panel-open" onclick="openPanel('chat')">Message the agency →</button>
-            <div class="sys-panel-body" id="panel-chat">
-              <div class="mini-chat">
-                <div class="mini-chat-msgs" id="mc-msgs"></div>
-                <div class="mini-qr" id="mc-qr"></div>
-                <div class="mini-chat-inp-row">
-                  <input class="mini-chat-inp" id="mc-inp" type="text" placeholder="Ask the agency something…" />
-                  <button class="mini-chat-send" id="mc-send" onclick="sendMiniChat()"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+          <!-- HUB: four systems around the NOVUS core -->
+          <div class="hub">
+            <div class="hub-line h"><i class="pulse pl"></i><i class="pulse pr"></i></div>
+            <div class="hub-line v"><i class="pulse pu"></i><i class="pulse pd"></i></div>
+
+            <div class="hub-grid">
+
+              <!-- 01 — NOVUS INTELLIGENCE -->
+              <div class="sys-panel" id="sp-intel">
+                <div class="sys-panel-head"><span class="sys-panel-num">01</span><span class="sys-panel-name">NOVUS Intelligence</span></div>
+                <div class="sys-panel-title">Your entire database, working for you.</div>
+                <div class="sys-panel-sub">Finds the people worth speaking to, why now, and what should happen next.</div>
+                <div class="mini-vis">
+                  <div class="db-grid" id="db-grid-preview"></div>
+                  <div class="vis-tags">
+                    <span class="vis-tag amber">Seller opportunity</span>
+                    <span class="vis-tag">High intent</span>
+                    <span class="vis-tag">Follow-up due</span>
+                  </div>
+                </div>
+                <button class="sys-panel-open" onclick="openPanel('intel')">See the signals →</button>
+                <div class="sys-panel-body" id="panel-intel">
+                  <div class="db-grid" id="db-grid-live"></div>
+                  <div class="vis-note">Opportunities found — tap one</div>
+                  <div class="chip-row" id="intel-chips"></div>
+                  <div class="sig-detail" id="intel-detail"></div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- 3 — SELLER REACTIVATION -->
-          <div class="sys-panel" id="sp-react">
-            <div class="sys-panel-head"><span class="sys-panel-num">03</span><span class="sys-panel-name">Seller Reactivation</span></div>
-            <div class="sys-panel-title">Turn forgotten contacts into new instructions.</div>
-            <div class="sys-panel-sub">Finds people in your database who may now be ready to move — and starts the right conversation.</div>
-            <div class="mini-vis">
-              <div class="rec on"><span class="rec-name">Past valuation — 14 months ago</span><span class="rec-flag">Worth contacting now</span></div>
-              <div class="rec"><span class="rec-name">Vendor — previously sold</span></div>
-              <div class="rec"><span class="rec-name">Applicant — mentioned moving</span></div>
-              <div class="rec-out"><span>Conversation</span><i>→</i><span>Valuation</span><i>→</i><span class="final">Instruction</span></div>
-            </div>
-            <button class="sys-panel-open" onclick="openPanel('react')">See the opportunities →</button>
-            <div class="sys-panel-body" id="panel-react">
-              <div class="vis-note">Dormant contacts NOVUS would raise — tap one</div>
-              <div class="contact-list" id="react-list"></div>
-              <div class="contact-detail" id="react-detail"></div>
-            </div>
-          </div>
-
-          <!-- 4 — AI FRONT DESK -->
-          <div class="sys-panel" id="sp-voice">
-            <div class="sys-panel-head"><span class="sys-panel-num">04</span><span class="sys-panel-name">AI Front Desk</span></div>
-            <div class="sys-panel-title">Never miss the next conversation.</div>
-            <div class="sys-panel-sub">Answers buyers and sellers when your team can't — then feeds the opportunity back into NOVUS.</div>
-            <div class="mini-vis">
-              <div class="call-when"><span class="call-day">Sunday · 8:14pm</span><span class="call-live">Incoming call</span></div>
-              <div class="call-quote">"I'm thinking of selling — could someone come and value the property?"</div>
-              <div class="rec-out"><span>Answered</span><i>→</i><span>Seller opportunity</span><i>→</i><span class="final">Valuation</span></div>
-            </div>
-            <button class="sys-panel-open" onclick="openPanel('voice')">Call the agency →</button>
-            <div class="sys-panel-body" id="panel-voice">
-              <div class="mini-voice">
-                <div class="mini-orb idle" id="mv-orb">🎙️</div>
-                <div class="mini-voice-status" id="mv-status">Ready to connect</div>
-                <div class="mini-voice-transcript" id="mv-transcript">Call the agency as a buyer or a seller and see how it handles the conversation.</div>
-                <button class="mini-call-btn" id="mv-call-btn" onclick="startMiniCall()">Call the agency</button>
-                <button class="mini-end-btn" id="mv-end-btn" onclick="endMiniCall()" style="display:none">End call</button>
+              <!-- 02 — CONVERSATIONAL AI -->
+              <div class="sys-panel" id="sp-chat">
+                <div class="sys-panel-head"><span class="sys-panel-num">02</span><span class="sys-panel-name">Conversational AI</span></div>
+                <div class="sys-panel-title">Keep every conversation moving.</div>
+                <div class="sys-panel-sub">Replies, follows up and keeps buyers and sellers engaged until they're ready for the next step.</div>
+                <div class="mini-vis">
+                  <div class="steps">
+                    <span class="lane b">Buyer</span>
+                    <em>Enquiry</em><i>→</i><em>Response</em><i>→</i><em>Follow-up</em><i>→</i><b>Viewing booked</b>
+                  </div>
+                  <div class="steps">
+                    <span class="lane s">Seller</span>
+                    <em>Enquiry</em><i>→</i><em>Conversation</em><i>→</i><b>Valuation booked</b>
+                  </div>
+                </div>
+                <button class="sys-panel-open" onclick="openPanel('chat')">Message the agency →</button>
+                <div class="sys-panel-body" id="panel-chat">
+                  <div class="mini-chat">
+                    <div class="mini-chat-msgs" id="mc-msgs"></div>
+                    <div class="mini-qr" id="mc-qr"></div>
+                    <div class="mini-chat-inp-row">
+                      <input class="mini-chat-inp" id="mc-inp" type="text" placeholder="Ask the agency something…" />
+                      <button class="mini-chat-send" id="mc-send" onclick="sendMiniChat()"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+                    </div>
+                  </div>
+                </div>
               </div>
+
+              <!-- 03 — SELLER REACTIVATION -->
+              <div class="sys-panel" id="sp-react">
+                <div class="sys-panel-head"><span class="sys-panel-num">03</span><span class="sys-panel-name">Seller Reactivation</span></div>
+                <div class="sys-panel-title">Turn forgotten contacts into new instructions.</div>
+                <div class="sys-panel-sub">Finds people in your database who may now be ready to move — and starts the right conversation.</div>
+                <div class="mini-vis">
+                  <div class="rec">
+                    <span class="rec-who"><span class="rec-name">Emma J.</span><span class="rec-meta">Last contact: 14 months ago</span></span>
+                    <span class="rec-flag">Worth contacting now</span>
+                  </div>
+                  <div class="rec">
+                    <span class="rec-who"><span class="rec-name">David R.</span><span class="rec-meta">Last contact: 9 months ago</span></span>
+                    <span class="rec-flag cool">Potential seller</span>
+                  </div>
+                  <div class="rec-act">Re-engage</div>
+                </div>
+                <button class="sys-panel-open" onclick="openPanel('react')">See the opportunities →</button>
+                <div class="sys-panel-body" id="panel-react">
+                  <div class="vis-note">Contacts NOVUS would raise — tap one</div>
+                  <div class="contact-list" id="react-list"></div>
+                  <div class="contact-detail" id="react-detail"></div>
+                </div>
+              </div>
+
+              <!-- 04 — AI FRONT DESK -->
+              <div class="sys-panel" id="sp-voice">
+                <div class="sys-panel-head"><span class="sys-panel-num">04</span><span class="sys-panel-name">AI Front Desk</span></div>
+                <div class="sys-panel-title">Never miss the next conversation.</div>
+                <div class="sys-panel-sub">Answers buyers and sellers when your team can't — then feeds the opportunity back into NOVUS.</div>
+                <div class="mini-vis">
+                  <div class="call-when"><span class="call-live">Incoming call</span><span class="call-day">Sunday · 8:14pm</span></div>
+                  <div class="call-quote">"I'm thinking of selling — could someone come and value the property?"</div>
+                  <div class="call-acts"><span>Answers</span><span>Captures details</span><span>Creates opportunity</span><span class="back">↩ back into NOVUS</span></div>
+                </div>
+                <button class="sys-panel-open" onclick="openPanel('voice')">Call the agency →</button>
+                <div class="sys-panel-body" id="panel-voice">
+                  <div class="mini-voice">
+                    <div class="mini-orb idle" id="mv-orb">🎙️</div>
+                    <div class="mini-voice-status" id="mv-status">Ready to connect</div>
+                    <div class="mini-voice-transcript" id="mv-transcript">Call the agency as a buyer or a seller and see how it handles the conversation.</div>
+                    <button class="mini-call-btn" id="mv-call-btn" onclick="startMiniCall()">Call the agency</button>
+                    <button class="mini-end-btn" id="mv-end-btn" onclick="endMiniCall()" style="display:none">End call</button>
+                  </div>
+                </div>
+              </div>
+
+            </div><!-- /hub-grid -->
+
+            <div class="hub-core">
+              <div class="core-ring"><img src="/novus-icon.png" alt="" onerror="this.style.display='none';this.parentNode.classList.add('noimg')" /></div>
+              <div class="core-word">NOVUS</div>
             </div>
+          </div><!-- /hub -->
+
+          <!-- OUTPUTS -->
+          <div class="io-col">
+            <div class="io-cap">Where it ends up</div>
+            <div class="io-chip out">Viewings</div>
+            <div class="io-chip out">Valuations</div>
+            <div class="io-chip out">Instructions</div>
           </div>
 
+        </div><!-- /sysmap -->
+
+        <div class="loopstrip">
+          <span>Identify</span><i>→</i><span>Handle</span><i>→</i><span>Reactivate</span><i>→</i><span>Capture</span><i class="back">↻</i><span class="back">Back into NOVUS</span>
         </div>
 
         <div class="punch">
-          <div class="punch-h">From first enquiry to instruction,<br/><span class="hl">nothing left behind.</span></div>
-          <p class="punch-sub">NOVUS works across the opportunities your agency already has — and makes sure more of them reach the next step.</p>
+          <div class="punch-h">Nothing gets lost.</div>
+          <p class="punch-sub">Every opportunity is seen, every conversation is acted on, and every missed opportunity has a way back in.</p>
         </div>
 
         <button class="stepper-btn" onclick="nextScene()">See the next step <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
@@ -1004,10 +1063,10 @@
   // ── Seller Reactivation ──
   let reactInited = false;
   const CONTACTS = [
-    { id: 'c1', name: 'M. Whitfield',  tag: 'Valued 8 months ago · never listed', score: 'High', why: 'Valued but never instructed. Two comparable properties on the same street have sold since, so the number we gave is now out of date.', action: '"Hi Mark — two places on your road have sold since we valued yours. The figure we gave you has probably moved. Worth a quick revisit?"' },
-    { id: 'c2', name: 'S. Okafor',     tag: 'Sale fell through · not relisted',   score: 'High', why: 'Sale collapsed before exchange and the property was never brought back to market. Still owns it, still wanted to move.', action: '"Hi Sade — sorry the last one fell through. If you\'re still thinking about moving, we\'d be glad to pick it back up when you are."' },
-    { id: 'c3', name: 'J. Underwood',  tag: 'Sold via us in 2019',                score: 'Medium', why: 'Sold through the agency six years ago — around the typical hold period before a next move in this area.', action: '"Hi James — it\'s been a while since we sold Elm Road for you. Any thoughts about a next move?"' },
-    { id: 'c4', name: 'R. Bianchi',    tag: 'Registered applicant · 6 months',    score: 'Medium', why: 'Still actively searching and matches current stock, but has never been asked whether they also have a property to sell.', action: '"Hi Rosa — still looking? One question we should have asked sooner: have you got somewhere to sell first?"' },
+    { id: 'c1', name: 'Emma J.',      tag: 'Last contact: 14 months ago', score: 'High',   why: 'Valued 14 months ago and never listed. Two comparable properties on her street have sold since, so the figure she was given is out of date.', action: '"Hi Emma - two places on your road have sold since we valued yours. The figure we gave you has probably moved. Worth a quick revisit?"' },
+    { id: 'c2', name: 'David R.',     tag: 'Last contact: 9 months ago',  score: 'High',   why: 'Registered as an applicant and mentioned needing to sell first. Nobody ever followed up on the selling half of that conversation.', action: '"Hi David - still looking? One thing we never picked up on: you mentioned you have somewhere to sell first. Want us to take a look at it?"' },
+    { id: 'c3', name: 'S. Okafor',    tag: 'Sale fell through',           score: 'Medium', why: 'Sale collapsed before exchange and the property was never brought back to market. Still owns it, still wanted to move.', action: '"Hi Sade - sorry the last one fell through. If you are still thinking about moving, we would be glad to pick it back up when you are."' },
+    { id: 'c4', name: 'J. Underwood', tag: 'Sold via us in 2019',         score: 'Medium', why: 'Sold through the agency six years ago - around the typical hold period before a next move in this area.', action: '"Hi James - it has been a while since we sold Elm Road for you. Any thoughts about a next move?"' },
   ];
   function initReact() {
     reactInited = true;
