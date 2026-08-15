@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="NOVUS — what a Grade C enquiry looks like, and what happens after." />
+<title>NOVUS — The Enquiry That Went Quiet</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%2711%2016%2080%2080%27%3E%3Crect%20x%3D%2711%27%20y%3D%2716%27%20width%3D%2780%27%20height%3D%2780%27%20rx%3D%2716%27%20fill%3D%27%23172D67%27/%3E%3Cpath%20d%3D%27M29%2082%20L29%2046%20C29%2030%2050%2030%2050%2046%20L73%2082%20L73%2030%27%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%2711%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet" />
+<link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet" />
+<script src="https://assets.calendly.com/assets/external/widget.js" async></script>
+<style>
+  :root{
+    --navy:#0B1B3F; --navy-2:#172D67; --navy-3:#1E3A8A;
+    --ink:#0F172A; --ink-2:#475569; --ink-3:#64748B;
+    --paper:#FFFFFF; --paper-2:#F8FAFC; --paper-3:#F1F5F9;
+    --line:#E2E8F0; --line-hi:#CBD5E1;
+    --accent:#2563EB; --accent-hi:#3B82F6; --accent-lo:rgba(37,99,235,.08);
+    --green:#22C55E; --amber:#F59E0B; --red:#EF4444;
+    --serif:'Fraunces',serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:'Inter',sans-serif; color:#fff; min-height:100vh;
+    background:
+      radial-gradient(120% 90% at 15% -10%, rgba(59,130,246,.25), transparent 55%),
+      radial-gradient(90% 70% at 100% 110%, rgba(30,58,138,.35), transparent 55%),
+      linear-gradient(165deg, var(--navy) 0%, var(--navy-2) 55%, #0D1A3D 100%);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  /* ── TOP CHROME ── */
+  .chrome{ position:fixed; top:0; left:0; right:0; z-index:50; display:flex; align-items:center; justify-content:space-between; padding:18px 28px; }
+  .brand{ display:flex; align-items:center; gap:9px; }
+  .brand img{ height:22px; width:auto; filter:brightness(0) invert(1); opacity:.92; }
+  .brand-word{ font-size:.92rem; font-weight:800; letter-spacing:.03em; color:#fff; }
+  .fiction-badge{ font-size:.62rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:rgba(255,255,255,.75); border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.06); padding:6px 12px; border-radius:100px; backdrop-filter:blur(6px); }
+
+  /* ── PROGRESS DOTS ── */
+  .progress{ position:fixed; bottom:22px; left:50%; transform:translateX(-50%); z-index:50; display:flex; gap:7px; }
+  .progress .d{ width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,.22); transition:background .3s, transform .3s; }
+  .progress .d.on{ background:#fff; transform:scale(1.35); }
+  .progress .d.done{ background:rgba(255,255,255,.55); }
+
+  /* ── STAGE / SCENES ── */
+  .stage{ position:relative; min-height:100vh; }
+  .scene{
+    position:relative; min-height:100vh; width:100%;
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    padding:110px 24px 100px; opacity:0;
+  }
+  .scene.active{ display:flex; animation:scene-in .55s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes scene-in{ from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
+  .scene-inner{ width:100%; max-width:620px; display:flex; flex-direction:column; gap:26px; align-items:center; text-align:center; }
+  .scene-inner.wide{ max-width:760px; }
+
+  .eyebrow{ font-size:.68rem; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:#93C5FD; display:flex; align-items:center; gap:10px; }
+  .eyebrow::before{ content:''; width:22px; height:1px; background:#93C5FD; }
+  h1.scene-h{ font-family:var(--serif); font-size:clamp(1.7rem,4vw,2.7rem); font-weight:600; line-height:1.18; letter-spacing:-.01em; color:#fff; }
+  h1.scene-h em{ font-style:italic; color:#93C5FD; }
+  p.scene-sub{ font-size:1rem; line-height:1.65; color:rgba(255,255,255,.72); max-width:520px; }
+
+  .stepper-btn{ display:inline-flex; align-items:center; gap:9px; background:#fff; color:var(--navy-2); border:none; border-radius:100px; padding:14px 26px; font-family:'Inter',sans-serif; font-size:.92rem; font-weight:800; letter-spacing:-.005em; cursor:pointer; box-shadow:0 10px 28px rgba(0,0,0,.28); transition:transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s, opacity .15s; }
+  .stepper-btn:hover{ transform:translateY(-2px); box-shadow:0 16px 38px rgba(0,0,0,.36); }
+  .stepper-btn:active{ transform:translateY(0) scale(.98); }
+  .stepper-btn[disabled]{ opacity:.35; cursor:not-allowed; transform:none; box-shadow:none; }
+  .stepper-btn svg{ width:14px; height:14px; }
+  .stepper-ghost{ background:transparent; color:rgba(255,255,255,.65); box-shadow:none; border:1px solid rgba(255,255,255,.22); padding:12px 22px; font-size:.82rem; }
+  .stepper-ghost:hover{ color:#fff; border-color:rgba(255,255,255,.45); transform:translateY(-1px); box-shadow:none; }
+
+  .back-arrow{ position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:49; font-size:.72rem; color:rgba(255,255,255,.5); letter-spacing:.04em; display:none; }
+
+  /* ═══ SCENE 1 — THE TEST ═══ */
+  .disclaimer-chip{ font-size:.72rem; line-height:1.5; color:rgba(255,255,255,.68); background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14); border-radius:12px; padding:10px 16px; max-width:480px; }
+  .disclaimer-chip strong{ color:rgba(255,255,255,.92); font-weight:700; }
+
+  .property-card{ width:100%; background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 30px 70px rgba(0,0,0,.35); text-align:left; }
+  .property-visual{ position:relative; aspect-ratio:16/10; overflow:hidden; background:
+      linear-gradient(155deg,#101A33 0%,#1C2D5C 45%,#233B7A 100%); }
+  .property-visual svg{ position:absolute; inset:0; width:100%; height:100%; }
+  .property-visual .grain{ position:absolute; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E"); opacity:.06; mix-blend-mode:overlay; }
+  .property-status{ position:absolute; top:16px; left:16px; font-size:.66rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#0F172A; background:rgba(255,255,255,.92); padding:6px 12px; border-radius:100px; }
+  .property-price-tag{ position:absolute; bottom:16px; left:16px; font-family:var(--serif); font-size:1.6rem; font-weight:600; color:#fff; letter-spacing:-.01em; }
+  .property-body{ padding:22px 24px 24px; display:flex; flex-direction:column; gap:12px; }
+  .property-addr{ font-size:1.05rem; font-weight:800; color:var(--ink); letter-spacing:-.01em; }
+  .property-meta{ display:flex; flex-wrap:wrap; gap:8px; }
+  .property-meta span{ font-size:.72rem; font-weight:600; color:var(--ink-2); background:var(--paper-2); border:1px solid var(--line); padding:5px 11px; border-radius:100px; }
+  .property-desc{ font-size:.86rem; line-height:1.6; color:var(--ink-2); }
+  .property-agency-row{ display:flex; align-items:center; justify-content:space-between; padding-top:12px; border-top:1px solid var(--line); gap:10px; flex-wrap:wrap; }
+  .property-agency{ font-size:.78rem; color:var(--ink-3); }
+  .property-agency strong{ color:var(--ink); font-weight:700; }
+  .property-link{ font-size:.76rem; font-weight:600; color:var(--accent); text-decoration:none; white-space:nowrap; }
+  .property-link:hover{ text-decoration:underline; }
+
+  /* ═══ SCENE 2 — THE EVIDENCE ═══ */
+  .grade-pill{ display:inline-flex; align-items:center; gap:8px; font-size:.72rem; font-weight:700; letter-spacing:.05em; color:#fff; background:rgba(245,158,11,.18); border:1px solid rgba(245,158,11,.4); padding:7px 14px; border-radius:100px; }
+  .grade-pill .g{ font-family:var(--serif); font-weight:700; font-size:.95rem; color:var(--amber); }
+
+  .trail{ width:100%; display:flex; flex-direction:column; align-items:stretch; text-align:left; }
+  .trail-item{ position:relative; padding:0 0 26px 34px; }
+  .trail-item::before{ content:''; position:absolute; left:5px; top:2px; width:11px; height:11px; border-radius:50%; background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,.14); }
+  .trail-item::after{ content:''; position:absolute; left:10px; top:16px; bottom:-4px; width:1.5px; background:rgba(255,255,255,.2); }
+  .trail-item:last-child::after{ display:none; }
+  .trail-item.gap::before{ background:transparent; border:1.5px dashed rgba(255,255,255,.35); }
+  .trail-item.gap::after{ background:repeating-linear-gradient(180deg, rgba(255,255,255,.25) 0 4px, transparent 4px 9px); }
+  .trail-label{ font-size:.66rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#93C5FD; display:flex; align-items:center; gap:10px; }
+  .trail-time{ font-size:.66rem; font-weight:600; color:rgba(255,255,255,.45); }
+  .trail-item.gap .trail-label{ color:rgba(255,255,255,.5); }
+  .trail-msg{ margin-top:7px; font-size:.87rem; line-height:1.6; color:rgba(255,255,255,.82); background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:12px 14px; }
+  .trail-msg .who{ display:block; font-size:.68rem; font-weight:700; color:rgba(255,255,255,.5); margin-bottom:4px; letter-spacing:.02em; }
+  .trail-item.gap .trail-msg{ background:transparent; border-style:dashed; border-color:rgba(255,255,255,.18); color:rgba(255,255,255,.45); font-style:italic; }
+  .trail-badge{ display:inline-block; margin-top:4px; font-size:.64rem; font-weight:700; color:var(--green); }
+  .trail-item.gap .trail-badge{ color:var(--red); }
+
+  /* ═══ SCENE 3 — INTERACTION ═══ */
+  .choice-row{ display:flex; flex-direction:column; gap:10px; width:100%; max-width:420px; }
+  .choice-btn{ font-family:'Inter',sans-serif; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.18); color:#fff; border-radius:14px; padding:15px 18px; font-size:.92rem; font-weight:600; cursor:pointer; text-align:left; display:flex; align-items:center; gap:12px; transition:background .15s, border-color .15s, transform .12s; }
+  .choice-btn:hover{ background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.36); transform:translateY(-1px); }
+  .choice-btn.picked{ background:rgba(37,99,235,.28); border-color:#93C5FD; }
+  .choice-btn .ico{ font-size:1.1rem; flex-shrink:0; }
+  .choice-reveal{ width:100%; max-width:460px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:16px 18px; text-align:left; font-size:.86rem; line-height:1.65; color:rgba(255,255,255,.78); display:none; }
+  .choice-reveal.show{ display:block; animation:msg-in .35s ease both; }
+  .choice-converge{ font-size:.92rem; line-height:1.65; color:rgba(255,255,255,.85); max-width:480px; display:none; }
+  .choice-converge.show{ display:block; animation:msg-in .35s ease both; }
+  .choice-converge strong{ color:#fff; }
+  @keyframes msg-in{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  /* ═══ SCENE 4 — NOVUS THINKS ═══ */
+  .context-strip{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  .ctx-chip{ font-size:.68rem; font-weight:600; color:rgba(255,255,255,.75); background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.15); padding:6px 12px; border-radius:100px; }
+  .gen-card{ width:100%; background:#fff; border-radius:16px; padding:20px 22px; text-align:left; box-shadow:0 24px 60px rgba(0,0,0,.3); }
+  .gen-card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--line); }
+  .gen-card-when{ font-size:.7rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3); }
+  .gen-card-tag{ font-size:.64rem; font-weight:700; color:var(--accent); background:var(--accent-lo); padding:4px 10px; border-radius:100px; }
+  .gen-card-body{ font-size:.94rem; line-height:1.7; color:var(--ink); }
+  .payoff-line{ font-family:var(--serif); font-size:clamp(1.15rem,2.4vw,1.5rem); font-weight:600; line-height:1.45; color:#fff; max-width:520px; }
+  .payoff-line .strike{ color:rgba(255,255,255,.4); text-decoration:line-through; }
+  .payoff-line .highlight{ color:#FCA5A5; }
+
+  /* ═══ SCENE 5 — OUTCOME ═══ */
+  .pipeline{ display:flex; flex-direction:column; gap:0; width:100%; max-width:380px; align-items:stretch; }
+  .pl-step{ display:flex; align-items:center; gap:14px; padding:10px 0; opacity:.3; transform:translateX(-8px); transition:opacity .5s ease, transform .5s ease; }
+  .pl-step.on{ opacity:1; transform:translateX(0); }
+  .pl-dot{ width:26px; height:26px; border-radius:50%; background:rgba(255,255,255,.08); border:1.5px solid rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:.7rem; font-weight:800; color:rgba(255,255,255,.5); transition:background .3s, border-color .3s, color .3s; }
+  .pl-step.on .pl-dot{ background:var(--green); border-color:var(--green); color:#fff; }
+  .pl-step.new .pl-dot{ background:var(--accent); border-color:var(--accent); }
+  .pl-label{ font-size:.88rem; font-weight:700; color:rgba(255,255,255,.4); letter-spacing:-.005em; transition:color .3s; text-align:left; }
+  .pl-step.on .pl-label{ color:#fff; }
+  .pl-step.new .pl-label::after{ content:'new'; margin-left:8px; font-size:.6rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#93C5FD; }
+  .pl-line{ width:1.5px; height:16px; background:rgba(255,255,255,.15); margin-left:13px; }
+  .outcome-card{ margin-top:6px; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:14px; padding:14px 18px; display:none; align-items:center; gap:10px; }
+  .outcome-card.show{ display:flex; animation:msg-in .4s ease both; }
+  .outcome-card .ico{ font-size:1.2rem; }
+  .outcome-card-text b{ display:block; font-size:.88rem; color:#fff; font-weight:800; }
+  .outcome-card-text span{ font-size:.74rem; color:rgba(255,255,255,.6); }
+
+  /* ═══ SCENE 6 — COMMERCIAL BRIDGE ═══ */
+  .bridge-flow{ display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; }
+  .bridge-node{ font-size:.72rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#fff; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.18); padding:10px 16px; border-radius:12px; }
+  .bridge-arrow{ color:rgba(255,255,255,.4); font-size:.9rem; }
+  .tier-note{ font-size:.86rem; line-height:1.6; color:rgba(255,255,255,.65); max-width:480px; }
+  .tier-note strong{ color:#fff; }
+
+  /* ═══ SCENE 7 — CTA ═══ */
+  .cta-actions{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:center; }
+  .cta-phone{ font-size:.86rem; color:rgba(255,255,255,.65); }
+  .cta-phone a{ color:#93C5FD; font-weight:700; text-decoration:none; }
+  .cta-phone a:hover{ text-decoration:underline; }
+  .cta-terms{ font-size:.76rem; color:rgba(255,255,255,.4); }
+  .calendly-wrap{ width:100%; max-width:640px; margin-top:6px; display:none; }
+  .calendly-wrap.show{ display:block; }
+  .calendly-inline-widget{ min-width:300px; height:640px; border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,.15); background:#fff; }
+  .final-disclaimer{ font-size:.72rem; line-height:1.6; color:rgba(255,255,255,.4); max-width:480px; margin-top:8px; }
+  .final-disclaimer a{ color:rgba(255,255,255,.55); }
+
+  @media (max-width:640px){
+    .chrome{ padding:14px 16px; }
+    .scene{ padding:90px 16px 90px; }
+    .property-price-tag{ font-size:1.3rem; }
+    .calendly-inline-widget{ height:560px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="chrome">
+    <div class="brand"><img src="/novus-icon.png" alt="" /><span class="brand-word">NOVUS</span></div>
+    <div class="fiction-badge">Fictional test scenario</div>
+  </div>
+
+  <div class="progress" id="progress"></div>
+
+  <div class="stage" id="stage">
+
+    <!-- SCENE 1 — THE TEST -->
+    <section class="scene active" data-scene="1">
+      <div class="scene-inner">
+        <div class="eyebrow">The Test</div>
+        <h1 class="scene-h">We tested the journey<br/>behind this property.</h1>
+        <div class="disclaimer-chip">Built on a <strong>real, publicly listed property</strong> from The Modern House for authenticity. The enquiry itself is <strong>fictional</strong> — this agency was not probed by NOVUS.</div>
+
+        <div class="property-card">
+          <div class="property-visual">
+            <svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">
+              <rect width="400" height="250" fill="none"/>
+              <g stroke="rgba(255,255,255,.16)" stroke-width="1">
+                <line x1="0" y1="150" x2="400" y2="150"/>
+                <line x1="60" y1="150" x2="60" y2="60"/>
+                <line x1="340" y1="150" x2="340" y2="60"/>
+                <line x1="60" y1="60" x2="340" y2="60"/>
+                <line x1="60" y1="105" x2="340" y2="105"/>
+                <line x1="150" y1="60" x2="150" y2="150"/>
+                <line x1="250" y1="60" x2="250" y2="150"/>
+              </g>
+              <g fill="rgba(255,255,255,.10)">
+                <rect x="72" y="72" width="66" height="21" rx="1"/>
+                <rect x="162" y="72" width="76" height="21" rx="1"/>
+                <rect x="262" y="72" width="66" height="21" rx="1"/>
+                <rect x="72" y="117" width="66" height="21" rx="1"/>
+                <rect x="162" y="117" width="76" height="21" rx="1"/>
+                <rect x="262" y="117" width="66" height="21" rx="1"/>
+              </g>
+            </svg>
+            <div class="grain"></div>
+            <div class="property-status">For Sale</div>
+            <div class="property-price-tag">£1,500,000</div>
+          </div>
+          <div class="property-body">
+            <div class="property-addr">Centaur Street, Waterloo, London SE1</div>
+            <div class="property-meta">
+              <span>2 bed + study</span>
+              <span>Split-level apartment</span>
+              <span>Ground &amp; first floor</span>
+            </div>
+            <p class="property-desc">Set within a critically acclaimed apartment block designed by architects dRMM — winner of the RIBA London Building of the Year. Described by The Guardian as "a minor masterpiece."</p>
+            <div class="property-agency-row">
+              <div class="property-agency">Listed by <strong>The Modern House</strong></div>
+              <a class="property-link" href="https://themodernhouse.com/sales-list/centaur-street-ii" target="_blank" rel="noopener">View the real listing ↗</a>
+            </div>
+          </div>
+        </div>
+
+        <button class="stepper-btn" onclick="nextScene()">Here's what happened <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- SCENE 2 — THE EVIDENCE -->
+    <section class="scene" data-scene="2">
+      <div class="scene-inner">
+        <div class="eyebrow">The Evidence</div>
+        <h1 class="scene-h">The enquiry trail.</h1>
+
+        <div class="trail">
+          <div class="trail-item">
+            <div class="trail-label">Enquiry <span class="trail-time">Tue 4 Aug · 18:52</span></div>
+            <div class="trail-msg"><span class="who">Priya Shah · via themodernhouse.com</span>"Hi — really love the look of the Centaur Street apartment, the split-level layout especially. Is it still available? Would love to see it this weekend if possible."</div>
+          </div>
+          <div class="trail-item">
+            <div class="trail-label">Automated acknowledgement <span class="trail-time">18:53</span></div>
+            <div class="trail-msg"><span class="who">System</span>"Thanks for getting in touch about Centaur Street — a member of the team will come back to you shortly."</div>
+          </div>
+          <div class="trail-item">
+            <div class="trail-label">Human response <span class="trail-time">19:15 · 23 minutes</span></div>
+            <div class="trail-msg"><span class="who">Rosa · The Modern House</span>"Hi Priya — thanks for your interest, it's still available! I'd love to arrange a viewing — would Saturday morning or Sunday afternoon work? Let me know and I'll lock in a time."</div>
+            <span class="trail-badge">✓ Fast, warm, specific</span>
+          </div>
+          <div class="trail-item gap">
+            <div class="trail-label">No follow-up <span class="trail-time">Wed 5 – Sat 8 Aug</span></div>
+            <div class="trail-msg">Priya didn't reply straight away. Nobody checked back. Four days later, the observation window closed.</div>
+            <span class="trail-badge">✕ Silence, not decline</span>
+          </div>
+        </div>
+
+        <div class="grade-pill"><span class="g">Grade C</span> — very fast response, zero follow-up</div>
+
+        <button class="stepper-btn" onclick="nextScene()">The buyer has gone quiet <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- SCENE 3 — THE PROSPECT INTERACTS -->
+    <section class="scene" data-scene="3">
+      <div class="scene-inner">
+        <div class="eyebrow">Your Call</div>
+        <h1 class="scene-h">The buyer has gone quiet.<br/>What happens next?</h1>
+        <p class="scene-sub">Rosa answered in 23 minutes. It's now four days later and Priya never confirmed a slot. What would you do?</p>
+
+        <div class="choice-row" id="choice-row">
+          <button class="choice-btn" data-choice="ring"><span class="ico">📞</span> Ring them</button>
+          <button class="choice-btn" data-choice="email"><span class="ico">✉️</span> Send a nudge email</button>
+          <button class="choice-btn" data-choice="leave"><span class="ico">—</span> Leave it — they'll come back if serious</button>
+        </div>
+
+        <div class="choice-reveal" id="choice-reveal"></div>
+        <div class="choice-converge" id="choice-converge">In this test, <strong>nobody did any of it</strong>. Not because Rosa dropped the ball — she was excellent. Because nothing in the system remembers to go back.</div>
+
+        <button class="stepper-btn" id="btn-scene3-next" onclick="nextScene()" disabled>See what NOVUS would have done <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- SCENE 4 — NOVUS THINKS -->
+    <section class="scene" data-scene="4">
+      <div class="scene-inner">
+        <div class="eyebrow">NOVUS Thinks</div>
+        <h1 class="scene-h">Same enquiry. Same reply.<br/>One difference.</h1>
+
+        <div class="context-strip">
+          <span class="ctx-chip">Centaur Street, SE1</span>
+          <span class="ctx-chip">Priya Shah</span>
+          <span class="ctx-chip">Human replied in 23 min</span>
+          <span class="ctx-chip">No reply since · day 2</span>
+        </div>
+
+        <div class="gen-card">
+          <div class="gen-card-head">
+            <span class="gen-card-when">Day 2 · 10:04am — follow-up NOVUS sends</span>
+            <span class="gen-card-tag">Generated</span>
+          </div>
+          <div class="gen-card-body">"Hi Priya, just following up on Centaur Street in case Saturday works better for a look — the ground floor with that little garden is worth seeing in person before it gets booked up. I've held two slots: Sat 10am or Sun 2pm. Whichever suits, just let me know and I'll confirm it."</div>
+        </div>
+
+        <p class="payoff-line">The human response was good.<br/><span class="highlight">The system failed to finish the job.</span></p>
+
+        <button class="stepper-btn" onclick="nextScene()">See it through <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- SCENE 5 — THE OUTCOME -->
+    <section class="scene" data-scene="5">
+      <div class="scene-inner">
+        <div class="eyebrow">The Outcome</div>
+        <h1 class="scene-h">The same enquiry, finished.</h1>
+
+        <div class="pipeline" id="pipeline">
+          <div class="pl-step" data-step="1"><div class="pl-dot">1</div><div class="pl-label">Enquiry</div></div>
+          <div class="pl-line"></div>
+          <div class="pl-step" data-step="2"><div class="pl-dot">2</div><div class="pl-label">Response</div></div>
+          <div class="pl-line"></div>
+          <div class="pl-step new" data-step="3"><div class="pl-dot">3</div><div class="pl-label">Follow-up</div></div>
+          <div class="pl-line"></div>
+          <div class="pl-step new" data-step="4"><div class="pl-dot">4</div><div class="pl-label">Qualification</div></div>
+          <div class="pl-line"></div>
+          <div class="pl-step new" data-step="5"><div class="pl-dot">5</div><div class="pl-label">Booking</div></div>
+        </div>
+
+        <div class="outcome-card" id="outcome-card">
+          <span class="ico">📅</span>
+          <div class="outcome-card-text"><b>Viewing booked · Sat 10:00am</b><span>Centaur Street, SE1 — illustrative outcome</span></div>
+        </div>
+
+        <p class="scene-sub">Nothing about Rosa's job changes. NOVUS just finishes what she started.</p>
+
+        <button class="stepper-btn" onclick="nextScene()">Why this matters <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- SCENE 6 — COMMERCIAL BRIDGE -->
+    <section class="scene" data-scene="6">
+      <div class="scene-inner">
+        <div class="eyebrow">Why It Matters</div>
+        <h1 class="scene-h">You already paid to<br/>generate the enquiry.</h1>
+        <p class="scene-sub">NOVUS makes sure the opportunity doesn't stop at the first response.</p>
+
+        <div class="bridge-flow">
+          <span class="bridge-node">More enquiries progressed</span>
+          <span class="bridge-arrow">→</span>
+          <span class="bridge-node">More viewings</span>
+          <span class="bridge-arrow">→</span>
+          <span class="bridge-node">More completed opportunities</span>
+        </div>
+
+        <p class="tier-note"><strong>Tier 1 / Core.</strong> NOVUS doesn't replace your front desk — it makes sure enquiries like this one keep moving after it.</p>
+
+        <button class="stepper-btn" onclick="nextScene()">See the next step <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- SCENE 7 — CTA -->
+    <section class="scene" data-scene="7">
+      <div class="scene-inner">
+        <div class="eyebrow">Next Step</div>
+        <h1 class="scene-h">The demo is the proof.<br/>The calendar's the next step.</h1>
+        <p class="scene-sub">Ten minutes with Joe. No deck — just what this looks like against your own enquiries.</p>
+
+        <div class="cta-actions">
+          <button class="stepper-btn" onclick="revealCalendly()">Book 10 minutes with Joe</button>
+          <span class="cta-phone">or call direct: <a href="tel:07455506761">07455 506761</a></span>
+        </div>
+        <p class="cta-terms">No contract. 30-day money-back guarantee.</p>
+
+        <div class="calendly-wrap" id="calendly-wrap">
+          <div class="calendly-inline-widget" data-url="https://calendly.com/joe-getnovus/10min?hide_gdpr_banner=1"></div>
+        </div>
+
+        <p class="final-disclaimer">This entire scenario is fictional, built for demonstration purposes around a real public listing for authenticity. The Modern House did not receive this enquiry and was not probed or tested by NOVUS. <a href="https://themodernhouse.com/sales-list/centaur-street-ii" target="_blank" rel="noopener">View the real listing ↗</a></p>
+      </div>
+    </section>
+
+  </div>
+
+<script>
+  const TOTAL = 7;
+  let scene = 1;
+
+  const progressEl = document.getElementById('progress');
+  for (let i = 1; i <= TOTAL; i++) {
+    const d = document.createElement('div');
+    d.className = 'd' + (i === 1 ? ' on' : '');
+    d.dataset.i = i;
+    progressEl.appendChild(d);
+  }
+
+  function renderProgress() {
+    [...progressEl.children].forEach((d) => {
+      const i = Number(d.dataset.i);
+      d.classList.toggle('on', i === scene);
+      d.classList.toggle('done', i < scene);
+    });
+  }
+
+  function goTo(n) {
+    if (n < 1 || n > TOTAL) return;
+    document.querySelectorAll('.scene').forEach((s) => s.classList.remove('active'));
+    const target = document.querySelector('.scene[data-scene="' + n + '"]');
+    target.classList.add('active');
+    scene = n;
+    renderProgress();
+    window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+    if (n === 5) animatePipeline();
+  }
+  function nextScene() { goTo(scene + 1); }
+  window.nextScene = nextScene;
+
+  // ── Scene 3: interaction ──
+  const CHOICE_COPY = {
+    ring: "Sure — if you remember, if you're not mid-viewing, and if you still have the context of what Priya originally asked. Most agents are juggling 30+ live threads like this one.",
+    email: "Someone has to notice the silence, find the thread, and write something worth sending — today, not next week.",
+    leave: "This is the default outcome. No one decided to drop it. It just... didn't happen. That's most enquiries that go quiet."
+  };
+  document.getElementById('choice-row').addEventListener('click', (e) => {
+    const btn = e.target.closest('.choice-btn');
+    if (!btn) return;
+    document.querySelectorAll('.choice-btn').forEach((b) => b.classList.remove('picked'));
+    btn.classList.add('picked');
+    const reveal = document.getElementById('choice-reveal');
+    reveal.textContent = CHOICE_COPY[btn.dataset.choice];
+    reveal.classList.add('show');
+    document.getElementById('choice-converge').classList.add('show');
+    document.getElementById('btn-scene3-next').removeAttribute('disabled');
+  });
+
+  // ── Scene 5: pipeline animation ──
+  let pipelineAnimated = false;
+  function animatePipeline() {
+    if (pipelineAnimated) return;
+    pipelineAnimated = true;
+    const steps = [...document.querySelectorAll('#pipeline .pl-step')];
+    steps.forEach((s, i) => {
+      setTimeout(() => { s.classList.add('on'); }, 220 * i);
+    });
+    setTimeout(() => { document.getElementById('outcome-card').classList.add('show'); }, 220 * steps.length + 200);
+  }
+
+  function revealCalendly() {
+    document.getElementById('calendly-wrap').classList.add('show');
+    setTimeout(() => { document.getElementById('calendly-wrap').scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60);
+  }
+  window.revealCalendly = revealCalendly;
+
+  // Keyboard nav (desktop convenience)
+  document.addEventListener('keydown', (e) => {
+    if (scene === 3 && document.getElementById('btn-scene3-next').hasAttribute('disabled')) return;
+    if (e.key === 'ArrowRight') nextScene();
+    if (e.key === 'ArrowLeft') goTo(scene - 1);
+  });
+</script>
+</body>
+</html>
