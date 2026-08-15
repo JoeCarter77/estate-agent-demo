@@ -32,7 +32,8 @@ import crypto from 'node:crypto';
 import { getRepo } from '../../../lib/sheets.mjs';
 import { newRawEventId, newCommunicationId } from '../../../lib/ids.mjs';
 import { normalizeEmail, canonicalTimestamp } from '../../../lib/normalize.mjs';
-import { matchAgency, matchProbe } from '../../../lib/matching.mjs';
+import { matchAgency, matchProbe, matchProbeByAddress } from '../../../lib/matching.mjs';
+import { classifyCommunication } from '../../../lib/classification.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 
 export const maxDuration = 20;
@@ -119,37 +120,79 @@ export default async function handler(req, res) {
       created_at: nowIso,
     });
 
-    // 2) Deterministic Agency match, then (only if matched) deterministic
-    // Probe match. Neither step ever guesses — ambiguous/unmatched stays that way.
+    // 2) Deterministic matching, strongest signal first. Nothing here ever
+    // guesses — ambiguous/unmatched stays that way and goes to review.
     const senderEmail = normalizeEmail(fromRaw);
-    const agencyResult = await matchAgency(repo, senderEmail);
+    const toRaw = String(body.to || '').trim();
 
-    let matchStatus = agencyResult.match_status;
-    let matchingMethod = agencyResult.matching_method;
-    let matchScore = agencyResult.match_score;
-    const agencyId = agencyResult.agency_id;
+    let matchStatus = 'unmatched';
+    let matchingMethod = '';
+    let matchScore = 0;
+    let agencyId = '';
     let probeId = '';
 
-    if (agencyResult.match_status === 'matched') {
-      const probeResult = await matchProbe(repo, agencyId, now);
-      if (probeResult.status === 'matched') {
-        probeId = probeResult.probe_id;
-        matchStatus = 'matched';
-      } else if (probeResult.status === 'ambiguous') {
-        // Agency is unambiguous but the probe isn't — the communication as a
-        // whole is not fully resolved, so it is not reported as fully matched.
-        matchStatus = 'ambiguous';
-        matchingMethod = '';
-        matchScore = 0;
-      } else {
-        // Agency known, but no active probe to attach — never guessed.
-        matchStatus = 'unmatched';
-        matchingMethod = '';
-        matchScore = 0;
+    // 2a) The probe's own reply address, carried by the message itself. This
+    // beats sender matching because it survives replies from individual
+    // mailboxes AND auto-acknowledgements relayed by a portal/CRM, and it
+    // names the exact probe rather than inferring it from the agency.
+    const addressResult = await matchProbeByAddress(
+      repo, toRaw, body.delivered_to, body.cc, body.reply_to,
+    );
+
+    if (addressResult.match_status === 'matched') {
+      agencyId = addressResult.agency_id;
+      probeId = addressResult.probe_id;
+      matchingMethod = addressResult.matching_method;
+      matchScore = addressResult.match_score;
+      // A probe with no agency_id is a data fault (probe-create now requires
+      // one). Keep the probe link, but do not pretend the agency is resolved.
+      matchStatus = agencyId ? 'matched' : 'ambiguous';
+    } else if (addressResult.match_status === 'ambiguous') {
+      matchStatus = 'ambiguous';
+    } else {
+      // 2b) Fall back to sender-based matching: agency first, then that
+      // agency's single active probe.
+      const agencyResult = await matchAgency(repo, senderEmail);
+      matchStatus = agencyResult.match_status;
+      matchingMethod = agencyResult.matching_method;
+      matchScore = agencyResult.match_score;
+      agencyId = agencyResult.agency_id;
+
+      if (agencyResult.match_status === 'matched') {
+        const probeResult = await matchProbe(repo, agencyId, now);
+        if (probeResult.status === 'matched') {
+          probeId = probeResult.probe_id;
+          matchStatus = 'matched';
+        } else if (probeResult.status === 'ambiguous') {
+          // Agency is unambiguous but the probe isn't — the communication as a
+          // whole is not fully resolved, so it is not reported as fully matched.
+          matchStatus = 'ambiguous';
+          matchingMethod = '';
+          matchScore = 0;
+        } else {
+          // Agency known, but no active probe to attach — never guessed.
+          matchStatus = 'unmatched';
+          matchingMethod = '';
+          matchScore = 0;
+        }
       }
     }
 
     // 3) The Communication Event. Only exact-signal outcomes reach here.
+    //
+    // Classified at write time (same as the voice/SMS handlers) rather than
+    // left for the recompute pass. Recompute only runs for communications
+    // matched to an active probe, so an unmatched or ambiguous email would
+    // otherwise sit in the review queue with no interpretation at all — the
+    // one place a human most needs to see what the message actually was.
+    const tags = classifyCommunication({
+      channel: 'email',
+      source_identifier_raw: fromRaw,
+      source_identifier_normalized: senderEmail.normalized,
+      subject: String(body.subject || ''),
+      body_text: body.body_text || '',
+    });
+
     const communicationId = newCommunicationId();
     await repo.appendRecord('COMMUNICATIONS', {
       communication_id: communicationId,
@@ -175,6 +218,13 @@ export default async function handler(req, res) {
       matching_method: matchingMethod,
       match_score: matchScore,
       match_status: matchStatus,
+      automated_or_human: tags.automated_or_human,
+      human_contact: tags.human_contact ? 'TRUE' : 'FALSE',
+      callback_attempt: 'FALSE', // email is not a phone callback
+      successful_conversation: 'FALSE',
+      follow_up: 'FALSE', // sequence-aware flag, set by the observation recompute pass
+      booking_attempt: tags.booking_attempt ? 'TRUE' : 'FALSE',
+      communication_classification: tags.communication_classification,
       manual_review_status: matchStatus === 'matched' ? 'not_required' : 'pending',
       created_at: nowIso,
       updated_at: nowIso,

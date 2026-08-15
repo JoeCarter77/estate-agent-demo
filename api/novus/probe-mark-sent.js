@@ -39,6 +39,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ probe: record.obj, already_sent: true });
     }
 
+    // Last line of defence before the window opens. A probe with no agency
+    // cannot be matched to its replies, so starting its clock would burn four
+    // days collecting evidence that can never be attributed. Probes created
+    // through the current API always carry an agency_id; this catches rows
+    // created by an older build or edited by hand in the sheet.
+    if (!String(record.obj.agency_id || '').trim()) {
+      return res.status(409).json({
+        error: 'This probe has no agency_id, so its replies could never be matched. Set the agency on the PROBES row before marking it as sent.',
+        probe: record.obj,
+      });
+    }
+
     const sentAt = new Date();
     const deadline = new Date(sentAt.getTime() + OBSERVATION_DAYS * 24 * 60 * 60 * 1000);
 

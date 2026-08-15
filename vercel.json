@@ -6,6 +6,12 @@
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/d/(.*)", "destination": "/index.html" }
   ],
+  "crons": [
+    {
+      "path": "/api/novus/observation/close-due",
+      "schedule": "0 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

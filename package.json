@@ -11,7 +11,10 @@
     "novus:comms-selftest": "node scripts/novus-comms-selftest.mjs",
     "novus:observation-selftest": "node scripts/novus-observation-selftest.mjs",
     "novus:phone-selftest": "node scripts/novus-phone-selftest.mjs",
-    "novus:smoke": "node scripts/novus-sheets-smoke.mjs"
+    "novus:smoke": "node scripts/novus-sheets-smoke.mjs",
+    "novus:readiness-selftest": "node scripts/novus-readiness-selftest.mjs",
+    "novus:agencies-dryrun": "node scripts/import-agencies.mjs --dry-run",
+    "novus:all": "node scripts/novus-selftest.mjs && node scripts/novus-comms-selftest.mjs && node scripts/novus-observation-selftest.mjs && node scripts/novus-phone-selftest.mjs && node scripts/novus-readiness-selftest.mjs"
   },
   "dependencies": {
     "@vercel/oidc": "^3.8.4",

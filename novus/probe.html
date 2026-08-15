@@ -58,6 +58,27 @@
     .foot{text-align:center;font-size:.72rem;color:var(--text-3);margin-top:26px;}
     .banner{display:flex;align-items:center;gap:10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:11px;padding:13px 15px;margin-bottom:20px;}
     .banner .em{font-size:.86rem;color:var(--text);font-weight:600;}
+    .results{margin-top:8px;border:1px solid var(--border);border-radius:11px;max-height:250px;overflow-y:auto;background:#fff;}
+    .results.hidden{display:none;}
+    .result{padding:11px 13px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s;}
+    .result:last-child{border-bottom:none;}
+    .result:hover,.result.active{background:var(--accent-lo);}
+    .result-name{font-size:.88rem;font-weight:600;color:var(--text);}
+    .result-meta{font-size:.75rem;color:var(--text-3);margin-top:2px;}
+    .result-warn{font-size:.72rem;color:var(--amber);margin-top:3px;font-weight:600;}
+    .results-empty{padding:13px;font-size:.82rem;color:var(--text-3);}
+    .chosen{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;padding:12px 14px;background:var(--accent-lo);border:1px solid rgba(37,99,235,.25);border-radius:11px;}
+    .chosen.hidden{display:none;}
+    .chosen-name{font-size:.9rem;font-weight:700;color:var(--text);}
+    .chosen-meta{font-size:.75rem;color:var(--text-2);margin-top:2px;}
+    .linkbtn{background:none;border:none;color:var(--accent);font-family:'Inter',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;padding:4px 6px;}
+    .linkbtn:hover{text-decoration:underline;}
+    .warn{font-size:.8rem;color:#92400E;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:10px;padding:11px 13px;margin-top:14px;line-height:1.5;}
+    .warn ul{margin:6px 0 0 18px;}
+    .warn li{margin-bottom:4px;}
+    .copyrow{display:flex;align-items:center;gap:8px;}
+    .copybtn{background:var(--panel);border:1px solid var(--border-hi);border-radius:7px;color:var(--text-2);font-size:.68rem;font-weight:700;padding:3px 8px;cursor:pointer;font-family:'Inter',sans-serif;flex-shrink:0;}
+    .copybtn:hover{border-color:var(--accent);color:var(--accent);}
   </style>
 </head>
 <body>
@@ -72,9 +93,20 @@
     <section id="view-new" class="card">
       <div class="eyebrow">New Probe</div>
       <h1>Create a probe</h1>
-      <p class="sub">Paste a Rightmove property URL. NOVUS creates a draft probe, generates the reference and attaches the probe email &amp; phone. You'll submit the genuine enquiry manually in the next step.</p>
+      <p class="sub">Pick the agency, then paste one of its Rightmove listings. NOVUS creates a draft probe, generates the reference and a reply address unique to this probe. You'll submit the genuine enquiry manually in the next step.</p>
 
-      <label for="url">Rightmove URL</label>
+      <label for="agency-q">Agency</label>
+      <input id="agency-q" type="text" placeholder="Search by name, town or domain…" autocomplete="off" spellcheck="false" />
+      <div id="agency-results" class="results hidden"></div>
+      <div id="agency-chosen" class="chosen hidden">
+        <div>
+          <div class="chosen-name" id="chosen-name"></div>
+          <div class="chosen-meta" id="chosen-meta"></div>
+        </div>
+        <button id="agency-clear" class="linkbtn" type="button">Change</button>
+      </div>
+
+      <label for="url" style="margin-top:18px;">Rightmove URL</label>
       <input id="url" type="url" placeholder="https://www.rightmove.co.uk/properties/123456789" autocomplete="off" spellcheck="false" />
 
       <button id="create-btn" class="btn btn-primary mt">Create Probe</button>
@@ -93,10 +125,11 @@
         <dt>Agency</dt><dd id="f-agency" class="muted">—</dd>
         <dt>Property</dt><dd id="f-address" class="muted">—</dd>
         <dt>Price</dt><dd id="f-price" class="muted">—</dd>
+        <dt>Property ID</dt><dd id="f-propid" class="mono muted">—</dd>
         <dt>Portal</dt><dd id="f-portal">—</dd>
         <dt>Probe Ref</dt><dd><span id="f-ref" class="ref-chip">—</span></dd>
-        <dt>Email</dt><dd id="f-email" class="mono">—</dd>
-        <dt>Phone</dt><dd id="f-phone" class="mono">—</dd>
+        <dt>Email</dt><dd class="mono"><span class="copyrow"><span id="f-email">—</span><button class="copybtn" data-copy="f-email" type="button">Copy</button></span></dd>
+        <dt>Phone</dt><dd class="mono"><span class="copyrow"><span id="f-phone">—</span><button class="copybtn" data-copy="f-phone" type="button">Copy</button></span></dd>
         <dt id="dt-sent" class="hidden">Sent at</dt><dd id="f-sent" class="mono hidden">—</dd>
         <dt id="dt-deadline" class="hidden">Observe until</dt><dd id="f-deadline" class="mono hidden">—</dd>
       </dl>
@@ -106,8 +139,9 @@
         <button id="sent-btn" class="btn btn-green">Mark as Sent</button>
       </div>
 
+      <div id="warn-box" class="warn hidden"></div>
       <div id="observing-note" class="hint hidden"></div>
-      <p class="hint" id="draft-hint">Open the listing, submit the genuine enquiry using the probe email &amp; phone above, then return here and click <strong>Mark as Sent</strong>. NOVUS records the exact server timestamp and starts a 4-day observation window.</p>
+      <p class="hint" id="draft-hint">Open the listing and submit the genuine enquiry using <strong>exactly</strong> the probe email &amp; phone above — the email address is unique to this probe and is how NOVUS matches every reply back to it. Then return here and click <strong>Mark as Sent</strong>. NOVUS records the exact server timestamp and starts a 4-day observation window.</p>
       <div id="mark-err" class="err"></div>
 
       <button id="another-btn" class="btn btn-ghost mt">+ New probe</button>
@@ -119,6 +153,7 @@
   <script>
     const $ = (id) => document.getElementById(id);
     let currentProbe = null;
+    let chosenAgency = null;
 
     // Basic Auth is enforced by the edge middleware on this page load, so the
     // browser already holds credentials for this origin and attaches them to
@@ -141,7 +176,7 @@
       } catch (e) { return iso; }
     }
 
-    function render(probe) {
+    function render(probe, warnings) {
       currentProbe = probe;
       $('ready-ref-inline').textContent = probe.probe_reference || '';
       const setField = (id, val, muted) => {
@@ -149,9 +184,27 @@
         el.textContent = val || '—';
         el.classList.toggle('muted', !val && muted);
       };
-      setField('f-agency', probe.agency_id, true);
+      const agencyLabel = (chosenAgency && chosenAgency.agency_id === probe.agency_id)
+        ? chosenAgency.agency_name : probe.agency_id;
+      setField('f-agency', agencyLabel, true);
       setField('f-address', probe.property_address, true);
       setField('f-price', probe.property_price, true);
+      setField('f-propid', probe.property_id, true);
+
+      // Anything that could not be read from the listing is stated outright,
+      // so a blank field is never mistaken for a confirmed absence.
+      const warnBox = $('warn-box');
+      const list = (warnings || []).slice();
+      if (probe.extraction_status && probe.extraction_status !== 'fetched') {
+        setField('f-address', probe.property_address, true);
+      }
+      if (list.length) {
+        warnBox.innerHTML = '<strong>Before you send this enquiry:</strong><ul>'
+          + list.map((w) => '<li>' + esc(w) + '</li>').join('') + '</ul>';
+        warnBox.classList.remove('hidden');
+      } else {
+        warnBox.classList.add('hidden');
+      }
       $('f-portal').textContent = probe.portal || '—';
       $('f-ref').textContent = probe.probe_reference || '—';
       $('f-email').textContent = probe.probe_email || '—';
@@ -188,16 +241,100 @@
       $('open-btn').onclick = () => { if (probe.property_url) window.open(probe.property_url, '_blank', 'noopener'); };
     }
 
+    // ── AGENCY PICKER ───────────────────────────────────────────────────────
+    // Every probe must name its agency: a probe with no agency_id can never be
+    // matched to the replies it provokes, so it would run its full four days
+    // and capture nothing attributable.
+    let searchTimer = null;
+
+    function renderAgencyResults(agencies) {
+      const box = $('agency-results');
+      if (!agencies.length) {
+        box.innerHTML = '<div class="results-empty">No agencies match that search.</div>';
+        box.classList.remove('hidden');
+        return;
+      }
+      box.innerHTML = agencies.map((a, i) => {
+        const meta = [a.location, a.domain, a.main_phone].filter(Boolean).join(' · ');
+        const warn = a.has_match_signal ? ''
+          : '<div class="result-warn">⚠ No domain or phone on record — replies match only by probe email</div>';
+        return '<div class="result" data-i="' + i + '">'
+          + '<div class="result-name">' + esc(a.agency_name || a.agency_id) + '</div>'
+          + '<div class="result-meta">' + esc(meta) + '</div>' + warn + '</div>';
+      }).join('');
+      box.classList.remove('hidden');
+      box.querySelectorAll('.result').forEach((el) => {
+        el.onclick = () => selectAgency(agencies[parseInt(el.dataset.i, 10)]);
+      });
+    }
+
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+      ));
+    }
+
+    function selectAgency(agency) {
+      chosenAgency = agency;
+      $('chosen-name').textContent = agency.agency_name || agency.agency_id;
+      $('chosen-meta').textContent = [agency.location, agency.domain, agency.main_phone]
+        .filter(Boolean).join(' · ') || agency.agency_id;
+      $('agency-chosen').classList.remove('hidden');
+      $('agency-results').classList.add('hidden');
+      $('agency-q').classList.add('hidden');
+      clearErr($('create-err'));
+    }
+
+    async function searchAgencies(q) {
+      try {
+        const data = await api('/api/novus/agencies-search?q=' + encodeURIComponent(q), { method: 'GET' });
+        renderAgencyResults(data.agencies || []);
+      } catch (e) {
+        showErr($('create-err'), 'Agency search failed: ' + e.message);
+      }
+    }
+
+    $('agency-q').addEventListener('input', (e) => {
+      clearTimeout(searchTimer);
+      const q = e.target.value.trim();
+      if (q.length < 2) { $('agency-results').classList.add('hidden'); return; }
+      searchTimer = setTimeout(() => searchAgencies(q), 220);
+    });
+
+    $('agency-clear').addEventListener('click', () => {
+      chosenAgency = null;
+      $('agency-chosen').classList.add('hidden');
+      $('agency-q').classList.remove('hidden');
+      $('agency-q').value = '';
+      $('agency-q').focus();
+    });
+
     // CREATE
     $('create-btn').addEventListener('click', async () => {
       const url = $('url').value.trim();
       clearErr($('create-err'));
+      if (!chosenAgency) { showErr($('create-err'), 'Select the agency you are probing first.'); return; }
       if (!url) { showErr($('create-err'), 'Please paste a Rightmove property URL.'); return; }
       const btn = $('create-btn');
       btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Creating…';
       try {
-        const data = await api('/api/novus/probe-create', { method: 'POST', body: JSON.stringify({ url }) });
-        render(data.probe);
+        let data;
+        try {
+          data = await api('/api/novus/probe-create', {
+            method: 'POST',
+            body: JSON.stringify({ agency_id: chosenAgency.agency_id, url }),
+          });
+        } catch (e) {
+          // A duplicate is a deliberate decision, not an error to hide.
+          if (/already exists for this listing/i.test(e.message)) {
+            if (!window.confirm(e.message + '\n\nCreate a second probe anyway?')) throw e;
+            data = await api('/api/novus/probe-create', {
+              method: 'POST',
+              body: JSON.stringify({ agency_id: chosenAgency.agency_id, url, force: true }),
+            });
+          } else throw e;
+        }
+        render(data.probe, data.warnings);
         $('view-new').classList.add('hidden');
         $('view-ready').classList.remove('hidden');
         $('ready-banner').classList.remove('hidden');
@@ -226,10 +363,31 @@
       }
     });
 
+    // Copy-to-clipboard for the probe email/phone. These must be entered on
+    // Rightmove exactly as shown — a retyped address breaks probe matching.
+    document.querySelectorAll('.copybtn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const value = $(btn.dataset.copy).textContent;
+        if (!value || value === '—') return;
+        try {
+          await navigator.clipboard.writeText(value);
+          const original = btn.textContent;
+          btn.textContent = 'Copied';
+          setTimeout(() => { btn.textContent = original; }, 1400);
+        } catch (e) { /* clipboard blocked — the value is visible to select */ }
+      });
+    });
+
     // NEW PROBE (reset)
     $('another-btn').addEventListener('click', () => {
       currentProbe = null;
+      chosenAgency = null;
       $('url').value = '';
+      $('agency-q').value = '';
+      $('agency-q').classList.remove('hidden');
+      $('agency-chosen').classList.add('hidden');
+      $('agency-results').classList.add('hidden');
+      $('warn-box').classList.add('hidden');
       clearErr($('create-err')); clearErr($('mark-err'));
       $('ready-banner').classList.add('hidden');
       $('view-ready').classList.add('hidden');
