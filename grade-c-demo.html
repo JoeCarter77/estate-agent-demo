@@ -10,6 +10,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet" />
 <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet" />
 <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
+<script type="module">
+  import Vapi from 'https://esm.sh/@vapi-ai/web';
+  window._VapiClass = Vapi;
+</script>
 <style>
   :root{
     --navy:#0B1B3F; --navy-2:#172D67; --navy-3:#1E3A8A;
@@ -34,154 +38,215 @@
   }
 
   /* ── TOP CHROME ── */
-  .chrome{ position:fixed; top:0; left:0; right:0; z-index:50; display:flex; align-items:center; justify-content:space-between; padding:18px 28px; }
+  .chrome{ position:fixed; top:0; left:0; right:0; z-index:50; display:flex; align-items:center; justify-content:space-between; padding:16px 26px; gap:12px; }
   .brand{ display:flex; align-items:center; gap:9px; }
-  .brand img{ height:22px; width:auto; filter:brightness(0) invert(1); opacity:.92; }
-  .brand-word{ font-size:.92rem; font-weight:800; letter-spacing:.03em; color:#fff; }
-  .fiction-badge{ font-size:.62rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:rgba(255,255,255,.75); border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.06); padding:6px 12px; border-radius:100px; backdrop-filter:blur(6px); }
+  .brand img{ height:20px; width:auto; filter:brightness(0) invert(1); opacity:.92; }
+  .brand-word{ font-size:.88rem; font-weight:800; letter-spacing:.03em; color:#fff; }
+  .chrome-right{ display:flex; align-items:center; gap:8px; }
+  .fiction-badge{ font-size:.6rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:rgba(255,255,255,.7); border:1px solid rgba(255,255,255,.2); background:rgba(255,255,255,.06); padding:5px 11px; border-radius:100px; backdrop-filter:blur(6px); white-space:nowrap; }
+  .system-btn{ font-family:'Inter',sans-serif; font-size:.66rem; font-weight:700; letter-spacing:.04em; color:#fff; background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.24); padding:7px 13px; border-radius:100px; cursor:pointer; white-space:nowrap; transition:background .15s, border-color .15s, transform .15s; backdrop-filter:blur(6px); }
+  .system-btn:hover{ background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.4); transform:translateY(-1px); }
+  .system-btn.hide{ display:none; }
 
   /* ── PROGRESS DOTS ── */
-  .progress{ position:fixed; bottom:22px; left:50%; transform:translateX(-50%); z-index:50; display:flex; gap:7px; }
-  .progress .d{ width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,.22); transition:background .3s, transform .3s; }
+  .progress{ position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:50; display:flex; gap:7px; }
+  .progress .d{ position:relative; width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,.22); transition:background .3s, transform .3s; cursor:default; }
   .progress .d.on{ background:#fff; transform:scale(1.35); }
   .progress .d.done{ background:rgba(255,255,255,.55); }
+  .progress .d::after{ content:attr(data-label); position:absolute; bottom:14px; left:50%; transform:translateX(-50%); font-size:.6rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:rgba(255,255,255,.85); background:rgba(11,27,63,.92); border:1px solid rgba(255,255,255,.15); padding:4px 9px; border-radius:6px; white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .15s; }
+  .progress .d:hover::after{ opacity:1; }
 
   /* ── STAGE / SCENES ── */
   .stage{ position:relative; min-height:100vh; }
   .scene{
     position:relative; min-height:100vh; width:100%;
     display:none; flex-direction:column; align-items:center; justify-content:center;
-    padding:110px 24px 100px; opacity:0;
+    padding:86px 22px 84px; opacity:0;
   }
-  .scene.active{ display:flex; animation:scene-in .55s cubic-bezier(.22,1,.36,1) both; }
-  @keyframes scene-in{ from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
-  .scene-inner{ width:100%; max-width:620px; display:flex; flex-direction:column; gap:26px; align-items:center; text-align:center; }
+  .scene.active{ display:flex; animation:scene-in .5s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes scene-in{ from{opacity:0; transform:translateY(12px);} to{opacity:1; transform:translateY(0);} }
+  .scene-inner{ width:100%; max-width:580px; display:flex; flex-direction:column; gap:20px; align-items:center; text-align:center; }
   .scene-inner.wide{ max-width:760px; }
 
-  .eyebrow{ font-size:.68rem; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:#93C5FD; display:flex; align-items:center; gap:10px; }
-  .eyebrow::before{ content:''; width:22px; height:1px; background:#93C5FD; }
-  h1.scene-h{ font-family:var(--serif); font-size:clamp(1.7rem,4vw,2.7rem); font-weight:600; line-height:1.18; letter-spacing:-.01em; color:#fff; }
+  .eyebrow{ font-size:.66rem; font-weight:700; letter-spacing:.17em; text-transform:uppercase; color:#93C5FD; display:flex; align-items:center; gap:9px; }
+  .eyebrow::before{ content:''; width:20px; height:1px; background:#93C5FD; }
+  h1.scene-h{ font-family:var(--serif); font-size:clamp(1.45rem,3.2vw,2.15rem); font-weight:600; line-height:1.2; letter-spacing:-.01em; color:#fff; }
   h1.scene-h em{ font-style:italic; color:#93C5FD; }
-  p.scene-sub{ font-size:1rem; line-height:1.65; color:rgba(255,255,255,.72); max-width:520px; }
+  p.scene-sub{ font-size:.92rem; line-height:1.6; color:rgba(255,255,255,.72); max-width:480px; }
 
-  .stepper-btn{ display:inline-flex; align-items:center; gap:9px; background:#fff; color:var(--navy-2); border:none; border-radius:100px; padding:14px 26px; font-family:'Inter',sans-serif; font-size:.92rem; font-weight:800; letter-spacing:-.005em; cursor:pointer; box-shadow:0 10px 28px rgba(0,0,0,.28); transition:transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s, opacity .15s; }
-  .stepper-btn:hover{ transform:translateY(-2px); box-shadow:0 16px 38px rgba(0,0,0,.36); }
+  .stepper-btn{ display:inline-flex; align-items:center; gap:8px; background:#fff; color:var(--navy-2); border:none; border-radius:100px; padding:12px 22px; font-family:'Inter',sans-serif; font-size:.86rem; font-weight:800; letter-spacing:-.005em; cursor:pointer; box-shadow:0 10px 26px rgba(0,0,0,.28); transition:transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s, opacity .15s; }
+  .stepper-btn:hover{ transform:translateY(-2px); box-shadow:0 14px 34px rgba(0,0,0,.34); }
   .stepper-btn:active{ transform:translateY(0) scale(.98); }
   .stepper-btn[disabled]{ opacity:.35; cursor:not-allowed; transform:none; box-shadow:none; }
-  .stepper-btn svg{ width:14px; height:14px; }
-  .stepper-ghost{ background:transparent; color:rgba(255,255,255,.65); box-shadow:none; border:1px solid rgba(255,255,255,.22); padding:12px 22px; font-size:.82rem; }
-  .stepper-ghost:hover{ color:#fff; border-color:rgba(255,255,255,.45); transform:translateY(-1px); box-shadow:none; }
+  .stepper-btn svg{ width:13px; height:13px; }
 
-  .back-arrow{ position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:49; font-size:.72rem; color:rgba(255,255,255,.5); letter-spacing:.04em; display:none; }
+  /* ═══ SCENE 1 — THE PROPERTY ═══ */
+  .disclaimer-chip{ font-size:.68rem; line-height:1.5; color:rgba(255,255,255,.62); background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.13); border-radius:11px; padding:8px 14px; max-width:460px; }
+  .disclaimer-chip strong{ color:rgba(255,255,255,.88); font-weight:700; }
 
-  /* ═══ SCENE 1 — THE TEST ═══ */
-  .disclaimer-chip{ font-size:.72rem; line-height:1.5; color:rgba(255,255,255,.68); background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14); border-radius:12px; padding:10px 16px; max-width:480px; }
-  .disclaimer-chip strong{ color:rgba(255,255,255,.92); font-weight:700; }
-
-  .property-card{ width:100%; background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 30px 70px rgba(0,0,0,.35); text-align:left; }
-  .property-visual{ position:relative; aspect-ratio:16/10; overflow:hidden; background:
-      linear-gradient(155deg,#101A33 0%,#1C2D5C 45%,#233B7A 100%); }
+  .property-card{ width:100%; background:#fff; border-radius:18px; overflow:hidden; box-shadow:0 26px 60px rgba(0,0,0,.32); text-align:left; }
+  .property-visual{ position:relative; aspect-ratio:16/8.5; overflow:hidden; background:linear-gradient(155deg,#101A33 0%,#1C2D5C 45%,#233B7A 100%); }
   .property-visual svg{ position:absolute; inset:0; width:100%; height:100%; }
   .property-visual .grain{ position:absolute; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E"); opacity:.06; mix-blend-mode:overlay; }
-  .property-status{ position:absolute; top:16px; left:16px; font-size:.66rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#0F172A; background:rgba(255,255,255,.92); padding:6px 12px; border-radius:100px; }
-  .property-price-tag{ position:absolute; bottom:16px; left:16px; font-family:var(--serif); font-size:1.6rem; font-weight:600; color:#fff; letter-spacing:-.01em; }
-  .property-body{ padding:22px 24px 24px; display:flex; flex-direction:column; gap:12px; }
-  .property-addr{ font-size:1.05rem; font-weight:800; color:var(--ink); letter-spacing:-.01em; }
-  .property-meta{ display:flex; flex-wrap:wrap; gap:8px; }
-  .property-meta span{ font-size:.72rem; font-weight:600; color:var(--ink-2); background:var(--paper-2); border:1px solid var(--line); padding:5px 11px; border-radius:100px; }
-  .property-desc{ font-size:.86rem; line-height:1.6; color:var(--ink-2); }
-  .property-agency-row{ display:flex; align-items:center; justify-content:space-between; padding-top:12px; border-top:1px solid var(--line); gap:10px; flex-wrap:wrap; }
-  .property-agency{ font-size:.78rem; color:var(--ink-3); }
+  .property-status{ position:absolute; top:14px; left:14px; font-size:.62rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#0F172A; background:rgba(255,255,255,.92); padding:5px 11px; border-radius:100px; }
+  .property-price-tag{ position:absolute; bottom:14px; left:14px; font-family:var(--serif); font-size:1.4rem; font-weight:600; color:#fff; letter-spacing:-.01em; }
+  .property-body{ padding:18px 20px 20px; display:flex; flex-direction:column; gap:10px; }
+  .property-addr{ font-size:.98rem; font-weight:800; color:var(--ink); letter-spacing:-.01em; }
+  .property-meta{ display:flex; flex-wrap:wrap; gap:7px; }
+  .property-meta span{ font-size:.68rem; font-weight:600; color:var(--ink-2); background:var(--paper-2); border:1px solid var(--line); padding:4px 10px; border-radius:100px; }
+  .property-agency-row{ display:flex; align-items:center; justify-content:space-between; padding-top:10px; border-top:1px solid var(--line); gap:10px; flex-wrap:wrap; }
+  .property-agency{ font-size:.74rem; color:var(--ink-3); }
   .property-agency strong{ color:var(--ink); font-weight:700; }
-  .property-link{ font-size:.76rem; font-weight:600; color:var(--accent); text-decoration:none; white-space:nowrap; }
+  .property-link{ font-size:.72rem; font-weight:600; color:var(--accent); text-decoration:none; white-space:nowrap; }
   .property-link:hover{ text-decoration:underline; }
 
-  /* ═══ SCENE 2 — THE EVIDENCE ═══ */
-  .grade-pill{ display:inline-flex; align-items:center; gap:8px; font-size:.72rem; font-weight:700; letter-spacing:.05em; color:#fff; background:rgba(245,158,11,.18); border:1px solid rgba(245,158,11,.4); padding:7px 14px; border-radius:100px; }
-  .grade-pill .g{ font-family:var(--serif); font-weight:700; font-size:.95rem; color:var(--amber); }
+  /* ═══ SCENE 2 — EVIDENCE ═══ */
+  .grade-pill{ display:inline-flex; align-items:center; gap:8px; font-size:.7rem; font-weight:700; letter-spacing:.05em; color:#fff; background:rgba(245,158,11,.18); border:1px solid rgba(245,158,11,.4); padding:6px 13px; border-radius:100px; }
+  .grade-pill .g{ font-family:var(--serif); font-weight:700; font-size:.9rem; color:var(--amber); }
 
   .trail{ width:100%; display:flex; flex-direction:column; align-items:stretch; text-align:left; }
-  .trail-item{ position:relative; padding:0 0 26px 34px; }
-  .trail-item::before{ content:''; position:absolute; left:5px; top:2px; width:11px; height:11px; border-radius:50%; background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,.14); }
-  .trail-item::after{ content:''; position:absolute; left:10px; top:16px; bottom:-4px; width:1.5px; background:rgba(255,255,255,.2); }
+  .trail-item{ position:relative; padding:0 0 20px 32px; }
+  .trail-item::before{ content:''; position:absolute; left:5px; top:2px; width:10px; height:10px; border-radius:50%; background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,.14); }
+  .trail-item::after{ content:''; position:absolute; left:9px; top:15px; bottom:-3px; width:1.5px; background:rgba(255,255,255,.2); }
   .trail-item:last-child::after{ display:none; }
   .trail-item.gap::before{ background:transparent; border:1.5px dashed rgba(255,255,255,.35); }
   .trail-item.gap::after{ background:repeating-linear-gradient(180deg, rgba(255,255,255,.25) 0 4px, transparent 4px 9px); }
-  .trail-label{ font-size:.66rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#93C5FD; display:flex; align-items:center; gap:10px; }
-  .trail-time{ font-size:.66rem; font-weight:600; color:rgba(255,255,255,.45); }
+  .trail-label{ font-size:.64rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:#93C5FD; display:flex; align-items:center; gap:9px; }
+  .trail-time{ font-size:.64rem; font-weight:600; color:rgba(255,255,255,.45); }
   .trail-item.gap .trail-label{ color:rgba(255,255,255,.5); }
-  .trail-msg{ margin-top:7px; font-size:.87rem; line-height:1.6; color:rgba(255,255,255,.82); background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:12px 14px; }
-  .trail-msg .who{ display:block; font-size:.68rem; font-weight:700; color:rgba(255,255,255,.5); margin-bottom:4px; letter-spacing:.02em; }
+  .trail-msg{ margin-top:6px; font-size:.83rem; line-height:1.58; color:rgba(255,255,255,.82); background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:11px; padding:11px 13px; }
+  .trail-msg .who{ display:block; font-size:.66rem; font-weight:700; color:rgba(255,255,255,.5); margin-bottom:4px; letter-spacing:.02em; }
   .trail-item.gap .trail-msg{ background:transparent; border-style:dashed; border-color:rgba(255,255,255,.18); color:rgba(255,255,255,.45); font-style:italic; }
-  .trail-badge{ display:inline-block; margin-top:4px; font-size:.64rem; font-weight:700; color:var(--green); }
+  .signal-hl{ background:rgba(245,158,11,.28); color:#FDE68A; border-radius:3px; padding:0 2px; font-style:normal; font-weight:600; }
+  .trail-badge{ display:inline-block; margin-top:6px; margin-right:8px; font-size:.62rem; font-weight:700; color:var(--green); }
+  .trail-badge.bad{ color:var(--red); }
   .trail-item.gap .trail-badge{ color:var(--red); }
 
-  /* ═══ SCENE 3 — INTERACTION ═══ */
-  .choice-row{ display:flex; flex-direction:column; gap:10px; width:100%; max-width:420px; }
-  .choice-btn{ font-family:'Inter',sans-serif; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.18); color:#fff; border-radius:14px; padding:15px 18px; font-size:.92rem; font-weight:600; cursor:pointer; text-align:left; display:flex; align-items:center; gap:12px; transition:background .15s, border-color .15s, transform .12s; }
-  .choice-btn:hover{ background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.36); transform:translateY(-1px); }
-  .choice-btn.picked{ background:rgba(37,99,235,.28); border-color:#93C5FD; }
-  .choice-btn .ico{ font-size:1.1rem; flex-shrink:0; }
-  .choice-reveal{ width:100%; max-width:460px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:16px 18px; text-align:left; font-size:.86rem; line-height:1.65; color:rgba(255,255,255,.78); display:none; }
-  .choice-reveal.show{ display:block; animation:msg-in .35s ease both; }
-  .choice-converge{ font-size:.92rem; line-height:1.65; color:rgba(255,255,255,.85); max-width:480px; display:none; }
-  .choice-converge.show{ display:block; animation:msg-in .35s ease both; }
-  .choice-converge strong{ color:#fff; }
+  /* ═══ SCENE 3 — THE GAP ═══ */
+  .opp-row{ display:flex; gap:12px; width:100%; max-width:440px; flex-wrap:wrap; justify-content:center; }
+  .opp-chip{ flex:1 1 180px; font-family:'Inter',sans-serif; background:rgba(255,255,255,.06); border:1.5px solid rgba(255,255,255,.2); color:#fff; border-radius:14px; padding:16px 14px; cursor:pointer; text-align:center; display:flex; flex-direction:column; gap:5px; transition:background .15s, border-color .15s, transform .12s; }
+  .opp-chip:hover{ background:rgba(255,255,255,.11); border-color:rgba(255,255,255,.38); transform:translateY(-1px); }
+  .opp-chip .oc-ico{ font-size:1.4rem; }
+  .opp-chip .oc-title{ font-size:.82rem; font-weight:800; letter-spacing:.02em; }
+  .opp-chip .oc-sub{ font-size:.7rem; color:rgba(255,255,255,.55); }
+  .opp-chip.picked-good{ background:rgba(34,197,94,.16); border-color:var(--green); }
+  .opp-chip.picked-bad{ background:rgba(239,68,68,.14); border-color:var(--red); }
+  .opp-reveal{ width:100%; max-width:440px; font-size:.8rem; font-weight:700; padding:9px 14px; border-radius:10px; text-align:center; display:none; }
+  .opp-reveal.show{ display:block; animation:msg-in .3s ease both; }
+  .opp-reveal.good{ background:rgba(34,197,94,.12); color:#86EFAC; border:1px solid rgba(34,197,94,.3); }
+  .opp-reveal.bad{ background:rgba(239,68,68,.1); color:#FCA5A5; border:1px solid rgba(239,68,68,.28); }
+  .opp-converge{ font-size:.94rem; line-height:1.6; color:rgba(255,255,255,.85); max-width:460px; display:none; }
+  .opp-converge.show{ display:block; animation:msg-in .35s ease both; }
+  .opp-converge strong{ color:#fff; }
   @keyframes msg-in{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
 
-  /* ═══ SCENE 4 — NOVUS THINKS ═══ */
-  .context-strip{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
-  .ctx-chip{ font-size:.68rem; font-weight:600; color:rgba(255,255,255,.75); background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.15); padding:6px 12px; border-radius:100px; }
-  .gen-card{ width:100%; background:#fff; border-radius:16px; padding:20px 22px; text-align:left; box-shadow:0 24px 60px rgba(0,0,0,.3); }
-  .gen-card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--line); }
-  .gen-card-when{ font-size:.7rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3); }
-  .gen-card-tag{ font-size:.64rem; font-weight:700; color:var(--accent); background:var(--accent-lo); padding:4px 10px; border-radius:100px; }
-  .gen-card-body{ font-size:.94rem; line-height:1.7; color:var(--ink); }
-  .payoff-line{ font-family:var(--serif); font-size:clamp(1.15rem,2.4vw,1.5rem); font-weight:600; line-height:1.45; color:#fff; max-width:520px; }
-  .payoff-line .strike{ color:rgba(255,255,255,.4); text-decoration:line-through; }
-  .payoff-line .highlight{ color:#FCA5A5; }
+  /* ═══ SCENE 4 — NOVUS RESOLVES ═══ */
+  .dual-pipeline{ display:flex; gap:18px; width:100%; max-width:520px; text-align:left; }
+  .dp-col{ flex:1; display:flex; flex-direction:column; gap:2px; }
+  .dp-col-label{ font-size:.6rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:rgba(255,255,255,.45); margin-bottom:8px; }
+  .dp-good .dp-col-label{ color:#93C5FD; }
+  .dp-step{ font-size:.74rem; font-weight:600; color:rgba(255,255,255,.35); padding:6px 0 6px 16px; position:relative; border-left:1.5px solid rgba(255,255,255,.12); transition:color .3s, border-color .3s; }
+  .dp-step::before{ content:''; position:absolute; left:-4.5px; top:11px; width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.15); transition:background .3s; }
+  .dp-bad .dp-step{ color:rgba(255,255,255,.55); }
+  .dp-bad .dp-step::before{ background:rgba(255,255,255,.3); }
+  .dp-bad .dp-step.miss{ color:#FCA5A5; }
+  .dp-bad .dp-step.miss::before{ background:var(--red); }
+  .dp-good .dp-step.on{ color:#fff; border-color:rgba(147,197,253,.4); }
+  .dp-good .dp-step.on::before{ background:var(--green); }
+  .gen-card{ width:100%; background:#fff; border-radius:14px; padding:16px 18px; text-align:left; box-shadow:0 20px 50px rgba(0,0,0,.28); }
+  .gen-card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+  .gen-card-when{ font-size:.66rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3); }
+  .gen-card-tag{ font-size:.6rem; font-weight:700; color:var(--accent); background:var(--accent-lo); padding:3px 9px; border-radius:100px; }
+  .gen-card-body{ font-size:.87rem; line-height:1.6; color:var(--ink); }
+  .payoff-line{ font-family:var(--serif); font-size:clamp(1.05rem,2.1vw,1.3rem); font-weight:600; line-height:1.4; color:#fff; max-width:500px; }
+  .payoff-line .highlight{ color:#93C5FD; }
 
-  /* ═══ SCENE 5 — OUTCOME ═══ */
-  .pipeline{ display:flex; flex-direction:column; gap:0; width:100%; max-width:380px; align-items:stretch; }
-  .pl-step{ display:flex; align-items:center; gap:14px; padding:10px 0; opacity:.3; transform:translateX(-8px); transition:opacity .5s ease, transform .5s ease; }
-  .pl-step.on{ opacity:1; transform:translateX(0); }
-  .pl-dot{ width:26px; height:26px; border-radius:50%; background:rgba(255,255,255,.08); border:1.5px solid rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:.7rem; font-weight:800; color:rgba(255,255,255,.5); transition:background .3s, border-color .3s, color .3s; }
-  .pl-step.on .pl-dot{ background:var(--green); border-color:var(--green); color:#fff; }
-  .pl-step.new .pl-dot{ background:var(--accent); border-color:var(--accent); }
-  .pl-label{ font-size:.88rem; font-weight:700; color:rgba(255,255,255,.4); letter-spacing:-.005em; transition:color .3s; text-align:left; }
-  .pl-step.on .pl-label{ color:#fff; }
-  .pl-step.new .pl-label::after{ content:'new'; margin-left:8px; font-size:.6rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#93C5FD; }
-  .pl-line{ width:1.5px; height:16px; background:rgba(255,255,255,.15); margin-left:13px; }
-  .outcome-card{ margin-top:6px; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); border-radius:14px; padding:14px 18px; display:none; align-items:center; gap:10px; }
-  .outcome-card.show{ display:flex; animation:msg-in .4s ease both; }
-  .outcome-card .ico{ font-size:1.2rem; }
-  .outcome-card-text b{ display:block; font-size:.88rem; color:#fff; font-weight:800; }
-  .outcome-card-text span{ font-size:.74rem; color:rgba(255,255,255,.6); }
+  /* ═══ SCENE 5 — THE SYSTEM ═══ */
+  .system-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%; text-align:left; }
+  .sys-panel{ background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:14px 14px 13px; display:flex; flex-direction:column; gap:9px; }
+  .sys-panel-head{ display:flex; align-items:center; gap:9px; }
+  .sys-panel-ico{ width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.08); display:flex;align-items:center;justify-content:center; font-size:.9rem; flex-shrink:0; }
+  .sys-panel-title{ font-size:.8rem; font-weight:800; color:#fff; letter-spacing:-.005em; }
+  .sys-panel-sub{ font-size:.68rem; color:rgba(255,255,255,.55); line-height:1.45; }
+  .sys-panel-open{ align-self:flex-start; font-family:'Inter',sans-serif; font-size:.68rem; font-weight:700; color:var(--navy-2); background:#fff; border:none; border-radius:100px; padding:6px 13px; cursor:pointer; transition:transform .12s; }
+  .sys-panel-open:hover{ transform:translateY(-1px); }
+  .sys-panel-body{ display:none; }
+  .sys-panel-body.open{ display:block; animation:msg-in .3s ease both; }
 
-  /* ═══ SCENE 6 — COMMERCIAL BRIDGE ═══ */
-  .bridge-flow{ display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; }
-  .bridge-node{ font-size:.72rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#fff; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.18); padding:10px 16px; border-radius:12px; }
-  .bridge-arrow{ color:rgba(255,255,255,.4); font-size:.9rem; }
-  .tier-note{ font-size:.86rem; line-height:1.6; color:rgba(255,255,255,.65); max-width:480px; }
-  .tier-note strong{ color:#fff; }
+  /* mini chat */
+  .mini-chat{ display:flex; flex-direction:column; height:230px; background:var(--paper-2); border-radius:10px; overflow:hidden; }
+  .mini-chat-msgs{ flex:1; overflow-y:auto; padding:9px; display:flex; flex-direction:column; gap:6px; }
+  .mini-msg{ max-width:86%; padding:7px 10px; border-radius:9px; font-size:.74rem; line-height:1.48; animation:msg-in .2s ease; }
+  .mini-msg.bot{ background:#fff; border:1px solid var(--line); align-self:flex-start; border-radius:3px 9px 9px 9px; color:var(--ink); }
+  .mini-msg.user{ background:var(--navy-2); color:#fff; align-self:flex-end; border-radius:9px 3px 9px 9px; font-weight:600; }
+  .mini-chat-inp-row{ display:flex; gap:6px; padding:8px; border-top:1px solid var(--line); background:#fff; flex-shrink:0; }
+  .mini-chat-inp{ flex:1; min-width:0; border:1px solid var(--line-hi); border-radius:100px; padding:7px 11px; font-size:.74rem; font-family:'Inter',sans-serif; outline:none; }
+  .mini-chat-inp:focus{ border-color:var(--accent); }
+  .mini-chat-send{ width:28px;height:28px;border-radius:50%;background:var(--accent);border:none;color:#fff;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center; }
+  .mini-chat-send:disabled{ opacity:.4; }
+  .mini-typing{ display:flex; gap:4px; align-items:center; padding:8px 11px; background:#fff; border:1px solid var(--line); border-radius:3px 9px 9px 9px; align-self:flex-start; width:fit-content; }
+  .mtd{ width:4px;height:4px;border-radius:50%;background:#94A3B8; animation:tdot 1.1s ease infinite; }
+  .mtd:nth-child(2){ animation-delay:.15s; } .mtd:nth-child(3){ animation-delay:.3s; }
+  @keyframes tdot{ 0%,60%,100%{transform:translateY(0);opacity:.3;} 30%{transform:translateY(-3px);opacity:1;} }
 
-  /* ═══ SCENE 7 — CTA ═══ */
-  .cta-actions{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:center; }
-  .cta-phone{ font-size:.86rem; color:rgba(255,255,255,.65); }
+  /* mini voice */
+  .mini-voice{ display:flex; flex-direction:column; align-items:center; gap:9px; padding:16px 10px; background:var(--paper-2); border-radius:10px; }
+  .mini-orb{ width:48px;height:48px;border-radius:50%;background:#fff;border:1.5px solid var(--line-hi);display:flex;align-items:center;justify-content:center;transition:background .3s,border-color .3s; font-size:1.1rem; }
+  .mini-orb.connecting{ animation:orb-connecting 1.3s ease infinite; }
+  .mini-orb.listening{ background:var(--accent); border-color:var(--accent); animation:orb-pulse 1.3s ease infinite; }
+  .mini-orb.speaking{ background:var(--accent-hi); border-color:var(--accent-hi); animation:orb-pulse-fast .7s ease infinite; }
+  @keyframes orb-connecting{ 0%,100%{opacity:1;} 50%{opacity:.4;} }
+  @keyframes orb-pulse{ 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.4);} 60%{box-shadow:0 0 0 14px rgba(37,99,235,0);} }
+  @keyframes orb-pulse-fast{ 0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.5);} 60%{box-shadow:0 0 0 16px rgba(37,99,235,0);} }
+  .mini-voice-status{ font-size:.64rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); }
+  .mini-voice-transcript{ font-size:.7rem; color:var(--ink-2); text-align:center; min-height:28px; font-style:italic; }
+  .mini-call-btn{ background:var(--navy-2); color:#fff; border:none; border-radius:100px; padding:8px 16px; font-size:.74rem; font-weight:700; cursor:pointer; }
+  .mini-end-btn{ background:none;border:1px solid rgba(239,68,68,.4); color:#FCA5A5; border-radius:8px; padding:5px 13px; font-size:.66rem; font-weight:700; cursor:pointer; }
+
+  /* signals / reactivation */
+  .chip-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .sig-chip{ font-family:'Inter',sans-serif; font-size:.68rem; font-weight:600; color:rgba(255,255,255,.8); background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.16); padding:6px 11px; border-radius:100px; cursor:pointer; transition:background .15s,border-color .15s; }
+  .sig-chip:hover{ background:rgba(255,255,255,.13); }
+  .sig-chip.active{ background:rgba(37,99,235,.35); border-color:#93C5FD; color:#fff; }
+  .sig-detail{ display:none; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14); border-radius:10px; padding:11px 12px; font-size:.72rem; line-height:1.55; color:rgba(255,255,255,.82); }
+  .sig-detail.show{ display:block; animation:msg-in .25s ease both; }
+  .sig-detail-row{ margin-bottom:6px; }
+  .sig-detail-row:last-child{ margin-bottom:0; }
+  .sig-detail-row b{ display:block; font-size:.6rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#93C5FD; margin-bottom:2px; }
+
+  .contact-list{ display:flex; flex-direction:column; gap:5px; }
+  .contact-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.13); border-radius:9px; padding:8px 11px; cursor:pointer; transition:background .15s,border-color .15s; }
+  .contact-row:hover{ background:rgba(255,255,255,.11); }
+  .contact-row.active{ background:rgba(37,99,235,.25); border-color:#93C5FD; }
+  .contact-name{ font-size:.74rem; font-weight:700; color:#fff; }
+  .contact-tag{ font-size:.62rem; color:rgba(255,255,255,.5); }
+  .contact-detail{ display:none; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14); border-radius:10px; padding:11px 12px; font-size:.72rem; line-height:1.55; color:rgba(255,255,255,.82); margin-top:2px; }
+  .contact-detail.show{ display:block; animation:msg-in .25s ease both; }
+  .contact-detail b{ display:block; font-size:.6rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#93C5FD; margin-bottom:2px; }
+  .contact-detail .msgline{ margin-top:7px; font-style:italic; color:#fff; }
+
+  /* ═══ SCENE 6 — CTA ═══ */
+  .cta-actions{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; justify-content:center; }
+  .cta-phone{ font-size:.82rem; color:rgba(255,255,255,.65); }
   .cta-phone a{ color:#93C5FD; font-weight:700; text-decoration:none; }
   .cta-phone a:hover{ text-decoration:underline; }
-  .cta-terms{ font-size:.76rem; color:rgba(255,255,255,.4); }
-  .calendly-wrap{ width:100%; max-width:640px; margin-top:6px; display:none; }
+  .cta-terms{ font-size:.74rem; color:rgba(255,255,255,.4); }
+  .calendly-wrap{ width:100%; max-width:620px; margin-top:4px; display:none; }
   .calendly-wrap.show{ display:block; }
-  .calendly-inline-widget{ min-width:300px; height:640px; border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,.15); background:#fff; }
-  .final-disclaimer{ font-size:.72rem; line-height:1.6; color:rgba(255,255,255,.4); max-width:480px; margin-top:8px; }
+  .calendly-inline-widget{ min-width:280px; height:600px; border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,.15); background:#fff; }
+  .final-disclaimer{ font-size:.68rem; line-height:1.55; color:rgba(255,255,255,.4); max-width:460px; margin-top:6px; }
   .final-disclaimer a{ color:rgba(255,255,255,.55); }
 
   @media (max-width:640px){
-    .chrome{ padding:14px 16px; }
-    .scene{ padding:90px 16px 90px; }
-    .property-price-tag{ font-size:1.3rem; }
-    .calendly-inline-widget{ height:560px; }
+    .chrome{ padding:12px 14px; }
+    .scene{ padding:78px 14px 84px; }
+    .property-price-tag{ font-size:1.15rem; }
+    .calendly-inline-widget{ height:540px; }
+    .dual-pipeline{ gap:10px; }
+    .dp-step{ font-size:.68rem; }
+    .system-grid{ grid-template-columns:1fr; }
+    .opp-row{ flex-direction:column; }
+    .fiction-badge{ display:none; }
   }
 </style>
 </head>
@@ -189,40 +254,43 @@
 
   <div class="chrome">
     <div class="brand"><img src="/novus-icon.png" alt="" /><span class="brand-word">NOVUS</span></div>
-    <div class="fiction-badge">Fictional test scenario</div>
+    <div class="chrome-right">
+      <div class="fiction-badge">Fictional test scenario</div>
+      <button class="system-btn" id="system-btn" onclick="goTo(5)">Explore the full NOVUS system</button>
+    </div>
   </div>
 
   <div class="progress" id="progress"></div>
 
   <div class="stage" id="stage">
 
-    <!-- SCENE 1 — THE TEST -->
+    <!-- SCENE 1 — THE PROPERTY -->
     <section class="scene active" data-scene="1">
       <div class="scene-inner">
-        <div class="eyebrow">The Test</div>
-        <h1 class="scene-h">We tested the journey<br/>behind this property.</h1>
+        <div class="eyebrow">One Property</div>
+        <h1 class="scene-h">We started with one<br/>of your properties.</h1>
         <div class="disclaimer-chip">Built on a <strong>real, publicly listed property</strong> from The Modern House for authenticity. The enquiry itself is <strong>fictional</strong> — this agency was not probed by NOVUS.</div>
 
         <div class="property-card">
           <div class="property-visual">
-            <svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">
-              <rect width="400" height="250" fill="none"/>
+            <svg viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice">
+              <rect width="400" height="220" fill="none"/>
               <g stroke="rgba(255,255,255,.16)" stroke-width="1">
-                <line x1="0" y1="150" x2="400" y2="150"/>
-                <line x1="60" y1="150" x2="60" y2="60"/>
-                <line x1="340" y1="150" x2="340" y2="60"/>
-                <line x1="60" y1="60" x2="340" y2="60"/>
-                <line x1="60" y1="105" x2="340" y2="105"/>
-                <line x1="150" y1="60" x2="150" y2="150"/>
-                <line x1="250" y1="60" x2="250" y2="150"/>
+                <line x1="0" y1="132" x2="400" y2="132"/>
+                <line x1="60" y1="132" x2="60" y2="48"/>
+                <line x1="340" y1="132" x2="340" y2="48"/>
+                <line x1="60" y1="48" x2="340" y2="48"/>
+                <line x1="60" y1="90" x2="340" y2="90"/>
+                <line x1="150" y1="48" x2="150" y2="132"/>
+                <line x1="250" y1="48" x2="250" y2="132"/>
               </g>
               <g fill="rgba(255,255,255,.10)">
-                <rect x="72" y="72" width="66" height="21" rx="1"/>
-                <rect x="162" y="72" width="76" height="21" rx="1"/>
-                <rect x="262" y="72" width="66" height="21" rx="1"/>
-                <rect x="72" y="117" width="66" height="21" rx="1"/>
-                <rect x="162" y="117" width="76" height="21" rx="1"/>
-                <rect x="262" y="117" width="66" height="21" rx="1"/>
+                <rect x="72" y="58" width="66" height="21" rx="1"/>
+                <rect x="162" y="58" width="76" height="21" rx="1"/>
+                <rect x="262" y="58" width="66" height="21" rx="1"/>
+                <rect x="72" y="101" width="66" height="21" rx="1"/>
+                <rect x="162" y="101" width="76" height="21" rx="1"/>
+                <rect x="262" y="101" width="66" height="21" rx="1"/>
               </g>
             </svg>
             <div class="grain"></div>
@@ -236,7 +304,6 @@
               <span>Split-level apartment</span>
               <span>Ground &amp; first floor</span>
             </div>
-            <p class="property-desc">Set within a critically acclaimed apartment block designed by architects dRMM — winner of the RIBA London Building of the Year. Described by The Guardian as "a minor masterpiece."</p>
             <div class="property-agency-row">
               <div class="property-agency">Listed by <strong>The Modern House</strong></div>
               <a class="property-link" href="https://themodernhouse.com/sales-list/centaur-street-ii" target="_blank" rel="noopener">View the real listing ↗</a>
@@ -257,7 +324,7 @@
         <div class="trail">
           <div class="trail-item">
             <div class="trail-label">Enquiry <span class="trail-time">Tue 4 Aug · 18:52</span></div>
-            <div class="trail-msg"><span class="who">Priya Shah · via themodernhouse.com</span>"Hi — really love the look of the Centaur Street apartment, the split-level layout especially. Is it still available? Would love to see it this weekend if possible."</div>
+            <div class="trail-msg"><span class="who">Priya Shah · via themodernhouse.com</span>"Hi — really love the look of the Centaur Street apartment, the split-level layout especially. Is it still available? <span class="signal-hl">Also, we're planning to sell our current place before we buy — do you do valuations?</span> Would love to see Centaur Street this weekend too."</div>
           </div>
           <div class="trail-item">
             <div class="trail-label">Automated acknowledgement <span class="trail-time">18:53</span></div>
@@ -267,119 +334,153 @@
             <div class="trail-label">Human response <span class="trail-time">19:15 · 23 minutes</span></div>
             <div class="trail-msg"><span class="who">Rosa · The Modern House</span>"Hi Priya — thanks for your interest, it's still available! I'd love to arrange a viewing — would Saturday morning or Sunday afternoon work? Let me know and I'll lock in a time."</div>
             <span class="trail-badge">✓ Fast, warm, specific</span>
+            <span class="trail-badge bad">✕ Valuation question — not addressed</span>
           </div>
           <div class="trail-item gap">
             <div class="trail-label">No follow-up <span class="trail-time">Wed 5 – Sat 8 Aug</span></div>
-            <div class="trail-msg">Priya didn't reply straight away. Nobody checked back. Four days later, the observation window closed.</div>
-            <span class="trail-badge">✕ Silence, not decline</span>
+            <div class="trail-msg">Priya didn't reply straight away. Nobody checked back — on the viewing, or the valuation. Four days later, the observation window closed.</div>
+            <span class="trail-badge bad">✕ Buyer nudge — never sent</span>
+            <span class="trail-badge bad">✕ Seller valuation — never mentioned again</span>
           </div>
         </div>
 
         <div class="grade-pill"><span class="g">Grade C</span> — very fast response, zero follow-up</div>
 
-        <button class="stepper-btn" onclick="nextScene()">The buyer has gone quiet <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+        <button class="stepper-btn" onclick="nextScene()">See what that actually means <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
       </div>
     </section>
 
-    <!-- SCENE 3 — THE PROSPECT INTERACTS -->
+    <!-- SCENE 3 — THE GAP -->
     <section class="scene" data-scene="3">
       <div class="scene-inner">
-        <div class="eyebrow">Your Call</div>
-        <h1 class="scene-h">The buyer has gone quiet.<br/>What happens next?</h1>
-        <p class="scene-sub">Rosa answered in 23 minutes. It's now four days later and Priya never confirmed a slot. What would you do?</p>
+        <div class="eyebrow">The Gap</div>
+        <h1 class="scene-h">One enquiry.<br/>How many opportunities?</h1>
+        <p class="scene-sub">Rosa answered fast and well. Look again at what actually came through the door.</p>
 
-        <div class="choice-row" id="choice-row">
-          <button class="choice-btn" data-choice="ring"><span class="ico">📞</span> Ring them</button>
-          <button class="choice-btn" data-choice="email"><span class="ico">✉️</span> Send a nudge email</button>
-          <button class="choice-btn" data-choice="leave"><span class="ico">—</span> Leave it — they'll come back if serious</button>
+        <div class="opp-row" id="opp-row">
+          <button class="opp-chip" data-opp="buyer"><span class="oc-ico">🏠</span><span class="oc-title">BUYER</span><span class="oc-sub">Centaur Street viewing</span></button>
+          <button class="opp-chip" data-opp="seller"><span class="oc-ico">💷</span><span class="oc-title">SELLER</span><span class="oc-sub">Valuation of current home</span></button>
         </div>
 
-        <div class="choice-reveal" id="choice-reveal"></div>
-        <div class="choice-converge" id="choice-converge">In this test, <strong>nobody did any of it</strong>. Not because Rosa dropped the ball — she was excellent. Because nothing in the system remembers to go back.</div>
+        <div class="opp-reveal good" id="opp-buyer-reveal">✓ Handled — Rosa replied in 23 minutes.</div>
+        <div class="opp-reveal bad" id="opp-seller-reveal">✕ Never followed — no valuation booked, no follow-up sent.</div>
+
+        <div class="opp-converge" id="opp-converge">Exactly. <strong>One enquiry contained two opportunities.</strong> Only one was ever picked up.</div>
 
         <button class="stepper-btn" id="btn-scene3-next" onclick="nextScene()" disabled>See what NOVUS would have done <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
       </div>
     </section>
 
-    <!-- SCENE 4 — NOVUS THINKS -->
+    <!-- SCENE 4 — NOVUS RESOLVES -->
     <section class="scene" data-scene="4">
       <div class="scene-inner">
         <div class="eyebrow">NOVUS Thinks</div>
-        <h1 class="scene-h">Same enquiry. Same reply.<br/>One difference.</h1>
+        <h1 class="scene-h">Same enquiry.<br/>Both opportunities caught.</h1>
 
-        <div class="context-strip">
-          <span class="ctx-chip">Centaur Street, SE1</span>
-          <span class="ctx-chip">Priya Shah</span>
-          <span class="ctx-chip">Human replied in 23 min</span>
-          <span class="ctx-chip">No reply since · day 2</span>
+        <div class="dual-pipeline">
+          <div class="dp-col dp-bad">
+            <div class="dp-col-label">What happened</div>
+            <div class="dp-step">Enquiry</div>
+            <div class="dp-step">Human response</div>
+            <div class="dp-step miss">Seller signal missed</div>
+            <div class="dp-step miss">Silence</div>
+            <div class="dp-step miss">Opportunity disappears</div>
+          </div>
+          <div class="dp-col dp-good" id="dp-good">
+            <div class="dp-col-label">What NOVUS does</div>
+            <div class="dp-step">Enquiry</div>
+            <div class="dp-step">Detects buyer + seller intent</div>
+            <div class="dp-step">Buyer follow-up</div>
+            <div class="dp-step">Seller follow-up</div>
+            <div class="dp-step">Viewing + valuation booked</div>
+          </div>
         </div>
 
         <div class="gen-card">
           <div class="gen-card-head">
-            <span class="gen-card-when">Day 2 · 10:04am — follow-up NOVUS sends</span>
+            <span class="gen-card-when">Day 2 · 10:04am — message NOVUS sends</span>
             <span class="gen-card-tag">Generated</span>
           </div>
-          <div class="gen-card-body">"Hi Priya, just following up on Centaur Street in case Saturday works better for a look — the ground floor with that little garden is worth seeing in person before it gets booked up. I've held two slots: Sat 10am or Sun 2pm. Whichever suits, just let me know and I'll confirm it."</div>
+          <div class="gen-card-body">"Hi Priya, just following up on Centaur Street — if you'd still like to view it, I can help arrange a time. You also mentioned you're looking to sell your current place — if that's still the case, we'd be happy to arrange a valuation for you too."</div>
         </div>
 
         <p class="payoff-line">The human response was good.<br/><span class="highlight">The system failed to finish the job.</span></p>
 
-        <button class="stepper-btn" onclick="nextScene()">See it through <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+        <button class="stepper-btn" onclick="nextScene()">That was one enquiry <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
       </div>
     </section>
 
-    <!-- SCENE 5 — THE OUTCOME -->
+    <!-- SCENE 5 — THE FULL SYSTEM -->
     <section class="scene" data-scene="5">
-      <div class="scene-inner">
-        <div class="eyebrow">The Outcome</div>
-        <h1 class="scene-h">The same enquiry, finished.</h1>
+      <div class="scene-inner wide">
+        <div class="eyebrow">The Full System</div>
+        <h1 class="scene-h">That was one enquiry.<br/>Here's what runs underneath.</h1>
+        <p class="scene-sub">Your team already has the opportunities. NOVUS makes sure they don't disappear. Try each part below.</p>
 
-        <div class="pipeline" id="pipeline">
-          <div class="pl-step" data-step="1"><div class="pl-dot">1</div><div class="pl-label">Enquiry</div></div>
-          <div class="pl-line"></div>
-          <div class="pl-step" data-step="2"><div class="pl-dot">2</div><div class="pl-label">Response</div></div>
-          <div class="pl-line"></div>
-          <div class="pl-step new" data-step="3"><div class="pl-dot">3</div><div class="pl-label">Follow-up</div></div>
-          <div class="pl-line"></div>
-          <div class="pl-step new" data-step="4"><div class="pl-dot">4</div><div class="pl-label">Qualification</div></div>
-          <div class="pl-line"></div>
-          <div class="pl-step new" data-step="5"><div class="pl-dot">5</div><div class="pl-label">Booking</div></div>
+        <div class="system-grid">
+
+          <!-- AI FRONT DESK -->
+          <div class="sys-panel">
+            <div class="sys-panel-head"><div class="sys-panel-ico">📞</div><div class="sys-panel-title">AI Front Desk</div></div>
+            <div class="sys-panel-sub">Coverage when your team's busy or out of hours. Call the agency and try it as a buyer or a seller.</div>
+            <button class="sys-panel-open" onclick="openPanel('voice')">Call the agency →</button>
+            <div class="sys-panel-body" id="panel-voice">
+              <div class="mini-voice">
+                <div class="mini-orb idle" id="mv-orb">🎙️</div>
+                <div class="mini-voice-status" id="mv-status">Ready</div>
+                <div class="mini-voice-transcript" id="mv-transcript">You're calling The Modern House's AI front desk.</div>
+                <button class="mini-call-btn" id="mv-call-btn" onclick="startMiniCall()">Call now</button>
+                <button class="mini-end-btn" id="mv-end-btn" onclick="endMiniCall()" style="display:none">End call</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- CONVERSATIONAL AI -->
+          <div class="sys-panel">
+            <div class="sys-panel-head"><div class="sys-panel-ico">💬</div><div class="sys-panel-title">Conversational AI</div></div>
+            <div class="sys-panel-sub">The same intelligence, in chat. Send a message and see it progress the conversation.</div>
+            <button class="sys-panel-open" onclick="openPanel('chat')">Message the agency →</button>
+            <div class="sys-panel-body" id="panel-chat">
+              <div class="mini-chat">
+                <div class="mini-chat-msgs" id="mc-msgs"></div>
+                <div class="mini-chat-inp-row">
+                  <input class="mini-chat-inp" id="mc-inp" type="text" placeholder="Ask about Centaur Street…" />
+                  <button class="mini-chat-send" id="mc-send" onclick="sendMiniChat()"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- NOVUS INTELLIGENCE -->
+          <div class="sys-panel">
+            <div class="sys-panel-head"><div class="sys-panel-ico">🧠</div><div class="sys-panel-title">NOVUS Intelligence</div></div>
+            <div class="sys-panel-sub">More than a chatbot — it reads signals and decides what needs to happen next.</div>
+            <button class="sys-panel-open" onclick="openPanel('intel')">See the signals →</button>
+            <div class="sys-panel-body" id="panel-intel">
+              <div class="chip-row" id="intel-chips"></div>
+              <div class="sig-detail" id="intel-detail" style="margin-top:9px;"></div>
+            </div>
+          </div>
+
+          <!-- SELLER REACTIVATION -->
+          <div class="sys-panel">
+            <div class="sys-panel-head"><div class="sys-panel-ico">🔁</div><div class="sys-panel-title">Seller Reactivation</div></div>
+            <div class="sys-panel-sub">Not a mass campaign — NOVUS identifies who's worth speaking to, and why.</div>
+            <button class="sys-panel-open" onclick="openPanel('react')">See the list →</button>
+            <div class="sys-panel-body" id="panel-react">
+              <div class="contact-list" id="react-list"></div>
+              <div class="contact-detail" id="react-detail"></div>
+            </div>
+          </div>
+
         </div>
-
-        <div class="outcome-card" id="outcome-card">
-          <span class="ico">📅</span>
-          <div class="outcome-card-text"><b>Viewing booked · Sat 10:00am</b><span>Centaur Street, SE1 — illustrative outcome</span></div>
-        </div>
-
-        <p class="scene-sub">Nothing about Rosa's job changes. NOVUS just finishes what she started.</p>
-
-        <button class="stepper-btn" onclick="nextScene()">Why this matters <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
-      </div>
-    </section>
-
-    <!-- SCENE 6 — COMMERCIAL BRIDGE -->
-    <section class="scene" data-scene="6">
-      <div class="scene-inner">
-        <div class="eyebrow">Why It Matters</div>
-        <h1 class="scene-h">You already paid to<br/>generate the enquiry.</h1>
-        <p class="scene-sub">NOVUS makes sure the opportunity doesn't stop at the first response.</p>
-
-        <div class="bridge-flow">
-          <span class="bridge-node">More enquiries progressed</span>
-          <span class="bridge-arrow">→</span>
-          <span class="bridge-node">More viewings</span>
-          <span class="bridge-arrow">→</span>
-          <span class="bridge-node">More completed opportunities</span>
-        </div>
-
-        <p class="tier-note"><strong>Tier 1 / Core.</strong> NOVUS doesn't replace your front desk — it makes sure enquiries like this one keep moving after it.</p>
 
         <button class="stepper-btn" onclick="nextScene()">See the next step <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
       </div>
     </section>
 
-    <!-- SCENE 7 — CTA -->
-    <section class="scene" data-scene="7">
+    <!-- SCENE 6 — CTA -->
+    <section class="scene" data-scene="6">
       <div class="scene-inner">
         <div class="eyebrow">Next Step</div>
         <h1 class="scene-h">The demo is the proof.<br/>The calendar's the next step.</h1>
@@ -402,7 +503,8 @@
   </div>
 
 <script>
-  const TOTAL = 7;
+  const TOTAL = 6;
+  const STAGE_LABELS = ['Property', 'Evidence', 'The Gap', 'NOVUS', 'The System', 'Next Step'];
   let scene = 1;
 
   const progressEl = document.getElementById('progress');
@@ -410,6 +512,7 @@
     const d = document.createElement('div');
     d.className = 'd' + (i === 1 ? ' on' : '');
     d.dataset.i = i;
+    d.dataset.label = STAGE_LABELS[i - 1];
     progressEl.appendChild(d);
   }
 
@@ -424,45 +527,46 @@
   function goTo(n) {
     if (n < 1 || n > TOTAL) return;
     document.querySelectorAll('.scene').forEach((s) => s.classList.remove('active'));
-    const target = document.querySelector('.scene[data-scene="' + n + '"]');
-    target.classList.add('active');
+    document.querySelector('.scene[data-scene="' + n + '"]').classList.add('active');
     scene = n;
     renderProgress();
-    window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
-    if (n === 5) animatePipeline();
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    document.getElementById('system-btn').classList.toggle('hide', n >= 5);
   }
   function nextScene() { goTo(scene + 1); }
-  window.nextScene = nextScene;
+  window.nextScene = nextScene; window.goTo = goTo;
 
-  // ── Scene 3: interaction ──
-  const CHOICE_COPY = {
-    ring: "Sure — if you remember, if you're not mid-viewing, and if you still have the context of what Priya originally asked. Most agents are juggling 30+ live threads like this one.",
-    email: "Someone has to notice the silence, find the thread, and write something worth sending — today, not next week.",
-    leave: "This is the default outcome. No one decided to drop it. It just... didn't happen. That's most enquiries that go quiet."
-  };
-  document.getElementById('choice-row').addEventListener('click', (e) => {
-    const btn = e.target.closest('.choice-btn');
+  // ── Scene 3: the gap interaction ──
+  let oppPicked = { buyer: false, seller: false };
+  document.getElementById('opp-row').addEventListener('click', (e) => {
+    const btn = e.target.closest('.opp-chip');
     if (!btn) return;
-    document.querySelectorAll('.choice-btn').forEach((b) => b.classList.remove('picked'));
-    btn.classList.add('picked');
-    const reveal = document.getElementById('choice-reveal');
-    reveal.textContent = CHOICE_COPY[btn.dataset.choice];
-    reveal.classList.add('show');
-    document.getElementById('choice-converge').classList.add('show');
-    document.getElementById('btn-scene3-next').removeAttribute('disabled');
+    const kind = btn.dataset.opp;
+    oppPicked[kind] = true;
+    btn.classList.add(kind === 'buyer' ? 'picked-good' : 'picked-bad');
+    document.getElementById('opp-' + kind + '-reveal').classList.add('show');
+    if (oppPicked.buyer && oppPicked.seller) {
+      document.getElementById('opp-converge').classList.add('show');
+      document.getElementById('btn-scene3-next').removeAttribute('disabled');
+    }
   });
 
-  // ── Scene 5: pipeline animation ──
-  let pipelineAnimated = false;
-  function animatePipeline() {
-    if (pipelineAnimated) return;
-    pipelineAnimated = true;
-    const steps = [...document.querySelectorAll('#pipeline .pl-step')];
-    steps.forEach((s, i) => {
-      setTimeout(() => { s.classList.add('on'); }, 220 * i);
-    });
-    setTimeout(() => { document.getElementById('outcome-card').classList.add('show'); }, 220 * steps.length + 200);
+  // ── Scene 4: dual pipeline reveal on entry ──
+  let dpAnimated = false;
+  function animateDualPipeline() {
+    if (dpAnimated) return;
+    dpAnimated = true;
+    document.querySelectorAll('.dp-bad .dp-step').forEach((s) => s.classList.add('miss-shown'));
+    const goodSteps = [...document.querySelectorAll('#dp-good .dp-step')];
+    goodSteps.forEach((s, i) => setTimeout(() => s.classList.add('on'), 200 * i));
   }
+
+  const origGoTo = goTo;
+  goTo = function(n) {
+    origGoTo(n);
+    if (n === 4) animateDualPipeline();
+  };
+  window.goTo = goTo;
 
   function revealCalendly() {
     document.getElementById('calendly-wrap').classList.add('show');
@@ -470,12 +574,170 @@
   }
   window.revealCalendly = revealCalendly;
 
-  // Keyboard nav (desktop convenience)
+  // Keyboard nav
   document.addEventListener('keydown', (e) => {
     if (scene === 3 && document.getElementById('btn-scene3-next').hasAttribute('disabled')) return;
     if (e.key === 'ArrowRight') nextScene();
     if (e.key === 'ArrowLeft') goTo(scene - 1);
   });
+
+  // ═══════════════ SCENE 5 — THE FULL SYSTEM ═══════════════
+
+  function openPanel(id) {
+    const body = document.getElementById('panel-' + id);
+    const willOpen = !body.classList.contains('open');
+    document.querySelectorAll('.sys-panel-body').forEach((b) => b.classList.remove('open'));
+    if (willOpen) {
+      body.classList.add('open');
+      if (id === 'chat' && !mcInited) initMiniChat();
+      if (id === 'intel' && !intelInited) initIntel();
+      if (id === 'react' && !reactInited) initReact();
+    }
+  }
+  window.openPanel = openPanel;
+
+  const AGENCY_NAME = 'The Modern House';
+  const AGENCY_URL = 'https://themodernhouse.com';
+  const VAPI_PUBLIC_KEY = 'a154a7cb-a164-4fd8-bf2d-6b3aaba450a0';
+
+  const DEMO_SYSTEM_PROMPT_BASE =
+    "You are the AI front desk for The Modern House, an independent UK estate agency known for design-led homes and magazine-quality photography, founded 2005. You handle enquiries from buyers, sellers, tenants and landlords. Speak as the agency (\"we\"), warm, concise, professional British English.\n\n" +
+    "You know about one live listing for certain: Centaur Street, Waterloo, London SE1 - a two-bedroom (plus study) split-level apartment across the ground and first floor of an award-winning block designed by architects dRMM (RIBA London Building of the Year), guide price GBP 1,500,000. Beyond this one listing you do not have a live feed of stock - never invent other specific properties, prices or availability. If asked about something else, say you don't have that in front of you right now and offer to take details for the team to confirm, or the phone number.\n\n" +
+    "This is a demonstration. You cannot actually book anything - there is no live diary. Capture the person's intent (buyer or seller), take their name and rough requirement, and say the team will confirm shortly. Never claim a booking is done.\n\n" +
+    "Distinguish a VIEWING (buyer wants to see Centaur Street or similar) from a VALUATION (someone wants their own home valued to sell) - treat a valuation enquiry as a priority seller lead and lean in on it.\n\n" +
+    "Keep replies to 2-3 short sentences. Never use em dashes or en dashes - use a plain hyphen or rephrase.";
+
+  function buildDemoPrompt(mode) {
+    const voiceRule = mode === 'voice' ? '\n\nVOICE: Natural full sentences only, no lists, maximum 2 short sentences per turn.' : '';
+    return DEMO_SYSTEM_PROMPT_BASE + voiceRule;
+  }
+
+  function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+
+  // ── mini chat ──
+  let mcInited = false, mcHistory = [], mcSending = false;
+  function initMiniChat() {
+    mcInited = true;
+    addMiniMsg("Hi, you're through to " + AGENCY_NAME + " — are you looking to buy, sell, or both?", 'bot');
+    document.getElementById('mc-inp').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMiniChat(); });
+  }
+  function addMiniMsg(text, role) {
+    const c = document.getElementById('mc-msgs');
+    const d = document.createElement('div');
+    d.className = 'mini-msg ' + role;
+    d.innerHTML = esc(text);
+    c.appendChild(d);
+    c.scrollTop = c.scrollHeight;
+  }
+  async function sendMiniChat() {
+    if (mcSending) return;
+    const inp = document.getElementById('mc-inp');
+    const text = inp.value.trim();
+    if (!text) return;
+    mcSending = true; inp.value = ''; document.getElementById('mc-send').disabled = true;
+    addMiniMsg(text, 'user'); mcHistory.push({ role: 'user', content: text });
+    const c = document.getElementById('mc-msgs');
+    const typing = document.createElement('div');
+    typing.className = 'mini-typing'; typing.id = 'mc-typing';
+    typing.innerHTML = '<div class="mtd"></div><div class="mtd"></div><div class="mtd"></div>';
+    c.appendChild(typing); c.scrollTop = c.scrollHeight;
+    try {
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: mcHistory, systemPrompt: buildDemoPrompt('chat'), agencyName: AGENCY_NAME, agencyUrl: AGENCY_URL }) });
+      const data = await res.json();
+      document.getElementById('mc-typing')?.remove();
+      const reply = data.reply || "Sorry, I couldn't process that — try again!";
+      addMiniMsg(reply, 'bot'); mcHistory.push({ role: 'assistant', content: reply });
+    } catch (e) {
+      document.getElementById('mc-typing')?.remove();
+      addMiniMsg('Having trouble connecting right now — please try again.', 'bot');
+    }
+    mcSending = false; document.getElementById('mc-send').disabled = false; inp.focus();
+  }
+  window.sendMiniChat = sendMiniChat;
+
+  // ── mini voice (Vapi) ──
+  let mv = null, mvActive = false;
+  function startMiniCall() {
+    document.getElementById('mv-call-btn').style.display = 'none';
+    document.getElementById('mv-end-btn').style.display = 'inline-block';
+    const orb = document.getElementById('mv-orb'), statusEl = document.getElementById('mv-status'), transcript = document.getElementById('mv-transcript');
+    orb.className = 'mini-orb connecting'; statusEl.textContent = 'Connecting…'; transcript.textContent = 'Connecting to the AI front desk…';
+    try {
+      const VapiSDK = window._VapiClass;
+      if (!VapiSDK || typeof VapiSDK !== 'function') throw new Error('Voice not ready yet — try again in a moment');
+      mv = new VapiSDK(VAPI_PUBLIC_KEY);
+      mv.on('call-start', () => { mvActive = true; orb.className = 'mini-orb listening'; statusEl.textContent = 'Listening…'; transcript.textContent = 'Go ahead — ask about Centaur Street, or say you have a property to sell.'; });
+      mv.on('speech-start', () => { orb.className = 'mini-orb speaking'; statusEl.textContent = 'Speaking…'; });
+      mv.on('speech-end', () => { orb.className = 'mini-orb listening'; statusEl.textContent = 'Listening…'; });
+      mv.on('message', (msg) => { if (msg.type === 'transcript' && msg.transcriptType === 'final') transcript.textContent = msg.transcript; });
+      mv.on('call-end', () => { mvActive = false; orb.className = 'mini-orb idle'; statusEl.textContent = 'Call ended'; transcript.textContent = 'Thanks for calling — the team will be in touch.'; document.getElementById('mv-call-btn').style.display = 'inline-block'; document.getElementById('mv-call-btn').textContent = 'Call again'; document.getElementById('mv-end-btn').style.display = 'none'; });
+      mv.on('error', (e) => { console.error('Vapi error:', e); mvActive = false; orb.className = 'mini-orb idle'; statusEl.textContent = 'Connection error'; transcript.textContent = 'Could not connect — please try again.'; document.getElementById('mv-call-btn').style.display = 'inline-block'; document.getElementById('mv-end-btn').style.display = 'none'; });
+      mv.start({ name: AGENCY_NAME + ' Receptionist', firstMessage: 'Hi! Thanks for calling ' + AGENCY_NAME + ' — how can I help you today?', transcriber: { provider: 'deepgram', model: 'nova-2', language: 'en-GB' }, voice: { provider: '11labs', voiceId: 'sarah' }, model: { provider: 'openai', model: 'gpt-4o-mini', messages: [{ role: 'system', content: buildDemoPrompt('voice') }] } });
+    } catch (err) {
+      orb.className = 'mini-orb idle'; statusEl.textContent = 'Unavailable'; transcript.textContent = 'Voice unavailable: ' + err.message;
+      document.getElementById('mv-call-btn').style.display = 'inline-block'; document.getElementById('mv-end-btn').style.display = 'none';
+    }
+  }
+  function endMiniCall() {
+    if (mv) { try { if (mvActive) mv.stop(); } catch (e) {} mv = null; }
+    mvActive = false;
+    document.getElementById('mv-end-btn').style.display = 'none';
+    document.getElementById('mv-call-btn').style.display = 'inline-block';
+    document.getElementById('mv-call-btn').textContent = 'Call again';
+  }
+  window.startMiniCall = startMiniCall; window.endMiniCall = endMiniCall;
+
+  // ── NOVUS Intelligence panel ──
+  let intelInited = false;
+  const SIGNALS = [
+    { id: 'seller', label: 'Seller mentioned', why: 'Buyer enquiry included an unprompted intent to sell.', knows: 'Priya Shah — mentioned selling her current property, no valuation booked.', next: 'Send a valuation-focused follow-up alongside the viewing reply.' },
+    { id: 'quiet', label: 'Buyer went quiet', why: 'No reply four days after a fast, positive human response.', knows: 'Last contact: human reply, 19:15, 4 Aug — no reply since.', next: 'Send a low-pressure nudge with alternative viewing slots.' },
+    { id: 'valuation', label: 'Past valuation, no sale', why: 'A valuation was given but never converted to an instruction.', knows: 'Valuation given previously; no listing agreed; no recent contact.', next: 'Re-engage with a short market update for their road.' },
+    { id: 'vendor', label: 'Previous vendor', why: 'Sold through the agency before — a warm relationship already exists.', knows: 'Completed a sale previously; may be moving again.', next: 'A short personal check-in, not a mass email.' },
+    { id: 'unanswered', label: 'Unanswered enquiry', why: 'A question inside a reply thread was never actually answered.', knows: 'Enquiry contained a second question with no matching reply.', next: 'Flag it back to the team before the trail goes cold.' },
+  ];
+  function initIntel() {
+    intelInited = true;
+    const row = document.getElementById('intel-chips');
+    row.innerHTML = SIGNALS.map((s) => '<button class="sig-chip" data-sig="' + s.id + '">' + esc(s.label) + '</button>').join('');
+    row.addEventListener('click', (e) => {
+      const btn = e.target.closest('.sig-chip');
+      if (!btn) return;
+      row.querySelectorAll('.sig-chip').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      const s = SIGNALS.find((x) => x.id === btn.dataset.sig);
+      const detail = document.getElementById('intel-detail');
+      detail.innerHTML =
+        '<div class="sig-detail-row"><b>Why flagged</b>' + esc(s.why) + '</div>' +
+        '<div class="sig-detail-row"><b>What it knows</b>' + esc(s.knows) + '</div>' +
+        '<div class="sig-detail-row"><b>Next best action</b>' + esc(s.next) + '</div>';
+      detail.classList.add('show');
+    });
+  }
+
+  // ── Seller Reactivation panel ──
+  let reactInited = false;
+  const CONTACTS = [
+    { id: 'c1', name: 'M. Whitfield', tag: 'Past valuation · 8 months ago', why: "Valued at £1.4m, never listed. Two comparable sales on the same road since.", action: '"Hi Mark — your road\'s had two sales since we valued your place. Worth another look?"' },
+    { id: 'c2', name: 'S. Okafor', tag: 'Lost vendor · sale fell through', why: 'Sale collapsed at exchange. Property was never relisted.', action: '"Hi Sade — sorry the last one fell through. Keen to try again when you are."' },
+    { id: 'c3', name: 'R. Bianchi', tag: 'Applicant · registered 6 months ago', why: 'Still actively looking, and matches current stock closely.', action: '"Hi Rosa — a new listing just came in that matches what you\'re after."' },
+    { id: 'c4', name: 'J. Underwood', tag: 'Previous seller · sold via us in 2019', why: 'Owned the property six years — around the typical hold time for a next move in this area.', action: '"Hi James — it\'s been a while. Thinking about your next move?"' },
+  ];
+  function initReact() {
+    reactInited = true;
+    const list = document.getElementById('react-list');
+    list.innerHTML = CONTACTS.map((c) => '<div class="contact-row" data-c="' + c.id + '"><div><div class="contact-name">' + esc(c.name) + '</div><div class="contact-tag">' + esc(c.tag) + '</div></div><span>›</span></div>').join('');
+    list.addEventListener('click', (e) => {
+      const row = e.target.closest('.contact-row');
+      if (!row) return;
+      list.querySelectorAll('.contact-row').forEach((r) => r.classList.remove('active'));
+      row.classList.add('active');
+      const c = CONTACTS.find((x) => x.id === row.dataset.c);
+      const detail = document.getElementById('react-detail');
+      detail.innerHTML = '<b>Why prioritised</b>' + esc(c.why) + '<div class="msgline">' + c.action + '</div>';
+      detail.classList.add('show');
+    });
+  }
 </script>
 </body>
 </html>
