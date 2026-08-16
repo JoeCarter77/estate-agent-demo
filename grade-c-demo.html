@@ -87,6 +87,8 @@
   h1.scene-h{ font-family:var(--serif); font-size:clamp(1.28rem,2.5vw,1.75rem); font-weight:600; line-height:1.22; letter-spacing:-.01em; color:#fff; }
   p.scene-sub{ font-size:.82rem; line-height:1.5; color:rgba(255,255,255,.66); max-width:470px; }
   .micro-note{ font-size:.62rem; line-height:1.45; color:rgba(255,255,255,.32); max-width:420px; }
+  .scroll-hint{ animation:hint-bob 1.8s ease-in-out infinite; }
+  @keyframes hint-bob{ 0%,100%{ transform:translateY(0); opacity:.32; } 50%{ transform:translateY(3px); opacity:.55; } }
 
   .stepper-btn{ display:inline-flex; align-items:center; gap:8px; background:#fff; color:var(--navy-2); border:none; border-radius:100px; padding:11px 20px; font-family:'Inter',sans-serif; font-size:.81rem; font-weight:800; cursor:pointer; box-shadow:0 8px 22px rgba(0,0,0,.26); transition:transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s; }
   .stepper-btn:hover{ transform:translateY(-2px); box-shadow:0 13px 30px rgba(0,0,0,.32); }
@@ -149,6 +151,7 @@
   .branch.no{ border-color:rgba(239,68,68,.4); background:rgba(239,68,68,.07); }
   .br-mark{ font-size:1.15rem; line-height:1; }
   .branch.ok .br-mark{ color:#86EFAC; } .branch.no .br-mark{ color:#FCA5A5; }
+  .br-who{ font-size:.56rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.4); }
   .br-name{ font-size:.9rem; font-weight:800; color:#fff; letter-spacing:-.01em; }
   .br-state{ font-size:.6rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; }
   .branch.ok .br-state{ color:#86EFAC; } .branch.no .br-state{ color:#FCA5A5; }
@@ -211,7 +214,6 @@
   /* cards — one accent each, used only for small signals */
   .sys-panel{ background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.13); border-radius:13px; padding:11px 12px 10px; display:flex; flex-direction:column; gap:6px; transition:border-color .2s, background .2s; }
   .sys-panel:hover{ border-color:color-mix(in srgb, var(--c) 42%, transparent); background:color-mix(in srgb, var(--c) 5%, transparent); }
-  .sys-panel.opened{ border-color:color-mix(in srgb, var(--c) 50%, transparent); }
   .sys-panel.c1{ --c:#7DD3FC; } .sys-panel.c2{ --c:#A5B4FC; }
   .sys-panel.c3{ --c:#5EEAD4; } .sys-panel.c4{ --c:#FDBA74; }
   .sys-panel-head{ display:flex; align-items:center; gap:7px; }
@@ -220,12 +222,7 @@
   .sys-panel-name{ font-size:.57rem; font-weight:700; letter-spacing:.11em; text-transform:uppercase; color:var(--c); }
   .sys-panel-title{ font-size:.86rem; font-weight:800; color:#fff; letter-spacing:-.01em; line-height:1.3; }
   .sys-panel-sub{ font-size:.675rem; color:rgba(255,255,255,.52); line-height:1.4; }
-  .sys-panel-open{ align-self:flex-start; font-family:'Inter',sans-serif; font-size:.655rem; font-weight:700; color:var(--navy-2); background:#fff; border:none; border-radius:100px; padding:6px 12px; cursor:pointer; transition:transform .12s; margin-top:1px; }
-  .sys-panel-open:hover{ transform:translateY(-1px); }
-  .sys-panel-body{ display:none; }
-  .sys-panel-body.open{ display:block; animation:msg-in .3s ease both; }
   .mini-vis{ margin-top:1px; }
-  .sys-panel.opened .mini-vis{ display:none; }
   @keyframes msg-in{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
 
   /* 01 — CRM contact list */
@@ -251,26 +248,40 @@
   .chain b{ font-size:.53rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; padding:3px 8px; border-radius:100px; white-space:nowrap; background:color-mix(in srgb, var(--c) 14%, transparent); border:1px solid color-mix(in srgb, var(--c) 42%, transparent); color:var(--c); }
   .chain-branch{ padding-left:22px; margin-top:4px; }
   .chain-branch::before{ content:'↳'; color:rgba(255,255,255,.24); font-size:.62rem; }
+  .sys-panel:hover .chain b{ animation:node-glow 1s ease; }
+  @keyframes node-glow{ 0%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--c) 55%, transparent); } 55%{ box-shadow:0 0 0 7px transparent; } 100%{ box-shadow:none; } }
 
   /* 03 — reactivation rows */
-  .react-row{ display:flex; align-items:center; gap:8px; padding:4px 0; }
+  .react-row{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:4px 0; }
   .react-row .crm-av{ background:color-mix(in srgb, var(--c) 20%, transparent); }
   .react-when{ font-size:.55rem; color:rgba(255,255,255,.4); margin-left:auto; white-space:nowrap; }
   .react-act{ font-size:.5rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; padding:2px 7px; border-radius:100px; white-space:nowrap; background:color-mix(in srgb, var(--c) 14%, transparent); border:1px solid color-mix(in srgb, var(--c) 40%, transparent); color:var(--c); }
   .react-act.soft{ background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.16); color:rgba(255,255,255,.5); }
+  .react-why{ flex-basis:100%; font-size:.6rem; color:rgba(255,255,255,.5); line-height:1.4; max-height:0; opacity:0; overflow:hidden; transition:max-height .35s ease, opacity .3s ease, margin .35s ease; }
+  .sys-panel:hover .react-why{ max-height:40px; opacity:1; margin-top:2px; }
 
   /* 04 — incoming call */
   .call-when{ display:flex; align-items:center; gap:7px; }
   .call-live{ font-size:.5rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--c); background:color-mix(in srgb, var(--c) 13%, transparent); border:1px solid color-mix(in srgb, var(--c) 40%, transparent); padding:2px 7px; border-radius:100px; }
   .call-day{ font-size:.53rem; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:rgba(255,255,255,.4); }
   .call-quote{ font-size:.645rem; line-height:1.4; color:rgba(255,255,255,.78); font-style:italic; margin-top:5px; padding-left:9px; border-left:2px solid color-mix(in srgb, var(--c) 50%, transparent); }
-  .call-acts{ display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
-  .call-acts span{ font-size:.52rem; font-weight:700; padding:3px 8px; border-radius:100px; background:color-mix(in srgb, var(--c) 11%, transparent); border:1px solid color-mix(in srgb, var(--c) 34%, transparent); color:var(--c); }
-  .call-acts span.back{ background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.16); color:rgba(255,255,255,.55); }
+  .call-reveal{ font-size:.6rem; font-weight:700; color:var(--c); max-height:0; opacity:0; overflow:hidden; transition:max-height .35s ease, opacity .3s ease, margin .35s ease; }
+  .sys-panel:hover .call-reveal{ max-height:26px; opacity:1; margin-top:7px; }
 
   .vis-note{ font-size:.53rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:rgba(255,255,255,.28); margin:7px 0 5px; }
   .punch{ width:100%; border-top:1px solid rgba(255,255,255,.11); padding-top:9px; display:flex; flex-direction:column; align-items:center; }
   .punch-h{ font-family:var(--serif); font-size:clamp(1.02rem,2vw,1.26rem); font-weight:600; line-height:1.3; color:#fff; }
+
+  /* ═══ SCENE 6 — TRY NOVUS ═══ */
+  .try-scene{ background:radial-gradient(120% 80% at 50% -10%, rgba(56,189,248,.10), transparent 55%), linear-gradient(180deg, rgba(4,10,26,.55), rgba(4,10,26,.85)); }
+  .try-grid{ width:100%; display:grid; grid-template-columns:1fr 1fr; gap:14px; text-align:left; }
+  .try-card{ background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.13); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:8px; }
+  .try-card.c1{ --c:#7DD3FC; } .try-card.c2{ --c:#A5B4FC; }
+  .try-card.c3{ --c:#5EEAD4; } .try-card.c4{ --c:#FDBA74; }
+  .try-card-head{ display:flex; align-items:center; gap:8px; }
+  .try-card-name{ font-size:.68rem; font-weight:800; letter-spacing:.05em; color:#fff; }
+  .try-card-hint{ font-size:.63rem; color:rgba(255,255,255,.42); line-height:1.4; }
+  @media (max-width:820px){ .try-grid{ grid-template-columns:1fr; } }
 
   /* mini chat */
   .mini-chat{ display:flex; flex-direction:column; height:206px; background:var(--paper-2); border-radius:10px; overflow:hidden; margin-top:3px; }
@@ -476,17 +487,19 @@
         <div class="branches">
           <div class="branch ok">
             <div class="br-mark">✓</div>
+            <div class="br-who">Buyer</div>
             <div class="br-name">Viewing</div>
             <div class="br-state">Handled</div>
           </div>
           <div class="branch no">
             <div class="br-mark">✕</div>
+            <div class="br-who">Seller</div>
             <div class="br-name">Valuation</div>
             <div class="br-state">Missed</div>
           </div>
         </div>
 
-        <p class="verdict">This is the gap NOVUS is built to close.</p>
+        <p class="verdict">The agency answered the obvious one.<br/><span class="bad">The second opportunity disappeared.</span></p>
 
         <button class="stepper-btn" onclick="nextScene()">Show me what NOVUS would have done <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
       </div>
@@ -571,17 +584,7 @@
                 <div class="mini-vis">
                   <div class="call-when"><span class="call-live">Incoming call</span><span class="call-day">Sunday · 8:14pm</span></div>
                   <div class="call-quote">"Could someone come and value the property?"</div>
-                  <div class="call-acts"><span>AI answers</span><span>Captures details</span><span>Creates opportunity</span></div>
-                </div>
-                <button class="sys-panel-open" onclick="openPanel('voice')">Call the agency →</button>
-                <div class="sys-panel-body" id="panel-voice">
-                  <div class="mini-voice">
-                    <div class="mini-orb idle" id="mv-orb">🎙️</div>
-                    <div class="mini-voice-status" id="mv-status">Ready to connect</div>
-                    <div class="mini-voice-transcript" id="mv-transcript">Call the agency as a buyer or a seller and see how it handles the conversation.</div>
-                    <button class="mini-call-btn" id="mv-call-btn" onclick="startMiniCall()">Call the agency</button>
-                    <button class="mini-end-btn" id="mv-end-btn" onclick="endMiniCall()" style="display:none">End call</button>
-                  </div>
+                  <div class="call-reveal">→ Captured. Opportunity created in NOVUS.</div>
                 </div>
               </div>
 
@@ -594,17 +597,6 @@
                   <div class="chain"><em>Enquiry</em><i>→</i><em>Response</em><i>→</i><em>Follow-up</em><i>→</i><b>Viewing</b></div>
                   <div class="chain chain-branch"><b>Valuation</b></div>
                 </div>
-                <button class="sys-panel-open" onclick="openPanel('chat')">Message the agency →</button>
-                <div class="sys-panel-body" id="panel-chat">
-                  <div class="mini-chat">
-                    <div class="mini-chat-msgs" id="mc-msgs"></div>
-                    <div class="mini-qr" id="mc-qr"></div>
-                    <div class="mini-chat-inp-row">
-                      <input class="mini-chat-inp" id="mc-inp" type="text" placeholder="Ask the agency something…" />
-                      <button class="mini-chat-send" id="mc-send" onclick="sendMiniChat()"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               <!-- 03 — SELLER REACTIVATION -->
@@ -613,13 +605,11 @@
                 <div class="sys-panel-title">Turn forgotten contacts into new instructions.</div>
                 <div class="sys-panel-sub">Finds people already in your database who may now be ready to move.</div>
                 <div class="mini-vis">
-                  <div class="react-row"><span class="crm-av">EJ</span><span class="crm-name">Emma J.</span><span class="react-when">14 months ago</span><span class="react-act">Re-engage</span></div>
+                  <div class="react-row">
+                    <span class="crm-av">EJ</span><span class="crm-name">Emma J.</span><span class="react-when">14 months ago</span><span class="react-act">Re-engage</span>
+                    <div class="react-why">Two homes on her street sold since — her figure's out of date.</div>
+                  </div>
                   <div class="react-row"><span class="crm-av">DR</span><span class="crm-name">David R.</span><span class="react-when">9 months ago</span><span class="react-act soft">Potential</span></div>
-                </div>
-                <button class="sys-panel-open" onclick="openPanel('react')">See the opportunities →</button>
-                <div class="sys-panel-body" id="panel-react">
-                  <div class="contact-list" id="react-list"></div>
-                  <div class="contact-detail" id="react-detail"></div>
                 </div>
               </div>
 
@@ -630,11 +620,6 @@
                 <div class="sys-panel-sub">Stops promising opportunities going cold before they're ready to act.</div>
                 <div class="mini-vis">
                   <div class="chain"><em>Identified</em><i>→</i><em>Follow-up</em><i>→</i><em>Engaged</em><i>→</i><b>Ready</b></div>
-                </div>
-                <button class="sys-panel-open" onclick="openPanel('nurture')">See it progress →</button>
-                <div class="sys-panel-body" id="panel-nurture">
-                  <div class="contact-list" id="nurture-list"></div>
-                  <div class="contact-detail" id="nurture-detail"></div>
                 </div>
               </div>
 
@@ -666,14 +651,67 @@
           </div>
         </div>
 
-        <div class="punch"><div class="punch-h">Nothing gets lost.</div><p class="scene-sub">You just tried it — this is personalised to The Modern House, not a generic demo.</p></div>
+        <div class="punch"><div class="punch-h">Nothing gets lost.</div></div>
 
-        <button class="stepper-btn" onclick="nextScene()">See the next step <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+        <button class="stepper-btn" onclick="nextScene()">Try it yourself <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+        <p class="micro-note scroll-hint">Or just scroll ↓</p>
       </div>
     </section>
 
-    <!-- ══ SCENE 6 — CTA ══ -->
-    <section class="scene" data-scene="6">
+    <!-- ══ SCENE 6 — TRY NOVUS ══ -->
+    <section class="scene try-scene" data-scene="6">
+      <div class="scene-inner wide">
+        <div class="eyebrow">Try It Yourself</div>
+        <h1 class="scene-h">Try the NOVUS system.</h1>
+        <p class="scene-sub">These aren't generic demos. They're personalised to The Modern House.</p>
+
+        <div class="try-grid">
+
+          <div class="try-card c1">
+            <div class="try-card-head"><span class="sys-panel-dot"></span><span class="try-card-name">AI Front Desk</span></div>
+            <div class="mini-voice">
+              <div class="mini-orb idle" id="mv-orb">🎙️</div>
+              <div class="mini-voice-status" id="mv-status">Ready to connect</div>
+              <div class="mini-voice-transcript" id="mv-transcript">Call as a buyer or a seller and see how it handles the conversation.</div>
+              <button class="mini-call-btn" id="mv-call-btn" onclick="startMiniCall()">Call the agency</button>
+              <button class="mini-end-btn" id="mv-end-btn" onclick="endMiniCall()" style="display:none">End call</button>
+            </div>
+          </div>
+
+          <div class="try-card c2">
+            <div class="try-card-head"><span class="sys-panel-dot"></span><span class="try-card-name">Conversational AI</span></div>
+            <div class="mini-chat">
+              <div class="mini-chat-msgs" id="mc-msgs"></div>
+              <div class="mini-qr" id="mc-qr"></div>
+              <div class="mini-chat-inp-row">
+                <input class="mini-chat-inp" id="mc-inp" type="text" placeholder="Ask the agency something…" />
+                <button class="mini-chat-send" id="mc-send" onclick="sendMiniChat()"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="try-card c3">
+            <div class="try-card-head"><span class="sys-panel-dot"></span><span class="try-card-name">Seller Reactivation</span></div>
+            <p class="try-card-hint">Explore the database — tap a contact to see why NOVUS raised them.</p>
+            <div class="contact-list" id="react-list"></div>
+            <div class="contact-detail" id="react-detail"></div>
+          </div>
+
+          <div class="try-card c4">
+            <div class="try-card-head"><span class="sys-panel-dot"></span><span class="try-card-name">Opportunity Nurture</span></div>
+            <p class="try-card-hint">Tap an opportunity to see its next move.</p>
+            <div class="contact-list" id="nurture-list"></div>
+            <div class="contact-detail" id="nurture-detail"></div>
+          </div>
+
+        </div>
+
+        <button class="stepper-btn" onclick="nextScene()">Next: book 10 minutes with Joe <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- ══ SCENE 7 — CTA ══ -->
+    <section class="scene" data-scene="7">
       <div class="scene-inner">
         <div class="eyebrow">Next Step</div>
         <h1 class="scene-h">The demo is the proof.<br/>The calendar's the next step.</h1>
@@ -696,8 +734,8 @@
   </div>
 
 <script>
-  const TOTAL = 6;
-  const STAGES = ['Property', 'Evidence', 'The Gap', 'NOVUS', 'The System'];
+  const TOTAL = 7;
+  const STAGES = ['Property', 'Evidence', 'The Gap', 'NOVUS', 'The System', 'Try NOVUS'];
   let scene = 1;
   let furthest = 1;
 
@@ -740,6 +778,7 @@
     window.scrollTo({ top: 0, behavior: 'auto' });
     document.getElementById('system-btn').classList.toggle('hide', n >= 5);
     if (n === 4) animateFlow();
+    if (n === 6) initTryNovus();
   }
   function nextScene() { goTo(scene + 1); }
   window.goTo = goTo; window.nextScene = nextScene;
@@ -767,19 +806,6 @@
 
   // ═══════════════ SCENE 5 — THE SYSTEM ═══════════════
 
-  function openPanel(id) {
-    const body = document.getElementById('panel-' + id);
-    const willOpen = !body.classList.contains('open');
-    document.querySelectorAll('.sys-panel-body').forEach((b) => b.classList.remove('open'));
-    document.querySelectorAll('.sys-panel').forEach((p) => p.classList.remove('opened'));
-    if (!willOpen) return;
-    body.classList.add('open');
-    document.getElementById('sp-' + id).classList.add('opened');
-    if (id === 'chat' && !mcInited) initMiniChat();
-    if (id === 'react') { initReact(); runReactSweep(); }
-    if (id === 'nurture') { initNurture(); runNurtureSweep(); }
-  }
-
   function toggleIntel() {
     const strip = document.getElementById('intel-strip');
     const willOpen = !strip.classList.contains('open');
@@ -787,7 +813,36 @@
     if (willOpen) { initIntel(); runCrmScan(); }
   }
   window.toggleIntel = toggleIntel;
-  window.openPanel = openPanel;
+
+  // ═══════════════ SCENE 6 — TRY NOVUS ═══════════════
+  // The four live tools moved here from Scene 5 — Scene 5 stays explanation-only.
+  let tryNovusInited = false;
+  function initTryNovus() {
+    if (tryNovusInited) return;
+    tryNovusInited = true;
+    if (!mcInited) initMiniChat();
+    initReact(); runReactSweep();
+    initNurture(); runNurtureSweep();
+  }
+
+  // Scroll (or swipe) down while on the System scene glides straight into Try NOVUS —
+  // the one deliberate scroll-snap moment in an otherwise button/keyboard-driven journey.
+  let sceneWheelLock = false;
+  document.getElementById('stage').addEventListener('wheel', (e) => {
+    if (sceneWheelLock) return;
+    if (scene === 5 && e.deltaY > 12) { sceneWheelLock = true; nextScene(); setTimeout(() => { sceneWheelLock = false; }, 700); }
+    else if (scene === 6 && e.deltaY < -12) { sceneWheelLock = true; goTo(5); setTimeout(() => { sceneWheelLock = false; }, 700); }
+  }, { passive: true });
+
+  let touchStartY = null;
+  document.getElementById('stage').addEventListener('touchstart', (e) => { touchStartY = e.touches[0].clientY; }, { passive: true });
+  document.getElementById('stage').addEventListener('touchend', (e) => {
+    if (touchStartY === null || sceneWheelLock) return;
+    const dy = touchStartY - e.changedTouches[0].clientY;
+    touchStartY = null;
+    if (scene === 5 && dy > 60) { sceneWheelLock = true; nextScene(); setTimeout(() => { sceneWheelLock = false; }, 700); }
+    else if (scene === 6 && dy < -60) { sceneWheelLock = true; goTo(5); setTimeout(() => { sceneWheelLock = false; }, 700); }
+  }, { passive: true });
 
   const AGENCY_NAME = 'The Modern House';
   const AGENCY_URL = 'https://themodernhouse.com';
