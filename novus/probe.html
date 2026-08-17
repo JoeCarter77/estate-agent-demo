@@ -74,11 +74,21 @@
       <h1>Create a probe</h1>
       <p class="sub">Paste a Rightmove property URL. NOVUS creates a draft probe, generates the reference and attaches the probe email &amp; phone. You'll submit the genuine enquiry manually in the next step.</p>
 
-      <label for="url">Rightmove URL</label>
+      <div id="agency-field" class="hidden">
+        <label>Agency</label>
+        <input id="agency-name" type="text" value="" readonly />
+      </div>
+
+      <label for="url" class="mt">Rightmove URL</label>
       <input id="url" type="url" placeholder="https://www.rightmove.co.uk/properties/123456789" autocomplete="off" spellcheck="false" />
 
       <button id="create-btn" class="btn btn-primary mt">Create Probe</button>
       <div id="create-err" class="err"></div>
+    </section>
+
+    <!-- ── LOADING (probe_id rehydration) ──────────────────────────── -->
+    <section id="view-loading" class="card hidden">
+      <p class="sub"><span class="spinner" style="border-color:rgba(15,23,42,.15);border-top-color:var(--accent);"></span>Loading probe…</p>
     </section>
 
     <!-- ── PROBE READY ───────────────────────────────────────────── -->
@@ -119,6 +129,7 @@
   <script>
     const $ = (id) => document.getElementById(id);
     let currentProbe = null;
+    let launchAgencyId = '';
 
     // Basic Auth is enforced by the edge middleware on this page load, so the
     // browser already holds credentials for this origin and attaches them to
@@ -196,7 +207,7 @@
       const btn = $('create-btn');
       btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Creating…';
       try {
-        const data = await api('/api/novus/probe-create', { method: 'POST', body: JSON.stringify({ url }) });
+        const data = await api('/api/novus/probe-create', { method: 'POST', body: JSON.stringify({ url, agency_id: launchAgencyId }) });
         render(data.probe);
         $('view-new').classList.add('hidden');
         $('view-ready').classList.remove('hidden');
@@ -236,6 +247,44 @@
       $('view-new').classList.remove('hidden');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
+
+    // INIT — read agency_id / probe_id from the URL.
+    // ?probe_id=...  rehydrates an existing probe (no new probe created).
+    // ?agency_id=... preselects the agency for a new probe; the field is
+    //   read-only and never needs to be re-entered.
+    (async function init() {
+      const params = new URLSearchParams(window.location.search);
+      const probeId = (params.get('probe_id') || '').trim();
+      const agencyId = (params.get('agency_id') || '').trim();
+
+      if (probeId) {
+        $('view-new').classList.add('hidden');
+        $('view-loading').classList.remove('hidden');
+        try {
+          const data = await api('/api/novus/probe-get?probe_id=' + encodeURIComponent(probeId), { method: 'GET' });
+          render(data.probe);
+          $('view-loading').classList.add('hidden');
+          $('view-ready').classList.remove('hidden');
+        } catch (e) {
+          $('view-loading').classList.add('hidden');
+          $('view-new').classList.remove('hidden');
+          showErr($('create-err'), 'Could not load probe: ' + e.message);
+        }
+        return;
+      }
+
+      if (agencyId) {
+        launchAgencyId = agencyId;
+        $('agency-field').classList.remove('hidden');
+        $('agency-name').value = agencyId; // shown immediately; replaced by the real name below if found
+        try {
+          const data = await api('/api/novus/probe-get?agency_id=' + encodeURIComponent(agencyId), { method: 'GET' });
+          $('agency-name').value = data.agency.agency_name || agencyId;
+        } catch (e) {
+          showErr($('create-err'), 'Unknown agency_id — this probe cannot be created until it matches a real AGENCIES row.');
+        }
+      }
+    })();
   </script>
 </body>
 </html>

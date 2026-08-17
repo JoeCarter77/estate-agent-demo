@@ -1,5 +1,7 @@
 // api/novus/probe-create.js — POST /api/novus/probe-create
-// Body: { url }   (the pasted Rightmove listing URL — the ONLY required input)
+// Body: { url, agency_id }   (url is the ONLY required input; agency_id is
+//   optional — when present, e.g. from the agency-launched probe flow
+//   /novus/probe?agency_id=..., it must match a real AGENCIES row)
 //
 // Creates a DRAFT probe:
 //   • generates probe_id + human-readable probe_reference
@@ -23,6 +25,7 @@ export default async function handler(req, res) {
 
   const body = typeof req.body === 'string' ? safeParse(req.body) : req.body || {};
   const url = (body.url || '').trim();
+  const agencyId = (body.agency_id || '').trim();
   if (!url) return res.status(400).json({ error: 'Missing url' });
   if (!/^https?:\/\/|^www\./i.test(url) && !url.includes('.')) {
     return res.status(400).json({ error: 'That does not look like a valid URL' });
@@ -36,6 +39,14 @@ export default async function handler(req, res) {
   try {
     const repo = getRepo();
 
+    // If an agency_id was supplied (e.g. from the agency-launched probe
+    // flow), it must correspond to a real AGENCIES row — never guessed,
+    // never silently dropped.
+    if (agencyId) {
+      const agencyRecord = await repo.findById('AGENCIES', 'agency_id', agencyId);
+      if (!agencyRecord) return res.status(400).json({ error: 'Unknown agency_id' });
+    }
+
     // Best-effort metadata — never blocks probe creation.
     const meta = await fetchListingMeta(url).catch(() => ({ address: '', price: '', status: '', title: '' }));
 
@@ -46,7 +57,7 @@ export default async function handler(req, res) {
     const probe = {
       probe_id: newProbeId(),
       probe_reference: newProbeReference(sequence, portal),
-      agency_id: '',
+      agency_id: agencyId,
       portal,
       property_address: meta.address || '',
       property_url: url,
