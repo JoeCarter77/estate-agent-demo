@@ -50,6 +50,19 @@ export default async function handler(req, res) {
     });
     if (!updated) return res.status(404).json({ error: 'Probe not found' });
 
+    // Flag the originating agency as probed. The cell is located by the
+    // "probe_sent" HEADER NAME, so moving the column in the sheet keeps this
+    // working. Best-effort: a failure here (or no probe_sent column yet) is
+    // logged, never surfaced — the observation window is the outcome that
+    // matters, and it has already been recorded above.
+    if (record.obj.agency_id) {
+      try {
+        await repo.updateCell('AGENCIES', 'agency_id', record.obj.agency_id, 'probe_sent', 'YES');
+      } catch (err) {
+        console.error('probe-mark-sent: could not set AGENCIES.probe_sent:', err);
+      }
+    }
+
     return res.status(200).json({ probe: updated, already_sent: false });
   } catch (err) {
     console.error('probe-mark-sent error:', err);
