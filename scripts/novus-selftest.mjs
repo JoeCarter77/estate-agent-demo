@@ -10,6 +10,7 @@
 import assert from 'node:assert';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { newProbeReference } from '../lib/ids.mjs';
+import { __setListingMetaFetcherForTests } from '../lib/rightmove-meta.mjs';
 
 const PROBES_HEADER = [
   'probe_id','probe_reference','agency_id','portal','property_address','property_url',
@@ -18,12 +19,30 @@ const PROBES_HEADER = [
   'observation_closed_at','sent_from','observation_notes','created_at','updated_at',
 ];
 
+// probe-create now validates agency_id against AGENCIES, so the fake needs the
+// tab. Trimmed to the columns the handler actually reads.
+const AGENCIES_HEADER = [
+  'agency_id','agency_name','domain','location','sales_led_lettings_only',
+  'suppression_status','suppression_reason','notes','created_at','updated_at',
+];
+const TEST_AGENCY_ID = 'ag_selftest_0001';
+
 // ── In-memory fake of the Google Sheets values API ────────────────────────────
 function makeFakeSheet() {
   const store = {
     PROBES: [
       PROBES_HEADER.slice(),
       ['SCHEMA NOTE', 'One row per actual probe. probe_reference is the human-readable identifier.'],
+    ],
+    AGENCIES: [
+      AGENCIES_HEADER.slice(),
+      ['SCHEMA NOTE', 'One row per agency.'],
+      AGENCIES_HEADER.map((k) => {
+        if (k === 'agency_id') return TEST_AGENCY_ID;
+        if (k === 'agency_name') return 'Selftest Agency';
+        if (k === 'domain') return 'selftest.example.com';
+        return '';
+      }),
     ],
   };
   function tabOf(range) { return String(range).split('!')[0]; }
@@ -131,25 +150,32 @@ async function run() {
     const { store, valuesApi } = makeFakeSheet();
     __setRepoForTests(createRepo(valuesApi));
 
+    // Hermetic enrichment: probe-create must not reach out to rightmove.co.uk.
+    __setListingMetaFetcherForTests(async () => ({
+      address: '', price: '', status: '', property_type: '', bedrooms: '', title: '',
+    }));
+
     const { default: createHandler } = await import('../api/novus/probe-create.js');
     const { default: markHandler } = await import('../api/novus/probe-mark-sent.js');
     const { default: getHandler } = await import('../api/novus/probe-get.js');
 
     // Auth: a bad password is rejected.
     const bad = mockRes();
-    await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/1' }, auth: 'Basic ' + Buffer.from('novus:wrong').toString('base64') }), bad);
+    await createHandler(mockReq({ body: { agency_id: TEST_AGENCY_ID, url: 'https://www.rightmove.co.uk/properties/159273000' }, auth: 'Basic ' + Buffer.from('novus:wrong').toString('base64') }), bad);
     assert.strictEqual(bad.statusCode, 401, 'wrong password rejected');
     ok('Basic Auth rejects a wrong password (401)');
 
-    // Create draft (real fetch to Rightmove will fail/blank in this sandbox — fine).
+    // Create draft. agency_id is now REQUIRED — a probe with no agency is
+    // unmatchable downstream (see api/novus/probe-create.js).
     const cRes = mockRes();
-    await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/159273000' } }), cRes);
+    await createHandler(mockReq({ body: { agency_id: TEST_AGENCY_ID, url: 'https://www.rightmove.co.uk/properties/159273000' } }), cRes);
     assert.strictEqual(cRes.statusCode, 200, 'create returned 200');
     const probe = cRes.body.probe;
     assert.ok(probe.probe_id.startsWith('prb_'), 'probe_id generated');
     assert.strictEqual(probe.probe_reference, 'RM-0001', 'first reference is RM-0001');
     assert.strictEqual(probe.portal, 'rightmove');
     assert.strictEqual(probe.probe_status, 'draft', 'created as draft');
+    assert.strictEqual(probe.agency_id, TEST_AGENCY_ID, 'agency_id carried into the probe');
     assert.strictEqual(probe.probe_email, 'novusprobes@gmail.com', 'probe email attached');
     assert.strictEqual(probe.probe_phone, '+441234567890', 'probe phone attached');
     assert.strictEqual(probe.probe_timestamp, '', 'draft has no timestamp yet');
@@ -194,7 +220,7 @@ async function run() {
 
     // Second probe increments the reference.
     const c2 = mockRes();
-    await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/2' } }), c2);
+    await createHandler(mockReq({ body: { agency_id: TEST_AGENCY_ID, url: 'https://www.rightmove.co.uk/properties/159273111' } }), c2);
     assert.strictEqual(c2.body.probe.probe_reference, 'RM-0002', 'second reference is RM-0002');
     ok('a second probe gets RM-0002');
 

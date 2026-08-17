@@ -58,6 +58,26 @@
     .foot{text-align:center;font-size:.72rem;color:var(--text-3);margin-top:26px;}
     .banner{display:flex;align-items:center;gap:10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:11px;padding:13px 15px;margin-bottom:20px;}
     .banner .em{font-size:.86rem;color:var(--text);font-weight:600;}
+    /* Agency picker */
+    #agency-picker{position:relative;}
+    .results{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 4px);max-height:260px;overflow-y:auto;background:#fff;border:1px solid var(--border-hi);border-radius:11px;box-shadow:0 12px 28px rgba(15,23,42,.12);}
+    .results.hidden{display:none;}
+    .res-item{padding:10px 13px;cursor:pointer;border-bottom:1px solid var(--border);}
+    .res-item:last-child{border-bottom:none;}
+    .res-item:hover,.res-item.active{background:var(--accent-lo);}
+    .res-name{font-size:.88rem;font-weight:600;color:var(--text);}
+    .res-meta{font-size:.72rem;color:var(--text-3);margin-top:2px;}
+    .res-empty{padding:12px 13px;font-size:.8rem;color:var(--text-3);font-style:italic;}
+    .chosen{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--accent);border-radius:11px;padding:12px 14px;}
+    .chosen.hidden{display:none;}
+    .chosen-main{flex:1;min-width:0;}
+    .chosen-name{font-size:.92rem;font-weight:700;color:var(--brand-navy);}
+    .chosen-meta{font-size:.72rem;color:var(--text-3);margin-top:2px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+    .link-btn{background:none;border:none;color:var(--accent);font-family:'Inter',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;padding:4px 6px;}
+    .link-btn:hover{text-decoration:underline;}
+    .mt-lbl{margin-top:22px;}
+    .micro{font-size:.72rem;color:var(--text-3);line-height:1.45;margin-top:7px;}
+    input:disabled{background:var(--panel-2);color:var(--text-3);cursor:not-allowed;}
   </style>
 </head>
 <body>
@@ -72,12 +92,30 @@
     <section id="view-new" class="card">
       <div class="eyebrow">New Probe</div>
       <h1>Create a probe</h1>
-      <p class="sub">Paste a Rightmove property URL. NOVUS creates a draft probe, generates the reference and attaches the probe email &amp; phone. You'll submit the genuine enquiry manually in the next step.</p>
+      <p class="sub">A probe always belongs to an agency. Pick the agency first — NOVUS attaches its <code>agency_id</code> automatically so every reply, grade and action stays linked to it. Then paste the individual property URL you're enquiring about.</p>
 
-      <label for="url">Rightmove URL</label>
-      <input id="url" type="url" placeholder="https://www.rightmove.co.uk/properties/123456789" autocomplete="off" spellcheck="false" />
+      <!-- STEP 1 — the agency. This is what makes the whole chain work. -->
+      <label for="agency-search">1 · Agency</label>
+      <div id="agency-picker">
+        <input id="agency-search" type="text" placeholder="Start typing an agency name, e.g. Fisks" autocomplete="off" spellcheck="false" />
+        <div id="agency-results" class="results hidden"></div>
+      </div>
 
-      <button id="create-btn" class="btn btn-primary mt">Create Probe</button>
+      <div id="agency-chosen" class="chosen hidden">
+        <div class="chosen-main">
+          <div class="chosen-name" id="chosen-name">—</div>
+          <div class="chosen-meta" id="chosen-meta">—</div>
+        </div>
+        <button id="agency-clear" class="link-btn" type="button">Change</button>
+      </div>
+      <div id="agency-rm" class="hint hidden"></div>
+
+      <!-- STEP 2 — the specific property. -->
+      <label for="url" class="mt-lbl">2 · Individual property URL</label>
+      <input id="url" type="url" placeholder="https://www.rightmove.co.uk/properties/123456789" autocomplete="off" spellcheck="false" disabled />
+      <p class="micro">Must be one specific listing. An agency profile page or an area search won't be accepted — those don't identify a property.</p>
+
+      <button id="create-btn" class="btn btn-primary mt" disabled>Create Probe</button>
       <div id="create-err" class="err"></div>
     </section>
 
@@ -91,8 +129,11 @@
 
       <dl class="kv">
         <dt>Agency</dt><dd id="f-agency" class="muted">—</dd>
+        <dt>Agency ID</dt><dd id="f-agency-id" class="mono muted">—</dd>
         <dt>Property</dt><dd id="f-address" class="muted">—</dd>
+        <dt>Type</dt><dd id="f-type" class="muted">—</dd>
         <dt>Price</dt><dd id="f-price" class="muted">—</dd>
+        <dt>Property URL</dt><dd id="f-url" class="mono muted">—</dd>
         <dt>Portal</dt><dd id="f-portal">—</dd>
         <dt>Probe Ref</dt><dd><span id="f-ref" class="ref-chip">—</span></dd>
         <dt>Email</dt><dd id="f-email" class="mono">—</dd>
@@ -119,6 +160,28 @@
   <script>
     const $ = (id) => document.getElementById(id);
     let currentProbe = null;
+    let currentAgency = null;   // { agency_id, agency_name, ... }
+
+    // ── Deep links ────────────────────────────────────────────────────────────
+    // The probe flow is entered from an agency, so the agency must survive the
+    // hop. Two entry points, both handled here rather than by a bespoke URL
+    // scheme (the app has no router — /novus/probe is a vercel.json rewrite to
+    // this file, so query params are the only mechanism available and the only
+    // one the rest of the app uses):
+    //
+    //   /novus/probe?agency_id=ag_hist_fisks-ltd-d8u5
+    //       → resolve the agency, pre-select it, jump straight to the URL field.
+    //         This is what an "PROBE" button on an agency record links to.
+    //
+    //   /novus/probe?probe_id=prb_...
+    //       → rehydrate an existing probe via /api/novus/probe-get, so a
+    //         reload, a bookmark or a shared link lands back on the same probe
+    //         with its agency and property intact. (probe-get already existed
+    //         for exactly this purpose but nothing ever called it.)
+    //
+    // After a probe is created we push ?probe_id=... into the address bar, so
+    // the page the operator is looking at is always linkable.
+    const params = new URLSearchParams(window.location.search);
 
     // Basic Auth is enforced by the edge middleware on this page load, so the
     // browser already holds credentials for this origin and attaches them to
@@ -149,9 +212,16 @@
         el.textContent = val || '—';
         el.classList.toggle('muted', !val && muted);
       };
-      setField('f-agency', probe.agency_id, true);
+      // Prefer the agency NAME; fall back to the id if the lookup didn't run.
+      const agencyName = (currentAgency && currentAgency.agency_name) || '';
+      setField('f-agency', agencyName || probe.agency_id, true);
+      setField('f-agency-id', probe.agency_id, true);
       setField('f-address', probe.property_address, true);
+      const typeBits = [probe.property_bedrooms ? probe.property_bedrooms + ' bed' : '', probe.property_type || '']
+        .filter(Boolean).join(' · ');
+      setField('f-type', typeBits, true);
       setField('f-price', probe.property_price, true);
+      setField('f-url', probe.property_url, true);
       $('f-portal').textContent = probe.portal || '—';
       $('f-ref').textContent = probe.probe_reference || '—';
       $('f-email').textContent = probe.probe_email || '—';
@@ -188,20 +258,99 @@
       $('open-btn').onclick = () => { if (probe.property_url) window.open(probe.property_url, '_blank', 'noopener'); };
     }
 
+    // ── AGENCY PICKER ─────────────────────────────────────────────────────────
+    function selectAgency(agency) {
+      currentAgency = agency;
+      $('chosen-name').textContent = agency.agency_name || agency.agency_id;
+      $('chosen-meta').textContent = [agency.agency_id, agency.location].filter(Boolean).join(' · ');
+      $('agency-chosen').classList.remove('hidden');
+      $('agency-picker').classList.add('hidden');
+      $('agency-results').classList.add('hidden');
+
+      // Offer the agency's own Rightmove profile as the place to FIND a
+      // property. This is the agency URL — deliberately not something that can
+      // be pasted into the property field.
+      const rm = $('agency-rm');
+      if (agency.rightmove_sales_branch_url) {
+        rm.innerHTML = 'Find a property on this agency’s Rightmove profile: '
+          + '<a href="' + agency.rightmove_sales_branch_url + '" target="_blank" rel="noopener">open profile ↗</a>'
+          + ' — then copy one listing’s URL into the field below.';
+        rm.classList.remove('hidden');
+      } else {
+        rm.innerHTML = 'No confirmed Rightmove profile is recorded for this agency yet'
+          + (agency.rightmove_status ? ' (status: <strong>' + agency.rightmove_status + '</strong>)' : '')
+          + '. You can still probe it — just paste the individual property URL below.';
+        rm.classList.remove('hidden');
+      }
+
+      $('url').disabled = false;
+      $('create-btn').disabled = false;
+      $('url').focus();
+    }
+
+    function clearAgency() {
+      currentAgency = null;
+      $('agency-chosen').classList.add('hidden');
+      $('agency-rm').classList.add('hidden');
+      $('agency-picker').classList.remove('hidden');
+      $('agency-search').value = '';
+      $('agency-results').classList.add('hidden');
+      $('url').disabled = true;
+      $('create-btn').disabled = true;
+      $('agency-search').focus();
+    }
+    $('agency-clear').addEventListener('click', clearAgency);
+
+    let searchTimer = null;
+    let searchSeq = 0;
+    $('agency-search').addEventListener('input', () => {
+      const q = $('agency-search').value.trim();
+      clearTimeout(searchTimer);
+      if (q.length < 2) { $('agency-results').classList.add('hidden'); return; }
+      // Debounce: each keystroke would otherwise re-read the whole AGENCIES tab.
+      searchTimer = setTimeout(async () => {
+        const seq = ++searchSeq;
+        try {
+          const data = await api('/api/novus/agencies?probeable=1&limit=25&q=' + encodeURIComponent(q));
+          if (seq !== searchSeq) return; // a newer keystroke already won
+          const box = $('agency-results');
+          if (!data.agencies.length) {
+            box.innerHTML = '<div class="res-empty">No probeable agency matches “' + q + '”.</div>';
+          } else {
+            box.innerHTML = data.agencies.map((a, i) =>
+              '<div class="res-item" data-idx="' + i + '">'
+              + '<div class="res-name"></div><div class="res-meta"></div></div>').join('');
+            // Set text via textContent so an agency name can never inject markup.
+            [...box.querySelectorAll('.res-item')].forEach((el, i) => {
+              const a = data.agencies[i];
+              el.querySelector('.res-name').textContent = a.agency_name || a.agency_id;
+              el.querySelector('.res-meta').textContent =
+                [a.location, a.domain, a.rightmove_status ? 'RM: ' + a.rightmove_status : ''].filter(Boolean).join(' · ');
+              el.addEventListener('click', () => selectAgency(a));
+            });
+          }
+          box.classList.remove('hidden');
+        } catch (e) {
+          showErr($('create-err'), e.message);
+        }
+      }, 220);
+    });
+
     // CREATE
     $('create-btn').addEventListener('click', async () => {
       const url = $('url').value.trim();
       clearErr($('create-err'));
-      if (!url) { showErr($('create-err'), 'Please paste a Rightmove property URL.'); return; }
+      if (!currentAgency) { showErr($('create-err'), 'Pick the agency first — a probe has to belong to one.'); return; }
+      if (!url) { showErr($('create-err'), 'Please paste an individual Rightmove property URL.'); return; }
       const btn = $('create-btn');
       btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Creating…';
       try {
-        const data = await api('/api/novus/probe-create', { method: 'POST', body: JSON.stringify({ url }) });
-        render(data.probe);
-        $('view-new').classList.add('hidden');
-        $('view-ready').classList.remove('hidden');
-        $('ready-banner').classList.remove('hidden');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const data = await api('/api/novus/probe-create', {
+          method: 'POST',
+          body: JSON.stringify({ agency_id: currentAgency.agency_id, url }),
+        });
+        if (data.agency) currentAgency = data.agency;
+        showProbe(data.probe, { banner: true });
       } catch (e) {
         showErr($('create-err'), e.message);
       } finally {
@@ -209,6 +358,19 @@
       }
     });
     $('url').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('create-btn').click(); });
+
+    // Switches to the PROBE READY view and makes the current probe linkable.
+    function showProbe(probe, { banner = false } = {}) {
+      render(probe);
+      $('view-new').classList.add('hidden');
+      $('view-ready').classList.remove('hidden');
+      $('ready-banner').classList.toggle('hidden', !banner);
+      const next = new URL(window.location.href);
+      next.searchParams.delete('agency_id');
+      next.searchParams.set('probe_id', probe.probe_id);
+      window.history.replaceState({}, '', next);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 
     // MARK AS SENT
     $('sent-btn').addEventListener('click', async () => {
@@ -226,7 +388,8 @@
       }
     });
 
-    // NEW PROBE (reset)
+    // NEW PROBE (reset). The agency is KEPT selected — one agency can have many
+    // probes, so the common next action is another property for the same agency.
     $('another-btn').addEventListener('click', () => {
       currentProbe = null;
       $('url').value = '';
@@ -234,8 +397,55 @@
       $('ready-banner').classList.add('hidden');
       $('view-ready').classList.add('hidden');
       $('view-new').classList.remove('hidden');
+      const next = new URL(window.location.href);
+      next.searchParams.delete('probe_id');
+      if (currentAgency) next.searchParams.set('agency_id', currentAgency.agency_id);
+      window.history.replaceState({}, '', next);
+      if (!currentAgency) clearAgency(); else $('url').focus();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
+
+    // ── BOOT: resolve whichever deep link we arrived on ───────────────────────
+    (async function boot() {
+      const deepProbeId = (params.get('probe_id') || '').trim();
+      const deepAgencyId = (params.get('agency_id') || '').trim();
+
+      if (deepProbeId) {
+        try {
+          const data = await api('/api/novus/probe-get?probe_id=' + encodeURIComponent(deepProbeId));
+          const probe = data.probe;
+          // Resolve the agency so the view shows a name, not an opaque id.
+          if (probe.agency_id) {
+            try {
+              const a = await api('/api/novus/agencies?agency_id=' + encodeURIComponent(probe.agency_id));
+              currentAgency = a.agency;
+            } catch (e) { /* name is cosmetic — the id is what matters */ }
+          }
+          showProbe(probe);
+          return;
+        } catch (e) {
+          showErr($('create-err'), 'Could not open that probe: ' + e.message);
+        }
+      }
+
+      if (deepAgencyId) {
+        try {
+          const data = await api('/api/novus/agencies?agency_id=' + encodeURIComponent(deepAgencyId));
+          if (data.probeable === false) {
+            showErr($('create-err'),
+              (data.agency.agency_name || deepAgencyId) + ' is not probeable (suppressed or flagged non-sales). Pick a different agency.');
+            clearAgency();
+            return;
+          }
+          selectAgency(data.agency);
+          return;
+        } catch (e) {
+          showErr($('create-err'), 'Could not load that agency: ' + e.message);
+        }
+      }
+
+      $('agency-search').focus();
+    })();
   </script>
 </body>
 </html>
