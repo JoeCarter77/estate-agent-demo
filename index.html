@@ -492,9 +492,125 @@
     .call-active .voice-status-label.speaking { color: #86EFAC; }
     .call-active .voice-transcript { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); color: rgba(255,255,255,0.9); }
 
-    /* ── DEMO SECONDARY CAPTION (right browser mockup) ── */
+    /* ── HERO LOADING VEIL — covers the left column until we know whether this
+       agency resolves to the C1 case or the default marketing copy, so the
+       old default headline never paints and then gets swapped (see FIFTH). ── */
+    .hero-copy { position: relative; }
+    .hero-copy.is-loading > *:not(.hero-loading-veil) { visibility: hidden; }
+    .hero-loading-veil { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: var(--page); opacity: 1; transition: opacity 0.3s ease; }
+    .hero-copy:not(.is-loading) .hero-loading-veil { opacity: 0; pointer-events: none; }
+    .hero-loading-mark { width: 30px; height: 30px; animation: novus-pulse 1.4s ease-in-out infinite; }
+    .hero-loading-mark img { width: 100%; height: 100%; display: block; }
+    .hero-loading-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; color: var(--text-3); }
+    @keyframes novus-pulse { 0%,100% { opacity: 0.35; transform: scale(0.92); } 50% { opacity: 1; transform: scale(1); } }
+
+    /* ── CASE — the C/G seller-ask journey (NOVUS Demo OS). One central
+       stage that transforms, not a dashboard of cards. When active, .page
+       drops to a single column (see .page.case-mode below) and this becomes
+       the entire hero: OPEN → REVEAL → DECISION → INTELLIGENCE → ACTION →
+       BRIDGE → CTA, each stage resolving into the next in the same surface. ── */
+    .page.case-mode { grid-template-columns: 1fr; }
+    .page.case-mode .hero-demo { display: none; }
+    .case-wrap { width: 100%; max-width: 620px; margin: 0 auto; }
+    .case-stage-box {
+      background: linear-gradient(165deg, #0B1B3F 0%, var(--brand-navy) 60%, #1E3A8A 100%);
+      border-radius: 20px; border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 24px 60px rgba(15,23,42,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
+      padding: 30px 30px 26px; position: relative; overflow: hidden;
+      display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center;
+    }
+    .case-stage-box::before { content: ''; position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% -10%, rgba(59,130,246,0.24), transparent 60%); pointer-events: none; }
+
+    .case-progress { display: flex; gap: 5px; position: relative; z-index: 1; }
+    .case-progress-dot { width: 5px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.2); transition: background 0.2s, width 0.2s; }
+    .case-progress-dot.done { background: rgba(255,255,255,0.6); }
+    .case-progress-dot.current { background: var(--accent-hi); width: 16px; }
+
+    .case-panel { position: relative; z-index: 1; width: 100%; display: none; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+    .case-panel.active { display: flex; }
+    /* .case-anim: shared fade/rise choreography so advancing the case reads as
+       one system transforming, not slides swapping. */
+    .case-anim { opacity: 0; transform: translateY(9px); transition: opacity 0.28s ease, transform 0.28s ease; }
+    .case-anim.entered { opacity: 1; transform: translateY(0); }
+    .case-anim.leaving { opacity: 0; transform: translateY(-7px); }
+
+    .case-eyebrow { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: #9DB4E8; }
+    .case-line { font-size: 1.22rem; font-weight: 700; line-height: 1.4; color: #fff; letter-spacing: -0.015em; }
+    .case-line.dim { font-size: 0.95rem; font-weight: 500; color: rgba(255,255,255,0.65); }
+    .case-line strong { color: #fff; }
+
+    .case-property { width: 100%; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; overflow: hidden; text-align: left; }
+    .case-property-photo { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: rgba(255,255,255,0.04); }
+    .case-property-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+    .case-property-addr { font-size: 1rem; font-weight: 800; color: #fff; letter-spacing: -0.01em; }
+    .case-property-meta { font-size: 0.8rem; color: rgba(255,255,255,0.6); display: flex; gap: 10px; flex-wrap: wrap; }
+    .case-property-link { font-size: 0.72rem; color: #93C5FD; text-decoration: none; margin-top: 2px; align-self: flex-start; }
+    .case-property-link:hover { text-decoration: underline; }
+
+    .case-card { width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.13); border-radius: 12px; padding: 13px 16px; text-align: left; display: flex; flex-direction: column; }
+    .case-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 0.78rem; color: rgba(255,255,255,0.88); padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .case-row:last-child { border-bottom: none; }
+    .case-row .case-label { color: rgba(255,255,255,0.5); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.6rem; flex-shrink: 0; }
+
+    .case-timeline { width: 100%; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left; }
+    .case-timeline-row { display: flex; align-items: baseline; gap: 10px; font-size: 0.82rem; color: rgba(255,255,255,0.9); width: 100%; }
+    .case-timeline-t { color: rgba(255,255,255,0.45); font-size: 0.72rem; font-variant-numeric: tabular-nums; flex-shrink: 0; width: 44px; }
+    .case-timeline-gap { color: rgba(255,255,255,0.3); font-size: 0.76rem; font-style: italic; }
+    .case-quote { font-size: 0.85rem; line-height: 1.55; color: #fff; font-style: italic; }
+
+    .case-choices { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+    .case-choice-btn { width: 100%; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18); color: #fff; border-radius: 11px; padding: 12px 16px; font-family: 'Inter', sans-serif; font-size: 0.86rem; font-weight: 700; letter-spacing: 0.01em; cursor: pointer; text-align: center; transition: background 0.15s, border-color 0.15s, transform 0.14s; }
+    .case-choice-btn:hover { background: rgba(255,255,255,0.13); border-color: rgba(255,255,255,0.32); transform: translateY(-1px); }
+    .case-choice-btn:active { transform: translateY(0) scale(0.98); }
+    .case-choice-btn.chosen { background: #fff; color: var(--brand-navy); border-color: #fff; }
+    .case-choice-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+
+    .case-intel-grid { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+    .case-intel-row { display: flex; justify-content: space-between; align-items: baseline; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 10px 14px; }
+    .case-intel-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.5); }
+    .case-intel-value { font-size: 0.86rem; font-weight: 700; color: #fff; text-align: right; }
+    .case-intel-value.warn { color: #FCA5A5; }
+    .case-intel-value.ok { color: #86EFAC; }
+
+    .case-action-flow { display: flex; align-items: center; gap: 8px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; color: rgba(255,255,255,0.4); }
+    .case-action-flow .on { color: #86EFAC; }
+    .case-action-flow .arrow { color: rgba(255,255,255,0.25); font-size: 0.62rem; }
+    .case-action-msg { width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.13); border-radius: 12px; padding: 13px 16px; text-align: left; font-size: 0.82rem; line-height: 1.6; color: rgba(255,255,255,0.9); font-style: italic; }
+    .case-action-track { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+    .case-action-track-row { display: flex; align-items: center; gap: 9px; font-size: 0.8rem; color: rgba(255,255,255,0.9); }
+    .case-action-track-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-hi); flex-shrink: 0; }
+
+    .case-bridge-split { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .case-bridge-col { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.13); border-radius: 12px; padding: 14px 12px; }
+    .case-bridge-col .k { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.5); }
+    .case-bridge-col .v { font-size: 0.98rem; font-weight: 800; color: #fff; margin-top: 5px; letter-spacing: -0.01em; }
+
+    .case-btn { position: relative; z-index: 1; width: 100%; max-width: 320px; background: #fff; color: var(--brand-navy); border: none; border-radius: 100px; padding: 13px 20px; font-family: 'Inter', sans-serif; font-size: 0.88rem; font-weight: 800; letter-spacing: -0.01em; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,0.28); transition: transform 0.14s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.14s; }
+    .case-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(0,0,0,0.4); }
+    .case-btn:active { transform: translateY(0) scale(0.98); }
+    .case-btn-ghost { background: transparent; color: rgba(255,255,255,0.6); box-shadow: none; border: 1px solid rgba(255,255,255,0.2); font-weight: 700; padding: 10px 18px; font-size: 0.76rem; }
+    .case-btn-ghost:hover { transform: none; box-shadow: none; border-color: rgba(255,255,255,0.35); color: #fff; }
+
+    .case-status { display: inline-flex; align-items: center; gap: 7px; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 13px; border-radius: 100px; transition: background 0.25s, color 0.25s, border-color 0.25s; }
+    .case-status.ready    { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.6); }
+    .case-status.running  { background: rgba(37,99,235,0.18); border: 1px solid rgba(59,130,246,0.4); color: #93C5FD; }
+    .case-status.complete { background: rgba(34,197,94,0.14); border: 1px solid rgba(34,197,94,0.4); color: #86EFAC; }
+    .case-status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .case-status.running .case-status-dot { animation: blink 1s ease infinite; }
+
+    .case-voice-proof { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.1); }
+    .case-voice-proof-label { font-size: 0.78rem; color: rgba(255,255,255,0.6); }
+
+    /* ── DEMO SECONDARY CAPTION (right browser mockup, default hero only —
+       hidden entirely in .case-mode) ── */
     .demo-caption { font-size: 0.78rem; font-weight: 600; color: var(--text-3); text-align: center; margin-bottom: 4px; letter-spacing: -0.005em; }
     .demo-caption strong { color: var(--text-2); font-weight: 700; }
+
+    /* CTA visible near the top of the page even before the case unfolds (SIXTH). */
+    .case-top-cta { display: none; align-items: center; gap: 10px; font-size: 0.78rem; color: var(--text-2); background: var(--panel); border: 1px solid var(--border); border-radius: 100px; padding: 8px 8px 8px 16px; margin: 0 auto 4px; width: fit-content; }
+    .case-top-cta.show { display: flex; }
+    .case-top-cta a { background: var(--accent); color: #fff; font-weight: 700; font-size: 0.76rem; padding: 7px 14px; border-radius: 100px; text-decoration: none; white-space: nowrap; transition: background 0.15s; }
+    .case-top-cta a:hover { background: var(--accent-hi); }
 
     /* ── EVIDENCE BLOCK ── */
     .evidence { padding: 72px 24px 60px; border-top: 1px solid var(--border); }
@@ -549,27 +665,38 @@
   <div class="page">
 
     <!-- ══ LEFT (voice-first call panel - primary) ══ -->
-    <div class="left hero-copy">
-      <div class="hero-copy-top">
+    <div class="left hero-copy is-loading" id="hero-copy">
+      <!-- Loading veil: covers the left column until we know whether this
+           agency resolves to the C1 case or the default marketing copy, so
+           the old default headline never paints and then swaps (see FIFTH
+           in the redesign brief). Removed via revealHero(). -->
+      <div class="hero-loading-veil" id="hero-loading-veil">
+        <div class="hero-loading-mark"><img src="/novus-icon.png" alt="" /></div>
+        <div class="hero-loading-label">Loading your live demo…</div>
+      </div>
+
+      <div class="hero-copy-top" id="hero-copy-top">
         <div class="hero-eyebrow fu">LIVE DEMO - <span class="company-slot">Your Agency</span></div>
         <h1 class="hero-headline fu fu-1" id="hero-headline">You lost a valuation this week. That's the last one.</h1>
         <p class="hero-sub fu fu-1">Answering the calls you're missing - booking valuations and viewings straight into your calendar.</p>
         <p class="hero-caption fu fu-1">Built from a sample of your live listings - pulled straight from your website.</p>
       </div>
-      <div class="call-panel fu fu-2">
+      <div class="call-panel fu fu-2" id="call-panel">
+        <div class="case-status ready" id="case-status" style="display:none"><span class="case-status-dot"></span><span id="case-status-text">Ready</span></div>
         <div class="call-idle" id="hero-call-idle">
           <div class="call-avatar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
           </div>
-          <div class="call-callto">Your out-of-hours line</div>
+          <div class="call-callto" id="hero-call-callto">Your out-of-hours line</div>
           <button class="call-dial-btn" onclick="startHeroCall()">
             <span class="dial-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
-            <span>Call <span class="company-slot">Your Agency</span></span>
+            <span id="hero-call-btn-label">Call <span class="company-slot">Your Agency</span></span>
           </button>
-          <p class="call-subtext">This is what your out-of-hours line sounds like from Monday.</p>
+          <p class="call-subtext" id="hero-call-subtext">This is what your out-of-hours line sounds like from Monday.</p>
           <p class="call-poweredby">Powered by AI · trained on your live listings</p>
         </div>
         <div class="call-active" id="hero-call-active" style="display:none">
+          <div class="case-status running" id="case-status-active" style="display:none"><span class="case-status-dot"></span><span id="case-status-active-text">Running</span></div>
           <div class="voice-orb-wrap">
             <div class="voice-orb idle" id="hero-voice-orb">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
@@ -580,11 +707,33 @@
           <button class="voice-end-btn" onclick="endHeroCall()">End Call</button>
         </div>
       </div>
+
+      <!-- ══ CASE — the C/G seller-ask journey. Hidden/no-op for every agency
+           without journeyVariant set (see maybeActivateCaseJourney()); when
+           active, hero-copy-top + call-panel above are hidden and this
+           becomes the entire hero (single central stage, not a dashboard). ══ -->
+      <div class="case-wrap" id="case-wrap" style="display:none">
+        <div class="case-top-cta" id="case-top-cta">
+          <span>Want the full picture?</span>
+          <a href="#book" onclick="revealCalendly(event); document.getElementById('book').scrollIntoView({behavior:'smooth'});">Show me how</a>
+        </div>
+        <div class="case-stage-box">
+          <div class="case-progress" id="case-progress"></div>
+          <div class="case-panel case-anim" id="case-panel-open"></div>
+          <div class="case-panel case-anim" id="case-panel-reveal"></div>
+          <div class="case-panel case-anim" id="case-panel-decision"></div>
+          <div class="case-panel case-anim" id="case-panel-intelligence"></div>
+          <div class="case-panel case-anim" id="case-panel-action"></div>
+          <div class="case-panel case-anim" id="case-panel-bridge"></div>
+          <div class="case-panel case-anim" id="case-panel-cta"></div>
+          <div class="case-voice-slot" id="case-voice-slot" style="display:none"></div>
+        </div>
+      </div>
     </div>
 
     <!-- ══ RIGHT (website demo - secondary) ══ -->
-    <div class="right hero-demo fu fu-2">
-      <p class="demo-caption">The same thing, <strong>live on your website too.</strong></p>
+    <div class="right hero-demo fu fu-2" id="hero-demo">
+      <p class="demo-caption" id="demo-caption">The same thing, <strong>live on your website too.</strong></p>
       <!-- Browser mockup -->
       <div class="browser-wrap fu fu-2">
         <div class="browser">
@@ -768,7 +917,17 @@
     let probeAddress = p.get('probe_address') || '';
     let probeSent    = p.get('probe_sent')    || p.get('probe_timestamp') || '';
     // Probe proof line comes fully-formatted from the server (live Google Sheet, per request).
+    // This is the legacy path (lib/probes.mjs) — kept only as a fallback for slugs that
+    // don't yet have a linked probe in the real NOVUS engine (see demoOsState below).
     let probeLine    = null;
+
+    // Demo OS state (lib/demoOs.mjs via /api/novus/demo-state) — the authoritative
+    // PROBE → EVIDENCE → GRADE → PROBLEM data from the real NOVUS intelligence engine,
+    // when this agency has a linked probe. null until resolved / if none exists yet.
+    // Kept on window for now so later milestones (hero journey, personalised copy) can
+    // read it without a second network round-trip; nothing else in this milestone
+    // consumes it beyond the proof strip below.
+    let demoOsState  = null;
 
     // Brand slots - company-independent, render immediately so {{joe_phone}} never
     // shows as a raw placeholder even if the lead lookup is slow or fails (see item 8).
@@ -786,7 +945,13 @@
       return m ? decodeURIComponent(m[1]) : '';
     }
 
-    // Resolve lead data (slug lookup → fields), then apply it to the page.
+    // Resolve lead data (slug lookup → fields) AND the Demo OS state together
+    // before the hero paints anything real. This is what stops the old default
+    // headline ever being visible for a C1 agency and then getting swapped for
+    // the real one (see FIFTH in the redesign brief) — the left column stays
+    // behind a loading veil (index.html .hero-loading-veil) until both calls
+    // have settled or a hard timeout is hit, then reveals the correct state in
+    // one paint. Neither fetch failing is swallowed silently — both log.
     async function resolveLead() {
       const slug = slugFromPath();
       if (slug) {
@@ -801,10 +966,52 @@
               firstName    = cleanName(d.first_name) || firstName;
               probeLine    = d.probe_line || null;
             }
+          } else {
+            console.error('resolveLead: /api/lead responded', res.status, 'for slug', slug);
           }
-        } catch (e) { /* fall back to query-param / default values */ }
+        } catch (e) {
+          console.error('resolveLead: /api/lead fetch failed for slug', slug, e);
+        }
       }
+      // demoOsState resolution is capped so an unconfigured/slow NOVUS engine
+      // can never hold the page hostage — it degrades to the default hero,
+      // which is the correct, honest state for "no probe linked", not a bug.
+      if (slug) await fetchDemoOsState(slug);
       applyLead();
+      maybeActivateCaseJourney();
+      revealHero();
+    }
+
+    // Real NOVUS intelligence (grade, evidence, specific problem) for this agency,
+    // via the Demo OS adapter (lib/demoOs.mjs).
+    async function fetchDemoOsState(slug) {
+      const controller = new AbortController();
+      const timeout = setTimeout(function() { controller.abort(); }, 3000);
+      try {
+        const res = await fetch('/api/novus/demo-state?slug=' + encodeURIComponent(slug), { cache: 'no-store', signal: controller.signal });
+        if (!res.ok) {
+          console.error('fetchDemoOsState: /api/novus/demo-state responded', res.status, 'for slug', slug);
+          return;
+        }
+        const d = await res.json();
+        if (d && !d.error) {
+          demoOsState = d;
+        } else if (d && d.error) {
+          console.error('fetchDemoOsState: /api/novus/demo-state returned an error for slug', slug, d.error);
+        }
+      } catch (e) {
+        console.error('fetchDemoOsState: could not load Demo OS state for slug', slug, e);
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    // Reveals the left column once we know which state applies (C1 case or the
+    // default marketing hero already sitting in the DOM) — a single paint, no
+    // visible transition between "wrong" and "right" content.
+    function revealHero() {
+      const el = document.getElementById('hero-copy');
+      if (el) el.classList.remove('is-loading');
     }
 
     function applyLead() {
@@ -825,13 +1032,23 @@
       scrapeAndTrain();
     }
 
-    // Probe proof block - renders the server-built line above the hero, or nothing
-    // at all when there's no usable probe data (never a blank/broken line).
+    // Probe proof block - renders the authoritative Demo OS problem statement when
+    // available (real grade + evidence, via demoOsState), falling back to the legacy
+    // single-line probe proof for agencies with no linked probe yet, or nothing at all
+    // (never a blank/broken line). Suppressed entirely when the case journey is
+    // active: "Email = accusation. Demo = revelation." — the case tells this
+    // exact story far more specifically below, so restating a generic version
+    // of it above would repeat the email instead of building on it.
     function applyProof() {
       const sec = document.getElementById('proof');
       const q = document.getElementById('proof-quote');
       if (!sec || !q) return;
-      if (probeLine && probeLine.trim()) {
+      if (demoOsState && demoOsState.journeyVariant) { sec.style.display = 'none'; return; }
+      const problemStatement = demoOsState && demoOsState.problem && demoOsState.problem.statement;
+      if (problemStatement && problemStatement.trim()) {
+        q.textContent = problemStatement.trim();
+        sec.style.display = 'block';
+      } else if (probeLine && probeLine.trim()) {
         q.textContent = probeLine.trim();
         sec.style.display = 'block';
       } else {
@@ -1045,6 +1262,13 @@
       const siteCtx = gymContext ? '\n\n--- GENERAL WEBSITE INFO (branches, fees, about - secondary reference) ---\n' + gymContext.slice(0, 3500) + '\n--- END ---' : '';
       const locCtx = siteLocation ? '\n\nThe agency operates in and around ' + siteLocation + '. You can speak confidently about ' + siteLocation + ' and the surrounding area as their patch - but never invent a specific property you cannot see.' : '';
       const voiceRule = mode === 'voice' ? '\n\nVOICE: Full natural sentences only, never lists or bullet points, maximum 2 short sentences per turn.' : '';
+      // Case journey: grounds this specific call in the real tested enquiry
+      // (real property/evidence from demoOsState, via lib/demoOs.mjs) rather
+      // than a generic front-desk call - only active for an agency with a
+      // linked C/G seller-ask probe (Part 5: optional proof, not the hero).
+      const c1Ctx = (caseState.active && demoOsState && demoOsState.property && demoOsState.property.address)
+        ? '\n\nCONTEXT FOR THIS SPECIFIC CALL: this demo is showing what happens when Novus follows up on a real enquiry that got a fast automated or human reply but never closed the loop on whether the caller also had a property to sell - the enquiry was about ' + demoOsState.property.address + '. Open by acknowledging that enquiry warmly ("great to catch you about ' + demoOsState.property.address + '"), quickly re-qualify what the caller still needs, ask whether they also have a property to sell, and move firmly toward booking a viewing or valuation rather than starting a generic conversation.'
+        : '';
 
       const prompt =
 `You are the front desk for ${company}, an independent UK estate agent. You handle enquiries from buyers, sellers, tenants and landlords via chat on the agency's website. You speak as the agency ("we", "us") - warm, concise, professional British English. You are not a generic assistant; you are this agency's front desk.
@@ -1085,7 +1309,7 @@ Short replies (2-4 sentences usually). Warm, helpful, never pushy, never robotic
 FORMATTING
 Never use em dashes (-) or en dashes (-). Use a plain hyphen (-) instead, or rephrase. Keep punctuation simple and human.`;
 
-      return prompt + listingsJson + siteCtx + locCtx + voiceRule;
+      return prompt + listingsJson + siteCtx + locCtx + voiceRule + c1Ctx;
     }
 
     function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
@@ -1187,6 +1411,15 @@ Never use em dashes (-) or en dashes (-). Use a plain hyphen (-) instead, or rep
     function startHeroCall() {
       document.getElementById('hero-call-idle').style.display = 'none';
       document.getElementById('hero-call-active').style.display = 'flex';
+      // Case journey: this dial press is the optional voice proof at the end
+      // of the case (PART 5 — never the main journey). Flip the status badge
+      // from READY to RUNNING so the causality is visible.
+      if (caseState.active) {
+        const badge = document.getElementById('case-status-active');
+        const badgeText = document.getElementById('case-status-active-text');
+        if (badge) badge.style.display = 'inline-flex';
+        if (badgeText) badgeText.textContent = 'Running';
+      }
       const orb = document.getElementById('hero-voice-orb'), statusEl = document.getElementById('hero-voice-status'), transcript = document.getElementById('hero-voice-transcript');
       orb.className = 'voice-orb connecting'; statusEl.textContent = 'Connecting…'; statusEl.className = 'voice-status-label'; transcript.textContent = 'Connecting to your line…';
       try {
@@ -1199,13 +1432,325 @@ Never use em dashes (-) or en dashes (-). Use a plain hyphen (-) instead, or rep
         vapiHero.on('message', function(msg) { if (msg.type === 'transcript' && msg.transcriptType === 'final') transcript.textContent = msg.transcript; });
         vapiHero.on('call-end', function() { vapiActiveHero = false; orb.className = 'voice-orb idle'; statusEl.textContent = 'Call ended'; statusEl.className = 'voice-status-label'; transcript.textContent = 'Thanks for calling - the team will be in touch.'; });
         vapiHero.on('error', function(e) { console.error('Vapi error:', e); vapiActiveHero = false; orb.className = 'voice-orb idle'; statusEl.textContent = 'Connection error'; statusEl.className = 'voice-status-label error'; transcript.textContent = 'Could not connect. Please try again in a moment.'; });
-        vapiHero.start({ name: company + ' Receptionist', firstMessage: 'Hi' + (firstName ? ' ' + firstName : '') + '! Thanks for calling ' + company + ' - how can I help you today?', transcriber: { provider: 'deepgram', model: 'nova-2', language: 'en-GB' }, voice: { provider: '11labs', voiceId: 'sarah' }, model: { provider: 'openai', model: 'gpt-4o-mini', messages: [{ role: 'system', content: buildSystemPrompt('voice') }] } });
+        const heroAddr = caseState.active && demoOsState && demoOsState.property && demoOsState.property.address;
+        const heroFirstMessage = heroAddr
+          ? 'Hi' + (firstName ? ' ' + firstName : '') + '! It’s ' + company + ' here, following up on your enquiry about ' + heroAddr + ' - is now still a good time?'
+          : 'Hi' + (firstName ? ' ' + firstName : '') + '! Thanks for calling ' + company + ' - how can I help you today?';
+        vapiHero.start({ name: company + ' Receptionist', firstMessage: heroFirstMessage, transcriber: { provider: 'deepgram', model: 'nova-2', language: 'en-GB' }, voice: { provider: '11labs', voiceId: 'sarah' }, model: { provider: 'openai', model: 'gpt-4o-mini', messages: [{ role: 'system', content: buildSystemPrompt('voice') }] } });
       } catch (err) { orb.className = 'voice-orb idle'; statusEl.textContent = 'Unavailable'; statusEl.className = 'voice-status-label error'; transcript.textContent = 'Voice unavailable: ' + err.message; }
     }
     function endHeroCall() {
       if (vapiHero) { try { if (vapiActiveHero) vapiHero.stop(); } catch(e){} vapiHero = null; }
       vapiActiveHero = false;
-      setTimeout(function() { document.getElementById('hero-call-active').style.display = 'none'; document.getElementById('hero-call-idle').style.display = 'flex'; }, 800);
+      if (caseState.active) {
+        const badgeText = document.getElementById('case-status-active-text');
+        if (badgeText) badgeText.textContent = 'Complete';
+      }
+      setTimeout(function() {
+        document.getElementById('hero-call-active').style.display = 'none';
+        document.getElementById('hero-call-idle').style.display = 'flex';
+      }, 800);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // CASE — the C/G seller-ask journey (NOVUS Demo OS).
+    //
+    // Activates only when demoOsState.journeyVariant is set (lib/demoOs.mjs:
+    // official grade C or G, AND a real automated-acknowledgement
+    // communication was found for this probe — see deriveJourneyVariant).
+    // Every other agency — no linked probe, a different grade, or a C/G probe
+    // with no acknowledgement evidence at all — sees the existing default
+    // hero call panel completely unchanged. This replaces the old C1 journey
+    // entirely rather than layering a second one beside it.
+    //
+    // ONE central stage transforming, not a dashboard of cards (Part 6):
+    //   OPEN (the property, the exact enquiry) →
+    //   REVEAL+DECISION (the real evidence trail, then a genuine 3-way choice) →
+    //   INTELLIGENCE (what NOVUS derived from THIS enquiry only) →
+    //   ACTION (the deterministic re-open-both intervention) →
+    //   BRIDGE (the commercial reframe) →
+    //   CTA (visible at the top too, for anyone who never reaches this point)
+    // Voice AI is optional proof AFTER the cta stage (Part 5) — never the
+    // hero, never required for the demo to make sense on its own.
+    // ══════════════════════════════════════════════════════════════════════
+    const CASE_STAGES = ['open', 'reveal', 'intelligence', 'action', 'bridge', 'cta'];
+    const caseState = { active: false, stageIndex: 0, variant: null, decision: null };
+
+    function maybeActivateCaseJourney() {
+      if (caseState.active) return; // idempotent
+      if (!demoOsState || !demoOsState.journeyVariant) return;
+      caseState.active = true;
+      caseState.variant = demoOsState.journeyVariant;
+
+      const top = document.getElementById('hero-copy-top');
+      const panel = document.getElementById('call-panel');
+      const wrap = document.getElementById('case-wrap');
+      if (top) top.style.display = 'none';
+      if (panel) panel.style.display = 'none';
+      if (wrap) wrap.style.display = 'flex';
+      const page = document.querySelector('.page');
+      if (page) page.classList.add('case-mode');
+      const topCta = document.getElementById('case-top-cta');
+      if (topCta) topCta.classList.add('show');
+
+      renderCaseContent();
+      caseShowStage('open');
+      renderCaseProgress();
+    }
+
+    // ── Formatting helpers — every value comes from real demoOsState fields;
+    // these only format, never invent. ──
+    function fmtCaseHours(hrs) {
+      if (typeof hrs !== 'number' || isNaN(hrs)) return null;
+      if (hrs < 1) return Math.round(hrs * 60) + ' min';
+      const rounded = Math.round(hrs * 10) / 10;
+      return rounded === 1 ? '1 hour' : rounded + ' hours';
+    }
+    function fmtCaseTime(iso) {
+      if (!iso) return null;
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return null;
+      return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+    function fmtCaseTimeHuman(iso) {
+      if (!iso) return null;
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return null;
+      let h = d.getHours(); const m = d.getMinutes();
+      const ampm = h >= 12 ? 'pm' : 'am';
+      h = h % 12; if (h === 0) h = 12;
+      return h + (m ? ':' + String(m).padStart(2, '0') : '') + ampm;
+    }
+    function fmtCaseDateLine(iso) {
+      if (!iso) return null;
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return null;
+      const day = d.getDate();
+      const suffix = (day % 10 === 1 && day !== 11) ? 'st' : (day % 10 === 2 && day !== 12) ? 'nd' : (day % 10 === 3 && day !== 13) ? 'rd' : 'th';
+      const weekday = d.toLocaleDateString('en-GB', { weekday: 'long' });
+      return fmtCaseTime(iso) + ', ' + weekday + ' ' + day + suffix + '.';
+    }
+    function fmtCaseDaysAgo(iso) {
+      if (!iso) return null;
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return null;
+      const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+      if (days <= 0) return 'today';
+      return days === 1 ? '1 day' : days + ' days';
+    }
+    const CASE_TIMELINE_LABEL = { received: 'Enquiry received', auto_ack: 'Automated reply', human: 'Human reply' };
+
+    // Pure — no DOM access — so it can be tested in isolation (Part 8). The
+    // chosen option genuinely changes what the prospect reads next; this is
+    // not a progress control, all three are valid, real responses.
+    function caseDecisionResponse(choice) {
+      if (choice === 'ring') {
+        return 'Calling makes sense.<br>The problem isn’t knowing what to do.<br>It’s making sure someone does it every time.';
+      }
+      if (choice === 'email') {
+        return 'Reasonable. But who makes sure it happens when the next enquiry lands?';
+      }
+      if (choice === 'leave') {
+        return 'Fair. Most don’t come back and you can’t chase everyone.<br>The problem is you can’t tell which one was the seller.';
+      }
+      return null;
+    }
+
+    // Builds every stage's HTML once, from real demoOsState fields only. Never
+    // fabricates a value that isn't present — omits the row/line instead.
+    function renderCaseContent() {
+      const s = demoOsState;
+      const variant = caseState.variant;
+      const isAsk = variant === 'C_G_SELLER_ASK';
+      const prop = s.property || {};
+      const ack = s.acknowledgement || {};
+      const timeline = s.timeline || [];
+
+      // ── OPEN — the property is the wow, not a headline. ──
+      const opening = isAsk ? 'There was something else in your enquiry.' : 'There was something missing from your acknowledgement.';
+      const when = fmtCaseDateLine(s.probe && s.probe.timestamp);
+      const metaBits = [prop.price, prop.status].filter(Boolean);
+      document.getElementById('case-panel-open').innerHTML =
+        '<div class="case-eyebrow">NOVUS TESTED ' + esc(company.toUpperCase()) + '</div>' +
+        '<p class="case-line">' + opening + '</p>' +
+        (prop.address
+          ? '<div class="case-property"><div class="case-property-body">' +
+              '<div class="case-property-addr">' + esc(prop.address) + '</div>' +
+              (metaBits.length ? '<div class="case-property-meta">' + metaBits.map(esc).join(' · ') + '</div>' : '') +
+              (prop.url ? '<a class="case-property-link" href="' + esc(prop.url) + '" target="_blank" rel="noopener">View this listing ↗</a>' : '') +
+            '</div></div>'
+          : '') +
+        (when ? '<p class="case-line dim">' + esc(when) + ' That’s the one I sent.</p>' : '') +
+        '<button class="case-btn" onclick="caseNext()">Show me the trail →</button>';
+
+      // ── REVEAL — the real communication timeline, then the point (present
+      // vs. absent seller question), then a genuine 3-way decision. ──
+      const timelineHtml = timeline.map(function(ev) {
+        return '<div class="case-timeline-row"><span class="case-timeline-t">' + esc(fmtCaseTime(ev.at) || '') + '</span><span>' + esc(CASE_TIMELINE_LABEL[ev.kind] || ev.label) + '</span></div>';
+      }).join('') + '<div class="case-timeline-row"><span class="case-timeline-t"></span><span class="case-timeline-gap">— nothing since —</span></div>';
+
+      let revealBody;
+      if (isAsk) {
+        revealBody =
+          (ack.sellerAskEvidence ? '<p class="case-quote">“' + esc(ack.sellerAskEvidence) + '”</p>' : '') +
+          '<p class="case-line dim">Your system asked if I had a property to sell.<br>I never answered.<br>Nobody asked me again.</p>' +
+          '<p class="case-line">The best question in your business got asked once, by software' + (fmtCaseTimeHuman(ack.timestamp) ? ', at ' + esc(fmtCaseTimeHuman(ack.timestamp)) : '') + '.</p>';
+      } else {
+        revealBody =
+          (ack.text ? '<p class="case-quote">“' + esc(ack.text.trim()) + '”</p>' : '') +
+          '<p class="case-line">Answered in seconds.</p>' +
+          '<p class="case-line dim">Not once did it ask whether I had a property to sell.</p>' +
+          '<p class="case-line">That’s the difference between acknowledgement and completion.</p>';
+      }
+
+      const daysAgo = fmtCaseDaysAgo(ack.timestamp || (s.probe && s.probe.timestamp));
+      document.getElementById('case-panel-reveal').innerHTML =
+        '<div class="case-eyebrow">WHAT ACTUALLY HAPPENED</div>' +
+        '<div class="case-timeline">' + timelineHtml + '</div>' +
+        revealBody +
+        '<p class="case-line">' + (daysAgo ? esc(daysAgo) + ' later, ' : '') + 'the buyer’s still silent.<br>What does your team do?</p>' +
+        '<div class="case-choices" id="case-choices">' +
+          '<button class="case-choice-btn" data-choice="ring" onclick="selectCaseDecision(\'ring\')">Ring them</button>' +
+          '<button class="case-choice-btn" data-choice="email" onclick="selectCaseDecision(\'email\')">Email them</button>' +
+          '<button class="case-choice-btn" data-choice="leave" onclick="selectCaseDecision(\'leave\')">Leave it</button>' +
+        '</div>' +
+        '<div id="case-decision-response"></div>';
+
+      // ── INTELLIGENCE — derived entirely from THIS enquiry, never a database. ──
+      const lag = fmtCaseHours(s.evidence && s.evidence.humanLagHours);
+      const rows = [
+        '<div class="case-intel-row"><span class="case-intel-label">Seller question</span><span class="case-intel-value ' + (ack.sellerAsk ? 'warn' : '') + '">' + (ack.sellerAsk ? 'Asked — unanswered' : 'Not asked') + '</span></div>',
+        '<div class="case-intel-row"><span class="case-intel-label">Buyer</span><span class="case-intel-value">Still open' + (lag ? ' · replied in ' + esc(lag) : '') + '</span></div>',
+      ];
+      if (prop.status) rows.push('<div class="case-intel-row"><span class="case-intel-label">Property</span><span class="case-intel-value">' + esc(prop.status) + '</span></div>');
+      if (daysAgo) rows.push('<div class="case-intel-row"><span class="case-intel-label">Last contact</span><span class="case-intel-value">' + esc(daysAgo) + ' ago</span></div>');
+      document.getElementById('case-panel-intelligence').innerHTML =
+        '<div class="case-eyebrow">NOVUS SEES TWO OPPORTUNITIES</div>' +
+        '<div class="case-intel-grid">' + rows.join('') + '</div>' +
+        '<p class="case-line">One enquiry. Two open threads.</p>' +
+        '<button class="case-btn" onclick="caseNext()">Show me what NOVUS would do →</button>';
+
+      // ── ACTION — the deterministic re-open-both intervention. Real property
+      // context, no invented booking outcome. ──
+      const addr = prop.address || 'this property';
+      const buyerMsg = 'Hi' + (firstName ? ' ' + firstName : '') + ' — following up on your enquiry about ' + addr + '. Still worth a viewing this week?';
+      const sellerMsg = isAsk
+        ? 'Also — you mentioned possibly selling. Want a free, up-to-date valuation while we’re in touch?'
+        : 'By the way — is there a property of your own you’re thinking of selling? Happy to give you a free valuation.';
+      document.getElementById('case-panel-action').innerHTML =
+        '<div class="case-eyebrow">NOVUS INTERVENES</div>' +
+        '<div class="case-action-flow"><span class="on">IDENTIFIED</span><span class="arrow">→</span><span class="on">PRIORITISED</span><span class="arrow">→</span><span class="on">ACTIONED</span></div>' +
+        '<p class="case-line">Re-open both.</p>' +
+        '<div class="case-action-track">' +
+          '<div class="case-action-track-row"><span class="case-action-track-dot"></span>Buyer — progress toward a viewing</div>' +
+        '</div>' +
+        '<div class="case-action-msg">“' + esc(buyerMsg) + '”</div>' +
+        '<div class="case-action-track">' +
+          '<div class="case-action-track-row"><span class="case-action-track-dot"></span>Seller — re-open the qualification</div>' +
+        '</div>' +
+        '<div class="case-action-msg">“' + esc(sellerMsg) + '”</div>' +
+        '<p class="case-line dim">A demonstration of what NOVUS would do — nothing was actually sent.</p>' +
+        '<button class="case-btn" onclick="caseNext()">Show me the value →</button>';
+
+      // ── BRIDGE — the commercial reframe. ──
+      document.getElementById('case-panel-bridge').innerHTML =
+        '<div class="case-eyebrow">ONE ENQUIRY. TWO OPPORTUNITIES.</div>' +
+        '<div class="case-bridge-split">' +
+          '<div class="case-bridge-col"><div class="k">Buyer</div><div class="v">→ Viewing</div></div>' +
+          '<div class="case-bridge-col"><div class="k">Seller</div><div class="v">→ Valuation</div></div>' +
+        '</div>' +
+        '<p class="case-line">One of those is worth ten of the other.</p>' +
+        '<button class="case-btn" onclick="caseNext()">See what this means for you →</button>';
+
+      // ── CTA — also mirrored near the top of the page (#case-top-cta). ──
+      document.getElementById('case-panel-cta').innerHTML =
+        '<div class="case-eyebrow">THAT HAPPENED ONCE</div>' +
+        '<p class="case-line">That happened once, on a house I picked at random.</p>' +
+        '<p class="case-line dim">How many times last month?</p>' +
+        '<p class="case-line">Reply to this and I’ll show you how to count it.</p>' +
+        '<p class="case-line dim" style="font-size:.76rem">5 minutes. Nothing leaves your office.</p>' +
+        '<a class="case-btn" href="#book" onclick="revealCalendly(event); document.getElementById(\'book\').scrollIntoView({behavior:\'smooth\'});">Show me how</a>' +
+        '<div class="case-voice-proof">' +
+          '<p class="case-voice-proof-label">Want to hear NOVUS handle the front desk?</p>' +
+          '<button class="case-btn case-btn-ghost" onclick="revealCaseVoiceProof(this)">Call NOVUS</button>' +
+        '</div>';
+    }
+
+    // One real choice, not a re-selectable toggle — the response text is what
+    // makes the click meaningful, not a "continue" button disguised as one.
+    function selectCaseDecision(choice) {
+      if (caseState.decision) return;
+      caseState.decision = choice;
+      const box = document.getElementById('case-choices');
+      if (box) {
+        box.querySelectorAll('.case-choice-btn').forEach(function(btn) {
+          btn.disabled = true;
+          btn.classList.toggle('chosen', btn.getAttribute('data-choice') === choice);
+        });
+      }
+      const resp = caseDecisionResponse(choice);
+      const respBox = document.getElementById('case-decision-response');
+      if (respBox && resp) {
+        respBox.innerHTML = '<p class="case-line dim">' + resp + '</p><button class="case-btn" onclick="caseNext()">Show me what NOVUS sees →</button>';
+        respBox.classList.add('case-anim');
+        void respBox.offsetWidth;
+        requestAnimationFrame(function() { respBox.classList.add('entered'); });
+      }
+    }
+
+    function renderCaseProgress() {
+      const box = document.getElementById('case-progress');
+      if (!box) return;
+      box.innerHTML = CASE_STAGES.map(function(s, i) {
+        const cls = 'case-progress-dot' + (i < caseState.stageIndex ? ' done' : '') + (i === caseState.stageIndex ? ' current' : '');
+        return '<div class="' + cls + '"></div>';
+      }).join('');
+    }
+
+    function caseStageEl(key) { return document.getElementById('case-panel-' + key); }
+
+    function caseShowStage(key) {
+      CASE_STAGES.forEach(function(name) {
+        const el = caseStageEl(name);
+        if (!el) return;
+        el.classList.toggle('active', name === key);
+        el.classList.remove('entered', 'leaving');
+      });
+      const el = caseStageEl(key);
+      if (el) {
+        void el.offsetWidth; // force reflow so the fade-in actually runs
+        requestAnimationFrame(function() { el.classList.add('entered'); });
+      }
+    }
+
+    // Advances the case one causal beat: the current surface resolves out,
+    // then the next resolves in — never an instant swap.
+    function goToCaseStage(index) {
+      const prevEl = caseStageEl(CASE_STAGES[caseState.stageIndex]);
+      caseState.stageIndex = index;
+      renderCaseProgress();
+      if (prevEl) {
+        prevEl.classList.remove('entered');
+        prevEl.classList.add('leaving');
+        setTimeout(function() { caseShowStage(CASE_STAGES[index]); }, 180);
+      } else {
+        caseShowStage(CASE_STAGES[index]);
+      }
+    }
+
+    function caseNext() { if (caseState.stageIndex < CASE_STAGES.length - 1) goToCaseStage(caseState.stageIndex + 1); }
+
+    // Voice AI: optional proof AFTER the case, never the hero (Part 5). Reuses
+    // the existing #call-panel (dial UI + Vapi wiring) unchanged by moving the
+    // SAME node into the case's voice slot — no second voice widget is built.
+    function revealCaseVoiceProof(btn) {
+      const slot = document.getElementById('case-voice-slot');
+      const panel = document.getElementById('call-panel');
+      if (!slot || !panel) return;
+      slot.appendChild(panel);
+      panel.style.display = 'flex';
+      slot.style.display = 'flex';
+      if (btn) btn.style.display = 'none';
     }
 
     document.getElementById('cp-msgs').addEventListener('wheel', function(e) { e.stopPropagation(); }, { passive: true });

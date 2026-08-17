@@ -5,6 +5,39 @@
 // outreach columns here stay server-side; /api/lead exposes page fields only.
 
 export const LEADS = {
+  // ═══════════════════════════════════════════════════════════════════════
+  // TEMPORARY DEV-ONLY TEST FIXTURES — NOT real leads/agencies.
+  // Added manually (not by scripts/import-leads.mjs) so the two C/G
+  // seller-ask journey branches resolve an identity for manual review. Their
+  // probe/evidence/grade/communications data is self-contained, served
+  // entirely by api/novus/demo-state.js (see DEV_TEST_SLUG_C_ASK /
+  // DEV_TEST_SLUG_G_NO_ASK there) — neither touches the real
+  // PROBES/INTELLIGENCE/COMMUNICATIONS Google Sheet, so they cannot
+  // contaminate any real agency. TO REMOVE: delete both entries AND the
+  // matching blocks in api/novus/demo-state.js. A future re-run of
+  // scripts/import-leads.mjs will also silently drop these (it only writes
+  // real CSV-sourced leads) — re-add by hand if that happens first.
+  "test-c1-fast-response": {
+    "company": "NOVUS Test Agency — Seller Ask (DEV ONLY)",
+    "url": "",
+    "town": "Demo Town",
+    "first_name": "",
+    "phone": "",
+    "probe_address": "",
+    "probe_sent": "",
+    "listing_url": ""
+  },
+  "test-g-no-ask": {
+    "company": "NOVUS Test Agency — Seller No-Ask (DEV ONLY)",
+    "url": "",
+    "town": "Demo Town",
+    "first_name": "",
+    "phone": "",
+    "probe_address": "",
+    "probe_sent": "",
+    "listing_url": ""
+  },
+  // ═══════════════════════════════════════════════════════════════════════
   "ashton-white-dxfw": {
     "company": "Ashton White Estate Agents Billericay",
     "url": "http://www.ashtonwhite.co.uk/?%20utm_source=GoogleMyBusiness&utm_medium=organic&utm_campaign=GMB&utm_term=location&utm_content=location",

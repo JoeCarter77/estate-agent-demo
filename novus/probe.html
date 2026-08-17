@@ -77,6 +77,10 @@
       <label for="url">Rightmove URL</label>
       <input id="url" type="url" placeholder="https://www.rightmove.co.uk/properties/123456789" autocomplete="off" spellcheck="false" />
 
+      <label for="slug" class="mt">Demo slug (optional)</label>
+      <input id="slug" type="text" placeholder="ashton-white-dxfw" autocomplete="off" spellcheck="false" />
+      <p class="sub" style="margin:6px 0 0;">Links this probe to a Demo OS agency (trynovus.co.uk/d/{slug}) so its grade and evidence appear on that demo page. Leave blank for an unlinked probe.</p>
+
       <button id="create-btn" class="btn btn-primary mt">Create Probe</button>
       <div id="create-err" class="err"></div>
     </section>
@@ -191,12 +195,13 @@
     // CREATE
     $('create-btn').addEventListener('click', async () => {
       const url = $('url').value.trim();
+      const slug = $('slug').value.trim().toLowerCase();
       clearErr($('create-err'));
       if (!url) { showErr($('create-err'), 'Please paste a Rightmove property URL.'); return; }
       const btn = $('create-btn');
       btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Creating…';
       try {
-        const data = await api('/api/novus/probe-create', { method: 'POST', body: JSON.stringify({ url }) });
+        const data = await api('/api/novus/probe-create', { method: 'POST', body: JSON.stringify({ url, slug }) });
         render(data.probe);
         $('view-new').classList.add('hidden');
         $('view-ready').classList.remove('hidden');
@@ -230,6 +235,7 @@
     $('another-btn').addEventListener('click', () => {
       currentProbe = null;
       $('url').value = '';
+      $('slug').value = '';
       clearErr($('create-err')); clearErr($('mark-err'));
       $('ready-banner').classList.add('hidden');
       $('view-ready').classList.add('hidden');
