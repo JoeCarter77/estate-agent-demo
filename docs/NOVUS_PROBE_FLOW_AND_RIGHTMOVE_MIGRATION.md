@@ -32,7 +32,8 @@ AGENCIES, and carried from the agency the probe was launched from.**
 
 `ACTIONS` was a second break — a full 15-column schema plus a CONFIG
 `action_status` vocabulary, with no code reading or writing it. The chain
-physically ended at INTELLIGENCE. `api/novus/action-create.js` closes it.
+physically ended at INTELLIGENCE. `api/novus/_admin/action-create.js` (routed
+via `POST /api/novus/admin?resource=actions`) closes it.
 
 ---
 
@@ -76,12 +77,12 @@ BASE=https://<your-novus-domain>
 AUTH=$(printf '%s:%s' "$NOVUS_BASIC_AUTH_USER" "$NOVUS_BASIC_AUTH_PASS" | base64)
 
 # Dry run — reports what WOULD be added, writes nothing
-curl -s -X POST "$BASE/api/novus/admin/ensure-schema" \
+curl -s -X POST "$BASE/api/novus/admin?resource=ensure-schema" \
   -H "Authorization: Basic $AUTH" -H 'Content-Type: application/json' \
   -d '{"dry_run":true}' | jq
 
 # Apply
-curl -s -X POST "$BASE/api/novus/admin/ensure-schema" \
+curl -s -X POST "$BASE/api/novus/admin?resource=ensure-schema" \
   -H "Authorization: Basic $AUTH" -H 'Content-Type: application/json' \
   -d '{"dry_run":false}' | jq
 ```
@@ -142,7 +143,7 @@ will produce, including every rejected URL and every downgraded status.
 ## 4. The probe flow
 
 1. Operator opens `/novus/probe?agency_id=<id>` (or searches in the picker).
-2. `GET /api/novus/agencies?agency_id=…` resolves the agency so the UI shows a
+2. `GET /api/novus/admin?resource=agencies&agency_id=…` resolves the agency so the UI shows a
    **name**, not an opaque id, and offers its Rightmove profile as the place to
    find a listing.
 3. Operator pastes an **individual property URL**. An agency profile or a search

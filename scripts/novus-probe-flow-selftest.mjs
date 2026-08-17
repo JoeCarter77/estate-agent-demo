@@ -165,10 +165,10 @@ async function run() {
   const probeCreate = (await import('../api/novus/probe-create.js')).default;
   const probeGet = (await import('../api/novus/probe-get.js')).default;
   const probeMarkSent = (await import('../api/novus/probe-mark-sent.js')).default;
-  const agencies = (await import('../api/novus/agencies.js')).default;
-  const actionCreate = (await import('../api/novus/action-create.js')).default;
+  const agencies = (await import('../api/novus/_admin/agencies.js')).default;
+  const actionCreate = (await import('../api/novus/_admin/action-create.js')).default;
   const emailInbound = (await import('../api/novus/webhooks/email-inbound.js')).default;
-  const ensureSchema = (await import('../api/novus/admin/ensure-schema.js')).default;
+  const ensureSchema = (await import('../api/novus/_admin/ensure-schema.js')).default;
 
   // ══════════════════════════════════════════════════════════════════════════
   console.log('\n[1] Rightmove URL classification (Part 4)');

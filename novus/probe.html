@@ -311,7 +311,7 @@
       searchTimer = setTimeout(async () => {
         const seq = ++searchSeq;
         try {
-          const data = await api('/api/novus/agencies?probeable=1&limit=25&q=' + encodeURIComponent(q));
+          const data = await api('/api/novus/admin?resource=agencies&probeable=1&limit=25&q=' + encodeURIComponent(q));
           if (seq !== searchSeq) return; // a newer keystroke already won
           const box = $('agency-results');
           if (!data.agencies.length) {
@@ -417,7 +417,7 @@
           // Resolve the agency so the view shows a name, not an opaque id.
           if (probe.agency_id) {
             try {
-              const a = await api('/api/novus/agencies?agency_id=' + encodeURIComponent(probe.agency_id));
+              const a = await api('/api/novus/admin?resource=agencies&agency_id=' + encodeURIComponent(probe.agency_id));
               currentAgency = a.agency;
             } catch (e) { /* name is cosmetic — the id is what matters */ }
           }
@@ -430,7 +430,7 @@
 
       if (deepAgencyId) {
         try {
-          const data = await api('/api/novus/agencies?agency_id=' + encodeURIComponent(deepAgencyId));
+          const data = await api('/api/novus/admin?resource=agencies&agency_id=' + encodeURIComponent(deepAgencyId));
           if (data.probeable === false) {
             showErr($('create-err'),
               (data.agency.agency_name || deepAgencyId) + ' is not probeable (suppressed or flagged non-sales). Pick a different agency.');

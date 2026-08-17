@@ -1,5 +1,11 @@
-// api/novus/admin/ensure-schema.js — POST /api/novus/admin/ensure-schema
-// Body: { dry_run?: boolean }   (dry_run defaults to true)
+// api/novus/_admin/ensure-schema.js — resource handler for
+//   POST /api/novus/admin?resource=ensure-schema   Body: { dry_run?: boolean }
+//   (dry_run defaults to true)
+//
+// Relocated under the underscore-prefixed _admin/ directory so Vercel does not
+// route this file directly — api/novus/admin.js dispatches to it by
+// `resource`. Reason: staying within the Vercel Hobby plan's 12-serverless-
+// function limit (see that file's header comment). Handler logic unchanged.
 //
 // Adds the columns the new probe flow needs to the LIVE workbook, additively.
 //

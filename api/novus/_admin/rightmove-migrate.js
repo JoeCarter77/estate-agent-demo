@@ -1,4 +1,10 @@
-// api/novus/admin/rightmove-migrate.js — POST /api/novus/admin/rightmove-migrate
+// api/novus/_admin/rightmove-migrate.js — resource handler for
+//   POST /api/novus/admin?resource=rightmove-migrate
+//
+// Relocated under the underscore-prefixed _admin/ directory so Vercel does not
+// route this file directly — api/novus/admin.js dispatches to it by
+// `resource`. Reason: staying within the Vercel Hobby plan's 12-serverless-
+// function limit (see that file's header comment). Handler logic unchanged.
 //
 // Merges the Rightmove research into the LIVE AGENCIES table, keyed on
 // agency_id. The decision logic is lib/rightmove-migrate.mjs (pure, unit-tested

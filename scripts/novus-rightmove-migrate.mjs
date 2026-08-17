@@ -1,9 +1,13 @@
 // scripts/novus-rightmove-migrate.mjs — CLI driver for the Rightmove migration.
 //
 // Reads the Rightmove research as CSV and POSTs it to
-// /api/novus/admin/rightmove-migrate on the deployed NOVUS instance, which is
-// the only place with Google Sheets write access (keyless WIF — see
+// /api/novus/admin?resource=rightmove-migrate on the deployed NOVUS instance,
+// which is the only place with Google Sheets write access (keyless WIF — see
 // lib/sheets.mjs). Nothing is written unless you pass --apply.
+//
+// (Routed through the consolidated api/novus/admin.js dispatcher, not a
+// standalone /api/novus/admin/rightmove-migrate file — see that file's header
+// comment: Vercel Hobby's 12-serverless-function limit.)
 //
 // Why CSV and not .xlsx: this project deliberately carries almost no
 // dependencies, and adding an XLSX parser for a one-off import isn't worth it.
@@ -103,7 +107,7 @@ async function main() {
   console.log(apply ? '\n*** APPLY MODE — this WILL write to the live sheet ***\n' : '\nDRY RUN (pass --apply to write)\n');
 
   const auth = Buffer.from(`${user}:${pass}`).toString('base64');
-  const res = await fetch(`${base}/api/novus/admin/rightmove-migrate`, {
+  const res = await fetch(`${base}/api/novus/admin?resource=rightmove-migrate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Basic ${auth}` },
     body: JSON.stringify({ rows, dry_run: !apply }),

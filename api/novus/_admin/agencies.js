@@ -1,4 +1,10 @@
-// api/novus/agencies.js — GET /api/novus/agencies
+// api/novus/_admin/agencies.js — resource handler for GET /api/novus/admin?resource=agencies
+//
+// Relocated under the underscore-prefixed _admin/ directory so Vercel does not
+// route this file directly (see api/novus/admin.js for why: staying within the
+// Hobby plan's 12-serverless-function limit). The HANDLER LOGIC BELOW IS
+// UNCHANGED from the original api/novus/agencies.js — only its location (and
+// therefore its relative import depth) moved.
 //
 // The agency side of the probe flow. The probe UI needs this for two things:
 //   1) the agency picker — you launch a probe FROM an agency, so the UI has to
@@ -20,9 +26,9 @@
 // Read-only. Returns a trimmed projection — never the full agency row, so
 // contact emails and internal notes stay server-side.
 
-import { getRepo } from '../../lib/sheets.mjs';
-import { RIGHTMOVE_STATUS } from '../../lib/rightmove-urls.mjs';
-import { requireAuth } from './_auth.mjs';
+import { getRepo } from '../../../lib/sheets.mjs';
+import { RIGHTMOVE_STATUS } from '../../../lib/rightmove-urls.mjs';
+import { requireAuth } from '../_auth.mjs';
 
 export const maxDuration = 20;
 

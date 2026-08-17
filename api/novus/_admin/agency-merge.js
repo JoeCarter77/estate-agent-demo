@@ -1,5 +1,11 @@
-// api/novus/admin/agency-merge.js — POST /api/novus/admin/agency-merge
-// Body: { retain_agency_id, delete_agency_id, notes_addendum?, dry_run? }
+// api/novus/_admin/agency-merge.js — resource handler for
+//   POST /api/novus/admin?resource=agency-merge
+//   Body: { retain_agency_id, delete_agency_id, notes_addendum?, dry_run? }
+//
+// Relocated under the underscore-prefixed _admin/ directory so Vercel does not
+// route this file directly — api/novus/admin.js dispatches to it by
+// `resource`. Reason: staying within the Vercel Hobby plan's 12-serverless-
+// function limit (see that file's header comment). Handler logic unchanged.
 //
 // Merges a confirmed-duplicate AGENCIES record into another: repoints every
 // dependent PROBES/COMMUNICATIONS/INTELLIGENCE/ACTIONS row, merges list-type

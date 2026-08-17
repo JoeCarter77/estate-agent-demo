@@ -99,7 +99,7 @@ async function run() {
   process.env.NOVUS_BASIC_AUTH_USER = AUTH_USER;
   process.env.NOVUS_BASIC_AUTH_PASS = AUTH_PASS;
 
-  const mergeHandler = (await import('../api/novus/admin/agency-merge.js')).default;
+  const mergeHandler = (await import('../api/novus/_admin/agency-merge.js')).default;
 
   // ══════════════════════════════════════════════════════════════════════════
   console.log('\n[1] resolveAgencyMerge() — pure decision logic');
@@ -307,6 +307,82 @@ async function run() {
     await mergeHandler(mockReq({ retain_agency_id: 'ag_nope', delete_agency_id: 'ag_other', dry_run: true }), res);
     assert.equal(res.statusCode, 500);
     assert.match(res.body.error, /not found/);
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  console.log('\n[5] Router dispatch — api/novus/admin.js (Vercel Hobby 12-function consolidation)');
+  // ══════════════════════════════════════════════════════════════════════════
+  // Everything above calls the agency-merge handler directly. This section
+  // proves the ACTUAL router that Vercel serves (api/novus/admin.js) dispatches
+  // to it — and to the other four consolidated resources — correctly by
+  // `resource`, since that dispatch is itself new code with its own failure
+  // modes (wrong key, missing query parsing, swallowed method, etc.).
+  const adminRouter = (await import('../api/novus/admin.js')).default;
+  function routerReq({ method = 'POST', resource, body = {}, query = {} } = {}) {
+    return { method, body, query: { resource, ...query }, headers: { authorization: BASIC } };
+  }
+
+  await test('router: OPTIONS short-circuits to 200 regardless of resource', async () => {
+    const res = mockRes();
+    await adminRouter(routerReq({ method: 'OPTIONS', resource: undefined }), res);
+    assert.equal(res.statusCode, 200);
+  });
+
+  await test('router: missing "resource" query param is rejected with the full list', async () => {
+    const res = mockRes();
+    await adminRouter({ method: 'GET', body: {}, query: {}, headers: { authorization: BASIC } }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body.error, /agencies/);
+    assert.match(res.body.error, /rightmove-migrate/);
+  });
+
+  await test('router: unknown "resource" value is rejected the same way', async () => {
+    const res = mockRes();
+    await adminRouter(routerReq({ method: 'POST', resource: 'not-a-real-resource' }), res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body.error, /Missing or unknown/);
+  });
+
+  await test('router: resource=ensure-schema dispatches to the real handler (dry run, same fake sheet)', async () => {
+    const res = mockRes();
+    await adminRouter(routerReq({ method: 'POST', resource: 'ensure-schema', body: { dry_run: true } }), res);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+    assert.ok(res.body.tabs, 'ensure-schema response shape reached the client untouched');
+  });
+
+  await test('router: resource=agencies (GET) dispatches to the real handler', async () => {
+    const res = mockRes();
+    await adminRouter(routerReq({ method: 'GET', resource: 'agencies', query: { agency_id: 'ag_temme' } }), res);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+    assert.equal(res.body.agency.agency_name, 'Temme English Estate Agents Wickford');
+  });
+
+  await test('router: resource=actions (GET) dispatches to the real handler', async () => {
+    const res = mockRes();
+    await adminRouter(routerReq({ method: 'GET', resource: 'actions', query: { agency_id: 'ag_temme' } }), res);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+    // 1, not 0: section [3] above seeded an ACTIONS row against ag_carterward and
+    // then merged it, which repoints agency_id to ag_temme — so this also
+    // double-checks that repointed action is still findable through the router.
+    assert.equal(res.body.count, 1);
+    assert.equal(res.body.actions[0].agency_id, 'ag_temme');
+  });
+
+  await test('router: resource=rightmove-migrate dispatches to the real handler', async () => {
+    const res = mockRes();
+    await adminRouter(routerReq({
+      method: 'POST', resource: 'rightmove-migrate',
+      body: { dry_run: true, rows: [{ agency_id: 'ag_other', rightmove_status: 'unresolved' }] },
+    }), res);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+    assert.equal(res.body.report.matched, 1);
+  });
+
+  await test('router: resource=agency-merge dispatches to the real handler and hits the same refusal path', async () => {
+    const res = mockRes();
+    await adminRouter(routerReq({ method: 'POST', resource: 'agency-merge', body: { retain_agency_id: 'ag_temme', delete_agency_id: 'ag_temme', dry_run: true } }), res);
+    assert.equal(res.statusCode, 500);
+    assert.match(res.body.error, /must be different/);
   });
 
   console.log(`\n${'─'.repeat(70)}\n  ${passed} passed, ${failed} failed\n${'─'.repeat(70)}\n`);

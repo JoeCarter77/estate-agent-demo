@@ -89,8 +89,13 @@ const handlers = {
   '/api/novus/probe-create': (await import(`${ROOT}/api/novus/probe-create.js`)).default,
   '/api/novus/probe-get': (await import(`${ROOT}/api/novus/probe-get.js`)).default,
   '/api/novus/probe-mark-sent': (await import(`${ROOT}/api/novus/probe-mark-sent.js`)).default,
-  '/api/novus/agencies': (await import(`${ROOT}/api/novus/agencies.js`)).default,
-  '/api/novus/action-create': (await import(`${ROOT}/api/novus/action-create.js`)).default,
+  // agencies (was /api/novus/agencies) and actions (was /api/novus/action-create)
+  // are both routed through the SAME consolidated dispatcher now — see
+  // api/novus/admin.js's header comment for why (Vercel Hobby's 12-function
+  // limit). Pointing this mock server's one '/api/novus/admin' entry at the
+  // real router, rather than importing the two sub-handlers directly, means
+  // this test exercises the actual dispatch-by-`resource` code path too.
+  '/api/novus/admin': (await import(`${ROOT}/api/novus/admin.js`)).default,
 };
 
 const server = http.createServer(async (req, res) => {

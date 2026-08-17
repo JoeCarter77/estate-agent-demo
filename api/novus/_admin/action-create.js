@@ -1,6 +1,12 @@
-// api/novus/action-create.js
-//   POST /api/novus/action-create   Body: { probe_id, action_type, ... }
-//   GET  /api/novus/action-create?probe_id=...   list actions for a probe
+// api/novus/_admin/action-create.js — resource handler for
+//   POST /api/novus/admin?resource=actions   Body: { probe_id, action_type, ... }
+//   GET  /api/novus/admin?resource=actions&probe_id=...   list actions for a probe
+//
+// Relocated under the underscore-prefixed _admin/ directory so Vercel does not
+// route this file directly (see api/novus/admin.js for why: staying within the
+// Hobby plan's 12-serverless-function limit). The HANDLER LOGIC BELOW IS
+// UNCHANGED from the original api/novus/action-create.js — only its location
+// (and therefore its relative import depth) moved.
 //
 // The last link in AGENCY → PROBE → COMMUNICATION → INTELLIGENCE → ACTION.
 //
@@ -18,9 +24,9 @@
 // probe/agency pair that doesn't exist in the sheet. This is the same "derive,
 // never accept" rule the communications webhooks already follow.
 
-import { getRepo } from '../../lib/sheets.mjs';
-import { newActionId } from '../../lib/ids.mjs';
-import { requireAuth } from './_auth.mjs';
+import { getRepo } from '../../../lib/sheets.mjs';
+import { newActionId } from '../../../lib/ids.mjs';
+import { requireAuth } from '../_auth.mjs';
 
 export const maxDuration = 20;
 
