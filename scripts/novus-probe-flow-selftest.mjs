@@ -229,6 +229,10 @@ async function run() {
     assert.equal(normalizeRightmoveStatus('Confirmed'), RIGHTMOVE_STATUS.CONFIRMED);
     assert.equal(normalizeRightmoveStatus('candidate'), RIGHTMOVE_STATUS.CANDIDATE);
     assert.equal(normalizeRightmoveStatus('unresolved'), RIGHTMOVE_STATUS.UNRESOLVED);
+    assert.equal(normalizeRightmoveStatus('REVIEW'), RIGHTMOVE_STATUS.UNRESOLVED,
+      'the research uses REVIEW for rows it could not settle');
+    assert.equal(normalizeRightmoveStatus('DELETE - NON-SALES/LETTINGS'), RIGHTMOVE_STATUS.NOT_APPLICABLE);
+    assert.equal(normalizeRightmoveStatus('CANDIDATE - DIRECT AGENT PROFILE'), RIGHTMOVE_STATUS.CANDIDATE);
     assert.equal(normalizeRightmoveStatus('lettings only (no sales)'), RIGHTMOVE_STATUS.NOT_APPLICABLE);
     assert.equal(normalizeRightmoveStatus('DO NOT OUTREACH'), RIGHTMOVE_STATUS.NOT_APPLICABLE);
     assert.equal(normalizeRightmoveStatus(''), '', 'empty must stay empty, never invented');
@@ -243,8 +247,10 @@ async function run() {
       rightmove_status: 'confirmed',
     }, { sales_led_lettings_only: '' });
     assert.equal(r.patch.rightmove_sales_branch_url, undefined, 'generic URL must not be written');
-    assert.equal(r.patch.rightmove_status, RIGHTMOVE_STATUS.CANDIDATE);
+    assert.equal(r.patch.rightmove_status, RIGHTMOVE_STATUS.UNRESOLVED,
+      'no genuine profile URL → unresolved, not candidate');
     assert.ok(r.downgraded, 'must record the downgrade');
+    assert.equal(r.downgraded.to, RIGHTMOVE_STATUS.UNRESOLVED);
     assert.match(r.patch.rightmove_notes, /Rejected URL/);
   });
 
@@ -316,9 +322,9 @@ async function run() {
     assert.equal(migrationReport.urls_migrated, 1, 'only the genuine profile URL migrates');
     assert.equal(migrationReport.urls_rejected, 1);
     assert.equal(migrationReport.status_counts.confirmed, 1);
-    assert.equal(migrationReport.status_counts.candidate, 1, 'the downgraded row');
+    assert.equal(migrationReport.status_counts.candidate, 0, 'no candidate without a profile URL');
     assert.equal(migrationReport.status_counts.not_applicable, 1);
-    assert.equal(migrationReport.status_counts.unresolved, 1);
+    assert.equal(migrationReport.status_counts.unresolved, 2, 'ag_b downgraded + ag_d already unresolved');
     assert.equal(migrationReport.errors.length, 0);
   });
 
@@ -334,7 +340,7 @@ async function run() {
   await test('the generic-URL agency has NO rightmove URL stored', () => {
     const b = rowsOf(migrationFake.store, 'AGENCIES').find((r) => r.agency_id === 'ag_b');
     assert.equal(b.rightmove_sales_branch_url, '');
-    assert.equal(b.rightmove_status, 'candidate');
+    assert.equal(b.rightmove_status, 'unresolved');
     assert.match(b.rightmove_notes, /Rejected URL/);
   });
 
