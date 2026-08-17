@@ -10,6 +10,8 @@
 // Run:  npm run novus:probe-flow-selftest
 
 import assert from 'node:assert';
+import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { __setListingMetaFetcherForTests, parseTitleFacts } from '../lib/rightmove-meta.mjs';
 import {
@@ -18,7 +20,7 @@ import {
 } from '../lib/rightmove-urls.mjs';
 import { migrateRightmove, resolveRow, mapSourceHeaders, RIGHTMOVE_COLUMNS } from '../lib/rightmove-migrate.mjs';
 import { nextProbeReference } from '../lib/ids.mjs';
-import { parseCsv } from './novus-rightmove-migrate.mjs';
+import { parseCsv, isMainModule } from './novus-rightmove-migrate.mjs';
 
 // ── LIVE headers, verbatim ────────────────────────────────────────────────────
 const AGENCIES_HEADER = [
@@ -362,6 +364,73 @@ async function run() {
     assert.deepEqual(headers, ['agency_id', 'rightmove_notes']);
     assert.equal(rows.length, 1);
     assert.equal(rows[0].rightmove_notes, 'Says "confirmed", but\nsee note');
+  });
+
+  await test('CLI direct-invocation guard uses real URL semantics, not raw string concatenation', () => {
+    // The bug: `file://${argv1}` string-pastes a filesystem path where a
+    // properly-encoded file:// URL is required. That happens to be silently
+    // wrong on every OS (any char requiring percent-encoding breaks the
+    // comparison) but is *guaranteed* wrong on Windows, where argv[1] is a
+    // drive-letter, backslash path (C:\Users\...) that can never equal
+    // import.meta.url's forward-slash, extra-leading-slash form
+    // (file:///C:/Users/...) — so the guard never fired and main() silently
+    // never ran: exit 0, no output, exactly what was reported.
+    //
+    // pathToFileURL(argv1).href is Node's own platform-correct conversion —
+    // this checks the fixed guard actually calls it, using a path with a
+    // space, which every OS's pathToFileURL must percent-encode and naive
+    // string concatenation never does.
+    const argv1 = '/home/user/estate agent demo/scripts/novus-rightmove-migrate.mjs';
+    const properUrl = pathToFileURL(argv1).href;
+    assert.match(properUrl, /%20/, 'sanity: pathToFileURL must encode the space');
+
+    assert.equal(isMainModule(argv1, properUrl), true);
+
+    // Proves this is a real regression test, not a tautology: the OLD guard's
+    // naive concatenation never produces the correctly-encoded URL.
+    const oldGuardResult = `file://${argv1}` === properUrl;
+    assert.equal(oldGuardResult, false, 'old guard should NOT match — that was the bug');
+  });
+
+  await test('CLI direct-invocation guard still fires on a plain POSIX argv[1] path', () => {
+    const posixArgv1 = '/home/user/estate-agent-demo/scripts/novus-rightmove-migrate.mjs';
+    const posixModuleUrl = 'file:///home/user/estate-agent-demo/scripts/novus-rightmove-migrate.mjs';
+    assert.equal(isMainModule(posixArgv1, posixModuleUrl), true);
+  });
+
+  await test('CLI direct-invocation guard does not fire when imported (argv[1] is a different entrypoint)', () => {
+    const testRunnerArgv1 = '/home/user/estate-agent-demo/scripts/novus-probe-flow-selftest.mjs';
+    const migrateModuleUrl = 'file:///home/user/estate-agent-demo/scripts/novus-rightmove-migrate.mjs';
+    assert.equal(isMainModule(testRunnerArgv1, migrateModuleUrl), false);
+  });
+
+  await test('CLI actually runs main() end-to-end when invoked directly (regression for the reported exit-0/no-output bug)', async () => {
+    const { execFileSync } = await import('node:child_process');
+    const csvPath = '/tmp/novus-rightmove-guard-test.csv';
+    fs.writeFileSync(csvPath, 'agency_id,rightmove_status\nag_test,CONFIRMED\n');
+    let output = '';
+    let threw = false;
+    try {
+      output = execFileSync(
+        process.execPath,
+        ['scripts/novus-rightmove-migrate.mjs', '--file', csvPath],
+        {
+          cwd: new URL('..', import.meta.url).pathname,
+          env: { ...process.env, NOVUS_BASE_URL: 'http://127.0.0.1:1', NOVUS_BASIC_AUTH_USER: 'x', NOVUS_BASIC_AUTH_PASS: 'y' },
+          encoding: 'utf8',
+        }
+      );
+    } catch (e) {
+      // main() reaching the (expected, unreachable-host) fetch failure and
+      // exiting non-zero is FINE — that proves it ran. Silently exiting 0
+      // with empty stdout (the reported bug) is what this guards against.
+      threw = true;
+      output = (e.stdout || '') + (e.stderr || '');
+    }
+    fs.unlinkSync(csvPath);
+    assert.match(output, /Source: .*novus-rightmove-guard-test\.csv/, 'main() must have run and logged the source file');
+    assert.match(output, /Data rows: 1/, 'main() must have parsed the CSV');
+    assert.ok(threw, 'sanity: this run is expected to fail at the network call, not exit 0 silently');
   });
 
   // ══════════════════════════════════════════════════════════════════════════

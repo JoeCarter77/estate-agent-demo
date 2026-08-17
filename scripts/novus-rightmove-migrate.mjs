@@ -26,6 +26,7 @@
 //   NOVUS_BASIC_AUTH_PASS
 
 import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 function arg(name, fallback = null) {
   const i = process.argv.indexOf(`--${name}`);
@@ -147,7 +148,17 @@ async function main() {
   }
 }
 
+// Whether this module was invoked directly (`node this-file.mjs`) rather than
+// imported. `file://${argv1}` is not a valid comparison on Windows: argv[1] is
+// a drive-letter path with backslashes (C:\Users\...), which never equals the
+// properly-encoded file:// URL import.meta.url holds (file:///C:/Users/...),
+// so the guard silently never fired and main() never ran. pathToFileURL()
+// does the platform-correct conversion on every OS.
+export function isMainModule(argv1, moduleUrl) {
+  return Boolean(argv1) && pathToFileURL(argv1).href === moduleUrl;
+}
+
 // Only run when invoked directly (so parseCsv can be imported by the self-test).
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(process.argv[1], import.meta.url)) {
   main().catch((e) => { console.error(e); process.exit(1); });
 }
