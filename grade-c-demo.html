@@ -177,28 +177,29 @@
      Keeping them apart means the two transforms can never clobber each other. */
   .diagram-fit{ width:100%; transform-origin:center center; }
   .diagram-recede{ width:100%; will-change:transform,opacity; transition:opacity .05s linear, transform .05s linear; }
-  .reveal-diagram .scene-inner{ margin:0 auto; gap:9px; }
-  /* the whole first composition runs ~20% tighter than the rest of the deck so it
-     lands inside an ordinary (non-fullscreen) browser viewport */
-  .reveal-diagram .eyebrow{ font-size:.55rem; gap:8px; }
-  .reveal-diagram h1.scene-h{ font-size:clamp(1.05rem,2vw,1.4rem); }
-  .reveal-diagram p.scene-sub{ font-size:.72rem; }
+  .reveal-diagram .scene-inner{ margin:0 auto; gap:10px; }
+  /* the whole first composition runs tighter than the rest of the deck so it lands
+     inside an ordinary (non-fullscreen) browser viewport; the diagram itself was
+     enlarged ~12% once "What it creates" was removed, to use the recovered room */
+  .reveal-diagram .eyebrow{ font-size:.56rem; gap:8px; }
+  .reveal-diagram h1.scene-h{ font-size:clamp(1.1rem,2.1vw,1.46rem); }
+  .reveal-diagram p.scene-sub{ font-size:.74rem; }
   .reveal-try{ position:relative; z-index:2; min-height:100vh; width:100%; margin-top:0; padding:96px var(--gutter) 64px; display:flex; align-items:center; justify-content:center; border-radius:30px 30px 0 0; box-shadow:0 -60px 110px rgba(0,0,0,.55); background:var(--navy); }
 
   /* ── the diagram: a straight top-to-bottom architecture flow ── */
-  .flow{ width:100%; max-width:600px; margin:0 auto; display:flex; flex-direction:column; align-items:center; gap:4px; }
-  .flow-cap{ font-size:.46rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:rgba(255,255,255,.3); }
-  .flow-row{ display:flex; align-items:center; justify-content:center; gap:7px; flex-wrap:wrap; width:100%; margin-top:4px; }
-  .flow-pill{ font-size:.58rem; font-weight:600; padding:4px 10px; border-radius:100px; border:1px solid; line-height:1.3; white-space:nowrap; }
+  .flow{ width:100%; max-width:660px; margin:0 auto; display:flex; flex-direction:column; align-items:center; gap:5px; }
+  .flow-cap{ font-size:.5rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:rgba(255,255,255,.3); }
+  .flow-row{ display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; width:100%; margin-top:5px; }
+  .flow-pill{ font-size:.64rem; font-weight:600; padding:5px 12px; border-radius:100px; border:1px solid; line-height:1.3; white-space:nowrap; }
   .flow-pill.in{ color:rgba(255,255,255,.62); border-color:rgba(255,255,255,.16); background:rgba(255,255,255,.04); }
   .flow-pill.out{ color:#fff; border-color:rgba(125,211,252,.4); background:rgba(56,189,248,.11); }
 
-  .flow-connector{ width:70%; max-width:150px; height:22px; display:block; flex-shrink:0; }
-  .flow-connector.wide{ width:100%; max-width:480px; height:20px; }
+  .flow-connector{ width:70%; max-width:165px; height:25px; display:block; flex-shrink:0; }
+  .flow-connector.wide{ width:100%; max-width:530px; height:23px; }
   /* the negative margins tuck the line ends under the circle's opaque outer ring, so
      the inputs and the stem read as physically joined to the node */
-  .flow-connector.inputs{ width:100%; max-width:420px; height:28px; margin-bottom:-7px; }
-  .flow-connector.stem{ width:2px; max-width:2px; height:24px; margin-top:-7px; }
+  .flow-connector.inputs{ width:100%; max-width:465px; height:31px; margin-bottom:-8px; }
+  .flow-connector.stem{ width:2px; max-width:2px; height:27px; margin-top:-8px; }
   .flow-connector.stem .fc-line{ stroke:rgba(125,211,252,.32); }
   .fc-line{ fill:none; stroke:rgba(125,211,252,.14); stroke-width:1; vector-effect:non-scaling-stroke; }
   .fc-glow{ fill:none; stroke:rgba(125,211,252,.85); stroke-width:1.5; stroke-linecap:round; stroke-dasharray:9 200; vector-effect:non-scaling-stroke; opacity:.85; animation:flow-travel 2.8s linear infinite; filter:drop-shadow(0 0 2px rgba(125,211,252,.75)); }
@@ -210,12 +211,12 @@
      the same x the stem down to DECIDES & EXECUTES leaves from. READS THE CONTEXT and
      FINDS THE GAP are attached to it left and right by short links; they are never
      part of the vertical flow. */
-  .intel-row{ display:grid; grid-template-columns:minmax(0,1fr) 30px auto 30px minmax(0,1fr); align-items:center; width:100%; max-width:600px; }
+  .intel-row{ display:grid; grid-template-columns:minmax(0,1fr) 34px auto 34px minmax(0,1fr); align-items:center; width:100%; max-width:660px; }
   .intel-side{ display:flex; flex-direction:column; gap:1px; }
   .intel-side.left{ align-items:flex-end; text-align:right; }
   .intel-side.right{ align-items:flex-start; text-align:left; }
-  .is-title{ font-size:.53rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; color:#fff; }
-  .is-desc{ font-size:.53rem; font-weight:400; line-height:1.35; color:rgba(255,255,255,.42); max-width:150px; }
+  .is-title{ font-size:.58rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; color:#fff; }
+  .is-desc{ font-size:.58rem; font-weight:400; line-height:1.35; color:rgba(255,255,255,.42); max-width:165px; }
   .intel-link{ position:relative; height:1px; background:linear-gradient(90deg, rgba(125,211,252,.1), rgba(125,211,252,.4)); overflow:hidden; }
   .intel-link.r{ background:linear-gradient(270deg, rgba(125,211,252,.1), rgba(125,211,252,.4)); }
   .intel-link::after{ content:''; position:absolute; top:-1px; left:0; width:7px; height:3px; border-radius:2px; background:rgba(125,211,252,.9); box-shadow:0 0 5px rgba(125,211,252,.8); animation:link-travel 2.8s linear infinite; }
@@ -223,30 +224,30 @@
   @keyframes link-travel{ 0%{ transform:translateX(-8px); opacity:0; } 20%{ opacity:1; } 80%{ opacity:1; } 100%{ transform:translateX(30px); opacity:0; } }
   @keyframes link-travel-r{ 0%{ transform:translateX(30px); opacity:0; } 20%{ opacity:1; } 80%{ opacity:1; } 100%{ transform:translateX(-8px); opacity:0; } }
 
-  .core-ring{ position:relative; width:88px; height:88px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; flex-shrink:0;
+  .core-ring{ position:relative; width:98px; height:98px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; flex-shrink:0;
     background:radial-gradient(circle at 50% 32%, rgba(56,189,248,.4), rgba(13,26,61,.96) 72%);
     border:1px solid rgba(125,211,252,.6);
-    box-shadow:0 0 0 6px rgba(11,27,63,1), 0 0 0 7px rgba(125,211,252,.16), 0 0 30px rgba(56,189,248,.4); }
-  .core-ring::after{ content:''; position:absolute; inset:-6px; border-radius:50%; border:1px solid rgba(125,211,252,.2); animation:core-breathe 4.5s ease-in-out infinite; }
+    box-shadow:0 0 0 7px rgba(11,27,63,1), 0 0 0 8px rgba(125,211,252,.16), 0 0 32px rgba(56,189,248,.4); }
+  .core-ring::after{ content:''; position:absolute; inset:-7px; border-radius:50%; border:1px solid rgba(125,211,252,.2); animation:core-breathe 4.5s ease-in-out infinite; }
   @keyframes core-breathe{ 0%,100%{ transform:scale(1); opacity:.5; } 50%{ transform:scale(1.09); opacity:.12; } }
-  .core-t1{ font-size:.62rem; font-weight:800; letter-spacing:.15em; color:#fff; line-height:1; }
-  .core-t2{ font-size:.45rem; font-weight:700; letter-spacing:.09em; color:rgba(190,227,248,.9); line-height:1; }
+  .core-t1{ font-size:.68rem; font-weight:800; letter-spacing:.15em; color:#fff; line-height:1; }
+  .core-t2{ font-size:.5rem; font-weight:700; letter-spacing:.09em; color:rgba(190,227,248,.9); line-height:1; }
 
-  .decide{ display:flex; flex-direction:column; align-items:center; gap:1px; text-align:center; border:1px solid rgba(125,211,252,.32); background:rgba(56,189,248,.09); border-radius:100px; padding:5px 16px; }
-  .dc-title{ font-size:.55rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; color:#fff; }
-  .dc-desc{ font-size:.51rem; color:rgba(255,255,255,.45); line-height:1.3; }
+  .decide{ display:flex; flex-direction:column; align-items:center; gap:1px; text-align:center; border:1px solid rgba(125,211,252,.32); background:rgba(56,189,248,.09); border-radius:100px; padding:6px 18px; }
+  .dc-title{ font-size:.6rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; color:#fff; }
+  .dc-desc{ font-size:.55rem; color:rgba(255,255,255,.45); line-height:1.3; }
   @keyframes msg-in{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
 
   /* the four execution routes — small architectural nodes, not cards */
-  .flow-nodes{ display:flex; justify-content:center; gap:7px; flex-wrap:wrap; width:100%; }
-  .flow-node{ flex:1 1 120px; max-width:142px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:6px 9px; display:flex; flex-direction:column; gap:1px; text-align:left; }
+  .flow-nodes{ display:flex; justify-content:center; gap:8px; flex-wrap:wrap; width:100%; }
+  .flow-node{ flex:1 1 128px; max-width:158px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.12); border-radius:9px; padding:7px 10px; display:flex; flex-direction:column; gap:1px; text-align:left; }
   .flow-node.n1{ --c:#5EEAD4; } .flow-node.n2{ --c:#7DD3FC; }
   .flow-node.n3{ --c:#A5B4FC; } .flow-node.n4{ --c:#FDBA74; }
-  .flow-node .fn-num{ font-size:.46rem; font-weight:800; color:var(--c); }
-  .flow-node .fn-name{ font-size:.58rem; font-weight:800; letter-spacing:-.005em; color:#fff; line-height:1.25; }
-  .flow-node .fn-line{ font-size:.51rem; color:rgba(255,255,255,.46); line-height:1.3; }
+  .flow-node .fn-num{ font-size:.5rem; font-weight:800; color:var(--c); }
+  .flow-node .fn-name{ font-size:.64rem; font-weight:800; letter-spacing:-.005em; color:#fff; line-height:1.25; }
+  .flow-node .fn-line{ font-size:.56rem; color:rgba(255,255,255,.46); line-height:1.3; }
 
-  .punch{ width:100%; padding-top:14px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .punch{ width:100%; padding-top:16px; display:flex; flex-direction:column; align-items:center; gap:8px; }
   .scroll-cue{ display:flex; flex-direction:column; align-items:center; gap:2px; background:none; border:none; cursor:pointer; font-family:'Inter',sans-serif; padding:2px; }
   .scroll-cue-chev{ color:rgba(125,211,252,.7); font-size:.8rem; animation:hint-bob 1.8s ease-in-out infinite; }
   .scroll-cue-txt{ font-size:.7rem; font-weight:700; color:#fff; }
@@ -610,24 +611,6 @@
                 <div class="flow-node n2"><span class="fn-num">02</span><span class="fn-name">AI Front Desk</span><span class="fn-line">Capture every new opportunity.</span></div>
                 <div class="flow-node n3"><span class="fn-num">03</span><span class="fn-name">Conversational AI</span><span class="fn-line">Turn conversations into action.</span></div>
                 <div class="flow-node n4"><span class="fn-num">04</span><span class="fn-name">Opportunity Nurture</span><span class="fn-line">Stop active opportunities going cold.</span></div>
-              </div>
-
-              <svg class="flow-connector wide" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
-                <path class="fc-line" d="M12.5,0 Q12.5,16 25,30" />
-                <path class="fc-line" d="M37.5,0 Q37.5,16 42,30" />
-                <path class="fc-line" d="M62.5,0 Q62.5,16 58,30" />
-                <path class="fc-line" d="M87.5,0 Q87.5,16 75,30" />
-                <path class="fc-glow" d="M12.5,0 Q12.5,16 25,30" style="animation-delay:0s" />
-                <path class="fc-glow" d="M37.5,0 Q37.5,16 42,30" style="animation-delay:.3s" />
-                <path class="fc-glow" d="M62.5,0 Q62.5,16 58,30" style="animation-delay:.6s" />
-                <path class="fc-glow" d="M87.5,0 Q87.5,16 75,30" style="animation-delay:.9s" />
-              </svg>
-
-              <div class="flow-cap">What it creates</div>
-              <div class="flow-row">
-                <span class="flow-pill out">Viewings</span>
-                <span class="flow-pill out">Valuations</span>
-                <span class="flow-pill out">Instructions</span>
               </div>
 
             </div>
