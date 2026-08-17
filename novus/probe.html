@@ -23,12 +23,15 @@
     .env-pill{font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent-bd,rgba(37,99,235,.35));background:var(--accent-lo);padding:5px 11px;border-radius:100px;}
     .wrap{max-width:640px;margin:0 auto;padding:40px 24px 80px;}
     .card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 10px 30px rgba(15,23,42,.05);padding:28px;}
+    .card + .card{margin-top:18px;}
     .eyebrow{font-size:.66rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;}
     h1{font-size:1.6rem;font-weight:800;letter-spacing:-.02em;margin-bottom:6px;}
+    h2{font-size:1.05rem;font-weight:800;letter-spacing:-.01em;margin-bottom:4px;}
     .sub{font-size:.86rem;color:var(--text-2);line-height:1.5;margin-bottom:22px;}
     label{display:block;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px;}
-    input[type=url],input[type=text]{width:100%;font-family:'Inter',sans-serif;font-size:.95rem;color:var(--text);background:var(--panel);border:1px solid var(--border-hi);border-radius:11px;padding:13px 14px;transition:border-color .15s,box-shadow .15s;}
-    input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lo);background:#fff;}
+    input[type=url],input[type=text],textarea{width:100%;font-family:'Inter',sans-serif;font-size:.95rem;color:var(--text);background:var(--panel);border:1px solid var(--border-hi);border-radius:11px;padding:13px 14px;transition:border-color .15s,box-shadow .15s;}
+    textarea{min-height:74px;resize:vertical;line-height:1.45;}
+    input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lo);background:#fff;}
     .btn{font-family:'Inter',sans-serif;font-weight:700;font-size:.92rem;border:none;border-radius:11px;padding:13px 18px;cursor:pointer;width:100%;transition:transform .12s cubic-bezier(.34,1.56,.64,1),box-shadow .15s,background .15s,opacity .15s;}
     .btn-primary{background:var(--accent);color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.28);}
     .btn-primary:hover{background:var(--accent-hi);transform:translateY(-1px);}
@@ -37,11 +40,13 @@
     .btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
     .btn-green{background:var(--green);color:#fff;box-shadow:0 6px 16px rgba(34,197,94,.28);}
     .btn-green:hover{filter:brightness(1.05);transform:translateY(-1px);}
+    .btn-sm{width:auto;padding:8px 14px;font-size:.8rem;}
     .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;}
     .mt{margin-top:14px;}
     .status-tag{display:inline-flex;align-items:center;gap:6px;font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:5px 11px;border-radius:100px;}
     .st-draft{color:var(--amber);background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);}
     .st-observing{color:var(--green);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);}
+    .st-closed{color:var(--text-3);background:var(--panel-2);border:1px solid var(--border-hi);}
     .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
     .kv{display:grid;grid-template-columns:130px 1fr;gap:2px 16px;margin-top:18px;}
     .kv dt{font-size:.7rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);padding:9px 0;border-top:1px solid var(--border);}
@@ -50,6 +55,7 @@
     .kv dd.muted{color:var(--text-3);font-style:italic;}
     .ref-chip{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;color:var(--brand-navy);background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:3px 9px;font-size:.86rem;}
     .hint{font-size:.78rem;color:var(--text-2);line-height:1.5;margin-top:16px;background:var(--accent-lo);border:1px solid rgba(37,99,235,.18);border-radius:10px;padding:12px 14px;}
+    .warn{font-size:.78rem;color:#92400E;line-height:1.5;margin-top:16px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:12px 14px;}
     .err{display:none;font-size:.82rem;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:11px 13px;margin-top:14px;}
     .err.show{display:block;}
     .spinner{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:7px;}
@@ -58,6 +64,29 @@
     .foot{text-align:center;font-size:.72rem;color:var(--text-3);margin-top:26px;}
     .banner{display:flex;align-items:center;gap:10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:11px;padding:13px 15px;margin-bottom:20px;}
     .banner .em{font-size:.86rem;color:var(--text);font-weight:600;}
+    .agency-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:18px;box-shadow:0 10px 30px rgba(15,23,42,.05);}
+    .agency-bar .who{font-size:.95rem;font-weight:700;color:var(--brand-navy);}
+    .agency-bar .id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.75rem;color:var(--text-3);margin-top:2px;}
+    .agency-bar.bad{border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.05);}
+    .agency-bar.bad .who{color:var(--red);}
+    /* Screenshot paste zone */
+    .paste-zone{margin-top:6px;border:2px dashed var(--border-hi);border-radius:12px;background:var(--panel);padding:26px 18px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s;}
+    .paste-zone:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px var(--accent-lo);}
+    .paste-zone.armed{border-color:var(--accent);background:#fff;}
+    .paste-zone .big{font-size:.95rem;font-weight:700;color:var(--text);}
+    .paste-zone .small{font-size:.78rem;color:var(--text-3);margin-top:6px;line-height:1.5;}
+    kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;background:#fff;border:1px solid var(--border-hi);border-bottom-width:2px;border-radius:6px;padding:2px 6px;color:var(--brand-navy);}
+    .shot-preview{margin-top:14px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel);}
+    .shot-preview img{display:block;width:100%;max-height:320px;object-fit:contain;background:#fff;}
+    .shot-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-top:1px solid var(--border);}
+    .shot-actions .name{font-size:.76rem;color:var(--text-3);}
+    /* Confirm grid */
+    .conf-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;}
+    .conf-grid .full{grid-column:1 / -1;}
+    .conf-grid label{margin-bottom:6px;}
+    .conf-grid input{padding:10px 12px;font-size:.9rem;}
+    .src-pill{display:inline-flex;align-items:center;gap:6px;font-size:.66rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:100px;color:var(--text-3);background:var(--panel-2);border:1px solid var(--border);}
+    @media (max-width:520px){.conf-grid{grid-template-columns:1fr;}.btn-row{grid-template-columns:1fr;}}
   </style>
 </head>
 <body>
@@ -68,22 +97,80 @@
 
   <div class="wrap">
 
-    <!-- ── NEW PROBE ─────────────────────────────────────────────── -->
+    <!-- ── AGENCY IDENTITY (from the agency-specific probe URL) ───────── -->
+    <div id="agency-bar" class="agency-bar hidden">
+      <div>
+        <div class="who" id="agency-name">Resolving agency…</div>
+        <div class="id" id="agency-id">—</div>
+      </div>
+      <span class="src-pill" id="agency-pill">Agency</span>
+    </div>
+
+    <!-- ── STEP 1: PROPERTY ──────────────────────────────────────────── -->
     <section id="view-new" class="card">
-      <div class="eyebrow">New Probe</div>
-      <h1>Create a probe</h1>
-      <p class="sub">Paste a Rightmove property URL. NOVUS creates a draft probe, generates the reference and attaches the probe email &amp; phone. You'll submit the genuine enquiry manually in the next step.</p>
+      <div class="eyebrow">New Probe · Step 1</div>
+      <h1>Find the property</h1>
+      <p class="sub">Paste the Rightmove listing URL. NOVUS reads the property automatically; if the listing blocks that, screenshot it and press <kbd>CTRL</kbd>+<kbd>V</kbd> below. You confirm the details before the probe is created.</p>
 
       <label for="url">Rightmove URL</label>
       <input id="url" type="url" placeholder="https://www.rightmove.co.uk/properties/123456789" autocomplete="off" spellcheck="false" />
 
-      <button id="create-btn" class="btn btn-primary mt">Create Probe</button>
+      <button id="extract-btn" class="btn btn-primary mt">Read property</button>
       <div id="create-err" class="err"></div>
+
+      <!-- Screenshot fallback: hidden until automatic extraction can't deliver -->
+      <div id="fallback" class="hidden" style="margin-top:22px;">
+        <div class="warn" id="fallback-why">Automatic reading didn't return enough detail for this listing.</div>
+        <label style="margin-top:16px;">Screenshot fallback</label>
+        <div id="paste-zone" class="paste-zone" tabindex="0" role="button" aria-label="Paste a screenshot of the listing">
+          <div class="big">Click here, then press <kbd>CTRL</kbd>+<kbd>V</kbd></div>
+          <div class="small">Screenshot the Rightmove listing, copy it, click this box and paste. PNG or JPEG from the clipboard — no file upload, no saving.</div>
+        </div>
+        <div id="shot-preview" class="shot-preview hidden">
+          <img id="shot-img" alt="Pasted listing screenshot" />
+          <div class="shot-actions">
+            <span class="name" id="shot-name">screenshot</span>
+            <button id="shot-remove" class="btn btn-ghost btn-sm">Remove</button>
+          </div>
+        </div>
+        <button id="shot-extract-btn" class="btn btn-primary mt hidden">Extract from screenshot</button>
+        <div id="shot-err" class="err"></div>
+      </div>
     </section>
 
-    <!-- ── PROBE READY ───────────────────────────────────────────── -->
+    <!-- ── STEP 2: CONFIRM ───────────────────────────────────────────── -->
+    <section id="view-confirm" class="card hidden">
+      <div class="eyebrow">New Probe · Step 2</div>
+      <h1>Confirm the property</h1>
+      <p class="sub">Only what NOVUS could actually read is filled in — blanks are left blank rather than guessed. Correct anything that's wrong, then create the probe.</p>
+      <div><span class="src-pill" id="conf-source">source</span></div>
+
+      <div class="conf-grid">
+        <div class="full"><label for="c-address">Address</label><input id="c-address" type="text" /></div>
+        <div><label for="c-street">Street</label><input id="c-street" type="text" /></div>
+        <div><label for="c-postcode">Postcode</label><input id="c-postcode" type="text" /></div>
+        <div><label for="c-price">Price</label><input id="c-price" type="text" /></div>
+        <div><label for="c-type">Property type</label><input id="c-type" type="text" /></div>
+        <div><label for="c-beds">Bedrooms</label><input id="c-beds" type="text" inputmode="numeric" /></div>
+        <div><label for="c-baths">Bathrooms</label><input id="c-baths" type="text" inputmode="numeric" /></div>
+        <div><label for="c-status">Listing status</label><input id="c-status" type="text" /></div>
+        <div><label for="c-agent">Agent / branch</label><input id="c-agent" type="text" /></div>
+        <div class="full"><label for="c-title">Listing title</label><input id="c-title" type="text" /></div>
+        <div class="full"><label for="c-details">Details</label><textarea id="c-details"></textarea></div>
+        <div class="full"><label for="c-enquiry">Enquiry text (optional)</label><textarea id="c-enquiry" placeholder="The enquiry you will submit on the listing."></textarea></div>
+      </div>
+
+      <div class="btn-row">
+        <button id="back-btn" class="btn btn-ghost">← Back</button>
+        <button id="create-btn" class="btn btn-primary">Create Probe</button>
+      </div>
+      <div id="confirm-err" class="err"></div>
+    </section>
+
+    <!-- ── PROBE READY ───────────────────────────────────────────────── -->
     <section id="view-ready" class="card hidden">
       <div id="ready-banner" class="banner hidden"><span class="em">✓ Probe ready — submit the enquiry, then mark it as sent.</span></div>
+      <div id="dup-banner" class="warn hidden"></div>
 
       <div class="eyebrow">Probe <span id="ready-ref-inline"></span></div>
       <h1 id="ready-title">Probe ready</h1>
@@ -93,6 +180,7 @@
         <dt>Agency</dt><dd id="f-agency" class="muted">—</dd>
         <dt>Property</dt><dd id="f-address" class="muted">—</dd>
         <dt>Price</dt><dd id="f-price" class="muted">—</dd>
+        <dt>Detail</dt><dd id="f-detail" class="muted">—</dd>
         <dt>Portal</dt><dd id="f-portal">—</dd>
         <dt>Probe Ref</dt><dd><span id="f-ref" class="ref-chip">—</span></dd>
         <dt>Email</dt><dd id="f-email" class="mono">—</dd>
@@ -119,6 +207,20 @@
   <script>
     const $ = (id) => document.getElementById(id);
     let currentProbe = null;
+    let agency = null;          // resolved AGENCIES row (canonical agency_id)
+    let extracted = null;       // last extraction result shown for confirmation
+    let extractionSource = '';  // 'fetch' | 'brightdata' | 'screenshot' | 'manual'
+    let pastedImage = null;     // { dataUrl, mediaType, bytes }
+
+    // The agency-specific probe URL: /novus/a/<agency_id> or ?agency=<agency_id>.
+    // One canonical identifier, carried straight through to probe creation.
+    function agencyIdFromUrl() {
+      const qs = new URLSearchParams(window.location.search);
+      const q = (qs.get('agency') || qs.get('agency_id') || '').trim();
+      if (q) return q;
+      const m = window.location.pathname.match(/\/novus\/a\/([^/?#]+)/i);
+      return m ? decodeURIComponent(m[1]).trim() : '';
+    }
 
     // Basic Auth is enforced by the edge middleware on this page load, so the
     // browser already holds credentials for this origin and attaches them to
@@ -141,6 +243,231 @@
       } catch (e) { return iso; }
     }
 
+    // ── AGENCY RESOLUTION ────────────────────────────────────────────────
+    async function resolveAgency() {
+      const id = agencyIdFromUrl();
+      const bar = $('agency-bar');
+      bar.classList.remove('hidden');
+      if (!id) {
+        bar.classList.add('bad');
+        $('agency-name').textContent = 'No agency in this link';
+        $('agency-id').textContent = 'Open /novus/a/<agency_id> — a probe cannot be created without a resolved agency.';
+        $('extract-btn').disabled = true;
+        return;
+      }
+      try {
+        const data = await api('/api/novus/agency-get?agency_id=' + encodeURIComponent(id));
+        agency = data.agency;
+        $('agency-name').textContent = agency.agency_name || agency.agency_id;
+        $('agency-id').textContent = agency.agency_id + (agency.location ? ' · ' + agency.location : '');
+      } catch (e) {
+        bar.classList.add('bad');
+        $('agency-name').textContent = 'Agency not resolved';
+        $('agency-id').textContent = e.message;
+        $('extract-btn').disabled = true;
+      }
+    }
+
+    // ── STEP 1: automatic extraction ─────────────────────────────────────
+    $('extract-btn').addEventListener('click', async () => {
+      const url = $('url').value.trim();
+      clearErr($('create-err'));
+      if (!agency) { showErr($('create-err'), 'No resolved agency — open this page from the agency-specific probe link.'); return; }
+      if (!url) { showErr($('create-err'), 'Please paste a Rightmove property URL.'); return; }
+      const btn = $('extract-btn');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Reading listing…';
+      try {
+        const data = await api('/api/novus/property-extract', { method: 'POST', body: JSON.stringify({ url }) });
+        if (data.sufficient) {
+          extractionSource = data.source;
+          showConfirm(data.fields, data.source === 'brightdata' ? 'Read automatically (unlocker)' : 'Read automatically');
+        } else {
+          // Automatic extraction is never a hard dependency — go straight to
+          // the screenshot fallback, pre-filling whatever little was readable.
+          extracted = data.fields || {};
+          openFallback(data.blocked
+            ? 'Rightmove blocked the automatic read for this listing.'
+            : 'Automatic reading didn\'t return enough detail for this listing.');
+        }
+      } catch (e) {
+        openFallback('Automatic reading failed: ' + e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Read property';
+      }
+    });
+    $('url').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('extract-btn').click(); });
+
+    // ── SCREENSHOT FALLBACK (clipboard paste, no file upload) ────────────
+    function openFallback(why) {
+      $('fallback').classList.remove('hidden');
+      $('fallback-why').textContent = why;
+      $('paste-zone').focus();
+    }
+
+    const zone = $('paste-zone');
+    zone.addEventListener('click', () => zone.focus());
+    zone.addEventListener('focus', () => zone.classList.add('armed'));
+    zone.addEventListener('blur', () => zone.classList.remove('armed'));
+
+    function handleClipboard(e) {
+      const items = (e.clipboardData && e.clipboardData.items) || [];
+      for (const item of items) {
+        if (item.kind === 'file' && item.type && item.type.indexOf('image/') === 0) {
+          const file = item.getAsFile();
+          if (file) { e.preventDefault(); acceptImage(file); return true; }
+        }
+      }
+      return false;
+    }
+    // Paste works whether the zone itself has focus or the page does — the
+    // fallback area only has to be visible.
+    zone.addEventListener('paste', handleClipboard);
+    document.addEventListener('paste', (e) => {
+      if ($('fallback').classList.contains('hidden')) return;
+      if ($('view-confirm').classList.contains('hidden') === false) return;
+      handleClipboard(e);
+    });
+
+    function acceptImage(file) {
+      clearErr($('shot-err'));
+      const okTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+      if (okTypes.indexOf(file.type) === -1) {
+        showErr($('shot-err'), 'That clipboard image is a ' + (file.type || 'unknown type') + '. Paste a PNG or JPEG screenshot.');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        showErr($('shot-err'), 'Screenshot is too large (max 5MB). Crop to the listing details and paste again.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        pastedImage = { dataUrl: String(reader.result), mediaType: file.type, bytes: file.size };
+        $('shot-img').src = pastedImage.dataUrl;
+        $('shot-name').textContent = file.type.replace('image/', '').toUpperCase() + ' · ' + Math.round(file.size / 1024) + ' KB';
+        $('shot-preview').classList.remove('hidden');
+        $('shot-extract-btn').classList.remove('hidden');
+      };
+      reader.onerror = () => showErr($('shot-err'), 'Could not read that clipboard image. Try copying the screenshot again.');
+      reader.readAsDataURL(file);
+    }
+
+    $('shot-remove').addEventListener('click', () => {
+      pastedImage = null;
+      $('shot-img').removeAttribute('src');
+      $('shot-preview').classList.add('hidden');
+      $('shot-extract-btn').classList.add('hidden');
+      clearErr($('shot-err'));
+      zone.focus();
+    });
+
+    $('shot-extract-btn').addEventListener('click', async () => {
+      if (!pastedImage) return;
+      clearErr($('shot-err'));
+      const btn = $('shot-extract-btn');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Reading screenshot…';
+      try {
+        const data = await api('/api/novus/property-extract-image', {
+          method: 'POST',
+          body: JSON.stringify({ image_base64: pastedImage.dataUrl, media_type: pastedImage.mediaType }),
+        });
+        if (data.empty) {
+          showErr($('shot-err'), 'Nothing readable in that screenshot. Capture the listing header (address, price, beds) and paste again.');
+          return;
+        }
+        extractionSource = 'screenshot';
+        // Screenshot fields win where present; anything the URL read managed to
+        // get is kept for the blanks. Same confirmation step either way.
+        showConfirm(Object.assign({}, extracted || {}, stripEmpty(data.fields)), 'Read from screenshot');
+      } catch (e) {
+        showErr($('shot-err'), e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Extract from screenshot';
+      }
+    });
+
+    function stripEmpty(o) {
+      const out = {};
+      Object.keys(o || {}).forEach((k) => { if (o[k] !== '' && o[k] !== null && o[k] !== undefined) out[k] = o[k]; });
+      return out;
+    }
+
+    // ── STEP 2: CONFIRM ──────────────────────────────────────────────────
+    function showConfirm(fields, sourceLabel) {
+      extracted = fields || {};
+      const v = (k) => (extracted[k] === null || extracted[k] === undefined ? '' : String(extracted[k]));
+      $('c-address').value = v('address');
+      $('c-street').value = v('street');
+      $('c-postcode').value = v('postcode');
+      $('c-price').value = v('price');
+      $('c-type').value = v('property_type');
+      $('c-beds').value = v('bedrooms');
+      $('c-baths').value = v('bathrooms');
+      $('c-status').value = v('listing_status');
+      $('c-agent').value = v('agent_branch');
+      $('c-title').value = v('title');
+      $('c-details').value = v('details');
+      $('conf-source').textContent = sourceLabel;
+      $('view-new').classList.add('hidden');
+      $('view-confirm').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function confirmedProperty() {
+      return {
+        address: $('c-address').value.trim(),
+        street: $('c-street').value.trim(),
+        postcode: $('c-postcode').value.trim(),
+        price: $('c-price').value.trim(),
+        property_type: $('c-type').value.trim(),
+        bedrooms: $('c-beds').value.trim(),
+        bathrooms: $('c-baths').value.trim(),
+        listing_status: $('c-status').value.trim(),
+        agent_branch: $('c-agent').value.trim(),
+        title: $('c-title').value.trim(),
+        details: $('c-details').value.trim(),
+      };
+    }
+
+    $('back-btn').addEventListener('click', () => {
+      $('view-confirm').classList.add('hidden');
+      $('view-new').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    // ── CREATE (the one and only probe creation path) ────────────────────
+    $('create-btn').addEventListener('click', async () => {
+      clearErr($('confirm-err'));
+      if (!agency) { showErr($('confirm-err'), 'No resolved agency — open this page from the agency-specific probe link.'); return; }
+      const url = $('url').value.trim();
+      if (!url) { showErr($('confirm-err'), 'The Rightmove URL is missing.'); return; }
+      const btn = $('create-btn');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Creating…';
+      try {
+        const data = await api('/api/novus/probe-create', {
+          method: 'POST',
+          body: JSON.stringify({
+            agency_id: agency.agency_id,
+            url,
+            property: confirmedProperty(),
+            enquiry_text: $('c-enquiry').value.trim(),
+            extraction_source: extractionSource || 'manual',
+          }),
+        });
+        render(data.probe);
+        $('view-confirm').classList.add('hidden');
+        $('view-ready').classList.remove('hidden');
+        $('ready-banner').classList.toggle('hidden', !!data.duplicate);
+        const dup = $('dup-banner');
+        dup.classList.toggle('hidden', !data.duplicate);
+        if (data.duplicate) dup.textContent = data.message || 'A live probe already exists for this listing and agency.';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (e) {
+        showErr($('confirm-err'), e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Create Probe';
+      }
+    });
+
     function render(probe) {
       currentProbe = probe;
       $('ready-ref-inline').textContent = probe.probe_reference || '';
@@ -152,15 +479,25 @@
       setField('f-agency', probe.agency_id, true);
       setField('f-address', probe.property_address, true);
       setField('f-price', probe.property_price, true);
+      const detail = [
+        probe.property_bedrooms !== '' && probe.property_bedrooms != null ? probe.property_bedrooms + ' bed' : '',
+        probe.property_bathrooms !== '' && probe.property_bathrooms != null ? probe.property_bathrooms + ' bath' : '',
+        probe.property_type || '',
+        probe.property_postcode || '',
+      ].filter(Boolean).join(' · ');
+      setField('f-detail', detail, true);
       $('f-portal').textContent = probe.portal || '—';
       $('f-ref').textContent = probe.probe_reference || '—';
       $('f-email').textContent = probe.probe_email || '—';
       $('f-phone').textContent = probe.probe_phone || '—';
 
       const observing = probe.probe_status === 'observing';
-      // Status tag
+      const closed = probe.probe_status === 'closed';
       const tag = $('status-tag'), txt = $('status-text');
-      if (observing) {
+      if (closed) {
+        tag.className = 'status-tag st-closed'; txt.textContent = 'Closed';
+        $('ready-title').textContent = 'Observation closed';
+      } else if (observing) {
         tag.className = 'status-tag st-observing'; txt.textContent = 'Observing';
         $('ready-title').textContent = 'Observation running';
       } else {
@@ -168,47 +505,25 @@
         $('ready-title').textContent = 'Probe ready';
       }
 
-      // Sent / deadline rows
-      const showTiming = observing && probe.probe_timestamp;
+      const showTiming = (observing || closed) && probe.probe_timestamp;
       ['dt-sent','f-sent','dt-deadline','f-deadline'].forEach((id) => $(id).classList.toggle('hidden', !showTiming));
       if (showTiming) {
         $('f-sent').textContent = fmt(probe.probe_timestamp);
         $('f-deadline').textContent = fmt(probe.observation_deadline);
       }
 
-      // Actions vs observing note
-      $('ready-actions').classList.toggle('hidden', observing);
-      $('draft-hint').classList.toggle('hidden', observing);
+      $('ready-actions').classList.toggle('hidden', observing || closed);
+      $('draft-hint').classList.toggle('hidden', observing || closed);
       const note = $('observing-note');
-      note.classList.toggle('hidden', !observing);
+      note.classList.toggle('hidden', !(observing || closed));
       if (observing) {
         note.innerHTML = 'Enquiry marked as sent. Observation window is running until <strong>' + fmt(probe.observation_deadline) + '</strong>. Everything from here is automated.';
+      } else if (closed) {
+        note.innerHTML = 'Observation window closed on <strong>' + fmt(probe.observation_deadline) + '</strong>.';
       }
 
       $('open-btn').onclick = () => { if (probe.property_url) window.open(probe.property_url, '_blank', 'noopener'); };
     }
-
-    // CREATE
-    $('create-btn').addEventListener('click', async () => {
-      const url = $('url').value.trim();
-      clearErr($('create-err'));
-      if (!url) { showErr($('create-err'), 'Please paste a Rightmove property URL.'); return; }
-      const btn = $('create-btn');
-      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Creating…';
-      try {
-        const data = await api('/api/novus/probe-create', { method: 'POST', body: JSON.stringify({ url }) });
-        render(data.probe);
-        $('view-new').classList.add('hidden');
-        $('view-ready').classList.remove('hidden');
-        $('ready-banner').classList.remove('hidden');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } catch (e) {
-        showErr($('create-err'), e.message);
-      } finally {
-        btn.disabled = false; btn.textContent = 'Create Probe';
-      }
-    });
-    $('url').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('create-btn').click(); });
 
     // MARK AS SENT
     $('sent-btn').addEventListener('click', async () => {
@@ -228,14 +543,22 @@
 
     // NEW PROBE (reset)
     $('another-btn').addEventListener('click', () => {
-      currentProbe = null;
+      currentProbe = null; extracted = null; extractionSource = ''; pastedImage = null;
       $('url').value = '';
-      clearErr($('create-err')); clearErr($('mark-err'));
+      $('c-enquiry').value = '';
+      clearErr($('create-err')); clearErr($('mark-err')); clearErr($('confirm-err')); clearErr($('shot-err'));
       $('ready-banner').classList.add('hidden');
+      $('dup-banner').classList.add('hidden');
       $('view-ready').classList.add('hidden');
+      $('view-confirm').classList.add('hidden');
+      $('fallback').classList.add('hidden');
+      $('shot-preview').classList.add('hidden');
+      $('shot-extract-btn').classList.add('hidden');
       $('view-new').classList.remove('hidden');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
+
+    resolveAgency();
   </script>
 </body>
 </html>

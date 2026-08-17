@@ -18,12 +18,28 @@ const PROBES_HEADER = [
   'observation_closed_at','sent_from','observation_notes','created_at','updated_at',
 ];
 
+// probe-create resolves the agency from the agency-specific probe URL against
+// this tab — a probe can no longer be created without one.
+const AGENCIES_HEADER = [
+  'agency_id','agency_name','website','domain','location','branch_count','main_phone',
+  'known_phone_numbers','primary_contact_name','primary_contact_email','other_known_emails',
+  'owner_md','independent_franchise_corporate','sales_led_lettings_only','years_trading',
+  'incorporation_date','live_listing_count','crm_name','crm_evidence','qualification_segment',
+  'current_pipeline_status','suppression_status','suppression_reason','notes','created_at','updated_at',
+];
+const AGENCY_ID = 'AG-0001';
+
 // ── In-memory fake of the Google Sheets values API ────────────────────────────
 function makeFakeSheet() {
   const store = {
     PROBES: [
       PROBES_HEADER.slice(),
       ['SCHEMA NOTE', 'One row per actual probe. probe_reference is the human-readable identifier.'],
+    ],
+    AGENCIES: [
+      AGENCIES_HEADER.slice(),
+      ['SCHEMA NOTE', 'Stable identity only.'],
+      AGENCIES_HEADER.map((k) => (k === 'agency_id' ? AGENCY_ID : k === 'agency_name' ? 'Test Agency' : '')),
     ],
   };
   function tabOf(range) { return String(range).split('!')[0]; }
@@ -135,20 +151,25 @@ async function run() {
     const { default: markHandler } = await import('../api/novus/probe-mark-sent.js');
     const { default: getHandler } = await import('../api/novus/probe-get.js');
 
+    // Confirmed property data (as the UI sends it after the confirmation step),
+    // so creation never depends on a live listing fetch.
+    const PROPERTY = { address: '1 Test Street, Testtown', price: '£300,000', bedrooms: 3 };
+
     // Auth: a bad password is rejected.
     const bad = mockRes();
-    await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/1' }, auth: 'Basic ' + Buffer.from('novus:wrong').toString('base64') }), bad);
+    await createHandler(mockReq({ body: { agency_id: AGENCY_ID, url: 'https://www.rightmove.co.uk/properties/1' }, auth: 'Basic ' + Buffer.from('novus:wrong').toString('base64') }), bad);
     assert.strictEqual(bad.statusCode, 401, 'wrong password rejected');
     ok('Basic Auth rejects a wrong password (401)');
 
     // Create draft (real fetch to Rightmove will fail/blank in this sandbox — fine).
     const cRes = mockRes();
-    await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/159273000' } }), cRes);
+    await createHandler(mockReq({ body: { agency_id: AGENCY_ID, url: 'https://www.rightmove.co.uk/properties/159273000', property: PROPERTY } }), cRes);
     assert.strictEqual(cRes.statusCode, 200, 'create returned 200');
     const probe = cRes.body.probe;
     assert.ok(probe.probe_id.startsWith('prb_'), 'probe_id generated');
     assert.strictEqual(probe.probe_reference, 'RM-0001', 'first reference is RM-0001');
     assert.strictEqual(probe.portal, 'rightmove');
+    assert.strictEqual(probe.agency_id, AGENCY_ID, 'agency_id survives probe creation');
     assert.strictEqual(probe.probe_status, 'draft', 'created as draft');
     assert.strictEqual(probe.probe_email, 'novusprobes@gmail.com', 'probe email attached');
     assert.strictEqual(probe.probe_phone, '+441234567890', 'probe phone attached');
@@ -194,9 +215,16 @@ async function run() {
 
     // Second probe increments the reference.
     const c2 = mockRes();
-    await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/2' } }), c2);
+    await createHandler(mockReq({ body: { agency_id: AGENCY_ID, url: 'https://www.rightmove.co.uk/properties/2', property: PROPERTY } }), c2);
     assert.strictEqual(c2.body.probe.probe_reference, 'RM-0002', 'second reference is RM-0002');
     ok('a second probe gets RM-0002');
+
+    // Agency identity is mandatory: no agency → no probe row.
+    const noAgency = mockRes();
+    await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/3', property: PROPERTY } }), noAgency);
+    assert.strictEqual(noAgency.statusCode, 400, 'missing agency rejected');
+    assert.strictEqual(store.PROBES.length, 4, 'no orphan probe row written');
+    ok('probe-create refuses to create an orphan probe with no agency');
 
     // Missing id / not found.
     const nf = mockRes();

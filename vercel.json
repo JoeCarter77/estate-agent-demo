@@ -4,6 +4,7 @@
     { "source": "/demo/grade-c", "destination": "/grade-c-demo.html" },
     { "source": "/novus", "destination": "/novus/probe.html" },
     { "source": "/novus/probe", "destination": "/novus/probe.html" },
+    { "source": "/novus/a/(.*)", "destination": "/novus/probe.html" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/d/(.*)", "destination": "/index.html" }
   ],
