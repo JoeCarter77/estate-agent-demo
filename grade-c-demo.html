@@ -169,54 +169,94 @@
   .scene.mega-scene{ padding:0; align-items:stretch; justify-content:flex-start; min-height:0; display:none; }
   .scene.mega-scene.active{ display:block; opacity:1; animation:none; }
   .reveal-wrap{ position:relative; }
-  .reveal-diagram{ position:sticky; top:0; z-index:1; height:100vh; width:100%; display:flex; align-items:center; justify-content:center; padding:56px var(--gutter) 24px; overflow:hidden; }
-  .reveal-diagram .scene-inner{ margin:0 auto; transition:opacity .05s linear; }
+  .reveal-diagram{ position:sticky; top:0; z-index:1; height:100vh; height:100svh; width:100%; display:flex; align-items:center; justify-content:center; padding:46px var(--gutter) 18px; overflow:hidden; }
+  /* Two nested wrappers, deliberately separate:
+       .diagram-fit    — JS-applied uniform down-scale so the whole composition always
+                         fits the real viewport, whatever its height. Never animated.
+       .diagram-recede — the scroll-driven fade/recede as Try NOVUS rises over the top.
+     Keeping them apart means the two transforms can never clobber each other. */
+  .diagram-fit{ width:100%; transform-origin:center center; }
+  .diagram-recede{ width:100%; will-change:transform,opacity; transition:opacity .05s linear, transform .05s linear; }
+  .reveal-diagram .scene-inner{ margin:0 auto; gap:9px; }
+  /* the whole first composition runs ~20% tighter than the rest of the deck so it
+     lands inside an ordinary (non-fullscreen) browser viewport */
+  .reveal-diagram .eyebrow{ font-size:.55rem; gap:8px; }
+  .reveal-diagram h1.scene-h{ font-size:clamp(1.05rem,2vw,1.4rem); }
+  .reveal-diagram p.scene-sub{ font-size:.72rem; }
   .reveal-try{ position:relative; z-index:2; min-height:100vh; width:100%; margin-top:0; padding:96px var(--gutter) 64px; display:flex; align-items:center; justify-content:center; border-radius:30px 30px 0 0; box-shadow:0 -60px 110px rgba(0,0,0,.55); background:var(--navy); }
 
   /* ── the diagram: a straight top-to-bottom architecture flow ── */
-  .flow{ width:100%; max-width:640px; margin:0 auto; display:flex; flex-direction:column; align-items:center; gap:6px; }
-  .flow-cap{ font-size:.49rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:rgba(255,255,255,.3); }
-  .flow-row{ display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; width:100%; margin-top:5px; }
-  .flow-pill{ font-size:.63rem; font-weight:600; padding:5px 12px; border-radius:100px; border:1px solid; line-height:1.3; white-space:nowrap; }
+  .flow{ width:100%; max-width:600px; margin:0 auto; display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .flow-cap{ font-size:.46rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:rgba(255,255,255,.3); }
+  .flow-row{ display:flex; align-items:center; justify-content:center; gap:7px; flex-wrap:wrap; width:100%; margin-top:4px; }
+  .flow-pill{ font-size:.58rem; font-weight:600; padding:4px 10px; border-radius:100px; border:1px solid; line-height:1.3; white-space:nowrap; }
   .flow-pill.in{ color:rgba(255,255,255,.62); border-color:rgba(255,255,255,.16); background:rgba(255,255,255,.04); }
   .flow-pill.out{ color:#fff; border-color:rgba(125,211,252,.4); background:rgba(56,189,248,.11); }
 
-  .flow-connector{ width:70%; max-width:180px; height:30px; display:block; flex-shrink:0; }
-  .flow-connector.wide{ width:100%; max-width:520px; height:26px; }
+  .flow-connector{ width:70%; max-width:150px; height:22px; display:block; flex-shrink:0; }
+  .flow-connector.wide{ width:100%; max-width:480px; height:20px; }
+  /* the negative margins tuck the line ends under the circle's opaque outer ring, so
+     the inputs and the stem read as physically joined to the node */
+  .flow-connector.inputs{ width:100%; max-width:420px; height:28px; margin-bottom:-7px; }
+  .flow-connector.stem{ width:2px; max-width:2px; height:24px; margin-top:-7px; }
+  .flow-connector.stem .fc-line{ stroke:rgba(125,211,252,.32); }
   .fc-line{ fill:none; stroke:rgba(125,211,252,.14); stroke-width:1; vector-effect:non-scaling-stroke; }
   .fc-glow{ fill:none; stroke:rgba(125,211,252,.85); stroke-width:1.5; stroke-linecap:round; stroke-dasharray:9 200; vector-effect:non-scaling-stroke; opacity:.85; animation:flow-travel 2.8s linear infinite; filter:drop-shadow(0 0 2px rgba(125,211,252,.75)); }
   @keyframes flow-travel{ to{ stroke-dashoffset:-209; } }
 
-  .novus-core{ display:flex; flex-direction:column; align-items:center; gap:3px; flex-shrink:0; }
-  .core-ring{ position:relative; width:58px; height:58px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  /* ── THE INTELLIGENCE NODE ──
+     A five-column grid with symmetric side columns, so the circle sits on the exact
+     horizontal centre of the flow — the same x the input connector converges on and
+     the same x the stem down to DECIDES & EXECUTES leaves from. READS THE CONTEXT and
+     FINDS THE GAP are attached to it left and right by short links; they are never
+     part of the vertical flow. */
+  .intel-row{ display:grid; grid-template-columns:minmax(0,1fr) 30px auto 30px minmax(0,1fr); align-items:center; width:100%; max-width:600px; }
+  .intel-side{ display:flex; flex-direction:column; gap:1px; }
+  .intel-side.left{ align-items:flex-end; text-align:right; }
+  .intel-side.right{ align-items:flex-start; text-align:left; }
+  .is-title{ font-size:.53rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; color:#fff; }
+  .is-desc{ font-size:.53rem; font-weight:400; line-height:1.35; color:rgba(255,255,255,.42); max-width:150px; }
+  .intel-link{ position:relative; height:1px; background:linear-gradient(90deg, rgba(125,211,252,.1), rgba(125,211,252,.4)); overflow:hidden; }
+  .intel-link.r{ background:linear-gradient(270deg, rgba(125,211,252,.1), rgba(125,211,252,.4)); }
+  .intel-link::after{ content:''; position:absolute; top:-1px; left:0; width:7px; height:3px; border-radius:2px; background:rgba(125,211,252,.9); box-shadow:0 0 5px rgba(125,211,252,.8); animation:link-travel 2.8s linear infinite; }
+  .intel-link.r::after{ animation-name:link-travel-r; animation-delay:1.4s; }
+  @keyframes link-travel{ 0%{ transform:translateX(-8px); opacity:0; } 20%{ opacity:1; } 80%{ opacity:1; } 100%{ transform:translateX(30px); opacity:0; } }
+  @keyframes link-travel-r{ 0%{ transform:translateX(30px); opacity:0; } 20%{ opacity:1; } 80%{ opacity:1; } 100%{ transform:translateX(-8px); opacity:0; } }
+
+  .core-ring{ position:relative; width:88px; height:88px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; flex-shrink:0;
     background:radial-gradient(circle at 50% 32%, rgba(56,189,248,.4), rgba(13,26,61,.96) 72%);
     border:1px solid rgba(125,211,252,.6);
-    box-shadow:0 0 0 7px rgba(11,27,63,1), 0 0 0 8px rgba(125,211,252,.16), 0 0 26px rgba(56,189,248,.36); }
-  .core-ring::after{ content:''; position:absolute; inset:-7px; border-radius:50%; border:1px solid rgba(125,211,252,.2); animation:core-breathe 4.5s ease-in-out infinite; }
+    box-shadow:0 0 0 6px rgba(11,27,63,1), 0 0 0 7px rgba(125,211,252,.16), 0 0 30px rgba(56,189,248,.4); }
+  .core-ring::after{ content:''; position:absolute; inset:-6px; border-radius:50%; border:1px solid rgba(125,211,252,.2); animation:core-breathe 4.5s ease-in-out infinite; }
   @keyframes core-breathe{ 0%,100%{ transform:scale(1); opacity:.5; } 50%{ transform:scale(1.09); opacity:.12; } }
-  .core-ring img{ height:21px; width:auto; filter:brightness(0) invert(1); }
-  .core-ring.noimg::after{ content:'N'; inset:auto; border:none; animation:none; font-family:var(--serif); font-size:1.4rem; font-weight:600; color:#fff; }
-  .core-name{ font-size:.6rem; font-weight:800; letter-spacing:.1em; color:#fff; text-align:center; }
-  .core-tag{ font-size:.54rem; font-weight:500; color:rgba(255,255,255,.6); text-align:center; line-height:1.4; max-width:200px; }
+  .core-t1{ font-size:.62rem; font-weight:800; letter-spacing:.15em; color:#fff; line-height:1; }
+  .core-t2{ font-size:.45rem; font-weight:700; letter-spacing:.09em; color:rgba(190,227,248,.9); line-height:1; }
+
+  .decide{ display:flex; flex-direction:column; align-items:center; gap:1px; text-align:center; border:1px solid rgba(125,211,252,.32); background:rgba(56,189,248,.09); border-radius:100px; padding:5px 16px; }
+  .dc-title{ font-size:.55rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; color:#fff; }
+  .dc-desc{ font-size:.51rem; color:rgba(255,255,255,.45); line-height:1.3; }
   @keyframes msg-in{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
 
   /* the four execution routes — small architectural nodes, not cards */
-  .flow-nodes{ display:flex; justify-content:center; gap:8px; flex-wrap:wrap; width:100%; }
-  .flow-node{ flex:1 1 130px; max-width:155px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.12); border-radius:9px; padding:8px 10px; display:flex; flex-direction:column; gap:2px; text-align:left; }
+  .flow-nodes{ display:flex; justify-content:center; gap:7px; flex-wrap:wrap; width:100%; }
+  .flow-node{ flex:1 1 120px; max-width:142px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:6px 9px; display:flex; flex-direction:column; gap:1px; text-align:left; }
   .flow-node.n1{ --c:#5EEAD4; } .flow-node.n2{ --c:#7DD3FC; }
   .flow-node.n3{ --c:#A5B4FC; } .flow-node.n4{ --c:#FDBA74; }
-  .flow-node .fn-num{ font-size:.5rem; font-weight:800; color:var(--c); }
-  .flow-node .fn-name{ font-size:.63rem; font-weight:800; letter-spacing:-.005em; color:#fff; line-height:1.25; }
-  .flow-node .fn-line{ font-size:.56rem; color:rgba(255,255,255,.46); line-height:1.35; }
+  .flow-node .fn-num{ font-size:.46rem; font-weight:800; color:var(--c); }
+  .flow-node .fn-name{ font-size:.58rem; font-weight:800; letter-spacing:-.005em; color:#fff; line-height:1.25; }
+  .flow-node .fn-line{ font-size:.51rem; color:rgba(255,255,255,.46); line-height:1.3; }
 
-  .punch{ width:100%; padding-top:36px; display:flex; flex-direction:column; align-items:center; gap:8px; }
-  .scroll-cue{ display:flex; flex-direction:column; align-items:center; gap:4px; background:none; border:none; cursor:pointer; font-family:'Inter',sans-serif; padding:4px; }
-  .scroll-cue-chev{ color:rgba(125,211,252,.7); font-size:.9rem; animation:hint-bob 1.8s ease-in-out infinite; }
-  .scroll-cue-txt{ font-size:.78rem; font-weight:700; color:#fff; }
-  .scroll-cue-sub{ font-size:.63rem; color:rgba(255,255,255,.4); }
+  .punch{ width:100%; padding-top:14px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .scroll-cue{ display:flex; flex-direction:column; align-items:center; gap:2px; background:none; border:none; cursor:pointer; font-family:'Inter',sans-serif; padding:2px; }
+  .scroll-cue-chev{ color:rgba(125,211,252,.7); font-size:.8rem; animation:hint-bob 1.8s ease-in-out infinite; }
+  .scroll-cue-txt{ font-size:.7rem; font-weight:700; color:#fff; }
+  .scroll-cue-sub{ font-size:.57rem; color:rgba(255,255,255,.4); }
 
   /* ═══ SCENE 6 — TRY NOVUS ═══ */
   .try-scene{ background:radial-gradient(120% 80% at 50% -10%, rgba(56,189,248,.10), transparent 55%), linear-gradient(180deg, rgba(4,10,26,.85), rgba(4,10,26,.96)); }
+  /* As the rising layer it has to be opaque — anything translucent lets the diagram
+     ghost through it and the "emerging over the top" read is lost. */
+  .reveal-try.try-scene{ background:radial-gradient(120% 80% at 50% -10%, rgba(56,189,248,.10), transparent 55%), linear-gradient(180deg, #050C20 0%, #04091A 100%); }
   .try-grid{ width:100%; max-width:920px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:14% 8%; text-align:left; }
   .try-card{ background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.13); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:8px; }
   .try-card.c1{ --c:#7DD3FC; } .try-card.c2{ --c:#A5B4FC; }
@@ -299,13 +339,12 @@
   @media (max-width:480px){
     .flow-node{ flex-basis:100%; max-width:280px; }
   }
-  /* Diagram content can exceed a short viewport — either a narrow phone screen or a
-     perfectly wide desktop window with little vertical room once browser chrome is
-     subtracted. The sticky-pin/fade reveal only works when the diagram actually fits
-     inside 100vh; centring taller content inside a fixed, overflow:hidden box just
-     crops it and can push the top under the fixed nav bar. Below either threshold it's
-     dropped in favour of plain, reliable, uninterrupted scrolling into Try NOVUS. */
-  @media (max-width:820px), (max-height:820px){
+  /* The layered pin/recede reveal is kept at every desktop window height — fitDiagram()
+     scales the composition down so it genuinely fits inside the real viewport, rather
+     than cropping it inside a fixed overflow:hidden box the way the old height-based
+     cut-off did. Only narrow (phone) widths fall back to plain sequential scrolling,
+     where the four nodes wrap into a column and no uniform scale would stay legible. */
+  @media (max-width:820px){
     .reveal-diagram{ position:relative; top:auto; z-index:auto; height:auto; min-height:100vh; overflow:visible; padding-bottom:48px; }
     .reveal-try{ margin-top:0; border-radius:0; box-shadow:none; }
   }
@@ -501,6 +540,8 @@
 
         <!-- LAYER 1 — the diagram. Pins while the user starts scrolling. -->
         <div class="reveal-diagram" id="reveal-diagram">
+         <div class="diagram-fit" id="diagram-fit">
+          <div class="diagram-recede" id="diagram-recede">
           <div class="scene-inner wide">
             <div class="eyebrow">The Full System</div>
             <h1 class="scene-h">Every opportunity. One system.</h1>
@@ -515,19 +556,42 @@
                 <span class="flow-pill in">Missed / stalled opportunities</span>
               </div>
 
-              <svg class="flow-connector" viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true">
-                <path class="fc-line" d="M16.67,0 Q16.67,20 50,34" />
-                <path class="fc-line" d="M50,0 L50,34" />
-                <path class="fc-line" d="M83.33,0 Q83.33,20 50,34" />
-                <path class="fc-glow" d="M16.67,0 Q16.67,20 50,34" style="animation-delay:0s" />
-                <path class="fc-glow" d="M50,0 L50,34" style="animation-delay:.5s" />
-                <path class="fc-glow" d="M83.33,0 Q83.33,20 50,34" style="animation-delay:1s" />
+              <!-- the three inputs converge on the intelligence circle and nothing else -->
+              <svg class="flow-connector inputs" viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true">
+                <path class="fc-line" d="M16.67,0 Q16.67,20 50,30" />
+                <path class="fc-line" d="M50,0 L50,30" />
+                <path class="fc-line" d="M83.33,0 Q83.33,20 50,30" />
+                <path class="fc-glow" d="M16.67,0 Q16.67,20 50,30" style="animation-delay:0s" />
+                <path class="fc-glow" d="M50,0 L50,30" style="animation-delay:.5s" />
+                <path class="fc-glow" d="M83.33,0 Q83.33,20 50,30" style="animation-delay:1s" />
+                <path class="fc-line" d="M46,25 L50,32 L54,25" />
               </svg>
 
-              <div class="novus-core">
-                <div class="core-ring"><img src="/novus-icon.png" alt="" onerror="this.style.display='none';this.parentNode.classList.add('noimg')" /></div>
-                <div class="core-name">NOVUS<br/>INTELLIGENCE</div>
-                <div class="core-tag">Reads the context.<br/>Finds the gap.<br/>Decides what happens next.</div>
+              <div class="intel-row">
+                <div class="intel-side left">
+                  <span class="is-title">Reads the context</span>
+                  <span class="is-desc">Everything available about the opportunity.</span>
+                </div>
+                <span class="intel-link" aria-hidden="true"></span>
+                <div class="core-ring">
+                  <span class="core-t1">NOVUS</span>
+                  <span class="core-t2">INTELLIGENCE</span>
+                </div>
+                <span class="intel-link r" aria-hidden="true"></span>
+                <div class="intel-side right">
+                  <span class="is-title">Finds the gap</span>
+                  <span class="is-desc">What is missing, stalled or stopping progress.</span>
+                </div>
+              </div>
+
+              <svg class="flow-connector stem" viewBox="0 0 10 24" preserveAspectRatio="none" aria-hidden="true">
+                <path class="fc-line" d="M5,0 L5,24" />
+                <path class="fc-glow" d="M5,0 L5,24" />
+              </svg>
+
+              <div class="decide">
+                <span class="dc-title">Decides &amp; executes next actions</span>
+                <span class="dc-desc">What should happen next — and makes it happen.</span>
               </div>
 
               <svg class="flow-connector wide" viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true">
@@ -576,6 +640,8 @@
               </button>
             </div>
           </div>
+          </div>
+         </div>
         </div>
 
         <!-- LAYER 2 — Try NOVUS. Rises over the diagram as the user scrolls. -->
@@ -725,7 +791,7 @@
     renderJourney();
     document.getElementById('system-btn').classList.toggle('hide', n >= 5);
     if (n === 4) animateFlow();
-    if (n === 5 || n === 6) initTryNovus();
+    if (n === 5 || n === 6) { initTryNovus(); requestAnimationFrame(() => window.fitDiagram && window.fitDiagram()); }
     if (n === 6) requestAnimationFrame(() => requestAnimationFrame(scrollToTry));
     else if (n === 5 && !crossingSection) scrollToDiagram();
   }
@@ -776,17 +842,20 @@
     if (!megaSection || !megaSection.classList.contains('active')) return;
     const diagramEl = document.getElementById('reveal-diagram');
     const tryEl = document.getElementById('reveal-try');
-    const diagramInner = diagramEl.querySelector('.scene-inner');
-    if (!tryEl || !diagramInner) return;
+    const recede = document.getElementById('diagram-recede');
+    if (!tryEl || !recede) return;
     const vh = window.innerHeight || 1;
     const progress = Math.min(Math.max(1 - tryEl.getBoundingClientRect().top / vh, 0), 1);
-    // The pin/fade illusion only applies while the diagram is actually sticky — see the
-    // max-width/max-height:820px override, which drops it on short viewports (narrow
-    // phones and short desktop windows alike) in favour of plain sequential scrolling.
+    // The pin/recede illusion only applies while the diagram is actually sticky — see the
+    // max-width:820px override, which drops it on phone widths in favour of plain
+    // sequential scrolling. Everywhere else the diagram stays pinned, dims and settles
+    // backwards while Try NOVUS rises over the top of it.
     if (getComputedStyle(diagramEl).position === 'sticky') {
-      diagramInner.style.opacity = String(1 - progress * 0.85);
-    } else if (diagramInner.style.opacity) {
-      diagramInner.style.opacity = '';
+      recede.style.opacity = String(1 - progress * 0.88);
+      recede.style.transform = 'scale(' + (1 - progress * 0.07).toFixed(4) + ') translateY(' + (-progress * 26).toFixed(1) + 'px)';
+    } else if (recede.style.opacity) {
+      recede.style.opacity = '';
+      recede.style.transform = '';
     }
     const newScene = progress > 0.5 ? 6 : 5;
     if (newScene !== scene) {
@@ -801,6 +870,37 @@
     megaScrollTicking = true;
     requestAnimationFrame(onMegaScroll);
   }, { passive: true });
+
+  // ── FIT THE FIRST COMPOSITION TO THE REAL VIEWPORT ──
+  // The CSS already sizes the whole THE FULL SYSTEM composition to land inside an
+  // ordinary browser window. This is the guarantee on top of it: measure the natural
+  // height against the space actually available inside the pinned box and, if the
+  // window is shorter than that, scale the entire composition down uniformly. Nothing
+  // is cropped, nothing overlaps, and it is tied to no particular viewport height.
+  function fitDiagram() {
+    const box = document.getElementById('reveal-diagram');
+    const fit = document.getElementById('diagram-fit');
+    if (!box || !fit) return;
+    fit.style.transform = 'none';
+    if (getComputedStyle(box).position !== 'sticky') return;   // phone fallback: no scaling
+    const cs = getComputedStyle(box);
+    const avail = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const natural = fit.getBoundingClientRect().height;
+    if (!avail || !natural) return;
+    const k = Math.min(1, avail / natural);
+    fit.style.transform = k < 1 ? 'scale(' + k.toFixed(4) + ')' : '';
+  }
+  window.fitDiagram = fitDiagram;
+  let fitTicking = false;
+  function queueFit() {
+    if (fitTicking) return;
+    fitTicking = true;
+    requestAnimationFrame(() => { fitTicking = false; fitDiagram(); });
+  }
+  window.addEventListener('resize', queueFit);
+  window.addEventListener('orientationchange', queueFit);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(queueFit);
+  queueFit();
 
   const AGENCY_NAME = 'The Modern House';
   const AGENCY_URL = 'https://themodernhouse.com';
