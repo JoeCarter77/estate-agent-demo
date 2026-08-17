@@ -77,6 +77,9 @@
       <div id="agency-field" class="hidden">
         <label>Agency</label>
         <input id="agency-name" type="text" value="" readonly />
+        <a id="rm-agent-link" class="btn btn-ghost mt hidden" href="#" target="_blank" rel="noopener"
+           style="display:none;text-align:center;text-decoration:none;">Open Rightmove agent page ↗</a>
+        <div id="rm-popup-note" class="hint hidden">The agency's Rightmove page was blocked by your browser's popup blocker. Click the button above to open it, or allow popups for this site to have both pages open automatically from one click.</div>
       </div>
 
       <label for="url" class="mt">Rightmove URL</label>
@@ -280,6 +283,21 @@
         try {
           const data = await api('/api/novus/probe-get?agency_id=' + encodeURIComponent(agencyId), { method: 'GET' });
           $('agency-name').value = data.agency.agency_name || agencyId;
+
+          // ONE-CLICK LAUNCH — the agency's own Rightmove branch page, taken
+          // from the existing AGENCIES.rightmove_sales_branch_url column
+          // (never hardcoded, never derived). Opened as a SEPARATE tab; the
+          // button is always rendered so the page is reachable even when the
+          // browser blocks the automatic open.
+          const rmUrl = String(data.agency.rightmove_sales_branch_url || '').trim();
+          if (/^https?:\/\//i.test(rmUrl)) {
+            const link = $('rm-agent-link');
+            link.href = rmUrl;
+            link.classList.remove('hidden');
+            link.style.display = 'block';
+            const opened = window.open(rmUrl, '_blank', 'noopener');
+            if (!opened) $('rm-popup-note').classList.remove('hidden');
+          }
         } catch (e) {
           showErr($('create-err'), 'Unknown agency_id — this probe cannot be created until it matches a real AGENCIES row.');
         }
