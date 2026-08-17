@@ -354,6 +354,36 @@ async function run() {
     assert.equal(JSON.stringify(migrationFake.store.AGENCIES), before);
   });
 
+  await test('migration apply reads AGENCIES a constant number of times, not once per written row (429 regression)', async () => {
+    // Reproduces the reported failure mode: with the old repo.updateById()
+    // path, every written row triggered its own findById() -> getRecords() ->
+    // getTable() round trip, so GET calls scaled with row count and a
+    // ~150-row live migration blew through the Sheets API's per-minute quota
+    // (429 RESOURCE_EXHAUSTED). The fix caches one read of AGENCIES and
+    // writes each row directly by its known position, so GET calls stay flat
+    // regardless of how many rows get written.
+    const fake = makeFakeSheet();
+    let getCalls = 0;
+    const countingValuesApi = { ...fake.valuesApi, async get(range) { getCalls += 1; return fake.valuesApi.get(range); } };
+    const repo = createRepo(countingValuesApi);
+    for (let i = 0; i < 8; i += 1) {
+      seedAgency(fake.store, { agency_id: `ag_scale_${i}`, agency_name: `Scale Agency ${i}` });
+    }
+    const rows = Array.from({ length: 8 }, (_, i) => ({
+      agency_id: `ag_scale_${i}`,
+      rightmove_sales_branch_url: `https://www.rightmove.co.uk/estate-agents/agent/Scale-${i}/Town-1.html`,
+      rightmove_status: 'CONFIRMED',
+      rightmove_checked_at: '2026-08-17',
+      rightmove_notes: '',
+    }));
+
+    getCalls = 0;
+    const rep = await migrateRightmove(repo, rows, { dryRun: false });
+    assert.equal(rep.rows_written, 8, 'sanity: all 8 rows should have been written');
+    assert.equal(rep.errors.length, 0);
+    assert.ok(getCalls <= 4, `expected a small constant number of GET calls, got ${getCalls} for 8 written rows`);
+  });
+
   await test('existing agency columns are neither reordered nor removed', () => {
     const header = migrationFake.store.AGENCIES[0];
     assert.deepEqual(header.slice(0, AGENCIES_HEADER.length), AGENCIES_HEADER);
