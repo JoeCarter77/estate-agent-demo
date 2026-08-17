@@ -23,6 +23,9 @@ const AGENCIES_HEADER = [
   'owner_md','independent_franchise_corporate','sales_led_lettings_only','years_trading',
   'incorporation_date','live_listing_count','crm_name','crm_evidence','qualification_segment',
   'current_pipeline_status','suppression_status','suppression_reason','notes','created_at','updated_at',
+  // probe_sent sits mid-header on purpose: it is located by header NAME, so a
+  // test that only ever put it last would not prove position-independence.
+  'probe_sent',
   'rightmove_sales_branch_url','rightmove_status','rightmove_checked_at','rightmove_notes',
 ];
 const PROBES_HEADER = [
@@ -37,17 +40,36 @@ const ANDREW_GRANGER_ID = 'ag_test_andrewgranger';
 const ANDREW_GRANGER_NAME = 'Andrew Granger Estate Agents';
 const ANDREW_GRANGER_RM = 'https://www.rightmove.co.uk/estate-agents/agent/Andrew-Granger/Loughborough-265508.html#ram';
 
-function makeFakeSheet() {
+// Column letters -> 1-based index ("A" -> 1, "AE" -> 31).
+function colIndex(letters) {
+  return String(letters).split('').reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0);
+}
+
+function makeFakeSheet({ agenciesHeader = AGENCIES_HEADER } = {}) {
   const store = {
-    AGENCIES: [AGENCIES_HEADER.slice(), ['SCHEMA NOTE', 'Stable identity only.']],
+    AGENCIES: [agenciesHeader.slice(), ['SCHEMA NOTE', 'Stable identity only.']],
     PROBES: [PROBES_HEADER.slice(), ['SCHEMA NOTE', 'One row per actual probe.']],
   };
   const tabOf = (range) => String(range).split('!')[0];
-  const startRowOf = (range) => { const m = String(range).match(/!\D+(\d+)/); return m ? parseInt(m[1], 10) : null; };
+  // Honours the range's START COLUMN as well as its row, so a single-cell
+  // write (e.g. "AGENCIES!AE5:AE5") touches only that cell — exactly like the
+  // real Sheets values API, and the behaviour probe_sent depends on.
+  const anchorOf = (range) => {
+    const m = String(range).match(/!([A-Z]+)(\d+)/i);
+    return m ? { col: colIndex(m[1].toUpperCase()), row: parseInt(m[2], 10) } : { col: 1, row: 1 };
+  };
   return { store, valuesApi: {
     async get(range) { return (store[tabOf(range)] || []).map((r) => r.slice()); },
     async append(range, rows) { const t = tabOf(range); store[t] = store[t] || []; for (const r of rows) store[t].push(r.slice()); return {}; },
-    async update(range, rows) { const t = tabOf(range); const s = startRowOf(range); rows.forEach((r, i) => { store[t][s - 1 + i] = r.slice(); }); return {}; },
+    async update(range, rows) {
+      const t = tabOf(range); const { col, row } = anchorOf(range);
+      store[t] = store[t] || [];
+      rows.forEach((r, i) => {
+        const target = store[t][row - 1 + i] || (store[t][row - 1 + i] = []);
+        r.forEach((v, j) => { target[col - 1 + j] = v; });
+      });
+      return {};
+    },
   }};
 }
 
@@ -250,6 +272,99 @@ async function run() {
     assert.strictEqual(oneRes.statusCode, 200);
     assert.strictEqual(oneRes.body.agency.agency_name, 'One');
     ok('the existing ?agency_id= lookup still works unchanged');
+
+    __setRepoForTests(null);
+  }
+
+  // ── Part D: mark-sent flags the agency's probe_sent cell ──
+  console.log('\nPart D — marking a probe sent writes YES into AGENCIES.probe_sent');
+  {
+    const { store, valuesApi } = makeFakeSheet();
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_other', agency_name: 'Untouched Agency' }));
+    store.AGENCIES.push(agencyRow({ notes: 'KEEP ME', website: 'https://example.com' }));
+    __setRepoForTests(createRepo(valuesApi));
+
+    const { default: createHandler } = await import('../api/novus/probe-create.js');
+    const { default: markHandler } = await import('../api/novus/probe-mark-sent.js');
+
+    const probeSentIdx = AGENCIES_HEADER.indexOf('probe_sent');
+    const targetRow = () => store.AGENCIES.find((r) => r[0] === ANDREW_GRANGER_ID);
+    const otherRow = () => store.AGENCIES.find((r) => r[0] === 'ag_other');
+
+    assert.strictEqual(targetRow()[probeSentIdx] ?? '', '', 'probe_sent starts empty');
+
+    const cRes = mockRes();
+    await createHandler(mockReq({ body: {
+      url: 'https://www.rightmove.co.uk/properties/159273000', agency_id: ANDREW_GRANGER_ID,
+    }}), cRes);
+    const probeId = cRes.body.probe.probe_id;
+
+    // Not set merely by creating a draft — only by actually marking it sent.
+    assert.strictEqual(targetRow()[probeSentIdx] ?? '', '', 'creating a draft does not set probe_sent');
+    ok('creating a draft probe leaves probe_sent empty');
+
+    const mRes = mockRes();
+    await markHandler(mockReq({ body: { probe_id: probeId } }), mRes);
+    assert.strictEqual(mRes.statusCode, 200);
+    assert.strictEqual(mRes.body.probe.probe_status, 'observing', 'probe still flips to observing');
+    assert.strictEqual(targetRow()[probeSentIdx], 'YES');
+    ok('mark-sent writes YES into the matching agency\'s probe_sent cell');
+
+    // The cell is found by header name, at whatever position that header sits.
+    assert.ok(probeSentIdx > 0 && probeSentIdx < AGENCIES_HEADER.length - 1,
+      'probe_sent is mid-header, so this was a name lookup, not a fixed column');
+    ok('the column was located by its "probe_sent" header, not a fixed position');
+
+    // Everything else in that row survives — this is what protects formula
+    // columns from being flattened by a whole-row rewrite.
+    const row = targetRow();
+    assert.strictEqual(row[AGENCIES_HEADER.indexOf('agency_name')], ANDREW_GRANGER_NAME);
+    assert.strictEqual(row[AGENCIES_HEADER.indexOf('notes')], 'KEEP ME');
+    assert.strictEqual(row[AGENCIES_HEADER.indexOf('website')], 'https://example.com');
+    assert.strictEqual(row[AGENCIES_HEADER.indexOf('rightmove_sales_branch_url')], ANDREW_GRANGER_RM);
+    ok('every other cell in that agency row is left untouched (formula columns stay intact)');
+
+    // No other agency is affected.
+    assert.strictEqual(otherRow()[probeSentIdx] ?? '', '');
+    ok('other agencies\' probe_sent cells are not touched');
+
+    __setRepoForTests(null);
+  }
+
+  // ── Part E: degrades safely when the column/agency is absent ──
+  console.log('\nPart E — mark-sent still succeeds without a probe_sent column');
+  {
+    // A sheet exactly as it is today: no probe_sent column at all.
+    const headerWithout = AGENCIES_HEADER.filter((h) => h !== 'probe_sent');
+    const { store, valuesApi } = makeFakeSheet({ agenciesHeader: headerWithout });
+    store.AGENCIES.push(headerWithout.map((k) => ({
+      agency_id: ANDREW_GRANGER_ID, agency_name: ANDREW_GRANGER_NAME,
+      rightmove_sales_branch_url: ANDREW_GRANGER_RM,
+    }[k] ?? '')));
+    __setRepoForTests(createRepo(valuesApi));
+
+    const { default: createHandler } = await import('../api/novus/probe-create.js');
+    const { default: markHandler } = await import('../api/novus/probe-mark-sent.js');
+
+    const cRes = mockRes();
+    await createHandler(mockReq({ body: {
+      url: 'https://www.rightmove.co.uk/properties/1', agency_id: ANDREW_GRANGER_ID,
+    }}), cRes);
+    const mRes = mockRes();
+    await markHandler(mockReq({ body: { probe_id: cRes.body.probe.probe_id } }), mRes);
+    assert.strictEqual(mRes.statusCode, 200);
+    assert.strictEqual(mRes.body.probe.probe_status, 'observing');
+    assert.strictEqual(store.AGENCIES[2].length, headerWithout.length, 'no stray cell appended');
+    ok('a sheet with no probe_sent column still marks sent normally (no crash, no stray cell)');
+
+    // A probe with no agency at all.
+    const noAgency = mockRes();
+    await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/2' } }), noAgency);
+    const m2 = mockRes();
+    await markHandler(mockReq({ body: { probe_id: noAgency.body.probe.probe_id } }), m2);
+    assert.strictEqual(m2.statusCode, 200);
+    assert.strictEqual(m2.body.probe.probe_status, 'observing');
+    ok('a probe with no agency_id marks sent normally, touching no agency row');
 
     __setRepoForTests(null);
   }
