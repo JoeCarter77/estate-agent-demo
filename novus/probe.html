@@ -200,6 +200,7 @@
       }
 
       $('open-btn').onclick = () => { if (probe.property_url) window.open(probe.property_url, '_blank', 'noopener'); };
+      updateAnotherBtn();
     }
 
     // CREATE
@@ -240,15 +241,46 @@
       }
     });
 
-    // NEW PROBE (reset)
-    $('another-btn').addEventListener('click', () => {
-      currentProbe = null;
-      $('url').value = '';
-      clearErr($('create-err')); clearErr($('mark-err'));
-      $('ready-banner').classList.add('hidden');
-      $('view-ready').classList.add('hidden');
-      $('view-new').classList.remove('hidden');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    // The agency this probe belongs to — from the launch link, or from the
+    // probe itself when the page was rehydrated via ?probe_id=.
+    function activeAgencyId() {
+      return launchAgencyId || (currentProbe && currentProbe.agency_id) || '';
+    }
+
+    // "Next agency" when this probe has an agency; plain reset when it doesn't.
+    function updateAnotherBtn() {
+      $('another-btn').textContent = activeAgencyId() ? 'Next agency →' : '+ New probe';
+    }
+
+    // NEXT AGENCY (or reset, when there is no agency context)
+    $('another-btn').addEventListener('click', async () => {
+      const agencyId = activeAgencyId();
+
+      if (!agencyId) {
+        currentProbe = null;
+        $('url').value = '';
+        clearErr($('create-err')); clearErr($('mark-err'));
+        $('ready-banner').classList.add('hidden');
+        $('view-ready').classList.add('hidden');
+        $('view-new').classList.remove('hidden');
+        updateAnotherBtn();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      // Hand off to the same agency_id launch flow, so the next probe is
+      // created against the correct agency and that agency's Rightmove page
+      // is opened by the page's own init.
+      const btn = $('another-btn');
+      clearErr($('mark-err'));
+      btn.disabled = true; btn.innerHTML = '<span class="spinner" style="border-color:rgba(15,23,42,.15);border-top-color:var(--accent);"></span>Finding next agency…';
+      try {
+        const data = await api('/api/novus/probe-get?next_after=' + encodeURIComponent(agencyId), { method: 'GET' });
+        window.location.href = '/novus/probe?agency_id=' + encodeURIComponent(data.agency.agency_id);
+      } catch (e) {
+        showErr($('mark-err'), e.message);
+        btn.disabled = false; updateAnotherBtn();
+      }
     });
 
     // INIT — read agency_id / probe_id from the URL.
@@ -278,6 +310,7 @@
 
       if (agencyId) {
         launchAgencyId = agencyId;
+        updateAnotherBtn();
         $('agency-field').classList.remove('hidden');
         $('agency-name').value = agencyId; // shown immediately; replaced by the real name below if found
         try {

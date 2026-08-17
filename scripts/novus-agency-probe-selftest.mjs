@@ -201,6 +201,59 @@ async function run() {
     __setRepoForTests(null);
   }
 
+  // ── Part C: "Next agency" ordering + eligibility ──
+  console.log('\nPart C — Next agency follows AGENCIES row order, skipping ineligible rows');
+  {
+    const { store, valuesApi } = makeFakeSheet();
+    // Deliberate sheet order, mixing eligible and ineligible rows.
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_one', agency_name: 'One' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_no_url', agency_name: 'No Rightmove URL',
+      rightmove_sales_branch_url: '', rightmove_status: 'REVIEW' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_deleted', agency_name: 'Lettings only',
+      rightmove_sales_branch_url: '', rightmove_status: 'DELETE - NON-SALES/LETTINGS' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_suppressed', agency_name: 'Suppressed',
+      suppression_status: 'suppressed' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_two', agency_name: 'Two' }));
+    __setRepoForTests(createRepo(valuesApi));
+
+    const { default: getHandler } = await import('../api/novus/probe-get.js');
+
+    // Skips the blank-URL, DELETE and suppressed rows, lands on the next real one.
+    const nRes = mockRes();
+    await getHandler(mockReq({ method: 'GET', query: { next_after: 'ag_one' } }), nRes);
+    assert.strictEqual(nRes.statusCode, 200);
+    assert.strictEqual(nRes.body.agency.agency_id, 'ag_two');
+    ok('next_after skips blank-URL, DELETE and suppressed rows → "ag_two"');
+
+    // Ordering is the sheet's, not alphabetical/id order.
+    const idx = (id) => store.AGENCIES.findIndex((r) => r[0] === id);
+    assert.ok(idx('ag_two') > idx('ag_one'), 'ag_two really is later in sheet order');
+    ok('the next agency is the next eligible SHEET ROW, not an alphabetical pick');
+
+    // End of list → a clean 404 the UI can message, not a crash.
+    const endRes = mockRes();
+    await getHandler(mockReq({ method: 'GET', query: { next_after: 'ag_two' } }), endRes);
+    assert.strictEqual(endRes.statusCode, 404);
+    assert.match(endRes.body.error, /No further eligible agency/);
+    ok('running off the end of the list returns a clean "no further eligible agency" message');
+
+    // Unknown starting agency is distinguishable from end-of-list.
+    const badRes = mockRes();
+    await getHandler(mockReq({ method: 'GET', query: { next_after: 'ag_missing' } }), badRes);
+    assert.strictEqual(badRes.statusCode, 404);
+    assert.match(badRes.body.error, /Agency not found/);
+    ok('an unknown starting agency reports "Agency not found", not end-of-list');
+
+    // The existing single-agency lookup is untouched.
+    const oneRes = mockRes();
+    await getHandler(mockReq({ method: 'GET', query: { agency_id: 'ag_one' } }), oneRes);
+    assert.strictEqual(oneRes.statusCode, 200);
+    assert.strictEqual(oneRes.body.agency.agency_name, 'One');
+    ok('the existing ?agency_id= lookup still works unchanged');
+
+    __setRepoForTests(null);
+  }
+
   console.log(`\n✅ All ${passed} checks passed.\n`);
 }
 
