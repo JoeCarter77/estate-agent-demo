@@ -14,6 +14,7 @@
     "novus:probe-flow-selftest": "node scripts/novus-probe-flow-selftest.mjs",
     "novus:probe-ui-selftest": "node scripts/novus-probe-ui-selftest.mjs",
     "novus:rightmove-migrate": "node scripts/novus-rightmove-migrate.mjs",
+    "novus:agency-merge-selftest": "node scripts/novus-agency-merge-selftest.mjs",
     "novus:smoke": "node scripts/novus-sheets-smoke.mjs"
   },
   "dependencies": {
