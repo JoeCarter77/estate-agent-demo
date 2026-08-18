@@ -95,10 +95,17 @@ async function run() {
     const { gradeObservation } = await import('../lib/grading.mjs');
     const { computeObservation } = await import('../lib/observation.mjs');
     const probe = { probe_timestamp: '2026-08-01T21:00:00.000Z', observation_deadline: '2026-08-05T21:00:00.000Z' };
-    const reactiveComm = {
-      ...classifyCommunication({ channel: 'voice', transcript: "Hi, it's Terry, trying to catch up with you regarding your inquiry, give me a call back." }),
+    // A realistic COMMUNICATIONS row: the classification tags merged ONTO the
+    // row itself, not standing alone. computeObservation() reads the row's own
+    // channel and content (lib/comm-assessment.mjs), which a bare tag object
+    // does not carry.
+    const rawComm = {
+      communication_id: 'com_q1',
+      channel: 'voice',
+      transcript: "Hi, it's Terry, trying to catch up with you regarding your inquiry, give me a call back.",
       occurred_at: '2026-08-01T21:30:00.000Z',
     };
+    const reactiveComm = { ...rawComm, ...classifyCommunication(rawComm) };
     const observation = computeObservation(probe, [reactiveComm]);
     const { grade } = gradeObservation({ probe, observation, now: new Date('2026-08-02T00:00:00.000Z') });
     assert.strictEqual(observation.auto_acknowledgement, false, "a 'reactive'-tagged communication is never mistaken for an auto-acknowledgement");

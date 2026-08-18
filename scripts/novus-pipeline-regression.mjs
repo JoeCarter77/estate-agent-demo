@@ -31,6 +31,7 @@ import { rebuildAllIntelligence } from '../lib/intelligence-rebuild.mjs';
 import { rebuildAllDiagnosis } from '../lib/diagnosis-rebuild.mjs';
 import { isHumanCommunication, interpretCommunication } from '../lib/classification.mjs';
 import { readVendorStatus } from '../lib/vendor-intent.mjs';
+import { readMissedFindings } from '../lib/evidence-summary.mjs';
 
 const TABS = ['PROBES', 'COMMUNICATIONS', 'INTELLIGENCE', 'DIAGNOSIS'];
 
@@ -144,6 +145,16 @@ function measure(store) {
     'ai_evidence_summary': intel.filter((r) => filled(r.ai_evidence_summary)).length,
     'proactive_reactive': intel.filter((r) => filled(r.proactive_reactive)).length,
     'meaningful Diagnosis outputs': diag.filter((r) => filled(r.primary_problem) && !/^none observed/i.test(String(r.primary_problem).trim())).length,
+    // What the agency did NOT do — the capability the pipeline previously had
+    // no way to represent at all.
+    'probes with missed-opportunity findings': intel.filter((r) => readMissedFindings(r.ai_evidence_summary) !== '').length,
+    'probes where no genuine reply was sent': intel.filter((r) => /no genuine reply to this enquiry/.test(r.ai_evidence_summary)).length,
+    'vendor opportunity engaged (not no_evidence)': intel.filter((r) => {
+      const v = readVendorStatus(r.ai_evidence_summary);
+      return v && v !== 'no_evidence';
+    }).length,
+    'Diagnosis saying more than the grade': diag.filter((r) => filled(r.primary_problem)
+      && !/^(no response-handling problem|none observed|fast first response|slower first response|slow first response|automated acknowledgement only|no meaningful response)/i.test(String(r.primary_problem).trim())).length,
     _totals: { communications: comms.length, human_communications: humanComms.length, intelligence: intel.length, diagnosis: diag.length },
     _grades: intel.reduce((acc, r) => { const g = String(r.grade || '').trim() || '(blank)'; acc[g] = (acc[g] || 0) + 1; return acc; }, {}),
   };

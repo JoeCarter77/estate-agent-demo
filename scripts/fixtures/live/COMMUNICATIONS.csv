@@ -1,0 +1,741 @@
+communication_id,agency_id,probe_id,interaction_id,occurred_at,received_at,channel,direction,communication_type,provider,provider_event_id,source_identifier_raw,source_identifier_normalized,destination_identifier,display_name,call_status,duration_seconds,voicemail_present,recording_reference,transcript,email_message_id,email_thread_id,subject,body_text,raw_content,raw_payload_reference,matching_method,match_score,match_status,automated_or_human,human_contact,callback_attempt,successful_conversation,follow_up,booking_attempt,communication_classification,intent,contact_quality,ai_summary,ai_confidence,ai_model,manual_review_status,manual_override,override_reason,created_at,updated_at
+com_hist_e0008,ag_hist_parabar,prb_hist_0005,,2026-08-11T07:31:26Z,,email,inbound,email,gmail,,kaly-khan@parabar.co.uk,,joe@getnovus.co.uk,,,,,,,,,Property Details,Dear Joe Carter. Please find attached the brochure(s) for properties we think will interest you. Please contact me on 01277 65 65 63 if you are interested in arranging any viewings. You have been [registered].,,,deterministic_domain_plus_content,,MEDIUM,human,TRUE,,FALSE,FALSE,FALSE,generic,,,Bulk brochure send from a named mailbox. Does not reference the probe property and offers no appointment.,,,pending,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0009,ag_hist_parabar,prb_hist_0005,,2026-08-12T08:54:04Z,,email,inbound,email,gmail,,ialderton@parabar.co.uk,,joe@getnovus.co.uk,,,,,,,,,"Property Details - Outwood Common Road, Billericay",Dear Joe Carter. Please find attached the brochure(s) for properties we think will interest you. Please contact me on 01277 65 65 63 if you are interested in arranging any viewings.,,,deterministic_domain_plus_content,,MEDIUM,human,TRUE,,FALSE,TRUE,FALSE,generic,,,"Second bulk brochure send, for a property other than the recorded probe property.",,,pending,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0010,ag_hist_parabar,prb_hist_0005,,2026-08-12T08:54:57Z,,email,inbound,email,gmail,,ialderton@parabar.co.uk,,joe@getnovus.co.uk,,,,,,,,,"Property Details - Kilbarry Walk, Billericay",Dear Joe Carter. Please find attached the brochure(s) for properties we think will interest you. Please contact me on 01277 65 65 63 if you are interested in arranging any viewings.,,,deterministic_domain_plus_content,,MEDIUM,human,TRUE,,FALSE,TRUE,FALSE,generic,,,"Third bulk brochure send, 53 seconds after the previous one, for a further unrelated property.",,,pending,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0011,ag_hist_tylerestates,prb_hist_0006,,2026-08-10T21:03:57Z,,email,inbound,email,gmail,,info@tylerestates.co.uk,,joe@getnovus.co.uk,,,,,,,,,Your Rightmove enquiry,"Hello Joe. Thank you for your Rightmove enquiry regarding Apt 16, Southwood Court Southend Road, Billericay. To find out how to arrange a viewing, click below to register with us and start on your path [to finding a home].",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,TRUE,auto_acknowledgement,,,Instant automated acknowledgement naming the probe property and directing the enquirer to self-register rather than offering an appointment.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0012,ag_hist_tylerestates,prb_hist_0006,,2026-08-10T22:18:05Z,,email,inbound,email,gmail,,jeremy@tylerestates.co.uk,,joe@getnovus.co.uk,,,,,,,,,Welcome to Tyler Estates!,"Dear Joe. Thank you for contacting Tyler Estates! We are delighted to have the opportunity to assist you with your property needs... follow us on Facebook and Instagram... Should you have any further questions or require assistance, please do not hesitate to reach out.",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,FALSE,,,,"Generic bulk welcome email sent via SendGrid from a personal-looking address. No property reference, carries an unsubscribe link.",,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0013,ag_hist_thepropertyspecialists,prb_hist_0007,,2026-08-11T11:16:23Z,,email,inbound,email,gmail,,jay@thepropertyspecialists.co.uk,,joe@getnovus.co.uk,,,,,,,,,"Walman House, Billericay","Hi Joe, thanks for your enquiry regarding the property we have for sale in Walman House, St Ediths Court, Billericay. I understand you would like to arrange a viewing - if so, just let me know when [suits].",,,deterministic_domain_plus_content,,HIGH,human,TRUE,,FALSE,FALSE,TRUE,,,,Named staff member replied about the probe property and offered to arrange a viewing.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0014,ag_hist_gibsonandbrennan,prb_hist_0008,,2026-08-10T21:09:44Z,,email,inbound,email,gmail,,noreply@gibsonandbrennan.co.uk,,joe@getnovus.co.uk,,,,,,,,,Thank you for your enquiry..,"Thank you for your enquiry. Thanks for your enquiry about 2 bedroom terraced house for sale in Whitmore Way, Basildon, SS14. Before we move this forward we just need you to complete our online [registration].",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,FALSE,auto_acknowledgement,,,Automated acknowledgement from a noreply address naming the probe property and requiring the enquirer to complete a registration form before progressing.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0015,ag_hist_gibsonandbrennan,prb_hist_0008,,2026-08-11T09:27:12Z,,email,inbound,email,gmail,,daniel@gibsonandbrennan.co.uk,,joe@getnovus.co.uk,,,,,,,,,Your viewing request,"Hello Joe. We hope this email finds you in good health and high spirits. We received an email from you regarding arranging a viewing for a property, however, we haven't been able to connect with you over the phone and had to leave a message... Please let us know a suitable date and time for the viewing... You can simply create your own unique profile and our system will constantly give you the 'Heads Up' on suggested properties... Thank you for considering Gibson & Brennan for your property search.",,,deterministic_domain_plus_content,,HIGH,human,TRUE,,FALSE,FALSE,FALSE,reactive,,proactive_booking_push,"Templated nudge sent through a marketing platform from a named mailbox. States a call was attempted and a voicemail left, and asks for viewing availability.",,,pending,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0016,ag_hist_crownestatesagents,prb_hist_0009,,2026-08-12T15:37:15Z,,email,inbound,email,gmail,,enquiries@crownestatesagents.co.uk,,joe@getnovus.co.uk,,,,,,,,,Kathy Crown Estate Agents re inquiry,"Hi Joe. Thank you for your inquiry. We have tried to call you regarding Fox Cottage. If you would care to call back or email, we can make you an appointment to view. Kathy Horton, Email kathy@crownestatesagents.co.uk, Phone 01268 711 133.",,,deterministic_domain_plus_content,,HIGH,human,TRUE,,FALSE,TRUE,FALSE,reactive,,,"Named staff member replied, stated a call had been attempted, and invited the enquirer to call back to book a viewing.",,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0017,ag_hist_chalmersagency,prb_hist_0010,,2026-08-10T21:09:29Z,,email,inbound,email,gmail,,mandy@chalmers-agency.co.uk,,joe@getnovus.co.uk,,,,,,,,,Your Rightmove enquiry,"Hi Joe. Thank you for your Rightmove enquiry regarding Flat 7, 151A High Street, Brentwood. A member of our team will be in touch soon. In the mean time, if you want to see more details about the [property, register].",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,FALSE,,,,Automated acknowledgement naming the probe property and promising future human contact.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0018,ag_hist_chalmersagency,prb_hist_0010,,2026-08-12T12:48:43Z,,email,inbound,email,gmail,,mandy@chalmers-agency.co.uk,,joe@getnovus.co.uk,,,,,,,,,We've found some properties for sale you may like,"Hi Joe. As part of our ongoing efforts to find you a new home, I thought you might be interested in the following properties. Properties you might be interested in... Featured Property GBP450000 2 [bed].",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,FALSE,,,,Automated property-match marketing email. Does not reference the probe property or the enquiry.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0019,ag_hist_carterremy,prb_hist_0011,,2026-08-11T21:18:34Z,,email,inbound,email,gmail,,info@carter-remy.co.uk,,joe@getnovus.co.uk,,,,,,,,,Thank you for your enquiry,"Your Enquiry has been received. Dear Joe Carter, Thank you for your enquiry on 142 Belhouse Avenue South Ockendon RM15 4BF. It's helpful for us to know a bit more about your circumstances, please [complete].",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,FALSE,,,,Automated acknowledgement naming the probe property and requesting further circumstance details.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0020,ag_hist_carterremy,prb_hist_0011,,2026-08-12T13:25:54Z,,email,inbound,email,gmail,,elliegrant@carter-remy.co.uk,,joe@getnovus.co.uk,,,,,,,,,"Requested information for Bellhouse Avenue, South Ockendon, RM15","Hi. Please let me know if you would be able to attend a viewing of this property on Saturday 15th August at 3pm. Thank you. Ellie Heiden Grant, Cornwallis Business Centre, Howard Chase, Basildon, Essex.",,,deterministic_domain_plus_content,,HIGH,human,TRUE,,FALSE,FALSE,FALSE,,,proactive_booking_push,Named staff member offered a specific dated and timed viewing slot rather than asking for availability.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0021,ag_hist_carterremy,prb_hist_0011,,2026-08-14T08:09:50Z,,email,inbound,email,gmail,,elliegrant@carter-remy.co.uk,,joe@getnovus.co.uk,,,,,,,,,"Requested information for Bellhouse Avenue, South Ockendon, RM15","Thank you for your recent enquiry requesting more information, which I am pleased to provide. Would you like to arrange a viewing? If you have any questions or would like to know more, please do call [us].",,,deterministic_domain_plus_content,,HIGH,human,TRUE,,FALSE,TRUE,TRUE,,,,Further contact on the same subject line asking again about arranging a viewing.,,,pending,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0022,ag_hist_periodhomes,prb_hist_0012,,2026-08-15T16:00:34Z,,email,inbound,email,gmail,,claire@walkersestates.co.uk,,joe@getnovus.co.uk,,,,,,,,,"5 Milton Road, Warley","Hi Joe. Many thanks for your enquiry, if you could please let us know your availability for a viewing next week - days and times - we will endeavour to get you booked in. Please could you also confirm your position - sold/selling/nothing to sell? Kind regards, Claire Niner, Business Support Executive, Period Homes, T: 01277 288000, DD: 01277 288005, periodhomes.co.uk.",,,deterministic_domain_plus_content,,HIGH,human,TRUE,,FALSE,TRUE,FALSE,,,proactive_booking_push,Named staff member offered a viewing and asked directly about the enquirer's selling position. Sent from a different mail domain to the one recorded for the agency.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0023,ag_hist_hsestateagents,prb_hist_0015,,2026-08-12T10:34:11Z,,email,inbound,email,gmail,,simone@hs-estateagents.co.uk,,joe@getnovus.co.uk,,,,,,,,,RE: Potential valuation: Ingrave Road - Buyer from CM12,"Hi Joe, Good morning. Thank you for your email in relation to 6, Ingrave House, Ingrave Road, if you would like to view the property, please let me know some suitable dates/times and we can get you [booked in].",,,deterministic_domain_plus_content,,HIGH,human,TRUE,,FALSE,FALSE,FALSE,,,proactive_booking_push,Named staff member replied about the probe property and offered to arrange a viewing.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0024,ag_hist_hsestateagents,prb_hist_0015,,2026-08-15T08:37:17Z,,email,inbound,email,gmail,,sales@hs-estateagents.co.uk,,joe@getnovus.co.uk,,,,,,,,,Property Details From HS Estate Agents,"HS Estate Agents. Dear Sir/Madam, Please see below details for a property matching your search criteria. If this is not the type of property you are currently looking for please reply back to this [email].",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,FALSE,,,,Automated property-match mailshot addressed impersonally. Not a response to the enquiry.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0025,ag_hist_smoothmoveestates,prb_hist_0018,,2026-08-11T21:25:00Z,,email,outbound,email,gmail,,autoresponder@rightmove.com,,sales@smoothmoveestates.co.uk,,,,,,,,,Sales enquiry: Brentwood - Sales - Buyer from CM12,"Rightmove Lead: Joe Carter, 5 Lion Lane, Billericay CM12 9DL, 07455506761. Opportunities: Wants more details on this property. 2 bed Flat, 32 Palliser Drive, Rainham RM13 9TG, Offers Over GBP220,000, Status: Available.",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,FALSE,,,,"Rightmove delivered the probe lead. Note this lead carries no 'has a property to sell' declaration, unlike every other recovered probe.",,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0026,ag_hist_smoothmoveestates,prb_hist_0018,,2026-08-12T11:10:59Z,,email,inbound,email,gmail,,lisa@smoothmoveestates.co.uk,,joe@getnovus.co.uk,,,,,,,,,32 Palliser Drive,"Hi Joe. Thank you for getting in touch, I have phoned you and left a message with my contact number. I'm available to view the flat and would be happy to book a viewing. Please let me know what days and times you have available. Kind regards, Lisa Clark, Sales Manager.",,,deterministic_domain_plus_content,,HIGH,human,TRUE,,FALSE,TRUE,TRUE,reactive,,proactive_booking_push,"Sales manager replied, stated a call was made and a voicemail left, and offered to book a viewing.",,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0027,ag_hist_blueprintproperties,prb_hist_0019,,2026-08-12T15:08:05Z,,email,inbound,email,gmail,,jack@blueprintproperties.co.uk,,joe@getnovus.co.uk,,,,,,,,,RE: Potential valuation: Rayleigh Road - Buyer from CM12,"Hi Joe. Thank you for your enquiry, are you available to view at 10am Friday morning. Thanks. Jack Jaques, Associate Director.",,,deterministic_domain_plus_content,,HIGH,human,TRUE,,FALSE,FALSE,TRUE,,,proactive_booking_push,Associate director offered a specific timed viewing slot.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0028,ag_hist_farsonspropertygroup,prb_hist_0020,,2026-08-11T21:27:48Z,,email,inbound,email,gmail,,sales@farsonspropertygroup.com,,joe@getnovus.co.uk,,,,,,,,,Your Rightmove enquiry,"Hi Joe. Thank you for your Rightmove enquiry regarding Flat 3, Clive House, 61 Shenfield Road. To find out how to arrange a viewing, click below to register with us and start on your path to finding [a home].",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,TRUE,auto_acknowledgement,,,Automated acknowledgement naming the probe property and directing the enquirer to self-register.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0029,ag_hist_farsonspropertygroup,prb_hist_0020,,2026-08-15T10:27:08Z,,email,inbound,email,gmail,,jo@farsonspropertygroup.com,,joe@getnovus.co.uk,,,,,,,,,"Flat 3, Clive House, 61 Shenfield Road","Good morning Joe. Thank you for your Rightmove enquiry to view Flat 3, Clive House. I would be delighted to arrange a viewing for you, when would be a suitable date and time? I look forward to hearing [from you].",,,deterministic_domain_plus_content,,HIGH,human,TRUE,,FALSE,TRUE,TRUE,,,proactive_booking_push,"Named staff member replied about the probe property and offered to arrange a viewing, roughly 85 hours after the enquiry.",,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0030,ag_hist_thehomepartnership,prb_hist_0022,,2026-08-11T21:38:46Z,,email,inbound,email,gmail,,noreply@apex27.co.uk,,joe@getnovus.co.uk,,,,,,,,,Thank you for getting in touch!,"Dear Joe, Thank you for your email enquiring on one of our properties, a member of the team will be in touch very soon. Make sure you head on over and follow our social media pages... We have a team of dedicated Mortgage advisors who are here to help... Regards, HOME.",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,FALSE,auto_acknowledgement,,,Automated CRM acknowledgement sent via the Apex27 platform. Does not name the property. Signs off as HOME.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0031,ag_hist_thehomepartnership,prb_hist_0022,,2026-08-12T23:49:01Z,,email,inbound,email,gmail,,noreply@apex27.co.uk,,joe@getnovus.co.uk,,,,,,,,,Property Update,Dear Joe. I've put together a list of properties that I think may interest you. Hopefully these are what you're looking for. Give me a shout if you'd like to arrange any viewings or have [questions].,,,deterministic_domain_plus_content,,MEDIUM,automated,FALSE,,FALSE,FALSE,FALSE,auto_acknowledgement,,,Automated property-match mailshot from the same CRM relay.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0032,ag_hist_thehomepartnership,prb_hist_0022,,2026-08-13T13:27:05Z,,email,inbound,email,gmail,,michael@thehomepartnership.co.uk,,joe@getnovus.co.uk,,,,,,,,,Property Update,"Dear Joe, Please see below a property that I think may be of interest you. Give me a shout if you'd like to arrange a viewing or have any questions about what the area has to offer, including [schools].",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,TRUE,,,,"Automated property-match mailshot, this time sent from the agency domain. Not a response to the enquiry.",,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0033,ag_hist_charlesdavidcasson,prb_hist_0023,,2026-08-11T21:35:06Z,,email,inbound,email,gmail,,noreply@send.agentresponse.co.uk,,joe@getnovus.co.uk,,,,,,,,,Thank you for your Enquiry,"Hello Joe Carter. Thank you for your enquiry about 19, Lambourne Chase, Chelmsford, CM2 9FF. If you would also be interested in joining our exclusive mailing list for all the best properties in the area, please provide more details via the following link. Charles David Casson.",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,FALSE,auto_acknowledgement,,,"Automated acknowledgement sent through the Agent Response relay, naming the probe property and signed by the agency.",,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0034,ag_hist_charlesdavidcasson,prb_hist_0023,,2026-08-12T08:51:08Z,,email,inbound,email,gmail,,federica@charlesdavidcasson.co.uk,,joe@getnovus.co.uk,,,,,,,,,Getting In The Best Position To Have Your Offer Accepted,"Thank you for registering your details with us, we will do all we can to find you your perfect property. You no doubt want to secure your new property at the best possible price, and a key negotiation [point].",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,FALSE,,,,Automated buyer-nurture article sent after registration. Does not reference the probe property.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0035,ag_hist_charlesdavidcasson,prb_hist_0023,,2026-08-12T08:53:05Z,,email,inbound,email,gmail,,federica@charlesdavidcasson.co.uk,,joe@getnovus.co.uk,,,,,,,,,"Apartment on Lambourne Chase, Chelmsford",Hi Joe. Hope this email finds you well. I have tried to call regarding your enquiry on the property on Lambourne Chase. Are you available to view Saturday? 1 bedroom apartment for sale in Lambourne [Chase].,,,deterministic_domain_plus_content,,HIGH,human,TRUE,,FALSE,FALSE,TRUE,reactive,,proactive_booking_push,"Named staff member replied about the probe property, stated a call had been attempted, and proposed a viewing day.",,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0036,ag_hist_kilnandlodgeestates,prb_hist_0024,,2026-08-11T21:35:55Z,,email,outbound,email,gmail,,autoresponder@rightmove.com,,sales@kilnandlodgeestates.co.uk,,,,,,,,,Potential valuation: Powell Road - Buyer from CM12,"Rightmove Lead: Joe Carter, 5 Lion Lane, Billericay CM12 9DL, 07455506761. Opportunities: Has a property to sell: yes, it is not yet on the market. 1 bed Apartment, 12 Hamilton Court, Powell Road, Basildon SS15 6HZ, GBP180,000.",,,deterministic_domain_plus_content,,HIGH,automated,FALSE,,FALSE,FALSE,FALSE,,,,Rightmove delivered the probe lead to the agency.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0037,ag_hist_kilnandlodgeestates,prb_hist_0024,,2026-08-12T14:13:04Z,,email,inbound,email,gmail,,sales@kilnandlodgeestates.co.uk,,joe@getnovus.co.uk,,,,,,,,,Re: Potential valuation: Powell Road - Buyer from CM12,Hi Joe. Thanks for the enquiry. When are you free for a viewing? Kind regards.,,,deterministic_domain_plus_content,,HIGH,human,TRUE,,FALSE,FALSE,FALSE,,,proactive_booking_push,Reply from the shared sales mailbox offering a viewing. Sender not individually named.,,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_e0038,ag_hist_kilnandlodgeestates,prb_hist_0024,,2026-08-13T09:32:33Z,,email,inbound,email,gmail,,sales@kilnandlodgeestates.co.uk,,joe@getnovus.co.uk,,,,,,,,,RE: Potential valuation: Powell Road - Buyer from CM12,"Good morning Joe. Thank you for your Rightmove enquiry for Hamilton Court. What days/times work best for you to view? Kind regards, Emily.",,,deterministic_domain_plus_content,,HIGH,human,TRUE,,FALSE,TRUE,FALSE,,,proactive_booking_push,"Second contact from the same mailbox, this time from a named individual, asking again for viewing availability.",,,,,,2026-08-15T22:24:49Z,2026-08-15T22:24:49Z
+com_hist_c0001,ag_hist_stantonhockett,prb_hist_0002,,2026-08-12T11:00:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01277 714777,,7455506761,,VOICEMAIL,,TRUE,,"Hi, Jerry, it's Terry from Stanton Hockett estate agents. Trying to catch up with you regarding your inquiry on our lovely Wedgewood Way property in Ashingdon area of Rochford. It's one on the market for 450,000. Give me a call back when you're free. Be happy to...",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,FALSE,FALSE,reactive,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0002,ag_hist_stantonhockett,prb_hist_0002,,2026-08-15T00:00:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01277 714777,,7455506761,,MISSED,,FALSE,,,,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,TRUE,FALSE,,,,"Inbound call from the agency, not answered, no voicemail left.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0003,ag_hist_hentonkirkman,prb_hist_0004,,2026-08-11T16:48:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01277 500800,,7455506761,,MISSED,,FALSE,,,,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,FALSE,FALSE,,,,"Inbound call from the agency, not answered, no voicemail left.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0004,ag_hist_tylerestates,prb_hist_0006,,2026-08-11T09:41:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01277 626181,,7455506761,Freddy,VOICEMAIL,,TRUE,,"Hi, this message for Joe. It's Freddy calling from Tyro Estates. I hope you're well. Just calling regarding your request on Southwood. Cool. Kind of give me a call back number 012776261811. Thank you.",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,FALSE,FALSE,reactive,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0005,ag_hist_tylerestates,prb_hist_0006,,2026-08-13T00:00:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01277 626181,,7455506761,Martin,VOICEMAIL,,TRUE,,"Oh, good morning, Joe. It's Martin here from Tyler Estates. I'm just coming back to you regarding an inquiry you've made on one of our retirement properties at Southwood Court. I'll drop you a WhatsApp message just in case it's easy for you to reply to that. I'm not sure if it's, what, what your situation is, where you're looking at your profile bedroom or so, it looks like you're a...",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,TRUE,FALSE,reactive,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0006,ag_hist_gibsonandbrennan,prb_hist_0008,,2026-08-11T10:26:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01268 219992,,7455506761,Dan,VOICEMAIL,,TRUE,,"Hello Joe, this is Dan from Gibson and Brennan. Give me a call back when you get this. 01268 219992. Thanks.",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,FALSE,FALSE,reactive,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0007,ag_hist_crownestatesagents,prb_hist_0009,,2026-08-11T12:29:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01268 711133,,7455506761,,VOICEMAIL,,TRUE,,"Hi, my name's Kathy from a company called Crown State Agents. We've had a contact detail from you regarding a property we've got for sale. Fox Cottage in Ramsden Heath. I wonder if you could give us a call back on 012687 11133. Thank you.",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,FALSE,FALSE,reactive,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0008,ag_hist_crownestatesagents,prb_hist_0009,,2026-08-12T00:00:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01268 711133,,7455506761,,MISSED,,FALSE,,,,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,TRUE,FALSE,,,,"Inbound call from the agency, not answered, no voicemail left.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0009,ag_hist_chalmersagency,prb_hist_0010,,2026-08-13T13:47:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01277 840917,,7455506761,,MISSED,,FALSE,,,,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,FALSE,FALSE,,,,"Inbound call from the agency, not answered, no voicemail left.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0010,ag_hist_periodhomes,prb_hist_0012,,2026-08-12T09:47:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01277 288008,,7455506761,,VOICEMAIL,,TRUE,,[Unable to transcribe from recording.,,,,,,,deterministic_domain_plus_content,,MEDIUM,human,TRUE,TRUE,FALSE,FALSE,FALSE,,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0011,ag_hist_wnproperties,prb_hist_0013,,2026-08-13T17:02:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01245 505288,,7455506761,,VOICEMAIL,,TRUE,,"Hello Joe, this is Jackie calling from WN Properties and Northwood Group. You sent us an inquiry for a possible viewing on a...",,,,,,,deterministic_domain_plus_content,,MEDIUM,human,TRUE,TRUE,FALSE,FALSE,FALSE,reactive,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0012,ag_hist_keithashton,prb_hist_0014,,2026-08-12T10:20:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01277 260858,,7455506761,,VOICEMAIL,,TRUE,,Hello.,,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,FALSE,FALSE,,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0013,ag_hist_keithashton,prb_hist_0014,,2026-08-14T11:00:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01277 260858,,7455506761,,VOICEMAIL,,TRUE,,"So, good morning. It's been sent from Keith Ashton Estate Agents. You were interested in viewing a property we have in number 11 Hammonds Lane. I'd love to arrange the...",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,TRUE,FALSE,,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0014,ag_hist_hsestateagents,prb_hist_0015,,2026-08-13T11:22:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01277 220819,,7455506761,Olivia,VOICEMAIL,,TRUE,,"Hi Joe, it's Olivia from H Estate Agents. I was just giving you a quick call regarding your enquiry to view one of our properties in Ingrave House. You can give me a call back, the number is 01277220819. Thank you.",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,TRUE,FALSE,reactive,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0015,ag_hist_smoothmoveestates,prb_hist_0018,,2026-08-12T00:00:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,07984 146509,,7455506761,,MISSED,,FALSE,,,,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,FALSE,FALSE,,,,"Inbound call from the agency, not answered, no voicemail left.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0016,ag_hist_smoothmoveestates,prb_hist_0018,,2026-08-12T12:06:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,07984 146509,,7455506761,Lisa,VOICEMAIL,,TRUE,,"Hello, Joe, this is Lisa from Smooth Move Estates. Just received your inquiry regarding the flat in Raynham, Palliser Drive. If you'd like to give me a call back on 07984146509. We can arrange to get round and have a look at it with you. All right, speak to you soon.",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,TRUE,FALSE,reactive,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0017,ag_hist_smoothmoveestates,prb_hist_0018,,2026-08-14T08:58:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,07984 146509,,7455506761,Lisa,VOICEMAIL,,TRUE,,"Hello, Joe, it's Lisa from Smooth Move Estates. Just a quick call, really. I'm assuming you haven't replied, so you're not really particularly interested in looking at 32 Palliser Drive. After all, if this is...",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,TRUE,FALSE,,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0018,ag_hist_farsonspropertygroup,prb_hist_0020,,2026-08-12T09:51:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01277 288850,,7455506761,,VOICEMAIL,,TRUE,,"Hi, this is Debs from Farsons Property Group. You put in a request to view Clive House flat in Shenfield Road. If you'd like to call me back, then I can arrange a viewing for you. 01277288850. Thanks.",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,FALSE,TRUE,reactive,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0019,ag_hist_thehomepartnership,prb_hist_0022,,2026-08-12T08:55:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01245 250222,,7455506761,Bethany,VOICEMAIL,,TRUE,,"Hi there, it's Bethany calling from Home Estate Agents. Just giving you a quick call in regards to an inquiry you sent in to us for the property we've got put out on Centenary Way in Bewley. If you can, please return the call. It's 01245 250222. Thank...",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,FALSE,FALSE,reactive,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0020,ag_hist_thehomepartnership,prb_hist_0022,,2026-08-13T10:31:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01245 250222,,7455506761,Michael,VOICEMAIL,,TRUE,,"Hi, it's a message for Joe. It's Michael calling from Home Partnership Estate Agents in Chelmsford. Received your inquiry about the property we have for sale on the Centenary Way in Beaulieu Park. Can you give me a call back please on 01245 250222? We can take...",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,TRUE,FALSE,reactive,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0021,ag_hist_thehomepartnership,prb_hist_0022,,2026-08-15T10:53:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01245 250222,,7455506761,Bethany,VOICEMAIL,,TRUE,,"Hi there, it's Bethany calling from Home Estate Agents. Giving you a quick call. You inquired on a property that we've got for sale...",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,TRUE,FALSE,reactive,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0022,ag_hist_charlesdavidcasson,prb_hist_0023,,2026-08-12T09:50:00+01:00,,voice,inbound,call,iphone_call_log_screenshot,,01245 835859,,7455506761,,VOICEMAIL,,TRUE,,"Hi, Joey, it's Paddy calling from Charles David Casson Estate Agents regarding your inquiry on the one bedroom apartment we've got for sale on Lambourne Chase. If you could please give me a call back on 01245835859. Many thanks.",,,,,,,deterministic_domain_plus_content,,HIGH,human,TRUE,TRUE,FALSE,FALSE,FALSE,reactive,,,"Inbound call from the agency, went to voicemail.",,,SCREENSHOT_TRANSCRIBED,,,2026-08-15T22:24:49Z,2026-08-16T00:00:00Z
+com_hist_c0023,ag_hist_thepropertyspecialists,,,2026-08-05T10:37:00+01:00,,voice,inbound,voicemail,iphone,,01277 654446,1277654446,,The Property Specialists,VOICEMAIL,19,TRUE,,"Good morning, Joe, it's Fiona calling from the Property Specialists in Billericay, just regarding your viewing inquiry that we've received for the flat at Pilgrim House. If you'd like to call the office and let us know when you're available to view, please, that would be great. The number's 01277654446. Thank you.",,,,,,,deterministic_phone_match,,HIGH_AGENCY_OUT_OF_WINDOW,human,TRUE,FALSE,FALSE,FALSE,FALSE,VIEWING_REQUEST,viewing_request,,"Agency voicemail dated 5 Aug regarding a Pilgrim House viewing inquiry. This predates the recorded 10 Aug probe, so it is retained separately and not linked to that probe.",,,SEPARATE_EARLIER_PROBE,,,2026-08-16T00:00:00Z,2026-08-16T00:00:00Z
+com_msxtckyn_cm80ko,ag_hist_countryside-estates-q72g,prb_msxtcfp6_ebl5yn,,2026-08-17T22:36:29.000Z,2026-08-17T22:36:32.436Z,email,inbound,email,gmail,1a011de8313e79b4,sales@countrysideestates.co.uk,sales@countrysideestates.co.uk,joe.novus2@gmail.com,,,,,,,<ZrHDeJLaQrmqC_XtzGVIkA@geopod-ismtpd-5>,1a011de8313e79b4,Thank you for your portal lead enquiry [ref:1BUJKPs1WrE2VjRbb5DTRfA]," 
+
+Dear Joe Carter
+
+Thank you for your interest in our services. We will respond to your 
+enquiry as quickly as we can.
+
+Benfleet
+
+205, High Road
+Benfleet
+Essex
+SS7 5HY
+"," 
+
+Dear Joe Carter
+
+Thank you for your interest in our services. We will respond to your 
+enquiry as quickly as we can.
+
+Benfleet
+
+205, High Road
+Benfleet
+Essex
+SS7 5HY
+",rev_msxtckcs_p5ziow,domain_exact,1,matched,human,TRUE,,,FALSE,FALSE,,,,,,,not_required,,,2026-08-17T22:36:34.443Z,2026-08-17T22:36:34.443Z
+com_msxvlmi9_g23oks,ag_hist_aspire-estate-aus5,prb_msxtd2eq_3aad13,SM0000000015dc77f5d59b4e02769e1ef0,2026-08-17T23:39:35.957Z,2026-08-17T23:39:35.957Z,sms,inbound,sms,twilio,SM0000000015dc77f5d59b4e02769e1ef0,AspireEstat,,+447575333064,,,,,,,,,,Hi Joe Carter! Aspire Estate Agents here about the 2-bed property in SS7. Book a viewing: https://bot.bridgeai.co.uk/0ae51bcc-2cb7-4212-ab9e-42e1450e78d5,Hi Joe Carter! Aspire Estate Agents here about the 2-bed property in SS7. Book a viewing: https://bot.bridgeai.co.uk/0ae51bcc-2cb7-4212-ab9e-42e1450e78d5,rev_msxvlm6t_j2qere,,0,matched,human,TRUE,FALSE,FALSE,FALSE,TRUE,,,,,,,pending,,,2026-08-17T23:39:35.957Z,2026-08-17T23:39:35.957Z
+com_msy3j3vf_7yp110,ag_hist_aspire-estate-aus5,prb_msxtd2eq_3aad13,,2026-08-18T03:21:12.000Z,2026-08-18T03:21:32.384Z,email,inbound,email,gmail,1a012e32be1e0846,Aspire Estate Agents <no-reply@bridgeai.co.uk>,no-reply@bridgeai.co.uk,joe.novus2@gmail.com,Aspire Estate Agents,,,,,,<178702327171.1292.12165231106520566716@ba-prod-vm-celery-worker-green-grpz.europe-west1-b.c.bridgeai-fusion-prod.internal>,1a012e32be1e0846,Viewing the 2-bedroom House - Terraced in SS7.,"        Email Template                 Aspire Estate Agents
+<https://www.linkedin.com/company/bridge-ai-uk/>
+<https://www.youtube.com/@Bridge-AI> <https://www.instagram.com/bridgeaiuk>
+                Greetings from Aspire Estate Agents! ✨ 
+
+ *Good Morning, 👋*  Thank you for your enquiry regarding the above
+property.
+
+ We would, of course, be delighted to arrange a viewing at a time that is
+convenient for you.
+
+ Before we book a viewing, would you mind telling us a little more about
+your current position regarding property? For example, do you have a
+property to sell? Will you require a mortgage? 
+
+ You can ask us any questions about the property by clicking on “Book a
+Viewing”.  Kind regards, 
+
+  Aspire Estate Agents      Book A Viewing
+<https://bot.bridgeai.co.uk/840b3d9c-44d5-4133-b32d-367029c9e88e> 
+        2026 BRIDGE AI All Rights Reserved 
+ Bridgeai.co.uk <https://www.bridge.rent>
+","        Email Template                 Aspire Estate Agents
+<https://www.linkedin.com/company/bridge-ai-uk/>
+<https://www.youtube.com/@Bridge-AI> <https://www.instagram.com/bridgeaiuk>
+                Greetings from Aspire Estate Agents! ✨ 
+
+ *Good Morning, 👋*  Thank you for your enquiry regarding the above
+property.
+
+ We would, of course, be delighted to arrange a viewing at a time that is
+convenient for you.
+
+ Before we book a viewing, would you mind telling us a little more about
+your current position regarding property? For example, do you have a
+property to sell? Will you require a mortgage? 
+
+ You can ask us any questions about the property by clicking on “Book a
+Viewing”.  Kind regards, 
+
+  Aspire Estate Agents      Book A Viewing
+<https://bot.bridgeai.co.uk/840b3d9c-44d5-4133-b32d-367029c9e88e> 
+        2026 BRIDGE AI All Rights Reserved 
+ Bridgeai.co.uk <https://www.bridge.rent>
+",rev_msy3j38s_bnmzl0,,0,matched,automated,FALSE,,,,TRUE,auto_acknowledgement,,,,,,pending,,,2026-08-18T03:21:35.020Z,2026-08-18T03:21:35.020Z
+com_msydpmrj_pzwn9e,ag_hist_robert-michael-zuab,prb_msxtfg2m_kg7i2u,,2026-08-18T08:04:03.000Z,2026-08-18T08:06:32.860Z,email,inbound,email,gmail,1a013e6262931e8f,Sue Gummer <sue@robertmichael.co.uk>,sue@robertmichael.co.uk,<joe.novus2@gmail.com>,Sue Gummer,,,,,,<76eae268a4670292d4bf18bfe6427f59@sue-laptop>,1a013e6262931e8f,Property Details From Robert Michael," Property Bulletin from Robert Michael
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Home
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+Dear Sir/Madam,   
+
+Please find below a link to particulars of a property that meets some of your requirements you requested, just click on the link for full details.
+
+ However this property has been sold subject to contract.
+
+We can retain your details in order to advise you if any similar properties come to the market.
+
+Alternatively you can unsubscribe from our mailing list at the bottom of this email
+
+Kind Regards
+
+Sue Gummer
+sue@robertmichael.co.ukRobert Michael
+83 Hart Road, Thundersley, Benfleet, Essex, SS7 3PB
+Telephone : 01268 753889
+Fax : 
+
+Registered Office: 30, Milton Road, 
+Westcliff-on-Sea, Essex, SS0 7JX 
+Company No 06009665 
+
+The information contained in this email and any attachment is confidential. Internet email is not a secure communication medium so please observe this lack of security when emailing us. This email is intended only for the named recipient(s). If you are not the intended recipient please notify the sender immediately and do not disclose the contents to another person or take copies.
+
+We cannot accept liability for any loss or damage caused by software viruses and would advise that you carry out your own virus checks on this email and any attachments contained therein.
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 3 Bedroom Terrace, Silverdale Avenue, Westcliff On Sea
+£285,000
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Visit Our Website
+
+ Keep up to date with our latest properties and news by visiting our website.
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Robert Michael
+83 Hart Road, Thundersley, Benfleet, Essex, SS7 3PB
+Telephone: 01268 753889
+Web: https://www.robertmichael.co.uk
+
+ Company Reg No : 06009665
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ I would like to unsubscribe or update my preferences
+
+ 
+ 
+"," Property Bulletin from Robert Michael
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Home
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+Dear Sir/Madam,   
+
+Please find below a link to particulars of a property that meets some of your requirements you requested, just click on the link for full details.
+
+ However this property has been sold subject to contract.
+
+We can retain your details in order to advise you if any similar properties come to the market.
+
+Alternatively you can unsubscribe from our mailing list at the bottom of this email
+
+Kind Regards
+
+Sue Gummer
+sue@robertmichael.co.ukRobert Michael
+83 Hart Road, Thundersley, Benfleet, Essex, SS7 3PB
+Telephone : 01268 753889
+Fax : 
+
+Registered Office: 30, Milton Road, 
+Westcliff-on-Sea, Essex, SS0 7JX 
+Company No 06009665 
+
+The information contained in this email and any attachment is confidential. Internet email is not a secure communication medium so please observe this lack of security when emailing us. This email is intended only for the named recipient(s). If you are not the intended recipient please notify the sender immediately and do not disclose the contents to another person or take copies.
+
+We cannot accept liability for any loss or damage caused by software viruses and would advise that you carry out your own virus checks on this email and any attachments contained therein.
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 3 Bedroom Terrace, Silverdale Avenue, Westcliff On Sea
+£285,000
+
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Visit Our Website
+
+ Keep up to date with our latest properties and news by visiting our website.
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Robert Michael
+83 Hart Road, Thundersley, Benfleet, Essex, SS7 3PB
+Telephone: 01268 753889
+Web: https://www.robertmichael.co.uk
+
+ Company Reg No : 06009665
+
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ I would like to unsubscribe or update my preferences
+
+ 
+ 
+",rev_msydpm74_7k6154,domain_exact,1,matched,human,TRUE,,,FALSE,FALSE,,,,,,,not_required,,,2026-08-18T08:06:35.679Z,2026-08-18T08:06:35.679Z
+com_msydtjhc_e52zsr,ag_hist_fisks-ltd-d8u5,prb_msxtehim_kxpw64,CA0000000038e7a2c2f64aacb81d56c77e,2026-08-18T08:09:38.236Z,2026-08-18T08:09:38.236Z,voice,inbound,call,twilio,CA0000000038e7a2c2f64aacb81d56c77e,+441268983480,+441268983480,+447575333064,,voicemail,14,TRUE,https://api.twilio.com/2010-04-01/Accounts/AC_REDACTED_ACCOUNT_SID/Recordings/RE000000002fc50f39dfdc723dfcde553e,"A hi Joe, it's Ron. Hey, from fisher sites. Agents have received your inquiry. One about flats on the market and been late in limbo. Co please call me back on 126-856-5555. Thank you.",,,,,,rev_msydtj24_iczvgl,,0,matched,human,TRUE,TRUE,FALSE,FALSE,FALSE,reactive,,,,,,pending,,,2026-08-18T08:09:38.236Z,2026-08-18T08:10:45.230Z
+com_msyeexqu_ymgizd,ag_hist_david-burr-tfbj,prb_msxt8w4a_oxvkl9,CA0000000076c01ee608f8e00f2d5013cc,2026-08-18T08:26:16.364Z,2026-08-18T08:26:16.364Z,voice,inbound,call,twilio,CA0000000076c01ee608f8e00f2d5013cc,+441638669035,+441638669035,+447575333064,,voicemail,15,TRUE,https://api.twilio.com/2010-04-01/Accounts/AC_REDACTED_ACCOUNT_SID/Recordings/RE00000000b5699f65cd394ff842b23605,"Hi, message for joey. My names down. I'm calling from david renewal. In case you sent us through an inquiry for property on pages road. So I'm calling to see if we can arrange a viewing for you. Please give us a call back when you can on 163-866-9035. Thank you.",,,,,,rev_msyeex7w_tcodme,phone_exact,1,matched,human,TRUE,TRUE,FALSE,FALSE,TRUE,reactive,,,,,,not_required,,,2026-08-18T08:26:16.364Z,2026-08-18T08:26:53.191Z
+com_msyej9kb_1yqc0j,ag_hist_brown-brand-28l8,prb_msxtgdkf_u5lr0v,CA00000000b970f2ccccf595462cbdf37f,2026-08-18T08:29:38.260Z,2026-08-18T08:29:38.260Z,voice,inbound,call,twilio,CA00000000b970f2ccccf595462cbdf37f,+441702552966,+441702552966,+447575333064,,voicemail,18,TRUE,https://api.twilio.com/2010-04-01/Accounts/AC_REDACTED_ACCOUNT_SID/Recordings/RE0000000004d94583b6263f00157bcdbc,"A hi joy, it's lucy calling from brandon brand. I'm just calling you made an inquiry and to be a flat half down and leave a large a if you could give us a call back. The number here is o 17, o 2, double 529, double 6. Thank you. Bye.",,,,,,rev_msyej904_gv47tg,phone_exact,1,matched,human,TRUE,TRUE,FALSE,FALSE,FALSE,reactive,,,,,,not_required,,,2026-08-18T08:29:38.260Z,2026-08-18T08:30:19.782Z
+com_msyekaww_otkf22,ag_hist_morgan-brookes-2cp4,prb_msxtdvbv_p95lot,CA00000000857b85f692f9ce532974ee4d,2026-08-18T08:30:26.677Z,2026-08-18T08:30:26.677Z,voice,inbound,call,twilio,CA00000000857b85f692f9ce532974ee4d,+441268755626,+441268755626,+447575333064,,voicemail,21,TRUE,https://api.twilio.com/2010-04-01/Accounts/AC_REDACTED_ACCOUNT_SID/Recordings/RE000000007895b153d2b654c913e91254,"Joy, if anything, quoted for monica brooks states agents just following up regarding the inquiry for bottom of pop creighton self and just wanted to get you registered and hopefully arrange a few and ca, i'm actually that this evening as well. So you have, please call me back whenever you're free, i will give you and schedules quite soon from you soon. Thank you. Bye.",,,,,,rev_msyekad1_lfrt62,phone_exact,1,matched,human,TRUE,TRUE,FALSE,FALSE,FALSE,reactive,,,,,,not_required,,,2026-08-18T08:30:26.677Z,2026-08-18T08:32:06.150Z
+com_msyekzya_s1mi5e,ag_hist_tylers-estate-1rwa,prb_msxtbczc_tjx5q6,CA000000003f194ee2224638a0b9035cc1,2026-08-18T08:30:59.311Z,2026-08-18T08:30:59.311Z,voice,inbound,call,twilio,CA000000003f194ee2224638a0b9035cc1,+441638660633,+441638660633,+447575333064,,voicemail,12,TRUE,https://api.twilio.com/2010-04-01/Accounts/AC_REDACTED_ACCOUNT_SID/Recordings/RE00000000c7fb467fc20d9eaace60331a,Good morning is some toddlers estate agents here in New Market. I'm just calling to inquire about a property that you shed interested. If you could give me a call back. That would be great. Thanks very much.,,,,,,rev_msyekzjj_qzzzxw,,0,matched,human,TRUE,TRUE,FALSE,FALSE,FALSE,reactive,,,,,,pending,,,2026-08-18T08:30:59.311Z,2026-08-18T08:32:05.680Z
+com_msyelqrr_rch7re,ag_hist_david-burr-tfbj,prb_msxt8w4a_oxvkl9,,2026-08-18T08:29:17.000Z,2026-08-18T08:31:32.456Z,email,inbound,email,gmail,1a013fd46d21d674,Dan Driver <dan.driver@davidburr.co.uk>,dan.driver@davidburr.co.uk,"""joe.novus2@gmail.com"" <joe.novus2@gmail.com>",Dan Driver,,,,,,<CWXP123MB4471D832727765D53A67EFB6DAA62@CWXP123MB4471.GBRP123.PROD.OUTLOOK.COM>,1a013fd46d21d674,4 Bakers Row,"Good morning Joe,
+
+Thanks for your enquiry on 4 Bakers Row in Newmarket.
+
+Newmarket, Suffolk | David Burr Estate Agents<https://davidburr.co.uk/property/newmarket-suffolk-21/>
+
+I've left you a voicemail this morning to discuss. Please call me when you can on 01638 669035.
+
+Kind regards,
+
+Dan
+
+
+[David Burr]<https://davidburr.co.uk/>
+
+Dan Driver MNAEA
+
+Sales Negotiator
+
+T: 01638 669035
+
+156 High Street, Newmarket, CB8 9AQ
+
+davidburr.co.uk<https://davidburr.co.uk/>
+
+Bury St Edmunds • Castle Hedingham • Clare • Leavenheath • Long Melford • Newmarket • Woolpit • London SW1
+
+This email and any files transmitted with it are confidential and intended solely for the use of the individual or entity to whom they are addressed. If you have received this email in error please notify the system manager. This message contains confidential information and is intended only for the individual named. If you are not the named addressee you should not disseminate, distribute or copy this e-mail. Please notify the sender immediately by e-mail if you have received this e-mail by mistake and delete this e-mail from your system. If you are not the intended recipient you are notified that disclosing, copying, distributing or taking any action in reliance on the contents of this information is strictly prohibited. To stop receiving communications from David Burr please email optout@davidburr.co.uk<mailto:optout@davidburr.co.uk>. To view our Privacy Statement and Procedures please follow https://davidburr.co.uk/privacy-policy/
+
+Click the link below to read the latest edition of our ‘Rooftops’ Magazine:
+
+[David Burr Rooftops]<https://davidburr.co.uk/latest-rooftops>
+
+[David Burr]<https://davidburr.co.uk/>
+
+[David Burr]<https://www.facebook.com/davidburrestateagents/>
+
+[David Burr]<https://www.instagram.com/davidburrestateagents/>
+
+
+
+
+
+This email and any files transmitted with it are confidential and intended solely for the use of the individual or entity to whom they are addressed. If you have received this email in error please notify the system manager. This message contains confidential information and is intended only for the individual named. If you are not the named addressee you should not disseminate, distribute or copy this e-mail. Please notify the sender immediately by e-mail if you have received this e-mail by mistake and delete this e-mail from your system. If you are not the intended recipient you are notified that disclosing, copying, distributing or taking any action in reliance on the contents of this information is strictly prohibited.
+","Good morning Joe,
+
+Thanks for your enquiry on 4 Bakers Row in Newmarket.
+
+Newmarket, Suffolk | David Burr Estate Agents<https://davidburr.co.uk/property/newmarket-suffolk-21/>
+
+I've left you a voicemail this morning to discuss. Please call me when you can on 01638 669035.
+
+Kind regards,
+
+Dan
+
+
+[David Burr]<https://davidburr.co.uk/>
+
+Dan Driver MNAEA
+
+Sales Negotiator
+
+T: 01638 669035
+
+156 High Street, Newmarket, CB8 9AQ
+
+davidburr.co.uk<https://davidburr.co.uk/>
+
+Bury St Edmunds • Castle Hedingham • Clare • Leavenheath • Long Melford • Newmarket • Woolpit • London SW1
+
+This email and any files transmitted with it are confidential and intended solely for the use of the individual or entity to whom they are addressed. If you have received this email in error please notify the system manager. This message contains confidential information and is intended only for the individual named. If you are not the named addressee you should not disseminate, distribute or copy this e-mail. Please notify the sender immediately by e-mail if you have received this e-mail by mistake and delete this e-mail from your system. If you are not the intended recipient you are notified that disclosing, copying, distributing or taking any action in reliance on the contents of this information is strictly prohibited. To stop receiving communications from David Burr please email optout@davidburr.co.uk<mailto:optout@davidburr.co.uk>. To view our Privacy Statement and Procedures please follow https://davidburr.co.uk/privacy-policy/
+
+Click the link below to read the latest edition of our ‘Rooftops’ Magazine:
+
+[David Burr Rooftops]<https://davidburr.co.uk/latest-rooftops>
+
+[David Burr]<https://davidburr.co.uk/>
+
+[David Burr]<https://www.facebook.com/davidburrestateagents/>
+
+[David Burr]<https://www.instagram.com/davidburrestateagents/>
+
+
+
+
+
+This email and any files transmitted with it are confidential and intended solely for the use of the individual or entity to whom they are addressed. If you have received this email in error please notify the system manager. This message contains confidential information and is intended only for the individual named. If you are not the named addressee you should not disseminate, distribute or copy this e-mail. Please notify the sender immediately by e-mail if you have received this e-mail by mistake and delete this e-mail from your system. If you are not the intended recipient you are notified that disclosing, copying, distributing or taking any action in reliance on the contents of this information is strictly prohibited.
+",rev_msyelq97_kyxvw8,domain_exact,1,matched,human,TRUE,,,FALSE,FALSE,,,,,,,not_required,,,2026-08-18T08:31:33.931Z,2026-08-18T08:31:33.931Z
+com_msyfchh5_a8rwya,ag_hist_richard-poyntz-d7ni,prb_msxtgzga_radvon,CA0000000064ad5b294af1a72e44c8ad82,2026-08-18T08:52:21.763Z,2026-08-18T08:52:21.763Z,voice,inbound,call,twilio,CA0000000064ad5b294af1a72e44c8ad82,+447889718210,+447889718210,+447575333064,,voicemail,31,TRUE,https://api.twilio.com/2010-04-01/Accounts/AC_REDACTED_ACCOUNT_SID/Recordings/RE00000000daf48510529827783e2da5bf,"And my dad, my sister, just your point here. You can quite about pups cubic built to sally. Mileage in South thing, but happy to have a chat with you about. Explain the process and also any questions you may have and, and get your loan for you. And if you, so if you give me a call back on this, my phone number is 7, double 897-1821 I, I'm not in the office for a day or 2, but I'll be doing the, the booking for the appointment. So if you give me a call back, that'd be great. Thank you. Fine.",,,,,,rev_msyfch37_kt237i,,0,matched,human,TRUE,TRUE,FALSE,FALSE,FALSE,reactive,,,,,,pending,,,2026-08-18T08:52:21.763Z,2026-08-18T08:53:20.876Z
+com_msyfso56_uuqzso,ag_hist_aspire-estate-aus5,prb_msxtd2eq_3aad13,CA000000001daced42d39705a966ee2f19,2026-08-18T09:04:56.588Z,2026-08-18T09:04:56.588Z,voice,inbound,call,twilio,CA000000001daced42d39705a966ee2f19,+441268777400,+441268777400,+447575333064,,voicemail,10,TRUE,https://api.twilio.com/2010-04-01/Accounts/AC_REDACTED_ACCOUNT_SID/Recordings/RE00000000f3ae45e9cca8a947cba3f978,"A hi, it's critical thing for me as far as the agency, if you could please return my call. The number is a 1268, triple 7400. Thank you.",,,,,,rev_msyfsnik_ml0srk,phone_exact,1,matched,human,TRUE,TRUE,FALSE,TRUE,FALSE,,,,,,,not_required,,,2026-08-18T09:04:56.588Z,2026-08-18T09:05:24.849Z
+com_msyfuqok_ppnckk,ag_hist_aspire-estate-aus5,prb_msxtd2eq_3aad13,SM00000000b1b60b864ab0383d780cede4,2026-08-18T09:06:33.544Z,2026-08-18T09:06:33.544Z,sms,inbound,sms,twilio,SM00000000b1b60b864ab0383d780cede4,Aspire,,+447575333064,Kareena,,,,,,,,,"Hi, its Kareena from Aspire Estate Agents. PLease contact me regarding your recent enquiry on Peregrine DRive 01268 777400 Kareena Steane Aspire","Hi, its Kareena from Aspire Estate Agents. PLease contact me regarding your recent enquiry on Peregrine DRive 01268 777400 Kareena Steane Aspire",rev_msyfuqbs_xa5bpq,,0,matched,human,TRUE,FALSE,FALSE,TRUE,FALSE,,,,,,,pending,,,2026-08-18T09:06:33.544Z,2026-08-18T09:06:33.544Z
+com_msyhec3i_cdu9s7,ag_hist_morris-armitage-wg41,prb_msxtaq16_5krde9,CA00000000966b49ebdbbe975f88636db7,2026-08-18T09:49:47.125Z,2026-08-18T09:49:47.125Z,voice,inbound,call,twilio,CA00000000966b49ebdbbe975f88636db7,+441638560221,+441638560221,+447575333064,,voicemail,31,TRUE,https://api.twilio.com/2010-04-01/Accounts/AC_REDACTED_ACCOUNT_SID/Recordings/RE0000000030926452fd8a10dd66a3e9b1,"Hi Joe. It's Lisa from maurice armitage. Estate agents in New markets, even quantity about a property that was selling in George johnson avenue in New markets. So it was really just a quick call to have a chat about that property and see if we can get something organized in terms of a viewing my telephone number. Here is 163856. So 221. I'll pop over an email as well, but the number again 163-856-0221. Thank you.",,,,,,rev_msyhebjq_u6tcq0,phone_exact,1,matched,human,TRUE,TRUE,FALSE,FALSE,FALSE,,,,,,,not_required,,,2026-08-18T09:49:47.125Z,2026-08-18T09:51:56.673Z
+com_msyhn2h0_nqx8dp,ag_hist_morris-armitage-wg41,prb_msxtaq16_5krde9,,2026-08-18T09:51:40.000Z,2026-08-18T09:56:32.667Z,email,inbound,email,gmail,1a01448bcdb90814,Lisa Perry <lisa.perry@morrisarmitage.co.uk>,lisa.perry@morrisarmitage.co.uk,"""joe.novus2@gmail.com"" <joe.novus2@gmail.com>",Lisa Perry,,,,,,<CWXP265MB42753E66D1140889636CAD22A5A62@CWXP265MB4275.GBRP265.PROD.OUTLOOK.COM>,1a01448bcdb90814,212 George Lambton Avenue - Morris Armitage,"Good morning,
+
+I hope you are well?
+
+We have received a Rightmove lead to suggest that you are interested in a property we are selling in Newmarket and I wonder if I can assist you further?
+
+If you could kindly confirm your buying position please?  If this is a first time purchase or if you have a property to sell and are actively marketing.
+
+I look forward to hearing from you.
+
+Thank you.
+
+
+Kind regards,
+
+Lisa Perry
+Sales Division
+e.lisa.perry@morrisarmitage.co.uk<mailto:lisa.perry@morrisarmitage.co.uk>
+t. 01638 560 221<tel:%2001638560221>
+www.morrisarmitage.co.uk<http://www.morrisarmitage.co.uk>
+Godolphin House, 2 The Avenue. Newmarket, Suffolk CB8 9AA
+Newmarket | Burwell | Downham Market | Cambridge
+
+[Like us on Facebook]<https://www.facebook.com/MorrisArmitage>
+like us on Facebook!
+[Follow us on Instagram]<https://twitter.com/morrisarmitage>
+Follow us on Twitter!
+[Follow us on Instagram]<https://www.instagram.com/morrisarmitage2002/>
+Follow us on Instagram!
+[Whatsapp Us]<https://wa.me/7946505482>
+Message us on Whatsapp!
+
+
+[Click me]<http://www.morrisarmitage.co.uk/>
+
+This email is confidential. It may also be legally privileged. If you are not the addressee you may not copy, forward disclose or use any part of it. If you have received this message in error, please delete it and all copies from your system and notify the sender immediately by return e-mail. Internet communications cannot be guaranteed to be timely, secure, error or virus-free.The sender does not accept liability for any errors or omissions.
+
+
+","Good morning,
+
+I hope you are well?
+
+We have received a Rightmove lead to suggest that you are interested in a property we are selling in Newmarket and I wonder if I can assist you further?
+
+If you could kindly confirm your buying position please?  If this is a first time purchase or if you have a property to sell and are actively marketing.
+
+I look forward to hearing from you.
+
+Thank you.
+
+
+Kind regards,
+
+Lisa Perry
+Sales Division
+e.lisa.perry@morrisarmitage.co.uk<mailto:lisa.perry@morrisarmitage.co.uk>
+t. 01638 560 221<tel:%2001638560221>
+www.morrisarmitage.co.uk<http://www.morrisarmitage.co.uk>
+Godolphin House, 2 The Avenue. Newmarket, Suffolk CB8 9AA
+Newmarket | Burwell | Downham Market | Cambridge
+
+[Like us on Facebook]<https://www.facebook.com/MorrisArmitage>
+like us on Facebook!
+[Follow us on Instagram]<https://twitter.com/morrisarmitage>
+Follow us on Twitter!
+[Follow us on Instagram]<https://www.instagram.com/morrisarmitage2002/>
+Follow us on Instagram!
+[Whatsapp Us]<https://wa.me/7946505482>
+Message us on Whatsapp!
+
+
+[Click me]<http://www.morrisarmitage.co.uk/>
+
+This email is confidential. It may also be legally privileged. If you are not the addressee you may not copy, forward disclose or use any part of it. If you have received this message in error, please delete it and all copies from your system and notify the sender immediately by return e-mail. Internet communications cannot be guaranteed to be timely, secure, error or virus-free.The sender does not accept liability for any errors or omissions.
+
+
+",rev_msyhn1xu_dpxa4g,domain_exact,1,matched,human,TRUE,,,FALSE,FALSE,,vendor_acknowledged,,,,,not_required,,,2026-08-18T09:56:34.578Z,2026-08-18T09:56:34.578Z
+com_msyhxvuz_c41bmg,ag_hist_countryside-estates-q72g,prb_msxtcfp6_ebl5yn,CA0000000040230ca68323e7c528e1ddb2,2026-08-18T10:04:59.161Z,2026-08-18T10:04:59.161Z,voice,inbound,call,twilio,CA0000000040230ca68323e7c528e1ddb2,+441268755555,+441268755555,+447575333064,,voicemail,9,TRUE,https://api.twilio.com/2010-04-01/Accounts/AC_REDACTED_ACCOUNT_SID/Recordings/RE0000000014b8eb26272bcd29f1e451e2,"A hi Joe, this is Albert from comes on the sites. I've just got your inquiry to view the intel review and have lease him, give me a call back when you can. Thank you. I.",,,,,,rev_msyhxva1_yy5jfw,phone_exact,1,matched,human,TRUE,TRUE,FALSE,TRUE,FALSE,reactive,,,,,,not_required,,,2026-08-18T10:04:59.161Z,2026-08-18T10:05:32.957Z
+com_msyn397y_x6w5zd,ag_hist_cheffins-newmarket-cmj2,prb_msxsz07w_ci65jk,CA0000000063ea90026a03c58d5bb148b5,2026-08-18T12:29:07.877Z,2026-08-18T12:29:07.877Z,voice,inbound,call,twilio,CA0000000063ea90026a03c58d5bb148b5,+441638663228,+441638663228,+447575333064,,voicemail,20,TRUE,https://api.twilio.com/2010-04-01/Accounts/AC_REDACTED_ACCOUNT_SID/Recordings/RE00000000fe5ff03c44cae2e9e0dd95e1,"Hello, it's Jeff stace agents. My name is Chris with Steve. Email this, I'm writing is regarding a property the lots of you on pacific simon woke. If you could kindly come back to me at 816-386-6822. I will try to send it to thank you bye.",,,,,,rev_msyn38o5_npad4z,phone_exact,1,matched,human,TRUE,TRUE,FALSE,FALSE,FALSE,,,,,,,not_required,,,2026-08-18T12:29:07.877Z,2026-08-18T12:32:26.406Z
+com_msyo1tls_mrwoxw,ag_hist_tylers-estate-1rwa,prb_msxtbczc_tjx5q6,CA000000008c2ecb94fdb9ddf5bc237e83,2026-08-18T12:56:00.727Z,2026-08-18T12:56:00.727Z,voice,inbound,call,twilio,CA000000008c2ecb94fdb9ddf5bc237e83,+441638660633,+441638660633,+447575333064,,ringing,,FALSE,,,,,,,,rev_msyo1t5j_gt6tk8,,0,matched,human,TRUE,TRUE,FALSE,TRUE,FALSE,,,,,,,pending,,,2026-08-18T12:56:00.727Z,2026-08-18T12:56:00.727Z
+com_msypdfdl_gptvzu,ag_hist_fisks-ltd-d8u5,prb_msxtehim_kxpw64,CA00000000c4ae85b1fec6aff9c0de53a7,2026-08-18T13:33:00.826Z,2026-08-18T13:33:00.826Z,voice,inbound,call,twilio,CA00000000c4ae85b1fec6aff9c0de53a7,+441268983480,+441268983480,+447575333064,,voicemail,9,TRUE,https://api.twilio.com/2010-04-01/Accounts/AC_REDACTED_ACCOUNT_SID/Recordings/RE00000000e299673f5cd00976275861fb,"A hi Joe. Its ron henson, fisher sites agents call me back when you can 81268565555. Thank you.",,,,,,rev_msypde6y_5ik87t,,0,matched,human,TRUE,TRUE,FALSE,TRUE,FALSE,reactive,,,,,,pending,,,2026-08-18T13:33:00.826Z,2026-08-18T13:35:38.636Z
+com_msyuycs0_kb16kk,ag_hist_tylers-estate-1rwa,prb_msxtbczc_tjx5q6,CA000000006c15ad4b315e1a02b6e7f692,2026-08-18T16:09:16.095Z,2026-08-18T16:09:16.095Z,voice,inbound,call,twilio,CA000000006c15ad4b315e1a02b6e7f692,+441638660633,+441638660633,+447575333064,,ringing,,FALSE,,,,,,,,rev_msyuyc73_2kku9j,,0,matched,human,TRUE,TRUE,FALSE,TRUE,FALSE,,,,,,,pending,,,2026-08-18T16:09:16.095Z,2026-08-18T16:09:16.095Z
+com_msyve6lu_ljzc1d,ag_hist_tylers-estate-1rwa,prb_msxtbczc_tjx5q6,,2026-08-18T16:20:01.000Z,2026-08-18T16:21:32.487Z,email,inbound,email,gmail,1a015ac476497d48,Tom Cornwall <Tom.Cornwall@tylers.net>,tom.cornwall@tylers.net,"""joe.novus2@gmail.com"" <joe.novus2@gmail.com>",Tom Cornwall,,,,,,<CWLP265MB1761457555275F4A5B8CADADF0A62@CWLP265MB1761.GBRP265.PROD.OUTLOOK.COM>,1a015ac476497d48,Toyse Lane Burwell,"Good Afternoon, Mr Carter
+
+I'm writing in regards to your interest in Toyse Lane, Burwell. I haven't been able to reach you on the phone today , yet if you are still
+Interested, we would love to discuss and help you with the process. Please give me a call back on 01638 660303
+
+Thank you,
+
+Kind regards
+
+Tom Cornwall
+Trainee Sales Negotiator
+[https://cdn.connellsgroup.co.uk/EmailSignatures/Sequence/large/tylers.png]
+Meldreth House Wellington Street
+Newmarket, Suffolk, CB8 0HT
+
+T 01638 660303
+
+[email image]<mailto:newmarket@tylers.net>  [https://cdn.connellsgroup.co.uk/EmailSignatures/Sequence/large/globe.png] <https://www.tylers.net/>
+[barcode image]
+For your peace of mind, we are members of the Property Ombudsman
+and the Association of Residential Letting Agents
+
+""
+[X]
+
+Cybercrime Warning: Please be aware that there is a risk posed by cyber fraud, specifically affecting emails containing bank account details. If you receive an unexpected email from us informing of changes to bank details, please get in touch with your contact immediately to clarify. Note that our bank details WILL NOT change during the course of a transaction. We cannot accept responsibility if you transfer money into an incorrect account.
+
+Disclaimer:
+
+This e-mail (and any attachment) is confidential and may also be privileged. It is intended solely for the use of the individual to whom it is addressed. Any views or opinions presented are solely those of the author and do not necessarily represent those of Sequence (UK) Ltd. Sequence (UK) Ltd accepts no liability for the contents of this e-mail or of any attachment. If you are not the intended recipient, be advised that you have received this e-mail in error and that any use, dissemination, forwarding, disclosure, printing or copying is expressly prohibited. Further, if you are not the intended recipient, you are strictly prohibited from acting or refraining from acting in reliance on this e-mail.
+
+If you would prefer not to receive future mailings, you can manage your preferences by visiting https://managepreferences.co.uk/sequence
+
+Alternatively, please get in touch with your business contact or your local branch office.
+
+If you have received this mail in error please delete this e-mail and any attachments.
+
+This message has been checked for all known viruses by Mimecast Virus Scanning Service.
+
+Sequence (UK) Limited is registered in England and Wales under company number 4268443, Registered Office is Cumbria House, 16-20 Hockliffe Street, Leighton Buzzard, Bedfordshire, LU7 1GN. VAT Registration Number is 500 2481 05.
+
+For activities relating to regulated mortgages and non-investment insurance contracts, Sequence (UK) Limited is an appointed representative of Connells Limited which is authorised and regulated by the Financial Conduct Authority.
+Connells Limited's Financial Services Register number is 302221.
+
+Visit http://www.sequencehome.co.uk/legal-notices for details of who we are regulated by.
+Visit https://www.sequencehome.co.uk/contact-us for details of how to make a Mortgage Service Complaint and your right to refer your complaint to the Online Dispute Resolution platform (ODR) ""
+","Good Afternoon, Mr Carter
+
+I'm writing in regards to your interest in Toyse Lane, Burwell. I haven't been able to reach you on the phone today , yet if you are still
+Interested, we would love to discuss and help you with the process. Please give me a call back on 01638 660303
+
+Thank you,
+
+Kind regards
+
+Tom Cornwall
+Trainee Sales Negotiator
+[https://cdn.connellsgroup.co.uk/EmailSignatures/Sequence/large/tylers.png]
+Meldreth House Wellington Street
+Newmarket, Suffolk, CB8 0HT
+
+T 01638 660303
+
+[email image]<mailto:newmarket@tylers.net>  [https://cdn.connellsgroup.co.uk/EmailSignatures/Sequence/large/globe.png] <https://www.tylers.net/>
+[barcode image]
+For your peace of mind, we are members of the Property Ombudsman
+and the Association of Residential Letting Agents
+
+""
+[X]
+
+Cybercrime Warning: Please be aware that there is a risk posed by cyber fraud, specifically affecting emails containing bank account details. If you receive an unexpected email from us informing of changes to bank details, please get in touch with your contact immediately to clarify. Note that our bank details WILL NOT change during the course of a transaction. We cannot accept responsibility if you transfer money into an incorrect account.
+
+Disclaimer:
+
+This e-mail (and any attachment) is confidential and may also be privileged. It is intended solely for the use of the individual to whom it is addressed. Any views or opinions presented are solely those of the author and do not necessarily represent those of Sequence (UK) Ltd. Sequence (UK) Ltd accepts no liability for the contents of this e-mail or of any attachment. If you are not the intended recipient, be advised that you have received this e-mail in error and that any use, dissemination, forwarding, disclosure, printing or copying is expressly prohibited. Further, if you are not the intended recipient, you are strictly prohibited from acting or refraining from acting in reliance on this e-mail.
+
+If you would prefer not to receive future mailings, you can manage your preferences by visiting https://managepreferences.co.uk/sequence
+
+Alternatively, please get in touch with your business contact or your local branch office.
+
+If you have received this mail in error please delete this e-mail and any attachments.
+
+This message has been checked for all known viruses by Mimecast Virus Scanning Service.
+
+Sequence (UK) Limited is registered in England and Wales under company number 4268443, Registered Office is Cumbria House, 16-20 Hockliffe Street, Leighton Buzzard, Bedfordshire, LU7 1GN. VAT Registration Number is 500 2481 05.
+
+For activities relating to regulated mortgages and non-investment insurance contracts, Sequence (UK) Limited is an appointed representative of Connells Limited which is authorised and regulated by the Financial Conduct Authority.
+Connells Limited's Financial Services Register number is 302221.
+
+Visit http://www.sequencehome.co.uk/legal-notices for details of who we are regulated by.
+Visit https://www.sequencehome.co.uk/contact-us for details of how to make a Mortgage Service Complaint and your right to refer your complaint to the Online Dispute Resolution platform (ODR) ""
+",rev_msyve62o_3mwtig,domain_exact,1,matched,human,TRUE,,,TRUE,FALSE,reactive,,,,,,not_required,,,2026-08-18T16:21:34.656Z,2026-08-18T16:21:34.656Z
+com_msyvj8v9_8rd6r7,ag_hist_ensum-brown-ex9i,prb_msxta3fe_56unf9,CA0000000001a2cdbced9ac2494d04d2ad,2026-08-18T16:25:30.507Z,2026-08-18T16:25:30.507Z,voice,inbound,call,twilio,CA0000000001a2cdbced9ac2494d04d2ad,+441638280030,+441638280030,+447575333064,,voicemail,27,TRUE,https://api.twilio.com/2010-04-01/Accounts/AC_REDACTED_ACCOUNT_SID/Recordings/RE00000000ab17684bb4e9d9e068a41897,"Hello, this is Vicky calling from in some brown. I'm just reaching out on your inquiry for property in shipping. Can the recent edmonds, it's on the phone field. A 3 bedroom touched 4375. Just wanted to have a quick chat. See what your position is at the moment. Take some details and we can get you booked in for a few and I'll follow up with an email for you. I do feel free to give me a call back on 816-3828. That was the right 30. Thank you. Bye.",,,,,,rev_msyvj824_2d11uh,phone_exact,1,matched,human,TRUE,TRUE,FALSE,FALSE,FALSE,reactive,,,,,,not_required,,,2026-08-18T16:25:30.507Z,2026-08-18T16:27:30.549Z
+com_msyvr15t_dv3bo9,ag_hist_ensum-brown-ex9i,prb_msxta3fe_56unf9,,2026-08-18T16:26:51.000Z,2026-08-18T16:31:32.420Z,email,inbound,email,gmail,1a015b2759c48c20,Ensum Brown <newmarket@ensumbrown.com>,newmarket@ensumbrown.com,Joe Carter <joe.novus2@gmail.com>,Ensum Brown,,,,,,<KvUvKKqoSuyE5A1WRJueHw@geopod-ismtpd-6>,1a015b2759c48c20,Ensum Brown | Viewing Enquiry,"Hello ​​Joe​,
+
+Thank you for your enquiry on ​Barn Field, Chevington, IP29​. I’d be happy to arrange a viewing for you.
+
+I tried to give you a call, but I appreciate you may be busy, so I thought I'd follow up by email. When you have a moment, please give us a call on ​01638 28 00 30​, or simply reply to this email with the information below so we can complete your registration and arrange your viewing.
+
+Are you buying with a partner? If so, can I have their name and contact details please?
+
+Your address: Flat 5, Lion Lodge, Lion Lane, Billericay, Essex, CM12 9DL
+
+What is the situation with your current property? Are you on the market or renting for example?
+
+Your financial position e.g. will you be a cash buyer or require a mortgage? If you’d like, I can also arrange a complimentary, no-obligation affordability check with Expert Mortgages to help you understand your options.
+
+Your minimum and maximum budget
+
+Your property specifications e.g. number of bedrooms, garden space, parking, garage, type of house (detached, semi-detached)
+
+Which areas are you are looking to move to?
+
+Any additional comments
+
+Please also let us know your availability for a viewing, and we’ll do our best to arrange a suitable time.
+
+Kind regards
+​Vicky​","Hello ​​Joe​,
+
+Thank you for your enquiry on ​Barn Field, Chevington, IP29​. I’d be happy to arrange a viewing for you.
+
+I tried to give you a call, but I appreciate you may be busy, so I thought I'd follow up by email. When you have a moment, please give us a call on ​01638 28 00 30​, or simply reply to this email with the information below so we can complete your registration and arrange your viewing.
+
+Are you buying with a partner? If so, can I have their name and contact details please?
+
+Your address: Flat 5, Lion Lodge, Lion Lane, Billericay, Essex, CM12 9DL
+
+What is the situation with your current property? Are you on the market or renting for example?
+
+Your financial position e.g. will you be a cash buyer or require a mortgage? If you’d like, I can also arrange a complimentary, no-obligation affordability check with Expert Mortgages to help you understand your options.
+
+Your minimum and maximum budget
+
+Your property specifications e.g. number of bedrooms, garden space, parking, garage, type of house (detached, semi-detached)
+
+Which areas are you are looking to move to?
+
+Any additional comments
+
+Please also let us know your availability for a viewing, and we’ll do our best to arrange a suitable time.
+
+Kind regards
+​Vicky​",rev_msyvr0jc_sggbk7,domain_exact,1,matched,human,TRUE,,,FALSE,TRUE,,vendor_acknowledged,proactive_booking_push,,,,not_required,,,2026-08-18T16:31:34.008Z,2026-08-18T16:31:34.008Z
+SCHEMA NOTE,One row per meaningful communication. Provider lifecycle noise stays in RAW_EVENTS.,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,

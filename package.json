@@ -20,7 +20,8 @@
     "novus:proactive-booking-push-selftest": "node scripts/novus-proactive-booking-push-selftest.mjs",
     "novus:smoke": "node scripts/novus-sheets-smoke.mjs",
     "novus:pipeline-regression": "node scripts/novus-pipeline-regression.mjs",
-    "novus:intelligence-integration-selftest": "node scripts/novus-intelligence-integration-selftest.mjs"
+    "novus:intelligence-integration-selftest": "node scripts/novus-intelligence-integration-selftest.mjs",
+    "novus:live-data-selftest": "node scripts/novus-live-data-selftest.mjs"
   },
   "dependencies": {
     "@vercel/oidc": "^3.8.4",

@@ -262,7 +262,7 @@ async function run() {
     const summary = intelFor(store, pid).ai_evidence_summary;
 
     assert.notStrictEqual(summary, '', 'a non-vendor probe still gets an evidence summary');
-    assert.match(summary, /Response: first human contact/, 'the summary states when a person actually made contact');
+    assert.match(summary, /Response: first genuine human reply/, 'the summary states when a person actually made contact');
     assert.match(summary, /Persistence:/, 'the summary states attempts/follow-ups/channels');
     assert.match(summary, /speak soon/, 'evidence matching NO deterministic rule is still quoted rather than discarded');
     assert.match(summary, /voice/, 'the summary names the channel the evidence came from');
@@ -326,7 +326,7 @@ async function run() {
     assert.strictEqual(diag.grade, 'A', 'DIAGNOSIS keeps the same grade');
     assert.strictEqual(diag.tier, 'Growth', 'A/B still routes to Growth — the routing table is untouched');
     assert.doesNotMatch(diag.primary_problem, /^None observed/i, 'a Grade A probe no longer reports "None observed"');
-    assert.match(diag.primary_problem, /vendor opportunity was never picked up/i, 'it reports the real, evidence-backed commercial problem instead');
+    assert.match(diag.primary_problem, /declared a property to sell.*no communication ever mentioned selling/i, 'it reports the real, evidence-backed commercial problem instead');
     assert.match(diag.evidence_summary, /Vendor opportunity: no_evidence/, 'the Intelligence evidence reaches the Diagnosis row');
     ok('a strong A-H grade with a missed vendor opportunity produces a real Diagnosis, not a blank one');
   }
@@ -334,17 +334,26 @@ async function run() {
   // ── GAP 9: multiple weaknesses must all be preserved ─────────────────────
   console.log('\nGAP 9 — several weaknesses are all preserved; the most commercially important becomes primary');
   {
+    // An Intelligence row in the shape the rebuild now writes: the findings
+    // are recorded once, in commercial priority order, in ai_evidence_summary's
+    // "Missed:" section (lib/probe-intelligence.mjs), and Diagnosis reads them
+    // back rather than re-inferring them from a handful of booleans.
     const intelligence = {
       grade: 'A', grade_reason: 'Very fast human contact.', first_human_touch: 'yes',
       booking_attempt: 'FALSE', proactive_reactive: 'reactive', follow_up_count: '0',
-      ai_evidence_summary: 'Vendor opportunity: no_evidence. 2 human communication(s) reviewed; none referenced the declared vendor opportunity or a valuation.',
+      ai_evidence_summary:
+        'Vendor opportunity: no_evidence. The enquiry declared a property to sell that is not yet on the market; '
+        + 'across 2 human communication(s), no communication ever engaged with it. '
+        + 'Missed: The enquiry declared a property to sell that is not yet on the market, and no communication ever mentioned selling, a valuation or an appraisal. '
+        + 'The agency replied but never offered a viewing or valuation — the conversation never moved toward an appointment. '
+        + 'Response: first genuine human reply after 0.3h (2026-08-01T09:20:00.000Z).',
     };
     const diagnosis = computeDiagnosis(intelligence);
 
-    assert.match(diagnosis.primary_problem, /vendor opportunity was never picked up/i, 'the vendor miss outranks the others commercially');
+    assert.match(diagnosis.primary_problem, /declared a property to sell.*no communication ever mentioned selling/i, 'the vendor miss outranks the others commercially');
     assert.match(diagnosis.evidence_summary, /Also observed:/, 'the other weaknesses are kept, not thrown away');
-    assert.match(diagnosis.evidence_summary, /no viewing or valuation was ever proposed/i, 'the missed booking is retained');
-    assert.match(diagnosis.evidence_summary, /purely reactive/i, 'the reactive-only posture is retained');
+    assert.match(diagnosis.evidence_summary, /never offered a viewing or valuation/i, 'the missed booking is retained');
+    assert.match(diagnosis.evidence_summary, /No response-handling problem/i, "the grade's own finding is retained below the evidence findings");
     ok('every supported weakness is retained on the Diagnosis row, ranked by commercial importance');
   }
 
