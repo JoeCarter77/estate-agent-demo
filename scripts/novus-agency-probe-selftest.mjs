@@ -154,8 +154,8 @@ async function run() {
     store.AGENCIES.push(agencyRow());
     __setRepoForTests(createRepo(valuesApi));
 
-    const { default: createHandler } = await import('../api/novus/probe-create.js');
-    const { default: getHandler } = await import('../api/novus/probe-get.js');
+    const { default: createHandler } = await import('../api/novus/probe.js');
+    const { default: getHandler } = await import('../api/novus/probe.js');
 
     // 1) What the launch link resolves for display: the agency name + its
     //    Rightmove branch page (the two things one click needs).
@@ -171,6 +171,7 @@ async function run() {
     // 2) Creating the probe with that agency_id.
     const cRes = mockRes();
     await createHandler(mockReq({ body: {
+      action: 'create',
       url: 'https://www.rightmove.co.uk/properties/159273000',
       agency_id: ANDREW_GRANGER_ID,
     }}), cRes);
@@ -197,6 +198,7 @@ async function run() {
     const before = store.PROBES.length;
     const badRes = mockRes();
     await createHandler(mockReq({ body: {
+      action: 'create',
       url: 'https://www.rightmove.co.uk/properties/1', agency_id: 'ag_does_not_exist',
     }}), badRes);
     assert.strictEqual(badRes.statusCode, 400);
@@ -205,7 +207,7 @@ async function run() {
 
     // 6) Probes created without an agency (the pre-existing flow) still work.
     const noAgency = mockRes();
-    await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/2' } }), noAgency);
+    await createHandler(mockReq({ body: { action: 'create', url: 'https://www.rightmove.co.uk/properties/2' } }), noAgency);
     assert.strictEqual(noAgency.statusCode, 200);
     assert.strictEqual(noAgency.body.probe.agency_id, '');
     ok('creating a probe with no agency_id is unchanged (stays empty, no regression)');
@@ -238,7 +240,7 @@ async function run() {
     store.AGENCIES.push(agencyRow({ agency_id: 'ag_two', agency_name: 'Two' }));
     __setRepoForTests(createRepo(valuesApi));
 
-    const { default: getHandler } = await import('../api/novus/probe-get.js');
+    const { default: getHandler } = await import('../api/novus/probe.js');
 
     // Skips the blank-URL, DELETE and suppressed rows, lands on the next real one.
     const nRes = mockRes();
@@ -284,8 +286,8 @@ async function run() {
     store.AGENCIES.push(agencyRow({ notes: 'KEEP ME', website: 'https://example.com' }));
     __setRepoForTests(createRepo(valuesApi));
 
-    const { default: createHandler } = await import('../api/novus/probe-create.js');
-    const { default: markHandler } = await import('../api/novus/probe-mark-sent.js');
+    const { default: createHandler } = await import('../api/novus/probe.js');
+    const { default: markHandler } = await import('../api/novus/probe.js');
 
     const probeSentIdx = AGENCIES_HEADER.indexOf('probe_sent');
     const targetRow = () => store.AGENCIES.find((r) => r[0] === ANDREW_GRANGER_ID);
@@ -295,6 +297,7 @@ async function run() {
 
     const cRes = mockRes();
     await createHandler(mockReq({ body: {
+      action: 'create',
       url: 'https://www.rightmove.co.uk/properties/159273000', agency_id: ANDREW_GRANGER_ID,
     }}), cRes);
     const probeId = cRes.body.probe.probe_id;
@@ -304,7 +307,7 @@ async function run() {
     ok('creating a draft probe leaves probe_sent empty');
 
     const mRes = mockRes();
-    await markHandler(mockReq({ body: { probe_id: probeId } }), mRes);
+    await markHandler(mockReq({ body: { action: 'mark-sent', probe_id: probeId } }), mRes);
     assert.strictEqual(mRes.statusCode, 200);
     assert.strictEqual(mRes.body.probe.probe_status, 'observing', 'probe still flips to observing');
     assert.strictEqual(targetRow()[probeSentIdx], 'YES');
@@ -343,15 +346,16 @@ async function run() {
     }[k] ?? '')));
     __setRepoForTests(createRepo(valuesApi));
 
-    const { default: createHandler } = await import('../api/novus/probe-create.js');
-    const { default: markHandler } = await import('../api/novus/probe-mark-sent.js');
+    const { default: createHandler } = await import('../api/novus/probe.js');
+    const { default: markHandler } = await import('../api/novus/probe.js');
 
     const cRes = mockRes();
     await createHandler(mockReq({ body: {
+      action: 'create',
       url: 'https://www.rightmove.co.uk/properties/1', agency_id: ANDREW_GRANGER_ID,
     }}), cRes);
     const mRes = mockRes();
-    await markHandler(mockReq({ body: { probe_id: cRes.body.probe.probe_id } }), mRes);
+    await markHandler(mockReq({ body: { action: 'mark-sent', probe_id: cRes.body.probe.probe_id } }), mRes);
     assert.strictEqual(mRes.statusCode, 200);
     assert.strictEqual(mRes.body.probe.probe_status, 'observing');
     assert.strictEqual(store.AGENCIES[2].length, headerWithout.length, 'no stray cell appended');
@@ -359,9 +363,9 @@ async function run() {
 
     // A probe with no agency at all.
     const noAgency = mockRes();
-    await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/2' } }), noAgency);
+    await createHandler(mockReq({ body: { action: 'create', url: 'https://www.rightmove.co.uk/properties/2' } }), noAgency);
     const m2 = mockRes();
-    await markHandler(mockReq({ body: { probe_id: noAgency.body.probe.probe_id } }), m2);
+    await markHandler(mockReq({ body: { action: 'mark-sent', probe_id: noAgency.body.probe.probe_id } }), m2);
     assert.strictEqual(m2.statusCode, 200);
     assert.strictEqual(m2.body.probe.probe_status, 'observing');
     ok('a probe with no agency_id marks sent normally, touching no agency row');

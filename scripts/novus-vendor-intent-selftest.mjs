@@ -1,10 +1,11 @@
 // scripts/novus-vendor-intent-selftest.mjs — hermetic test for:
 //   1. Rightmove probe creation writing the vendor declaration into
-//      PROBES.enquiry_text (api/novus/probe-create.js).
+//      PROBES.enquiry_text (api/novus/probe.js, action=create).
 //   2. Vendor Opportunity detection in the Intelligence pipeline
 //      (lib/vendor-intent.mjs), wired into both the batch rebuild
 //      (lib/intelligence-rebuild.mjs) and the single-probe recompute used by
-//      the live webhooks (lib/observation-recompute.mjs / api/novus/observation/recompute.js).
+//      the live webhooks (lib/observation-recompute.mjs, exposed at
+//      api/novus/intelligence/rebuild-all.js when body.probe_id is present).
 //
 // No network, no creds — same in-memory fake-Sheets pattern as the other
 // novus-*-selftest.mjs scripts, using the live workbook's confirmed headers.
@@ -145,7 +146,10 @@ async function run() {
   process.env.NOVUS_PROBE_EMAIL = 'novusprobes@gmail.com';
   process.env.NOVUS_PROBE_PHONE = '+441234567890';
 
-  const { default: createHandler } = await import('../api/novus/probe-create.js');
+  // probe-create.js was consolidated into api/novus/probe.js (POST with
+  // body.action === 'create') to stay within Vercel Hobby's 12-function
+  // limit — same handler, same behaviour.
+  const { default: createHandler } = await import('../api/novus/probe.js');
   const { rebuildAllIntelligence } = await import('../lib/intelligence-rebuild.mjs');
   const { recomputeProbeObservation } = await import('../lib/observation-recompute.mjs');
 
@@ -170,7 +174,7 @@ async function run() {
     __setRepoForTests(createRepo(valuesApi));
 
     const res = mockRes();
-    await createHandler(mockReq({ url: 'https://www.rightmove.co.uk/properties/159273000' }), res);
+    await createHandler(mockReq({ action: 'create', url: 'https://www.rightmove.co.uk/properties/159273000' }), res);
     assert.strictEqual(res.statusCode, 200, `probe-create returned 200: ${JSON.stringify(res.body)}`);
     const probe = res.body.probe;
     assert.strictEqual(probe.portal, 'rightmove', 'portal detected as rightmove');
@@ -179,13 +183,13 @@ async function run() {
 
     // Existing enquiry details (if ever supplied) are preserved, not overwritten.
     const res2 = mockRes();
-    await createHandler(mockReq({ url: 'https://www.rightmove.co.uk/properties/2', enquiry_text: 'Prefers afternoon viewings.' }), res2);
+    await createHandler(mockReq({ action: 'create', url: 'https://www.rightmove.co.uk/properties/2', enquiry_text: 'Prefers afternoon viewings.' }), res2);
     assert.strictEqual(res2.body.probe.enquiry_text, `${VENDOR_DECLARATION} — Prefers afternoon viewings.`, 'existing enquiry detail preserved alongside the declaration');
     ok('any other supplied enquiry detail is preserved alongside the vendor declaration, not overwritten');
 
     // Non-Rightmove portals get no Rightmove-specific declaration.
     const res3 = mockRes();
-    await createHandler(mockReq({ url: 'https://www.zoopla.co.uk/for-sale/details/1' }), res3);
+    await createHandler(mockReq({ action: 'create', url: 'https://www.zoopla.co.uk/for-sale/details/1' }), res3);
     assert.strictEqual(res3.body.probe.portal, 'zoopla');
     assert.strictEqual(res3.body.probe.enquiry_text, '', 'zoopla probe gets no Rightmove-specific vendor declaration');
     ok('non-Rightmove probes are left untouched (declaration is Rightmove-form-specific)');
