@@ -16,6 +16,8 @@
     "novus:diagnosis-selftest": "node scripts/novus-diagnosis-selftest.mjs",
     "novus:phone-selftest": "node scripts/novus-phone-selftest.mjs",
     "novus:vendor-intent-selftest": "node scripts/novus-vendor-intent-selftest.mjs",
+    "novus:communication-quality-selftest": "node scripts/novus-communication-quality-selftest.mjs",
+    "novus:proactive-booking-push-selftest": "node scripts/novus-proactive-booking-push-selftest.mjs",
     "novus:smoke": "node scripts/novus-sheets-smoke.mjs"
   },
   "dependencies": {
