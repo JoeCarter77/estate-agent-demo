@@ -131,19 +131,22 @@ async function run() {
     const { store, valuesApi } = makeFakeSheet();
     __setRepoForTests(createRepo(valuesApi));
 
-    const { default: createHandler } = await import('../api/novus/probe-create.js');
-    const { default: markHandler } = await import('../api/novus/probe-mark-sent.js');
-    const { default: getHandler } = await import('../api/novus/probe-get.js');
+    // probe-create.js / probe-get.js / probe-mark-sent.js were consolidated
+    // into one route, api/novus/probe.js — same handler for all three,
+    // dispatched by method + body.action.
+    const { default: createHandler } = await import('../api/novus/probe.js');
+    const { default: markHandler } = await import('../api/novus/probe.js');
+    const { default: getHandler } = await import('../api/novus/probe.js');
 
     // Auth: a bad password is rejected.
     const bad = mockRes();
-    await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/1' }, auth: 'Basic ' + Buffer.from('novus:wrong').toString('base64') }), bad);
+    await createHandler(mockReq({ body: { action: 'create', url: 'https://www.rightmove.co.uk/properties/1' }, auth: 'Basic ' + Buffer.from('novus:wrong').toString('base64') }), bad);
     assert.strictEqual(bad.statusCode, 401, 'wrong password rejected');
     ok('Basic Auth rejects a wrong password (401)');
 
     // Create draft (real fetch to Rightmove will fail/blank in this sandbox — fine).
     const cRes = mockRes();
-    await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/159273000' } }), cRes);
+    await createHandler(mockReq({ body: { action: 'create', url: 'https://www.rightmove.co.uk/properties/159273000' } }), cRes);
     assert.strictEqual(cRes.statusCode, 200, 'create returned 200');
     const probe = cRes.body.probe;
     assert.ok(probe.probe_id.startsWith('prb_'), 'probe_id generated');
@@ -167,7 +170,7 @@ async function run() {
     // Mark as sent.
     const before = Date.now();
     const mRes = mockRes();
-    await markHandler(mockReq({ body: { probe_id: probe.probe_id } }), mRes);
+    await markHandler(mockReq({ body: { action: 'mark-sent', probe_id: probe.probe_id } }), mRes);
     const after = Date.now();
     assert.strictEqual(mRes.statusCode, 200, 'mark-sent returned 200');
     const sent = mRes.body.probe;
@@ -187,22 +190,28 @@ async function run() {
 
     // Idempotent second call.
     const m2 = mockRes();
-    await markHandler(mockReq({ body: { probe_id: probe.probe_id } }), m2);
+    await markHandler(mockReq({ body: { action: 'mark-sent', probe_id: probe.probe_id } }), m2);
     assert.strictEqual(m2.body.already_sent, true, 'second mark-sent is idempotent');
     assert.strictEqual(m2.body.probe.probe_timestamp, sent.probe_timestamp, 'timestamp not reset');
     ok('mark-sent is idempotent (window not reset on re-click)');
 
     // Second probe increments the reference.
     const c2 = mockRes();
-    await createHandler(mockReq({ body: { url: 'https://www.rightmove.co.uk/properties/2' } }), c2);
+    await createHandler(mockReq({ body: { action: 'create', url: 'https://www.rightmove.co.uk/properties/2' } }), c2);
     assert.strictEqual(c2.body.probe.probe_reference, 'RM-0002', 'second reference is RM-0002');
     ok('a second probe gets RM-0002');
 
     // Missing id / not found.
     const nf = mockRes();
-    await markHandler(mockReq({ body: { probe_id: 'prb_missing' } }), nf);
+    await markHandler(mockReq({ body: { action: 'mark-sent', probe_id: 'prb_missing' } }), nf);
     assert.strictEqual(nf.statusCode, 404, 'unknown probe → 404');
     ok('mark-sent returns 404 for an unknown probe');
+
+    // Missing/unknown action.
+    const badAction = mockRes();
+    await createHandler(mockReq({ body: {} }), badAction);
+    assert.strictEqual(badAction.statusCode, 400, 'a POST with no action is rejected (proves the consolidated route still dispatches correctly)');
+    ok('consolidated api/novus/probe.js rejects a POST with a missing/unknown action');
 
     __setRepoForTests(null);
   }

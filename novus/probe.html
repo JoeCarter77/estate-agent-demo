@@ -211,7 +211,7 @@
       const btn = $('create-btn');
       btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Creating…';
       try {
-        const data = await api('/api/novus/probe-create', { method: 'POST', body: JSON.stringify({ url, agency_id: launchAgencyId }) });
+        const data = await api('/api/novus/probe', { method: 'POST', body: JSON.stringify({ action: 'create', url, agency_id: launchAgencyId }) });
         render(data.probe);
         $('view-new').classList.add('hidden');
         $('view-ready').classList.remove('hidden');
@@ -232,7 +232,7 @@
       const btn = $('sent-btn');
       btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Recording…';
       try {
-        const data = await api('/api/novus/probe-mark-sent', { method: 'POST', body: JSON.stringify({ probe_id: currentProbe.probe_id }) });
+        const data = await api('/api/novus/probe', { method: 'POST', body: JSON.stringify({ action: 'mark-sent', probe_id: currentProbe.probe_id }) });
         render(data.probe);
       } catch (e) {
         showErr($('mark-err'), e.message);
@@ -275,7 +275,7 @@
       clearErr($('mark-err'));
       btn.disabled = true; btn.innerHTML = '<span class="spinner" style="border-color:rgba(15,23,42,.15);border-top-color:var(--accent);"></span>Finding next agency…';
       try {
-        const data = await api('/api/novus/probe-get?next_after=' + encodeURIComponent(agencyId), { method: 'GET' });
+        const data = await api('/api/novus/probe?next_after=' + encodeURIComponent(agencyId), { method: 'GET' });
         window.location.href = '/novus/probe?agency_id=' + encodeURIComponent(data.agency.agency_id);
       } catch (e) {
         showErr($('mark-err'), e.message);
@@ -296,7 +296,7 @@
         $('view-new').classList.add('hidden');
         $('view-loading').classList.remove('hidden');
         try {
-          const data = await api('/api/novus/probe-get?probe_id=' + encodeURIComponent(probeId), { method: 'GET' });
+          const data = await api('/api/novus/probe?probe_id=' + encodeURIComponent(probeId), { method: 'GET' });
           render(data.probe);
           $('view-loading').classList.add('hidden');
           $('view-ready').classList.remove('hidden');
@@ -314,7 +314,7 @@
         $('agency-field').classList.remove('hidden');
         $('agency-name').value = agencyId; // shown immediately; replaced by the real name below if found
         try {
-          const data = await api('/api/novus/probe-get?agency_id=' + encodeURIComponent(agencyId), { method: 'GET' });
+          const data = await api('/api/novus/probe?agency_id=' + encodeURIComponent(agencyId), { method: 'GET' });
           $('agency-name').value = data.agency.agency_name || agencyId;
 
           // ONE-CLICK LAUNCH — the agency's own Rightmove branch page, taken

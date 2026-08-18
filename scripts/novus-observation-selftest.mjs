@@ -132,7 +132,10 @@ const PROBE_SENT = '2026-08-01T21:00:00.000Z'; // ~9pm, per Source Master §7
 async function run() {
   process.env.NOVUS_BASIC_AUTH_USER = 'novus';
   process.env.NOVUS_BASIC_AUTH_PASS = 'test-pass';
-  const { default: recompute } = await import('../api/novus/observation/recompute.js');
+  // observation/recompute.js was folded into intelligence/rebuild-all.js
+  // (single-probe recompute when body.probe_id is present) to stay within
+  // Vercel Hobby's 12-function limit — same handler, same behaviour.
+  const { default: recompute } = await import('../api/novus/intelligence/rebuild-all.js');
 
   function mockReq(body) {
     const creds = Buffer.from('novus:test-pass').toString('base64');
