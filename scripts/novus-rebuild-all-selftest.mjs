@@ -42,12 +42,17 @@ const INTELLIGENCE_HEADER = [
   'manual_override','override_reason','observation_closed_at','created_at','updated_at',
 ];
 
+// calls: counts every request the fake transport receives, split by kind —
+// used to assert the rebuild path stays within the real Sheets API's request
+// quota (a small, roughly-constant number of calls regardless of probe
+// count), not O(probes).
 function makeFakeSheet() {
   const store = {
     PROBES: [PROBES_HEADER.slice(), ['SCHEMA NOTE', 'One row per actual probe.']],
     COMMUNICATIONS: [COMMUNICATIONS_HEADER.slice(), ['SCHEMA NOTE', 'One row per meaningful communication.']],
     INTELLIGENCE: [INTELLIGENCE_HEADER.slice(), ['SCHEMA NOTE', 'Derived behaviour and official decisions.']],
   };
+  const calls = { get: 0, append: 0, update: 0, batchUpdate: 0 };
   function tabOf(range) { return String(range).split('!')[0]; }
   function startRowOf(range) {
     const m = String(range).match(/!\D+(\d+)/);
@@ -55,24 +60,39 @@ function makeFakeSheet() {
   }
   const valuesApi = {
     async get(range) {
+      calls.get += 1;
       const tab = tabOf(range);
       return (store[tab] || []).map((r) => r.slice());
     },
     async append(range, rows) {
+      calls.append += 1;
       const tab = tabOf(range);
       store[tab] = store[tab] || [];
       for (const r of rows) store[tab].push(r.slice());
       return { updates: { updatedRows: rows.length } };
     },
     async update(range, rows) {
+      calls.update += 1;
       const tab = tabOf(range);
       const start = startRowOf(range);
       store[tab] = store[tab] || [];
       rows.forEach((r, i) => { store[tab][start - 1 + i] = r.slice(); });
       return { updatedRows: rows.length };
     },
+    // Mirrors the real Sheets values:batchUpdate endpoint: one request writes
+    // many ranges (any mix of tabs), no read involved.
+    async batchUpdate(data) {
+      calls.batchUpdate += 1;
+      for (const { range, values } of data) {
+        const tab = tabOf(range);
+        const start = startRowOf(range);
+        store[tab] = store[tab] || [];
+        values.forEach((row, i) => { store[tab][start - 1 + i] = row.slice(); });
+      }
+      return { totalUpdatedCells: data.reduce((n, d) => n + d.values[0].length, 0) };
+    },
   };
-  return { store, valuesApi };
+  return { store, valuesApi, calls };
 }
 
 function seedProbe(store, { probe_id, agency_id = 'ag_1', probe_status = 'observing', probe_timestamp = '', observation_deadline = '' }) {
@@ -151,7 +171,7 @@ async function run() {
   }
 
   console.log('\nRebuild-all: mixed real-world-shaped probe set');
-  const { store, valuesApi } = makeFakeSheet();
+  const { store, valuesApi, calls } = makeFakeSheet();
   __setRepoForTests(createRepo(valuesApi));
   const repo = createRepo(valuesApi);
 
@@ -232,6 +252,16 @@ async function run() {
     global.Date = OrigDate;
   }
 
+  // ── Read/write quota shape: exactly 3 reads (PROBES/COMMUNICATIONS/
+  // INTELLIGENCE, once each), zero legacy per-row reads (repo.update/repo.append
+  // are never called by the rebuild path), and writes going through the
+  // no-read batchUpdate transport only. ──
+  assert.strictEqual(calls.get, 3, 'exactly one read per table (PROBES, COMMUNICATIONS, INTELLIGENCE) — no per-probe or per-write reads');
+  assert.strictEqual(calls.update, 0, 'the no-read batch write path never calls the single-range update() transport');
+  assert.strictEqual(calls.append, 0, 'the no-read batch write path never calls the read-then-append() transport');
+  assert.ok(calls.batchUpdate >= 1, 'writes go through the batched, no-read batchUpdate() transport');
+  ok(`rebuild-all reads each table exactly once (3 total) and writes only via batchUpdate — 0 update()/append() calls`);
+
   assert.strictEqual(summary1.probes_processed, 10, 'all 10 seeded probes processed');
   assert.strictEqual(summary1.probes_with_communications, 6, 'prb_open_with_comms, prb_closed_with_comms, prb_automated_only, prb_historical, prb_sms_email, prb_historical_no_deadline_with_comms');
   assert.strictEqual(summary1.probes_with_zero_communications, 4, 'prb_zero_open, prb_zero_closed, prb_draft, prb_historical_no_deadline_zero');
@@ -292,12 +322,18 @@ async function run() {
     constructor(...args) { if (args.length === 0) return new OrigDate(NOW); super(...args); }
     static now() { return NOW.getTime(); }
   };
+  const callsBeforeSecondRun = { ...calls };
   let summary2;
   try {
     summary2 = await rebuildAllIntelligence(repo);
   } finally {
     global.Date = OrigDate;
   }
+
+  assert.strictEqual(calls.get - callsBeforeSecondRun.get, 3, 'second run also reads each table exactly once — no per-probe reads even when every row is an update');
+  assert.strictEqual(calls.update - callsBeforeSecondRun.update, 0, 'second run still never calls the single-range update() transport');
+  assert.strictEqual(calls.append - callsBeforeSecondRun.append, 0, 'second run still never calls the read-then-append() transport');
+  ok('re-running rebuild-all is just as batch-based as the first run — same fixed 3-read shape, no per-write reads');
 
   assert.strictEqual(summary2.probes_processed, summary1.probes_processed, 'same probe count on second run');
   const intelligenceAfterSecondRun = await repo.getRecords('INTELLIGENCE', 'intelligence_id');
@@ -312,7 +348,79 @@ async function run() {
   }
   ok('running rebuild-all twice produces identical grades and the same INTELLIGENCE row ids — no duplicates');
 
-  __setRepoForTests(null);
+  // ── Live-sized quota test: a rebuild across hundreds of probes must stay
+  // within the Google Sheets API's per-minute READ quota (60 read requests
+  // per user per 100 seconds is the default project quota) — i.e. total
+  // reads must stay O(1), not O(probes). Also asserts the write side stays
+  // a small, bounded number of batched requests, not one per row. ──
+  console.log('\nLive-sized rebuild — Sheets API quota check (400 probes, mixed shapes)');
+  {
+    const big = makeFakeSheet();
+    __setRepoForTests(createRepo(big.valuesApi));
+    const bigRepo = createRepo(big.valuesApi);
+
+    const PROBE_COUNT = 400;
+    for (let i = 0; i < PROBE_COUNT; i++) {
+      const probeId = `prb_live_${i}`;
+      // A representative mix: ~40% zero-communication, ~30% automated-only,
+      // ~30% real human contact with a follow-up (exercises classification +
+      // follow-up writes on most probes, not just a quiet majority).
+      if (i % 10 < 4) {
+        seedProbe(big.store, { probe_id: probeId, probe_timestamp: PROBE_SENT, observation_deadline: iso(4 * DAY, PROBE_SENT) });
+      } else if (i % 10 < 7) {
+        seedProbe(big.store, { probe_id: probeId, probe_timestamp: PROBE_SENT, observation_deadline: iso(4 * DAY, PROBE_SENT) });
+        seedCommunication(big.store, {
+          probe_id: probeId, occurred_at: iso(5 * MIN, PROBE_SENT),
+          from: 'no-reply@agency.co.uk', subject: 'We have received your enquiry', body_text: 'This is an automated response.',
+        });
+      } else {
+        seedProbe(big.store, { probe_id: probeId, probe_timestamp: PROBE_SENT, observation_deadline: iso(4 * DAY, PROBE_SENT) });
+        seedCommunication(big.store, { probe_id: probeId, occurred_at: iso(30 * MIN, PROBE_SENT), body_text: 'Thanks, calling you now.' });
+        seedCommunication(big.store, { probe_id: probeId, occurred_at: iso(2 * DAY, PROBE_SENT), body_text: 'Just checking in again.' });
+      }
+    }
+    // A third of these probes already have a pre-existing INTELLIGENCE row
+    // (simulating a prior rebuild), so this run is a realistic mix of
+    // creates and updates, not all-creates.
+    for (let i = 0; i < PROBE_COUNT; i += 3) {
+      big.store.INTELLIGENCE.push(INTELLIGENCE_HEADER.map((key) => {
+        if (key === 'intelligence_id') return `itl_live_${i}`;
+        if (key === 'probe_id') return `prb_live_${i}`;
+        if (key === 'grade') return 'stale_placeholder';
+        return '';
+      }));
+    }
+
+    global.Date = class extends OrigDate {
+      constructor(...args) { if (args.length === 0) return new OrigDate(NOW); super(...args); }
+      static now() { return NOW.getTime(); }
+    };
+    let bigSummary;
+    try {
+      bigSummary = await rebuildAllIntelligence(bigRepo);
+    } finally {
+      global.Date = OrigDate;
+    }
+
+    assert.strictEqual(bigSummary.probes_processed, PROBE_COUNT, `all ${PROBE_COUNT} probes processed`);
+    assert.deepStrictEqual(bigSummary.problems, [], 'no problems processing a live-sized probe set');
+
+    // The actual quota-safety claim: reads do NOT scale with probe count.
+    assert.strictEqual(big.calls.get, 3, `exactly 3 reads total for ${PROBE_COUNT} probes (not O(probes)) — well inside the ~60/min Sheets read quota`);
+    assert.strictEqual(big.calls.update, 0, 'no legacy per-row update() calls at this scale either');
+    assert.strictEqual(big.calls.append, 0, 'no legacy per-row append() calls at this scale either');
+    // Writes are chunked (200 rows/request by default) but still a small,
+    // bounded count — nowhere near one request per row/probe.
+    assert.ok(big.calls.batchUpdate >= 1 && big.calls.batchUpdate < PROBE_COUNT, `writes sent in ${big.calls.batchUpdate} chunked batchUpdate request(s), not ${PROBE_COUNT} individual writes`);
+
+    const liveIntelligence = await bigRepo.getRecords('INTELLIGENCE', 'intelligence_id');
+    assert.strictEqual(liveIntelligence.length, PROBE_COUNT, `exactly ${PROBE_COUNT} INTELLIGENCE rows exist after rebuilding ${PROBE_COUNT} probes — no duplicates, none missing`);
+
+    ok(`live-sized rebuild (${PROBE_COUNT} probes, mixed creates/updates) stays at a fixed 3 reads total and ${big.calls.batchUpdate} batched write request(s) — reads never scale with probe count, so the real Sheets API read quota (429s) cannot be hit regardless of how many probes exist`);
+
+    __setRepoForTests(null);
+  }
+
   console.log(`\n✅ All ${passed} checks passed.\n`);
 }
 
