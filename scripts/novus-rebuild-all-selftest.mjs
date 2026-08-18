@@ -183,6 +183,16 @@ async function run() {
   // prb_draft — never sent (draft), no probe_timestamp/deadline at all.
   seedProbe(store, { probe_id: 'prb_draft', probe_status: 'draft' });
 
+  // prb_sms_email — SMS + human email + automated email, to prove
+  // inbound_sms_count/email_touch_count/channels_used on the full-rebuild path.
+  seedProbe(store, { probe_id: 'prb_sms_email', probe_timestamp: PROBE_SENT, observation_deadline: iso(4 * DAY, PROBE_SENT) });
+  seedCommunication(store, { probe_id: 'prb_sms_email', occurred_at: iso(10 * MIN, PROBE_SENT), channel: 'sms', body_text: 'Please call me back to arrange a viewing.' });
+  seedCommunication(store, { probe_id: 'prb_sms_email', occurred_at: iso(20 * MIN, PROBE_SENT), channel: 'email', body_text: "Hi, it's Jane, following up on your enquiry." });
+  seedCommunication(store, {
+    probe_id: 'prb_sms_email', occurred_at: iso(1 * HOUR, PROBE_SENT), channel: 'email',
+    from: 'no-reply@agency.co.uk', subject: 'We have received your enquiry', body_text: 'This is an automated response.',
+  });
+
   // Pre-existing INTELLIGENCE row for prb_closed_with_comms, simulating a
   // prior rebuild/recompute run with a stale grade — must be UPDATED in
   // place, not duplicated.
@@ -209,8 +219,8 @@ async function run() {
     global.Date = OrigDate;
   }
 
-  assert.strictEqual(summary1.probes_processed, 7, 'all 7 seeded probes processed');
-  assert.strictEqual(summary1.probes_with_communications, 4, 'prb_open_with_comms, prb_closed_with_comms, prb_automated_only, prb_historical');
+  assert.strictEqual(summary1.probes_processed, 8, 'all 8 seeded probes processed');
+  assert.strictEqual(summary1.probes_with_communications, 5, 'prb_open_with_comms, prb_closed_with_comms, prb_automated_only, prb_historical, prb_sms_email');
   assert.strictEqual(summary1.probes_with_zero_communications, 3, 'prb_zero_open, prb_zero_closed, prb_draft');
   assert.deepStrictEqual(summary1.problems, [], 'no problematic/unmatched probes');
   ok(`rebuild-all processed all probes (${summary1.probes_processed}), split communications/zero correctly`);
@@ -231,13 +241,19 @@ async function run() {
   // Every probe, including both zero-comm probes, must have produced an INTELLIGENCE row.
   const allIntelligence = await repo.getRecords('INTELLIGENCE', 'intelligence_id');
   const intelligenceProbeIds = new Set(allIntelligence.map((r) => r.obj.probe_id));
-  for (const pid of ['prb_open_with_comms', 'prb_closed_with_comms', 'prb_automated_only', 'prb_zero_open', 'prb_zero_closed', 'prb_historical', 'prb_draft']) {
+  for (const pid of ['prb_open_with_comms', 'prb_closed_with_comms', 'prb_automated_only', 'prb_zero_open', 'prb_zero_closed', 'prb_historical', 'prb_draft', 'prb_sms_email']) {
     assert.ok(intelligenceProbeIds.has(pid), `INTELLIGENCE row exists for ${pid}`);
   }
   ok('every probe (including zero-communication and draft probes) has exactly one INTELLIGENCE row');
 
+  const smsEmailIntelligence = allIntelligence.find((r) => r.obj.probe_id === 'prb_sms_email').obj;
+  assert.strictEqual(String(smsEmailIntelligence.inbound_sms_count), '1', 'one human SMS touch counted');
+  assert.strictEqual(String(smsEmailIntelligence.email_touch_count), '1', 'one human email touch counted; automated email excluded');
+  assert.strictEqual(smsEmailIntelligence.channels_used, 'sms,email', 'channels_used includes both sms and email');
+  ok('rebuild-all populates inbound_sms_count/email_touch_count/channels_used correctly for SMS + human email + automated email');
+
   assert.strictEqual(summary1.intelligence_updated, 1, 'prb_closed_with_comms had a pre-existing row -> updated');
-  assert.strictEqual(summary1.intelligence_created, 6, 'the other 6 probes create a fresh row');
+  assert.strictEqual(summary1.intelligence_created, 7, 'the other 7 probes create a fresh row');
   const preExisting = allIntelligence.find((r) => r.obj.probe_id === 'prb_closed_with_comms');
   assert.strictEqual(preExisting.obj.intelligence_id, 'itl_pre_existing', 'existing INTELLIGENCE row updated in place, not duplicated');
   assert.notStrictEqual(preExisting.obj.grade, 'stale_placeholder', 'stale grade recalculated');
