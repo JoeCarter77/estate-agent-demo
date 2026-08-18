@@ -15,6 +15,7 @@
     "novus:rebuild-all-selftest": "node scripts/novus-rebuild-all-selftest.mjs",
     "novus:diagnosis-selftest": "node scripts/novus-diagnosis-selftest.mjs",
     "novus:phone-selftest": "node scripts/novus-phone-selftest.mjs",
+    "novus:vendor-intent-selftest": "node scripts/novus-vendor-intent-selftest.mjs",
     "novus:smoke": "node scripts/novus-sheets-smoke.mjs"
   },
   "dependencies": {

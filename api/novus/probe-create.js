@@ -36,6 +36,14 @@ export default async function handler(req, res) {
     : /onthemarket\./i.test(url) ? 'onthemarket'
     : 'rightmove';
 
+  // Every genuine Rightmove probe enquiry is submitted the same way: "I have
+  // a property to sell" -> "Yes, it is not yet on the market" — the vendor-
+  // opportunity branch. Recording that declaration on the PROBES row itself
+  // (reusing enquiry_text, no new column) is what lets the Intelligence
+  // pipeline later check whether the agency's replies actually noticed it.
+  // Matches the exact wording already present on historical imported probes.
+  const VENDOR_DECLARATION = 'Declared: has a property to sell, yes, it is not yet on the market';
+
   try {
     const repo = getRepo();
 
@@ -63,7 +71,11 @@ export default async function handler(req, res) {
       property_url: url,
       property_price: meta.price || '',
       property_status: meta.status || '',
-      enquiry_text: '',
+      // Preserve any other enquiry detail passed in (none exists today — this
+      // is forward-compatible), appended after the standing vendor declaration.
+      enquiry_text: portal === 'rightmove'
+        ? [VENDOR_DECLARATION, (body.enquiry_text || '').trim()].filter(Boolean).join(' — ')
+        : (body.enquiry_text || '').trim(),
       probe_email: process.env.NOVUS_PROBE_EMAIL || 'joe.novus2@gmail.com',
       probe_phone: process.env.NOVUS_PROBE_PHONE || '+447575333064',
       probe_timestamp: '',
