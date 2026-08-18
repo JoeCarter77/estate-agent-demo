@@ -54,10 +54,17 @@ function rebuildIntelligence() {
 
   SpreadsheetApp.getActiveSpreadsheet().toast('Rebuilding intelligence for every probe…', 'NOVUS', -1);
 
+  // ONE-OFF: also runs the historical COMMUNICATIONS.contact_quality
+  // backfill (lib/communications-backfill.mjs) in the same request — see
+  // api/novus/intelligence/rebuild-all.js. Revert this payload back to {}
+  // once the one-time backfill has run and been verified in the live sheet,
+  // so future clicks of this button don't keep re-running it.
   let response;
   try {
     response = UrlFetchApp.fetch(baseUrl + '/api/novus/intelligence/rebuild-all', {
       method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ backfill_contact_quality: true }),
       headers: { Authorization: 'Basic ' + Utilities.base64Encode(user + ':' + pass) },
       muteHttpExceptions: true,
     });
