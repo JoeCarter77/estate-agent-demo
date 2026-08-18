@@ -183,6 +183,29 @@ async function run() {
   // prb_draft — never sent (draft), no probe_timestamp/deadline at all.
   seedProbe(store, { probe_id: 'prb_draft', probe_status: 'draft' });
 
+  // prb_sms_email — SMS + human email + automated email, to prove
+  // inbound_sms_count/email_touch_count/channels_used on the full-rebuild path.
+  seedProbe(store, { probe_id: 'prb_sms_email', probe_timestamp: PROBE_SENT, observation_deadline: iso(4 * DAY, PROBE_SENT) });
+  seedCommunication(store, { probe_id: 'prb_sms_email', occurred_at: iso(10 * MIN, PROBE_SENT), channel: 'sms', body_text: 'Please call me back to arrange a viewing.' });
+  seedCommunication(store, { probe_id: 'prb_sms_email', occurred_at: iso(20 * MIN, PROBE_SENT), channel: 'email', body_text: "Hi, it's Jane, following up on your enquiry." });
+  seedCommunication(store, {
+    probe_id: 'prb_sms_email', occurred_at: iso(1 * HOUR, PROBE_SENT), channel: 'email',
+    from: 'no-reply@agency.co.uk', subject: 'We have received your enquiry', body_text: 'This is an automated response.',
+  });
+
+  // prb_historical_no_deadline_zero — historical probe from "last week" with
+  // NO observation_deadline written (legacy/imported PROBES row), zero
+  // communications. probe_timestamp is 10 days before NOW, so the derived
+  // 4-day deadline has long since passed -> must resolve closed -> Grade H,
+  // not still 'observing'.
+  seedProbe(store, { probe_id: 'prb_historical_no_deadline_zero', probe_timestamp: iso(-10 * DAY, NOW.toISOString()), observation_deadline: '' });
+
+  // prb_historical_no_deadline_with_comms — same missing-deadline shape, but
+  // with a genuine human touch inside the derived 4-day window -> must
+  // resolve closed with a real A-F grade (not H, not stuck 'observing').
+  seedProbe(store, { probe_id: 'prb_historical_no_deadline_with_comms', probe_timestamp: iso(-10 * DAY, NOW.toISOString()), observation_deadline: '' });
+  seedCommunication(store, { probe_id: 'prb_historical_no_deadline_with_comms', occurred_at: iso(-10 * DAY + 30 * MIN, NOW.toISOString()), body_text: 'Thanks, calling you now.' });
+
   // Pre-existing INTELLIGENCE row for prb_closed_with_comms, simulating a
   // prior rebuild/recompute run with a stale grade — must be UPDATED in
   // place, not duplicated.
@@ -209,9 +232,9 @@ async function run() {
     global.Date = OrigDate;
   }
 
-  assert.strictEqual(summary1.probes_processed, 7, 'all 7 seeded probes processed');
-  assert.strictEqual(summary1.probes_with_communications, 4, 'prb_open_with_comms, prb_closed_with_comms, prb_automated_only, prb_historical');
-  assert.strictEqual(summary1.probes_with_zero_communications, 3, 'prb_zero_open, prb_zero_closed, prb_draft');
+  assert.strictEqual(summary1.probes_processed, 10, 'all 10 seeded probes processed');
+  assert.strictEqual(summary1.probes_with_communications, 6, 'prb_open_with_comms, prb_closed_with_comms, prb_automated_only, prb_historical, prb_sms_email, prb_historical_no_deadline_with_comms');
+  assert.strictEqual(summary1.probes_with_zero_communications, 4, 'prb_zero_open, prb_zero_closed, prb_draft, prb_historical_no_deadline_zero');
   assert.deepStrictEqual(summary1.problems, [], 'no problematic/unmatched probes');
   ok(`rebuild-all processed all probes (${summary1.probes_processed}), split communications/zero correctly`);
 
@@ -231,13 +254,33 @@ async function run() {
   // Every probe, including both zero-comm probes, must have produced an INTELLIGENCE row.
   const allIntelligence = await repo.getRecords('INTELLIGENCE', 'intelligence_id');
   const intelligenceProbeIds = new Set(allIntelligence.map((r) => r.obj.probe_id));
-  for (const pid of ['prb_open_with_comms', 'prb_closed_with_comms', 'prb_automated_only', 'prb_zero_open', 'prb_zero_closed', 'prb_historical', 'prb_draft']) {
+  for (const pid of ['prb_open_with_comms', 'prb_closed_with_comms', 'prb_automated_only', 'prb_zero_open', 'prb_zero_closed', 'prb_historical', 'prb_draft', 'prb_sms_email', 'prb_historical_no_deadline_zero', 'prb_historical_no_deadline_with_comms']) {
     assert.ok(intelligenceProbeIds.has(pid), `INTELLIGENCE row exists for ${pid}`);
   }
   ok('every probe (including zero-communication and draft probes) has exactly one INTELLIGENCE row');
 
+  // ── Historical probes with a missing observation_deadline must still close ──
+  const noDeadlineZero = allIntelligence.find((r) => r.obj.probe_id === 'prb_historical_no_deadline_zero').obj;
+  const noDeadlineWithComms = allIntelligence.find((r) => r.obj.probe_id === 'prb_historical_no_deadline_with_comms').obj;
+  const expectedDeadline = iso(-10 * DAY + 4 * DAY, NOW.toISOString());
+
+  assert.strictEqual(noDeadlineZero.observation_status, 'closed', 'historical probe from last week with no stored deadline is closed, not stuck observing');
+  assert.strictEqual(noDeadlineZero.grade, 'H', 'closed + zero communications -> Grade H');
+  assert.strictEqual(noDeadlineZero.observation_deadline, expectedDeadline, 'missing deadline derived as probe_timestamp + 4 days and written back to INTELLIGENCE');
+
+  assert.strictEqual(noDeadlineWithComms.observation_status, 'closed', 'historical probe with communications and no stored deadline is closed, not stuck observing');
+  assert.ok(['A', 'B', 'C', 'D', 'E', 'F'].includes(noDeadlineWithComms.grade), `closed + human contact -> a real A-F grade, got ${noDeadlineWithComms.grade}`);
+  assert.strictEqual(noDeadlineWithComms.observation_deadline, expectedDeadline, 'missing deadline derived as probe_timestamp + 4 days and written back to INTELLIGENCE');
+  ok('historical probes with a missing observation_deadline derive it from probe_timestamp + 4 days, resolve to closed, and grade correctly (H when no evidence, A-F when human contact occurred)');
+
+  const smsEmailIntelligence = allIntelligence.find((r) => r.obj.probe_id === 'prb_sms_email').obj;
+  assert.strictEqual(String(smsEmailIntelligence.inbound_sms_count), '1', 'one human SMS touch counted');
+  assert.strictEqual(String(smsEmailIntelligence.email_touch_count), '1', 'one human email touch counted; automated email excluded');
+  assert.strictEqual(smsEmailIntelligence.channels_used, 'sms,email', 'channels_used includes both sms and email');
+  ok('rebuild-all populates inbound_sms_count/email_touch_count/channels_used correctly for SMS + human email + automated email');
+
   assert.strictEqual(summary1.intelligence_updated, 1, 'prb_closed_with_comms had a pre-existing row -> updated');
-  assert.strictEqual(summary1.intelligence_created, 6, 'the other 6 probes create a fresh row');
+  assert.strictEqual(summary1.intelligence_created, 9, 'the other 9 probes create a fresh row');
   const preExisting = allIntelligence.find((r) => r.obj.probe_id === 'prb_closed_with_comms');
   assert.strictEqual(preExisting.obj.intelligence_id, 'itl_pre_existing', 'existing INTELLIGENCE row updated in place, not duplicated');
   assert.notStrictEqual(preExisting.obj.grade, 'stale_placeholder', 'stale grade recalculated');

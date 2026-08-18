@@ -264,6 +264,23 @@ async function run() {
     ok('grade C: <=1h contact + 0 genuine follow-ups (voicemail + SMS grouped into one attempt)');
   }
 
+  // ── inbound_sms_count / email_touch_count / channels_used ──
+  console.log('\ninbound_sms_count / email_touch_count / channels_used (SMS + Email evidence)');
+  {
+    const body = await runProbeGrade('prb_sms_email', [
+      { occurred_at: iso(10 * MIN, PROBE_SENT), channel: 'sms', body_text: 'Please call me back to arrange a viewing.' },
+      { occurred_at: iso(20 * MIN, PROBE_SENT), channel: 'email', body_text: "Hi, it's Jane, following up on your enquiry." },
+      {
+        occurred_at: iso(1 * HOUR, PROBE_SENT), channel: 'email',
+        from: 'no-reply@agency.co.uk', subject: 'We have received your enquiry', body_text: 'This is an automated response.',
+      },
+    ]);
+    assert.strictEqual(body.observation.inbound_sms_count, 1, 'one human SMS touch counted');
+    assert.strictEqual(body.observation.email_touch_count, 1, 'one human email touch counted; the automated email is excluded');
+    assert.strictEqual(body.observation.channels_used, 'sms,email', 'channels_used includes both sms and email');
+    ok('inbound_sms_count and email_touch_count count only human-contact touches; automated email excluded; channels_used includes sms + email');
+  }
+
   // ── Grade D: fast (>1h, <=16h) + non-persistent ──
   console.log('\nGrade D — fast + non-persistent');
   {
