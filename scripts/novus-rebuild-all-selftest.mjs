@@ -41,6 +41,10 @@ const INTELLIGENCE_HEADER = [
   'grade_reason','tier','tier_reason','sales_angle','segment','ai_evidence_summary','ai_confidence',
   'manual_override','override_reason','observation_closed_at','created_at','updated_at',
 ];
+const DIAGNOSIS_HEADER = [
+  'diagnosis_id','agency_id','probe_id','grade','tier','primary_problem','evidence_summary',
+  'commercial_implication','recommended_solution','sales_angle','created_at','updated_at',
+];
 
 // calls: counts every request the fake transport receives, split by kind —
 // used to assert the rebuild path stays within the real Sheets API's request
@@ -51,6 +55,7 @@ function makeFakeSheet() {
     PROBES: [PROBES_HEADER.slice(), ['SCHEMA NOTE', 'One row per actual probe.']],
     COMMUNICATIONS: [COMMUNICATIONS_HEADER.slice(), ['SCHEMA NOTE', 'One row per meaningful communication.']],
     INTELLIGENCE: [INTELLIGENCE_HEADER.slice(), ['SCHEMA NOTE', 'Derived behaviour and official decisions.']],
+    DIAGNOSIS: [DIAGNOSIS_HEADER.slice(), ['SCHEMA NOTE', 'Commercial read of a closed Intelligence record.']],
   };
   const calls = { get: 0, append: 0, update: 0, batchUpdate: 0 };
   function tabOf(range) { return String(range).split('!')[0]; }
@@ -272,11 +277,15 @@ async function run() {
   // INTELLIGENCE, once each), zero legacy per-row reads (repo.update/repo.append
   // are never called by the rebuild path), and writes going through the
   // no-read batchUpdate transport only. ──
-  assert.strictEqual(calls.get, 3, 'exactly one read per table (PROBES, COMMUNICATIONS, INTELLIGENCE) — no per-probe or per-write reads');
+  // 3 reads for the Intelligence rebuild (PROBES/COMMUNICATIONS/INTELLIGENCE)
+  // + 2 more for the Diagnosis rebuild the handler now runs afterwards
+  // (INTELLIGENCE again, DIAGNOSIS) — still a small, constant number, not
+  // O(probes).
+  assert.strictEqual(calls.get, 5, 'exactly one read per table across both rebuild steps — no per-probe or per-write reads');
   assert.strictEqual(calls.update, 0, 'the no-read batch write path never calls the single-range update() transport');
   assert.strictEqual(calls.append, 0, 'the no-read batch write path never calls the read-then-append() transport');
   assert.ok(calls.batchUpdate >= 1, 'writes go through the batched, no-read batchUpdate() transport');
-  ok(`rebuild-all reads each table exactly once (3 total) and writes only via batchUpdate — 0 update()/append() calls`);
+  ok(`rebuild-all + diagnosis rebuild-all together read each table exactly once (5 total) and write only via batchUpdate — 0 update()/append() calls`);
 
   assert.strictEqual(summary1.probes_processed, 11, 'all 11 seeded probes processed');
   assert.strictEqual(summary1.probes_with_communications, 7, 'prb_open_with_comms, prb_closed_with_comms, prb_automated_only, prb_historical, prb_sms_email, prb_sms_imported_no_direction, prb_historical_no_deadline_with_comms');
