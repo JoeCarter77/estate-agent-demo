@@ -79,6 +79,7 @@ function rebuildIntelligence() {
     return;
   }
 
+  const diagnosis = body.diagnosis || {};
   const lines = [
     'Probes processed: ' + body.probes_processed,
     'Probes with communications: ' + body.probes_with_communications,
@@ -86,6 +87,11 @@ function rebuildIntelligence() {
     'Intelligence created: ' + body.intelligence_created,
     'Intelligence updated: ' + body.intelligence_updated,
     'Problems: ' + (body.problems ? body.problems.length : 0),
+    '',
+    'Diagnosis created: ' + diagnosis.diagnosis_created,
+    'Diagnosis updated: ' + diagnosis.diagnosis_updated,
+    'Diagnosis skipped (not closed): ' + diagnosis.skipped_not_closed,
+    'Diagnosis problems: ' + (diagnosis.problems ? diagnosis.problems.length : 0),
   ];
   ui.alert('Rebuild Intelligence — complete', lines.join('\n'), ui.ButtonSet.OK);
 }
