@@ -94,6 +94,10 @@ async function run() {
   seedIntelligence(store, { probe_id: 'prb_closed_h', observation_status: 'closed', grade: 'H' });
   seedIntelligence(store, { probe_id: 'prb_closed_a', observation_status: 'closed', grade: 'A' });
   seedIntelligence(store, { probe_id: 'prb_closed_c', observation_status: 'closed', grade: 'C' });
+  // REGRESSION: sheet-sourced values with incidental whitespace/case (manual
+  // edit, copy/paste) must still be recognised — this was the exact bug
+  // that made every closed row silently produce zero Diagnosis rows.
+  seedIntelligence(store, { probe_id: 'prb_closed_whitespace', observation_status: ' Closed ', grade: ' h ' });
 
   const summary1 = await rebuildAllDiagnosis(repo);
 
@@ -103,7 +107,7 @@ async function run() {
   ok('diagnosis rebuild reads each table exactly once and writes only via batchUpdate');
 
   assert.strictEqual(summary1.skipped_not_closed, 1, 'open observation skipped (no Diagnosis for it)');
-  assert.strictEqual(summary1.diagnosis_created, 3, 'one Diagnosis created per closed observation');
+  assert.strictEqual(summary1.diagnosis_created, 4, 'one Diagnosis created per closed observation');
   assert.strictEqual(summary1.diagnosis_updated, 0);
   ok('only closed observations get a Diagnosis');
 
@@ -121,19 +125,23 @@ async function run() {
   assert.ok(byProbe.prb_closed_h.sales_angle.length > 0);
   ok('Diagnosis fields populated correctly per grade -> tier routing table');
 
+  assert.strictEqual(byProbe.prb_closed_whitespace.tier, 'Core', 'grade " h " (whitespace/case) still routes correctly, grade H -> Core');
+  assert.strictEqual(byProbe.prb_closed_whitespace.grade, 'H', 'grade is normalized to "H" in the written row');
+  ok('a closed observation with whitespace/case around observation_status/grade still produces a Diagnosis row (the reported bug)');
+
   // ── Idempotency: rebuilding again updates in place, never duplicates ──
   const summary2 = await rebuildAllDiagnosis(repo);
   assert.strictEqual(summary2.diagnosis_created, 0, 'second run creates nothing new');
-  assert.strictEqual(summary2.diagnosis_updated, 3, 'second run updates the existing 3 rows in place');
+  assert.strictEqual(summary2.diagnosis_updated, 4, 'second run updates the existing 4 rows in place');
   const rowsAfter = await repo.getRecords('DIAGNOSIS', 'diagnosis_id');
-  assert.strictEqual(rowsAfter.length, 3, 'still exactly 3 Diagnosis rows — no duplicates');
+  assert.strictEqual(rowsAfter.length, 4, 'still exactly 4 Diagnosis rows — no duplicates');
   ok('rebuilding Diagnosis twice is idempotent — one row per probe_id, updated not duplicated');
 
   // ── Grade change on re-close must update the existing Diagnosis row ──
   const idx = store.INTELLIGENCE.findIndex((r) => r[2] === 'prb_closed_c');
   store.INTELLIGENCE[idx][INTELLIGENCE_HEADER.indexOf('grade')] = 'A';
   const summary3 = await rebuildAllDiagnosis(repo);
-  assert.strictEqual(summary3.diagnosis_updated, 3);
+  assert.strictEqual(summary3.diagnosis_updated, 4);
   const rowsAfter3 = await repo.getRecords('DIAGNOSIS', 'diagnosis_id');
   const updatedC = rowsAfter3.find((r) => r.obj.probe_id === 'prb_closed_c').obj;
   assert.strictEqual(updatedC.tier, 'Growth', 'Diagnosis reflects the recomputed grade after another Intelligence rebuild');
