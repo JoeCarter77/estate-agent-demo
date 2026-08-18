@@ -473,8 +473,10 @@ async function run() {
 
     // A probe + an ALREADY-CLASSIFIED historical-shaped communication
     // (automated_or_human already 'human', contact_quality already blank) —
-    // exactly the shape real historical rows have, which the normal rebuild
-    // path's isClassified() guard skips reclassifying.
+    // exactly the shape real historical rows have. The normal rebuild path
+    // used to SKIP reclassifying these (the old isClassified() guard), which
+    // is why the one-off backfill flag below had to exist at all; the rebuild
+    // now reaches them itself.
     seedProbe(store, { probe_id: 'prb_backfill_flag', probe_timestamp: PROBE_SENT, observation_deadline: iso(4 * DAY, PROBE_SENT) });
     const commId = seedCommunication(store, { probe_id: 'prb_backfill_flag', occurred_at: iso(HOUR, PROBE_SENT), body_text: 'Are you available to view at 10am Friday morning?' });
     const commRow = store.COMMUNICATIONS[store.COMMUNICATIONS.length - 1];
@@ -487,19 +489,21 @@ async function run() {
     assert.strictEqual(res1.statusCode, 200);
     assert.strictEqual(res1.body.contact_quality_backfill, undefined, 'no backfill key in the response when the flag is omitted');
     let comm = (await repo.getRecords('COMMUNICATIONS', 'communication_id')).find((r) => r.obj.communication_id === commId).obj;
-    assert.strictEqual(comm.contact_quality, '', 'the already-classified historical-shaped row is untouched by a normal rebuild-all call (isClassified() skips it, same as before this change)');
-    ok('a normal rebuild-all call (no flag) behaves exactly as before — no backfill runs, no contact_quality_backfill key in the response');
+    assert.strictEqual(comm.contact_quality, 'proactive_booking_push', 'a normal rebuild-all call now reclassifies the already-classified historical-shaped row (the isClassified() guard that froze it is gone)');
+    ok('a normal rebuild-all call (no flag) reaches already-classified historical rows — no backfill needed, and still no contact_quality_backfill key in the response');
 
     // Explicit opt-in — runs the backfill in the same request.
     const res2 = mockRes();
     await rebuildAllHandler(mockReq({ backfill_contact_quality: true }), res2);
     assert.strictEqual(res2.statusCode, 200);
     assert.ok(res2.body.contact_quality_backfill, 'backfill summary present when the flag is true');
-    assert.strictEqual(res2.body.contact_quality_backfill.proactive_detected, 1, 'the one seeded proactive message detected');
-    assert.strictEqual(res2.body.contact_quality_backfill.cells_written, 1);
+    // The rebuild in the same request already set contact_quality, so the
+    // backfill correctly finds nothing left to do (it skips rows that already
+    // carry a value). It stays wired up and idempotent, but is now redundant.
+    assert.strictEqual(res2.body.contact_quality_backfill.cells_written, 0, 'backfill has nothing left to write once the rebuild itself classifies historical rows');
     comm = (await repo.getRecords('COMMUNICATIONS', 'communication_id')).find((r) => r.obj.communication_id === commId).obj;
-    assert.strictEqual(comm.contact_quality, 'proactive_booking_push', 'backfill_contact_quality:true reaches the historical-shaped row via the same detector as new communications');
-    ok('backfill_contact_quality:true opts into the one-off backfill through this same route, no dedicated endpoint required');
+    assert.strictEqual(comm.contact_quality, 'proactive_booking_push', 'the row carries the same value either way — rebuild and backfill share one detector');
+    ok('backfill_contact_quality:true still runs through this same route and is now a no-op, the rebuild having already done the work');
 
     __setRepoForTests(null);
   }
