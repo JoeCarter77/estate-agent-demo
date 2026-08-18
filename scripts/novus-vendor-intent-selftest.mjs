@@ -14,7 +14,7 @@
 
 import assert from 'node:assert';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
-import { hasVendorDeclaration, classifyVendorCommunication, computeVendorOpportunity } from '../lib/vendor-intent.mjs';
+import { hasVendorDeclaration, classifyVendorCommunication, computeVendorOpportunity, readVendorStatus } from '../lib/vendor-intent.mjs';
 
 const PROBES_HEADER = [
   'probe_id','probe_reference','agency_id','portal','property_address','property_url',
@@ -297,7 +297,12 @@ async function run() {
     assert.strictEqual(commsFor('prb_vendor_missed')[0].intent, '', 'rebuild-all: no COMMUNICATIONS.intent tag when nothing matched');
 
     const noDecl = byProbe('prb_no_declaration');
-    assert.strictEqual(noDecl.ai_evidence_summary, '', 'rebuild-all: probes without the vendor declaration get no ai_evidence_summary at all');
+    // ai_evidence_summary is now written for EVERY probe (lib/evidence-summary.mjs),
+    // not only vendor-declaration probes — but a probe with no declaration must
+    // still carry NO vendor line, so nothing downstream reads a vendor status
+    // off a probe that never declared one.
+    assert.strictEqual(readVendorStatus(noDecl.ai_evidence_summary), '', 'rebuild-all: probes without the vendor declaration carry no vendor line in ai_evidence_summary');
+    assert.match(noDecl.ai_evidence_summary, /Response:/, 'rebuild-all: a non-vendor probe still gets a real evidence summary from its communications');
     assert.strictEqual(commsFor('prb_no_declaration')[0].intent, '', 'rebuild-all: non-vendor probes never get an intent tag, even with matching language');
     ok('rebuildAllIntelligence() writes vendor evidence for declared probes only, leaves the A-H grade untouched, and leaves non-vendor probes completely alone');
 

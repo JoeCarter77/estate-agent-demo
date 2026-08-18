@@ -1,0 +1,2 @@
+diagnosis_id,agency_id,probe_id,grade,tier,primary_problem,evidence_summary,commercial_implication,recommended_solution,sales_angle,created_at,updated_at
+SCHEMA NOTE,Fixture export in live workbook shape.,,,,,,,,,,
