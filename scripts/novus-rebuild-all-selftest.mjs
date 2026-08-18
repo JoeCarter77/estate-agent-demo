@@ -108,7 +108,7 @@ function seedProbe(store, { probe_id, agency_id = 'ag_1', probe_status = 'observ
 }
 
 let commSeq = 0;
-function seedCommunication(store, { probe_id, agency_id = 'ag_1', occurred_at, channel = 'email', from = 'agent@agency-one.co.uk', subject = '', body_text = '', historical = false }) {
+function seedCommunication(store, { probe_id, agency_id = 'ag_1', occurred_at, channel = 'email', from = 'agent@agency-one.co.uk', subject = '', body_text = '', historical = false, direction = 'inbound' }) {
   commSeq += 1;
   const communication_id = `com_test_${commSeq}`;
   const row = COMMUNICATIONS_HEADER.map((key) => {
@@ -118,7 +118,7 @@ function seedCommunication(store, { probe_id, agency_id = 'ag_1', occurred_at, c
     if (key === 'occurred_at') return occurred_at;
     if (key === 'received_at') return occurred_at;
     if (key === 'channel') return channel;
-    if (key === 'direction') return 'inbound';
+    if (key === 'direction') return direction;
     if (key === 'communication_type') return channel;
     if (key === 'source_identifier_raw') return from;
     if (key === 'source_identifier_normalized') return from.toLowerCase();
@@ -213,6 +213,22 @@ async function run() {
     from: 'no-reply@agency.co.uk', subject: 'We have received your enquiry', body_text: 'This is an automated response.',
   });
 
+  // prb_sms_imported_no_direction — REGRESSION: an imported/historical SMS,
+  // already matched to its probe (matching_method historical_import, valid
+  // probe_id) — but, like a real backfilled row, its `direction` column was
+  // never populated (blank, not "inbound"; rebuild classifies it fresh, same
+  // as any other unclassified row). Before the fix this SMS still correctly
+  // drove grade/first_human_touch/channels_used (direction was never checked
+  // there) but INTELLIGENCE.inbound_sms_count stayed 0 — the SMS was
+  // invisible in the one field meant to surface it. Proves: SMS -> correct
+  // probe -> Intelligence evidence (including inbound_sms_count) includes
+  // the SMS.
+  seedProbe(store, { probe_id: 'prb_sms_imported_no_direction', probe_timestamp: PROBE_SENT, observation_deadline: iso(4 * DAY, PROBE_SENT) });
+  seedCommunication(store, {
+    probe_id: 'prb_sms_imported_no_direction', occurred_at: iso(3 * HOUR, PROBE_SENT), channel: 'sms',
+    body_text: 'Sorry for the slow reply — give me a call when you get a chance.', direction: '', historical: true,
+  });
+
   // prb_historical_no_deadline_zero — historical probe from "last week" with
   // NO observation_deadline written (legacy/imported PROBES row), zero
   // communications. probe_timestamp is 10 days before NOW, so the derived
@@ -262,8 +278,8 @@ async function run() {
   assert.ok(calls.batchUpdate >= 1, 'writes go through the batched, no-read batchUpdate() transport');
   ok(`rebuild-all reads each table exactly once (3 total) and writes only via batchUpdate — 0 update()/append() calls`);
 
-  assert.strictEqual(summary1.probes_processed, 10, 'all 10 seeded probes processed');
-  assert.strictEqual(summary1.probes_with_communications, 6, 'prb_open_with_comms, prb_closed_with_comms, prb_automated_only, prb_historical, prb_sms_email, prb_historical_no_deadline_with_comms');
+  assert.strictEqual(summary1.probes_processed, 11, 'all 11 seeded probes processed');
+  assert.strictEqual(summary1.probes_with_communications, 7, 'prb_open_with_comms, prb_closed_with_comms, prb_automated_only, prb_historical, prb_sms_email, prb_sms_imported_no_direction, prb_historical_no_deadline_with_comms');
   assert.strictEqual(summary1.probes_with_zero_communications, 4, 'prb_zero_open, prb_zero_closed, prb_draft, prb_historical_no_deadline_zero');
   assert.deepStrictEqual(summary1.problems, [], 'no problematic/unmatched probes');
   ok(`rebuild-all processed all probes (${summary1.probes_processed}), split communications/zero correctly`);
@@ -284,7 +300,7 @@ async function run() {
   // Every probe, including both zero-comm probes, must have produced an INTELLIGENCE row.
   const allIntelligence = await repo.getRecords('INTELLIGENCE', 'intelligence_id');
   const intelligenceProbeIds = new Set(allIntelligence.map((r) => r.obj.probe_id));
-  for (const pid of ['prb_open_with_comms', 'prb_closed_with_comms', 'prb_automated_only', 'prb_zero_open', 'prb_zero_closed', 'prb_historical', 'prb_draft', 'prb_sms_email', 'prb_historical_no_deadline_zero', 'prb_historical_no_deadline_with_comms']) {
+  for (const pid of ['prb_open_with_comms', 'prb_closed_with_comms', 'prb_automated_only', 'prb_zero_open', 'prb_zero_closed', 'prb_historical', 'prb_draft', 'prb_sms_email', 'prb_sms_imported_no_direction', 'prb_historical_no_deadline_zero', 'prb_historical_no_deadline_with_comms']) {
     assert.ok(intelligenceProbeIds.has(pid), `INTELLIGENCE row exists for ${pid}`);
   }
   ok('every probe (including zero-communication and draft probes) has exactly one INTELLIGENCE row');
@@ -309,8 +325,23 @@ async function run() {
   assert.strictEqual(smsEmailIntelligence.channels_used, 'sms,email', 'channels_used includes both sms and email');
   ok('rebuild-all populates inbound_sms_count/email_touch_count/channels_used correctly for SMS + human email + automated email');
 
+  // ── REGRESSION: imported SMS with no `direction` value must still show up
+  // as SMS evidence. This is the exact bug report — trace COMMUNICATIONS ->
+  // probe matching -> intelligence rebuild -> evidence for a real-shaped
+  // imported SMS and confirm every step actually surfaces it. ──
+  const smsNoDirection = byId.prb_sms_imported_no_direction;
+  assert.ok(smsNoDirection, 'the imported SMS is grouped under its correct probe_id by the rebuild (matching + collection both worked)');
+  assert.strictEqual(smsNoDirection.communications_matched, 1, 'the rebuild collected the SMS communication for this probe');
+
+  const smsNoDirectionIntelligence = allIntelligence.find((r) => r.obj.probe_id === 'prb_sms_imported_no_direction').obj;
+  assert.strictEqual(smsNoDirectionIntelligence.first_human_touch, 'yes', 'the imported SMS was classified as human contact (not excluded by classification)');
+  assert.strictEqual(String(smsNoDirectionIntelligence.inbound_sms_count), '1', 'inbound_sms_count reflects the SMS even though direction was never populated on import');
+  assert.strictEqual(smsNoDirectionIntelligence.channels_used, 'sms', 'channels_used includes sms');
+  assert.ok(['A', 'B', 'C', 'D', 'E', 'F'].includes(smsNoDirectionIntelligence.grade), `SMS-driven human contact produces a real grade, got ${smsNoDirectionIntelligence.grade}`);
+  ok('a correctly probe-matched imported SMS with no direction value still contributes full Intelligence evidence, including inbound_sms_count (regression for the direction-filter bug)');
+
   assert.strictEqual(summary1.intelligence_updated, 1, 'prb_closed_with_comms had a pre-existing row -> updated');
-  assert.strictEqual(summary1.intelligence_created, 9, 'the other 9 probes create a fresh row');
+  assert.strictEqual(summary1.intelligence_created, 10, 'the other 10 probes create a fresh row');
   const preExisting = allIntelligence.find((r) => r.obj.probe_id === 'prb_closed_with_comms');
   assert.strictEqual(preExisting.obj.intelligence_id, 'itl_pre_existing', 'existing INTELLIGENCE row updated in place, not duplicated');
   assert.notStrictEqual(preExisting.obj.grade, 'stale_placeholder', 'stale grade recalculated');
