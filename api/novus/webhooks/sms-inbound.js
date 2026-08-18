@@ -19,6 +19,7 @@ import { getRepo } from '../../../lib/sheets.mjs';
 import { newRawEventId, newCommunicationId } from '../../../lib/ids.mjs';
 import { normalizePhone, canonicalTimestamp } from '../../../lib/normalize.mjs';
 import { matchAgencyByPhone, matchActiveProbe } from '../../../lib/phone-matching.mjs';
+import { matchAgencyByName } from '../../../lib/agency-content-matching.mjs';
 import { classifyCommunication } from '../../../lib/classification.mjs';
 import { requireTwilioSignature, parseTwilioBody, sendTwiml } from '../../../lib/twilio-webhook.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
@@ -77,18 +78,30 @@ export default async function handler(req, res) {
 
     // 2) Deterministic Agency match by phone, then (only if matched)
     // deterministic Probe match. Never guessed.
-    const agencyResult = await matchAgencyByPhone(repo, fromRaw);
+    let agencyResult = await matchAgencyByPhone(repo, fromRaw);
+
+    // Deterministic phone match found nothing — fall back to an explicit,
+    // unambiguous agency-name mention in the SMS body. Same conservative
+    // rule as email: never guessed, never used ahead of the phone match.
+    if (agencyResult.match_status === 'unmatched') {
+      const contentResult = await matchAgencyByName(repo, bodyText);
+      if (contentResult.match_status !== 'unmatched') {
+        agencyResult = contentResult;
+      }
+    }
 
     let matchStatus = agencyResult.match_status;
     let matchingMethod = agencyResult.matching_method;
     let matchScore = agencyResult.match_score;
     const agencyId = agencyResult.agency_id;
     let probeId = '';
+    let probeTimestamp;
 
     if (agencyResult.match_status === 'matched') {
       const probeResult = await matchActiveProbe(repo, agencyId, new Date());
       if (probeResult.status === 'matched') {
         probeId = probeResult.probe_id;
+        probeTimestamp = probeResult.probe_timestamp;
         matchStatus = 'matched';
       } else if (probeResult.status === 'ambiguous') {
         matchStatus = 'ambiguous';
@@ -103,7 +116,10 @@ export default async function handler(req, res) {
 
     // 3) The Communication Event.
     const normalizedFrom = normalizePhone(fromRaw);
-    const tags = classifyCommunication({ channel: 'sms', source_identifier_raw: fromRaw, source_identifier_normalized: normalizedFrom, subject: '', body_text: bodyText });
+    const tags = classifyCommunication(
+      { channel: 'sms', source_identifier_raw: fromRaw, source_identifier_normalized: normalizedFrom, subject: '', body_text: bodyText, occurred_at: occurredAt },
+      { probeTimestamp }
+    );
 
     const communicationId = newCommunicationId();
     await repo.appendRecord('COMMUNICATIONS', {

@@ -106,11 +106,13 @@ export default async function handler(req, res) {
     let matchScore = agencyResult.match_score;
     const agencyId = agencyResult.agency_id;
     let probeId = '';
+    let probeTimestamp;
 
     if (agencyResult.match_status === 'matched') {
       const probeResult = await matchActiveProbe(repo, agencyId, now);
       if (probeResult.status === 'matched') {
         probeId = probeResult.probe_id;
+        probeTimestamp = probeResult.probe_timestamp;
         matchStatus = 'matched';
       } else if (probeResult.status === 'ambiguous') {
         matchStatus = 'ambiguous';
@@ -125,9 +127,13 @@ export default async function handler(req, res) {
 
     // 3) The Communication Event. A phone call is, on its face, made by a
     // person — classifyCommunication defaults voice/SMS to human contact
-    // unless a known auto-ack signal is present (there is none at ringing time).
+    // unless a known auto-ack signal is present (there is none at ringing time,
+    // before any transcript exists — see voice-recording.js for re-classification).
     const normalizedFrom = normalizePhone(fromRaw);
-    const tags = classifyCommunication({ channel: 'voice', source_identifier_raw: fromRaw, source_identifier_normalized: normalizedFrom, subject: '', body_text: '' });
+    const tags = classifyCommunication(
+      { channel: 'voice', source_identifier_raw: fromRaw, source_identifier_normalized: normalizedFrom, subject: '', body_text: '', occurred_at: occurredAt },
+      { probeTimestamp }
+    );
 
     const communicationId = newCommunicationId();
     await repo.appendRecord('COMMUNICATIONS', {

@@ -26,6 +26,8 @@
 import { getRepo } from '../../../lib/sheets.mjs';
 import { newRawEventId } from '../../../lib/ids.mjs';
 import { classifyCommunication } from '../../../lib/classification.mjs';
+import { matchAgencyByName } from '../../../lib/agency-content-matching.mjs';
+import { matchActiveProbe } from '../../../lib/phone-matching.mjs';
 import { requireTwilioSignature, parseTwilioBody } from '../../../lib/twilio-webhook.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 
@@ -106,10 +108,56 @@ export default async function handler(req, res) {
       patch.call_status = 'voicemail';
     } else {
       patch.transcript = String(body.TranscriptionText || '');
-      // Re-classify now that transcript text is available (e.g. a spoken
-      // auto-ack), unless a human already corrected this row.
+
       if (!isOverridden(comm)) {
-        const tags = classifyCommunication({ ...comm, channel: 'voice', body_text: patch.transcript });
+        // Deterministic phone matching found no agency at ringing time —
+        // now that a transcript exists, fall back to an explicit,
+        // unambiguous agency-name mention in it (e.g. "it's Kareena from
+        // Aspire Estate Agents..."). Same conservative rule as the other
+        // channels: never used ahead of the phone match, never guessed —
+        // an ambiguous or unrecognisable (e.g. garbled) transcript simply
+        // leaves the row unmatched for manual review.
+        if (comm.match_status === 'unmatched' && !comm.agency_id) {
+          const contentResult = await matchAgencyByName(repo, patch.transcript);
+          if (contentResult.match_status === 'matched') {
+            const probeResult = await matchActiveProbe(repo, contentResult.agency_id, new Date());
+            patch.agency_id = contentResult.agency_id;
+            if (probeResult.status === 'matched') {
+              patch.probe_id = probeResult.probe_id;
+              patch.match_status = 'matched';
+              patch.matching_method = contentResult.matching_method;
+              patch.match_score = contentResult.match_score;
+            } else if (probeResult.status === 'ambiguous') {
+              patch.match_status = 'ambiguous';
+              patch.matching_method = '';
+              patch.match_score = 0;
+            } else {
+              // Agency identified from content, but no active probe to
+              // attach — still not fully resolved, never guessed further.
+              patch.match_status = 'unmatched';
+              patch.matching_method = '';
+              patch.match_score = 0;
+            }
+            patch.manual_review_status = patch.match_status === 'matched' ? 'not_required' : 'pending';
+          }
+          // ambiguous/unmatched content result: leave the row exactly as it
+          // was — still unmatched, still pending manual review.
+        }
+
+        const linkedProbeId = patch.probe_id || comm.probe_id;
+        let probeTimestamp;
+        if (linkedProbeId) {
+          const probeRecord = await repo.findById('PROBES', 'probe_id', linkedProbeId);
+          probeTimestamp = probeRecord?.obj?.probe_timestamp;
+        }
+
+        // Re-classify now that transcript text (and possibly a newly
+        // resolved agency/probe) is available, unless a human already
+        // corrected this row.
+        const tags = classifyCommunication(
+          { ...comm, ...patch, channel: 'voice', body_text: patch.transcript },
+          { probeTimestamp }
+        );
         patch.automated_or_human = tags.automated_or_human;
         patch.human_contact = tags.human_contact ? 'TRUE' : 'FALSE';
         patch.communication_classification = tags.communication_classification;
@@ -125,12 +173,15 @@ export default async function handler(req, res) {
     });
 
     // Automatic recompute: only when the call this recording/transcription
-    // belongs to was matched to an active probe. Covers both callbacks —
-    // the recording landing (voicemail_present/recording_reference) and the
-    // transcript landing (which can also change classification above).
-    if (comm.probe_id) {
+    // belongs to was matched to an active probe — including a probe newly
+    // resolved above via the transcript's content-based agency fallback.
+    // Covers both callbacks — the recording landing (voicemail_present/
+    // recording_reference) and the transcript landing (which can also
+    // change matching and classification above).
+    const recomputeProbeId = patch.probe_id || comm.probe_id;
+    if (recomputeProbeId) {
       try {
-        await recomputeProbeObservation(repo, comm.probe_id);
+        await recomputeProbeObservation(repo, recomputeProbeId);
       } catch (err) {
         console.error('voice-recording: auto-recompute failed:', err);
       }

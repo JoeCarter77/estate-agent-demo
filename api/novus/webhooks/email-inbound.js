@@ -33,6 +33,7 @@ import { getRepo } from '../../../lib/sheets.mjs';
 import { newRawEventId, newCommunicationId } from '../../../lib/ids.mjs';
 import { normalizeEmail, canonicalTimestamp } from '../../../lib/normalize.mjs';
 import { matchAgency, matchProbe } from '../../../lib/matching.mjs';
+import { matchAgencyByName } from '../../../lib/agency-content-matching.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 
 export const maxDuration = 20;
@@ -122,7 +123,19 @@ export default async function handler(req, res) {
     // 2) Deterministic Agency match, then (only if matched) deterministic
     // Probe match. Neither step ever guesses — ambiguous/unmatched stays that way.
     const senderEmail = normalizeEmail(fromRaw);
-    const agencyResult = await matchAgency(repo, senderEmail);
+    let agencyResult = await matchAgency(repo, senderEmail);
+
+    // Deterministic identifiers found nothing — fall back to looking for an
+    // explicit, unambiguous agency-name mention in the subject/body. Never
+    // used ahead of the identifier match, and never guessed: ambiguous/no
+    // mention stays unmatched for manual review (Source Master rule: AI must
+    // never guess Agency ID).
+    if (agencyResult.match_status === 'unmatched') {
+      const contentResult = await matchAgencyByName(repo, `${body.subject || ''}\n${body.body_text || ''}`);
+      if (contentResult.match_status !== 'unmatched') {
+        agencyResult = contentResult;
+      }
+    }
 
     let matchStatus = agencyResult.match_status;
     let matchingMethod = agencyResult.matching_method;
