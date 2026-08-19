@@ -29,6 +29,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('NOVUS')
     .addItem('Rebuild Intelligence', 'rebuildIntelligence')
+    .addItem('Install auto-recompute on manual match', 'installMatchStatusTrigger')
     .addToUi();
 }
 
