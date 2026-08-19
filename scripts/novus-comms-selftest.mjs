@@ -10,6 +10,26 @@
 
 import assert from 'node:assert';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
+import { __setAiCallerForTests } from '../lib/ai-client.mjs';
+
+// This suite is hermetic (no network, no creds) but recomputeProbeObservation()
+// now always makes one AI interpretation call when a probe is matched. Stub it
+// with a fixed, schema-valid response — these tests assert on matching/webhook
+// mechanics, not on AI interpretation content (see
+// scripts/novus-probe-interpretation-selftest.mjs for that).
+__setAiCallerForTests(async ({ tool }) => {
+  if (tool.name === 'record_probe_diagnosis') {
+    return {
+      primary_problem: '', primary_evidence: '', secondary_problem: '', secondary_evidence: '',
+      strengths: '', missed_opportunities: '', commercial_implication: '',
+      novus_opportunity: 'None evidenced', diagnosis_summary: 'Stubbed for a hermetic test.',
+    };
+  }
+  return {
+    viewing_progression: 'none', buyer_questions_asked: [], seller_recognition: 'none',
+    communication_quality: 'generic', did_well: '', missed: '', evidence: [],
+  };
+});
 
 const AGENCIES_HEADER = [
   'agency_id','agency_name','website','domain','location','branch_count','main_phone',

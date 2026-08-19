@@ -10,6 +10,26 @@
 
 import assert from 'node:assert';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
+import { __setAiCallerForTests } from '../lib/ai-client.mjs';
+
+// This suite is hermetic (no network, no creds) but recomputeProbeObservation()
+// now always makes one AI interpretation call when a probe is matched. Stub it
+// with a fixed, schema-valid response — these tests assert on matching/webhook
+// mechanics, not on AI interpretation content (see
+// scripts/novus-probe-interpretation-selftest.mjs for that).
+__setAiCallerForTests(async ({ tool }) => {
+  if (tool.name === 'record_probe_diagnosis') {
+    return {
+      primary_problem: '', primary_evidence: '', secondary_problem: '', secondary_evidence: '',
+      strengths: '', missed_opportunities: '', commercial_implication: '',
+      novus_opportunity: 'None evidenced', diagnosis_summary: 'Stubbed for a hermetic test.',
+    };
+  }
+  return {
+    viewing_progression: 'none', buyer_questions_asked: [], seller_recognition: 'none',
+    communication_quality: 'generic', did_well: '', missed: '', evidence: [],
+  };
+});
 import { computeTwilioSignature } from '../lib/twilio-signature.mjs';
 import { matchAgencyByPhone } from '../lib/phone-matching.mjs';
 import { classifyCommunication } from '../lib/classification.mjs';
@@ -45,13 +65,11 @@ const RAW_EVENTS_HEADER = [
 ];
 const INTELLIGENCE_HEADER = [
   'intelligence_id','agency_id','probe_id','observation_status','observation_deadline',
-  'auto_acknowledgement','auto_ack_timestamp','crm_detected','crm_name','crm_evidence',
-  'first_human_touch','first_human_touch_at','human_lag_hours','callback_attempts',
-  'successful_conversations','voicemail_count','inbound_sms_count','email_touch_count',
-  'follow_up_count','follow_up_channels','last_touch_at','days_chased','booking_attempt',
-  'contact_quality','proactive_reactive','persistence_profile','channels_used','grade',
-  'grade_reason','tier','tier_reason','sales_angle','segment','ai_evidence_summary','ai_confidence',
-  'manual_override','override_reason','observation_closed_at','created_at','updated_at',
+  'observation_closed_at','human_contact','response_hours','first_human_response_at',
+  'contact_attempts','follow_ups','channels_used',
+  'viewing_progression','buyer_qualification','buyer_questions_asked','seller_recognition',
+  'communication_quality','did_well','missed','evidence',
+  'grade','grade_reason','created_at','updated_at',
 ];
 
 function makeFakeSheet() {
@@ -231,7 +249,6 @@ async function run() {
     assert.strictEqual(comm.probe_id, 'prb_1', 'probe matched (active observation window)');
     assert.strictEqual(comm.channel, 'voice');
     assert.strictEqual(comm.interaction_id, 'CA_001', 'CallSid stored for later recording/transcript correlation');
-    assert.strictEqual(comm.human_contact, 'TRUE', 'a phone call defaults to human contact');
     assert.strictEqual(comm.callback_attempt, 'TRUE', 'every inbound call is evidence of a callback attempt');
     assert.strictEqual(comm.successful_conversation, 'FALSE', 'V1 never connects a live conversation (S16) — deterministic');
     assert.strictEqual(comm.voicemail_present, 'FALSE', 'not yet known at ringing time');
@@ -289,7 +306,6 @@ async function run() {
     assert.strictEqual(comm.duration_seconds, '18');
     assert.strictEqual(comm.recording_reference, 'https://api.twilio.com/rec/RE_001');
     assert.strictEqual(comm.transcript, 'Hi, this is Jane from the agency, please call me back.');
-    assert.strictEqual(comm.human_contact, 'TRUE', 'transcript re-classification confirms human contact');
 
     // Idempotent re-delivery of the same recording callback.
     const resDupRecording = mockRes();
@@ -388,7 +404,7 @@ async function run() {
     const afterFirst = intelligenceRows(store);
     assert.strictEqual(afterFirst.length, 1, 'INTELLIGENCE row created automatically after the call');
     assert.strictEqual(afterFirst[0].grade, 'C', 'single contact attempt, 0 follow-ups -> Grade C');
-    assert.strictEqual(afterFirst[0].follow_up_count, 0);
+    assert.strictEqual(afterFirst[0].follow_ups, 0);
     const intelligenceIdBeforeFollowUp = afterFirst[0].intelligence_id;
 
     // A genuinely separate follow-up SMS, 31 minutes after attempt 1's
@@ -404,7 +420,7 @@ async function run() {
     assert.strictEqual(afterSecond.length, 1, 'still exactly one INTELLIGENCE row — updated in place, not duplicated');
     assert.strictEqual(afterSecond[0].intelligence_id, intelligenceIdBeforeFollowUp, 'same intelligence_id after automatic recalculation');
     assert.strictEqual(afterSecond[0].grade, 'A', `expected A after genuine follow-up, got ${afterSecond[0].grade}: ${afterSecond[0].grade_reason}`);
-    assert.strictEqual(afterSecond[0].follow_up_count, 1, 'contact-attempt count +1, follow-up count +1 — the 31-minute-later SMS is a genuine new attempt');
+    assert.strictEqual(afterSecond[0].follow_ups, 1, 'contact-attempt count +1, follow-up count +1 — the 31-minute-later SMS is a genuine new attempt');
 
     ok('a genuine follow-up communication automatically recalculates INTELLIGENCE from Grade C to Grade A, in the same row, via the webhook trigger alone');
     __setRepoForTests(null);
@@ -424,7 +440,7 @@ async function run() {
     const afterCall = intelligenceRows(store);
     assert.strictEqual(afterCall.length, 1, 'INTELLIGENCE row created automatically after the call');
     const intelligenceIdAfterCall = afterCall[0].intelligence_id;
-    assert.strictEqual(afterCall[0].voicemail_count, 0, 'no recording exists yet at ringing time');
+    assert.strictEqual(afterCall[0].contact_attempts, 1, 'the ringing call already counts as one contact attempt');
 
     await voiceRecording(signedReq({
       path: '/api/novus/webhooks/voice-recording',
@@ -434,7 +450,7 @@ async function run() {
     const afterRecording = intelligenceRows(store);
     assert.strictEqual(afterRecording.length, 1, 'still exactly one INTELLIGENCE row — recalculated in place');
     assert.strictEqual(afterRecording[0].intelligence_id, intelligenceIdAfterCall, 'same intelligence_id after the recording callback');
-    assert.strictEqual(afterRecording[0].voicemail_count, 1, 'voicemail_count reflects the newly landed recording, via automatic recompute');
+    assert.strictEqual(afterRecording[0].contact_attempts, 1, 'the recording callback patches the same contact attempt, via automatic recompute, rather than creating a new one');
 
     ok('a recording callback (not just a new COMMUNICATIONS row) also triggers automatic recompute for its probe_id');
     __setRepoForTests(null);

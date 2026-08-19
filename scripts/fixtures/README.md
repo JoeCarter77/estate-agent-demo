@@ -4,10 +4,14 @@ CSV exports of the four NOVUS workbook tabs, in the exact live header order,
 used by `npm run novus:pipeline-regression`.
 
 These are **production-shaped**: every `COMMUNICATIONS` row already carries an
-`automated_or_human` value (written by an earlier deploy) with
-`communication_classification`, `intent` and `contact_quality` left blank —
-the state that the old stale-classification guard made permanent, and which
-the rebuild now repairs.
+`automated_or_human` value (written by an earlier deploy). `INTELLIGENCE` and
+`DIAGNOSIS` are in the V2 schema (docs/V2_COMMS_INTELLIGENCE_DIAGNOSIS_SCHEMA.md)
+— the rebuild AI-interprets every probe once (`communication_quality` etc. are
+blank until then) and never again once populated.
+
+Running the regression makes real AI calls unless you inject a fake caller —
+see `scripts/novus-pipeline-regression.mjs`'s use of
+`lib/ai-client.mjs`'s `__setAiCallerForTests()`.
 
 ## Using your own exports
 

@@ -30,7 +30,31 @@ import { createRepo } from '../lib/sheets.mjs';
 import { rebuildAllIntelligence } from '../lib/intelligence-rebuild.mjs';
 import { rebuildAllDiagnosis } from '../lib/diagnosis-rebuild.mjs';
 import { isHumanCommunication, interpretCommunication } from '../lib/classification.mjs';
-import { readVendorStatus } from '../lib/vendor-intent.mjs';
+import { __setAiCallerForTests } from '../lib/ai-client.mjs';
+
+// This regression harness runs entirely offline (no network, no creds): the
+// AI half of the V2 pipeline (lib/probe-interpretation.mjs, lib/probe-diagnosis.mjs)
+// is stubbed with a fixed, schema-valid response. That's enough to exercise
+// every rebuild mechanic this script actually checks — population counts,
+// the "only interpret once" rule, and idempotency — without asserting
+// anything about interpretation QUALITY, which is a job for real fixture
+// content instead (see the worked examples in
+// docs/V2_COMMS_INTELLIGENCE_DIAGNOSIS_SCHEMA.md §7).
+__setAiCallerForTests(async ({ tool }) => {
+  if (tool.name === 'record_probe_diagnosis') {
+    return {
+      primary_problem: 'Stubbed primary problem for pipeline-regression.', primary_evidence: 'Stubbed evidence.',
+      secondary_problem: '', secondary_evidence: '',
+      strengths: 'Stubbed strengths.', missed_opportunities: 'Stubbed missed opportunity.',
+      commercial_implication: 'Stubbed commercial implication.', novus_opportunity: 'Core (front desk)',
+      diagnosis_summary: 'Stubbed diagnosis summary — pipeline-regression checks rebuild mechanics, not AI content.',
+    };
+  }
+  return {
+    viewing_progression: 'mentioned', buyer_questions_asked: [], seller_recognition: 'none',
+    communication_quality: 'competent', did_well: 'Stubbed did_well.', missed: 'Stubbed missed.', evidence: [],
+  };
+});
 
 const TABS = ['PROBES', 'COMMUNICATIONS', 'INTELLIGENCE', 'DIAGNOSIS'];
 
@@ -127,23 +151,19 @@ function measure(store) {
   const humanComms = comms.filter((c) => isHumanCommunication(c));
 
   return {
-    'human communications classified': humanComms.filter((c) => filled(c.automated_or_human) && filled(c.human_contact)).length,
-    // The metric that exposes the stale-classification guard directly: a row
-    // counts here only if the values ON the row are what the CURRENT
-    // classification logic produces for it. Rows frozen by the old
-    // isClassified() guard fail this even though they look "classified".
+    'human communications classified (automated_or_human)': humanComms.filter((c) => filled(c.automated_or_human)).length,
+    // The metric that exposes a stale-classification guard directly: a row
+    // counts here only if the value ON the row is what the CURRENT
+    // classification logic produces for it.
     'human comms matching current logic': humanComms.filter((c) => {
       const now = interpretCommunication(c);
-      return ['automated_or_human', 'human_contact', 'communication_classification', 'booking_attempt', 'contact_quality']
-        .every((k) => String(c[k] ?? '') === String(now[k]));
+      return String(c.automated_or_human ?? '') === String(now.automated_or_human);
     }).length,
-    'communication_classification': comms.filter((c) => filled(c.communication_classification)).length,
-    'intent': comms.filter((c) => filled(c.intent)).length,
-    'contact_quality (COMMUNICATIONS)': comms.filter((c) => filled(c.contact_quality)).length,
-    'vendor-opportunity evidence': intel.filter((r) => readVendorStatus(r.ai_evidence_summary) !== '').length,
-    'ai_evidence_summary': intel.filter((r) => filled(r.ai_evidence_summary)).length,
-    'proactive_reactive': intel.filter((r) => filled(r.proactive_reactive)).length,
-    'meaningful Diagnosis outputs': diag.filter((r) => filled(r.primary_problem) && !/^none observed/i.test(String(r.primary_problem).trim())).length,
+    'deterministic grade populated': intel.filter((r) => filled(r.grade)).length,
+    'AI interpretation run (communication_quality)': intel.filter((r) => filled(r.communication_quality)).length,
+    'viewing_progression': intel.filter((r) => filled(r.viewing_progression)).length,
+    'evidence (INTELLIGENCE)': intel.filter((r) => filled(r.evidence)).length,
+    'meaningful Diagnosis outputs (diagnosis_summary)': diag.filter((r) => filled(r.diagnosis_summary)).length,
     _totals: { communications: comms.length, human_communications: humanComms.length, intelligence: intel.length, diagnosis: diag.length },
     _grades: intel.reduce((acc, r) => { const g = String(r.grade || '').trim() || '(blank)'; acc[g] = (acc[g] || 0) + 1; return acc; }, {}),
   };
@@ -168,8 +188,10 @@ async function run() {
 
   const before = measure(store);
 
+  const probesById = new Map(records(store, 'PROBES', 'probe_id').map((p) => [p.probe_id, p]));
+
   const intelligenceSummary = await rebuildAllIntelligence(makeRepoFromStore(store));
-  const diagnosisSummary = await rebuildAllDiagnosis(makeRepoFromStore(store));
+  const diagnosisSummary = await rebuildAllDiagnosis(makeRepoFromStore(store), probesById);
 
   const after = measure(store);
 
@@ -184,7 +206,7 @@ async function run() {
   }));
   const snapshot = stableSnapshot();
   await rebuildAllIntelligence(makeRepoFromStore(store));
-  await rebuildAllDiagnosis(makeRepoFromStore(store));
+  await rebuildAllDiagnosis(makeRepoFromStore(store), probesById);
   const idempotent = stableSnapshot() === snapshot;
 
   const metrics = Object.keys(before).filter((k) => !k.startsWith('_'));
