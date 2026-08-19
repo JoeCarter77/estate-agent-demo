@@ -38,6 +38,14 @@
 //      finalised-probe freeze layered on top — a finalised probe costs
 //      nothing from the AI-call budget, so budget goes entirely to probes
 //      that still have real work.
+//  10. A historical probe with a BLANK PROBES.observation_deadline gets it
+//      derived (probe_timestamp + 4 days) and persisted back onto PROBES —
+//      and if that derived deadline has already passed, the probe closes
+//      and gets its final Diagnosis in that same pass. A probe still within
+//      its derived window is backfilled but stays open. A probe that
+//      already HAS an observation_deadline is never touched, even if it's
+//      a different value than probe_timestamp + 4 days would give. All of
+//      it is idempotent — a second pass changes nothing further.
 //
 // Run: npm run novus:lifecycle-selftest
 
@@ -383,6 +391,80 @@ async function run() {
   assert.strictEqual(budgeted.remaining_interpretations, 0, 'no finalised probe counts as "remaining" work — they are frozen, not queued');
   assert.ok(budgeted.probes_finalized_skipped >= 3, 'finalised probes are reported as skipped, not as spending budget');
   ok('AI-call batching (the 504-timeout fix) still holds with the finalised-probe freeze layered on top — frozen probes cost nothing from the budget (requirement 9; full batching regression: npm run novus:rebuild-batching-selftest)');
+
+  // ── 10: Blank observation_deadline backfill for historical probes ───────
+  // Historical probe A: past deadline once derived (probe_timestamp+4days),
+  // has communications, blank observation_deadline on PROBES — models a
+  // real pre-lifecycle-feature import.
+  const histSentAt = new Date(OLD_TIMESTAMP);
+  const histDerivedDeadline = new Date(histSentAt.getTime() + 4 * 24 * 60 * 60 * 1000);
+  store.PROBES.push(row(PROBES_HEADER, {
+    probe_id: 'prb_hist_expired', probe_reference: 'RM-HIST-EXP', agency_id: 'agc_e',
+    property_address: '5 Historical Street', property_price: '£310,000',
+    enquiry_text: 'Interested in viewing this property.',
+    probe_timestamp: histSentAt.toISOString(),
+    observation_deadline: '', // blank — never written when this probe was imported
+    probe_status: 'observing',
+  }));
+  store.COMMUNICATIONS.push(row(COMMUNICATIONS_HEADER, {
+    communication_id: 'com_hist_1', agency_id: 'agc_e', probe_id: 'prb_hist_expired',
+    occurred_at: new Date(histSentAt.getTime() + 45 * 60 * 1000).toISOString(),
+    channel: 'email', body_text: 'Happy to arrange a viewing.', match_status: 'matched',
+  }));
+
+  // Historical probe B: same blank observation_deadline, but sent recently
+  // enough that its derived deadline hasn't passed yet — must be backfilled
+  // but must stay open (no Diagnosis).
+  const histRecentSentAt = new Date(Date.now() - 60 * 60 * 1000); // 1h ago
+  store.PROBES.push(row(PROBES_HEADER, {
+    probe_id: 'prb_hist_future', probe_reference: 'RM-HIST-FUT', agency_id: 'agc_f',
+    property_address: '6 Historical Avenue', property_price: '£320,000',
+    enquiry_text: 'Interested.', probe_timestamp: histRecentSentAt.toISOString(),
+    observation_deadline: '', probe_status: 'observing',
+  }));
+
+  // Control probe: an EXPLICIT observation_deadline that is deliberately
+  // NOT probe_timestamp + 4 days (and already past) — must survive
+  // byte-for-byte, proving the backfill only ever touches a truly blank cell.
+  const explicitDeadline = new Date(histSentAt.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString(); // +10 days, not +4
+  store.PROBES.push(row(PROBES_HEADER, {
+    probe_id: 'prb_explicit_deadline', probe_reference: 'RM-EXPLICIT', agency_id: 'agc_g',
+    property_address: '7 Explicit Road', property_price: '£330,000',
+    enquiry_text: 'Interested.', probe_timestamp: histSentAt.toISOString(),
+    observation_deadline: explicitDeadline, probe_status: 'observing',
+  }));
+
+  await runRebuildPass(repo, {});
+
+  const histExpiredProbe = findRow(store, 'PROBES', PROBES_HEADER, 'prb_hist_expired');
+  assert.strictEqual(histExpiredProbe.observation_deadline, histDerivedDeadline.toISOString(), 'the blank deadline is derived as probe_timestamp + 4 days and persisted onto PROBES');
+  assert.strictEqual(histExpiredProbe.probe_status, 'closed', 'the derived deadline had already passed, so the probe closes in the same pass');
+  const histExpiredIntel = findRow(store, 'INTELLIGENCE', INTELLIGENCE_HEADER, 'prb_hist_expired');
+  assert.strictEqual(histExpiredIntel.observation_status, 'closed');
+  const histExpiredDiag = findRow(store, 'DIAGNOSIS', DIAGNOSIS_HEADER, 'prb_hist_expired');
+  assert.ok(histExpiredDiag && histExpiredDiag.diagnosis_summary, 'the final Diagnosis is generated and frozen in the very same pass that backfilled the deadline');
+  ok('a historical probe with a blank observation_deadline whose derived deadline has already passed is backfilled, closed, and diagnosed in one pass (requirement 10a)');
+
+  const histFutureProbe = findRow(store, 'PROBES', PROBES_HEADER, 'prb_hist_future');
+  const histFutureDerivedDeadline = new Date(histRecentSentAt.getTime() + 4 * 24 * 60 * 60 * 1000).toISOString();
+  assert.strictEqual(histFutureProbe.observation_deadline, histFutureDerivedDeadline, 'the blank deadline is backfilled even for a probe still within its window');
+  assert.strictEqual(histFutureProbe.probe_status, 'observing', 'the derived deadline has not passed yet, so the probe stays open');
+  assert.strictEqual(findRow(store, 'DIAGNOSIS', DIAGNOSIS_HEADER, 'prb_hist_future'), undefined, 'no Diagnosis for a backfilled-but-still-open probe');
+  ok('a historical probe with a blank observation_deadline still within its derived window is backfilled but stays open, with no Diagnosis (requirement 10b)');
+
+  const explicitProbe = findRow(store, 'PROBES', PROBES_HEADER, 'prb_explicit_deadline');
+  assert.strictEqual(explicitProbe.observation_deadline, explicitDeadline, 'a probe that already has an observation_deadline is never altered, even though it differs from probe_timestamp + 4 days');
+  ok('a probe with an existing observation_deadline is left completely untouched by the backfill (requirement 10c)');
+
+  // Idempotency: a second pass changes nothing further for any of the three.
+  const aiCountsBeforeSecond = { interpret: interpretCallCount, diagnose: diagnoseCallCount };
+  const secondBackfillPass = await runRebuildPass(repo, {});
+  assert.strictEqual(interpretCallCount, aiCountsBeforeSecond.interpret, 'a second pass makes no further AI interpretation calls for these probes');
+  assert.strictEqual(diagnoseCallCount, aiCountsBeforeSecond.diagnose, 'a second pass makes no further AI diagnosis calls — prb_hist_expired is now finalised, prb_hist_future is still open');
+  assert.deepStrictEqual(findRow(store, 'PROBES', PROBES_HEADER, 'prb_hist_expired'), histExpiredProbe, 'prb_hist_expired PROBES row is byte-identical after a second pass');
+  assert.deepStrictEqual(findRow(store, 'PROBES', PROBES_HEADER, 'prb_hist_future'), histFutureProbe, 'prb_hist_future PROBES row is byte-identical after a second pass (already backfilled, still open)');
+  assert.deepStrictEqual(findRow(store, 'PROBES', PROBES_HEADER, 'prb_explicit_deadline'), explicitProbe, 'prb_explicit_deadline PROBES row is byte-identical after a second pass');
+  ok('the backfill is fully idempotent — a second rebuild pass changes nothing further for any of these probes (requirement 10d)');
 
   console.log(`\n${passed} checks passed.`);
 }
