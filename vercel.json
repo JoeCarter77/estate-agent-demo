@@ -16,5 +16,11 @@
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/novus/intelligence/finalize",
+      "schedule": "0 * * * *"
+    }
   ]
 }

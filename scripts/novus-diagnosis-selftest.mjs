@@ -7,7 +7,8 @@
 //   - AI diagnosis runs exactly once per probe that has never been diagnosed
 //     (diagnosis_summary blank) — a probe already diagnosed is left alone
 //   - a second rebuild makes ZERO further AI calls
-//   - force_ai:true re-runs every closed probe regardless
+//   - a diagnosed probe is FINALISED/FROZEN: force_ai has no effect on it
+//     (probe lifecycle requirement — Diagnosis is generated once, ever)
 //
 // Run: npm run novus:probe-diagnosis-selftest -- covers the unit; this one
 // covers the batch-rebuild orchestration: npm run novus:diagnosis-selftest
@@ -132,10 +133,14 @@ async function run() {
   assert.strictEqual(aiCallCount, 0);
   ok('a second rebuild is fully idempotent: zero AI calls');
 
-  // ── force_ai re-runs every closed probe ──
+  // ── Diagnosis is finalised/frozen: opts.forceAi has no effect on a probe
+  // that already has a diagnosis_summary, unlike INTELLIGENCE's forceAi
+  // (probe lifecycle requirement — a Diagnosis is generated exactly once and
+  // never regenerated, forced or not). Both prb_a and prb_c are diagnosed by
+  // this point.
   const forced = await rebuildAllDiagnosis(repo, probesById, { forceAi: true });
-  assert.strictEqual(forced.ai_diagnoses_run, 2, 'force_ai re-diagnoses both closed probes, including the already-diagnosed one');
-  ok('force_ai:true re-runs diagnosis for every closed probe');
+  assert.strictEqual(forced.ai_diagnoses_run, 0, 'forceAi does not re-diagnose an already-finalised probe — Diagnosis is frozen once written');
+  ok('opts.forceAi has no effect once a probe is diagnosed — Diagnosis is frozen for good');
 
   console.log(`\n${passed} checks passed.`);
 }

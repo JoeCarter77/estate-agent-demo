@@ -163,8 +163,12 @@ async function handleMarkSent(body, res) {
     const record = await repo.findById('PROBES', 'probe_id', probeId);
     if (!record) return res.status(404).json({ error: 'Probe not found' });
 
-    // Already sent → return as-is (do not reset the window).
-    if (record.obj.probe_status === 'observing' && record.obj.probe_timestamp) {
+    // Already sent → return as-is (do not reset the window). Covers both
+    // 'observing' (mid-window) and 'closed' (finalised, frozen) — anything
+    // other than 'draft' means this probe was already sent once and must
+    // never have its probe_timestamp/observation_deadline reset, including
+    // a closed probe that must stay frozen, never re-armed.
+    if (record.obj.probe_status && record.obj.probe_status !== 'draft' && record.obj.probe_timestamp) {
       return res.status(200).json({ probe: record.obj, already_sent: true });
     }
 

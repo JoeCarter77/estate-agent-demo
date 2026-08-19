@@ -24,9 +24,14 @@
 // path returns, NOT wrapped in the full-rebuild summary shape, and
 // short-circuits before touching the full-rebuild path.
 //
-// Optional body: { "force_ai": true } — re-runs AI interpretation/diagnosis
-// on every probe, even ones already interpreted/diagnosed. Use after a
+// Optional body: { "force_ai": true } — re-runs AI interpretation on every
+// probe that isn't yet finalised, even ones already interpreted. Use after a
 // prompt change; otherwise leave unset so a routine rebuild costs no AI calls.
+// Has no effect on DIAGNOSIS: once a probe is finalised (closed, with a
+// non-blank DIAGNOSIS.diagnosis_summary) it is frozen for good — see the
+// probe-lifecycle comments in lib/diagnosis-rebuild.mjs and
+// lib/intelligence-rebuild.mjs. force_ai only ever touches probes that
+// haven't been finalised yet.
 //
 // BATCHING (fixes 504 FUNCTION_INVOCATION_TIMEOUT on large historical
 // datasets): the deterministic pass and the sheet writes are cheap and
@@ -48,8 +53,7 @@
 // budget (default below / NOVUS_REBUILD_BATCH_SIZE). Mainly for tests.
 
 import { getRepo } from '../../../lib/sheets.mjs';
-import { rebuildAllIntelligence } from '../../../lib/intelligence-rebuild.mjs';
-import { rebuildAllDiagnosis } from '../../../lib/diagnosis-rebuild.mjs';
+import { runRebuildPass } from '../../../lib/rebuild-pass.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 import { requireAuth } from '../_auth.mjs';
 
@@ -83,24 +87,9 @@ export default async function handler(req, res) {
       return res.status(200).json(result);
     }
 
-    const intelligenceSummary = await rebuildAllIntelligence(repo, { forceAi, maxAiCalls: batchSize });
+    const summary = await runRebuildPass(repo, { forceAi, maxAiCalls: batchSize });
 
-    // Diagnosis gets whatever's left of this invocation's AI-call budget
-    // after interpretation spent its share, so one call never runs more
-    // than `batch_size` AI calls total.
-    const diagnosisBudget = Math.max(0, batchSize - intelligenceSummary.ai_interpretations_run);
-
-    // DIAGNOSIS prompts need the probe's property/price for context —
-    // loaded once here rather than inside the rebuild loop.
-    const probeRecords = await repo.getRecords('PROBES', 'probe_id');
-    const probesById = new Map(probeRecords.map((r) => [r.obj.probe_id, r.obj]));
-
-    const diagnosisSummary = await rebuildAllDiagnosis(repo, probesById, { forceAi, maxAiCalls: diagnosisBudget });
-    const complete = intelligenceSummary.remaining_interpretations === 0
-      && diagnosisSummary.remaining_diagnoses === 0;
-    const response = { ...intelligenceSummary, diagnosis: diagnosisSummary, complete, batch_size: batchSize };
-
-    return res.status(200).json(response);
+    return res.status(200).json({ ...summary, batch_size: batchSize });
   } catch (err) {
     console.error('intelligence rebuild-all error:', err);
     return res.status(500).json({ error: err.message || 'Failed to rebuild intelligence' });
