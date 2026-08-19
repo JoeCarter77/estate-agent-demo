@@ -40,14 +40,21 @@
 //
 // AUTH: Cron requests aren't a human with the NOVUS_BASIC_AUTH password, and
 // they aren't a provider webhook with a payload to verify either — Vercel
-// calls this on its own schedule. Verified with a shared secret
-// (NOVUS_CRON_SECRET) sent as `Authorization: Bearer <secret>`, matching
-// Vercel's own documented convention for securing Cron Job endpoints. Set
-// NOVUS_CRON_SECRET as a Vercel env var; Vercel automatically attaches that
-// header to its own Cron requests once an env var of that exact name exists
-// (see https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs),
-// but this handler checks it explicitly either way, the same
-// requireIngestSecret-style pattern api/novus/webhooks/email-inbound.js uses.
+// calls this on its own schedule. Verified with a shared secret sent as
+// `Authorization: Bearer <secret>`, matching Vercel's own documented
+// convention for securing Cron Job endpoints. Vercel ONLY auto-attaches that
+// header — on both its scheduled firing AND the dashboard's manual "Run"
+// button — when the env var holding the secret is named EXACTLY
+// `CRON_SECRET` (see https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs).
+// A differently-named var (e.g. the NOVUS_CRON_SECRET this endpoint used to
+// check) never gets attached at all, so every invocation — cron or manual
+// Run — 401s before runRebuildPass() ever runs, silently leaving every
+// probe stuck at 'observing' no matter how expired its deadline is. Set
+// CRON_SECRET as a Vercel env var. NOVUS_CRON_SECRET is still accepted as a
+// fallback name (for anyone who already configured it under the old name),
+// but only CRON_SECRET gets Vercel's automatic header — this handler checks
+// it explicitly either way, the same requireIngestSecret-style pattern
+// api/novus/webhooks/email-inbound.js uses.
 //
 // Schedule granularity: see the "crons" entry in vercel.json. Vercel Hobby
 // projects are limited to once-daily Cron invocations; Pro/Enterprise allow
@@ -74,9 +81,12 @@ function safeEqual(a, b) {
 }
 
 function requireCronSecret(req, res) {
-  const expected = process.env.NOVUS_CRON_SECRET;
+  // CRON_SECRET must come first: it's the only name Vercel will ever
+  // auto-attach an Authorization header for. NOVUS_CRON_SECRET is a
+  // fallback for a value already configured under the old name.
+  const expected = process.env.CRON_SECRET || process.env.NOVUS_CRON_SECRET;
   if (!expected) {
-    res.status(500).json({ error: 'NOVUS_CRON_SECRET is not configured' });
+    res.status(500).json({ error: 'CRON_SECRET is not configured' });
     return false;
   }
   const header = req.headers?.authorization || '';
