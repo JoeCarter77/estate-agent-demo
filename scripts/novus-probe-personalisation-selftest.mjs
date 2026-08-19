@@ -159,6 +159,77 @@ async function run() {
     ok('hero_journey is derived deterministically from Intelligence/Diagnosis shape for every branch, with no AI call involved');
   }
 
+  // ── hero_journey response-speed regression: aligned to lib/grading.mjs's
+  // own ">1h and <=16h = Fast, >16h = Slow" boundary (Source Master §10),
+  // not a second, independently-chosen threshold. Every case below has a
+  // non-blank primary_problem (a real Diagnosis finding), since the speed
+  // band only matters once "handled well" has already been ruled out. ──
+  {
+    // Real, previously-misclassified cases (all genuinely Fast per the
+    // grading engine — grade B/D — but were landing on 'slow_response_gap'
+    // under the old <=6h threshold).
+    assert.strictEqual(
+      pickHeroJourney(baseIntelligence({ response_hours: 1.581944444, seller_recognition: '', follow_ups: 2 }), baseDiagnosis()),
+      'fast_response_stalled_follow_up',
+      '1.58h (prb_hist_0018 shape) is Fast, not a response-speed gap'
+    );
+    assert.strictEqual(
+      pickHeroJourney(baseIntelligence({ response_hours: 6, seller_recognition: '', follow_ups: 1 }), baseDiagnosis()),
+      'fast_response_stalled_follow_up',
+      '6h is Fast under the real >1h/<=16h boundary — the old <=6h cutoff is gone, not just relocated'
+    );
+    assert.strictEqual(
+      pickHeroJourney(baseIntelligence({ response_hours: 11.96805556, seller_recognition: '', follow_ups: 1 }), baseDiagnosis()),
+      'fast_response_stalled_follow_up',
+      '11.97h (prb_hist_0014 shape) is Fast'
+    );
+    assert.strictEqual(
+      pickHeroJourney(baseIntelligence({ response_hours: 11.45194444, seller_recognition: 'asked_position', viewing_progression: 'availability_requested', follow_ups: 1 }), baseDiagnosis()),
+      'weak_seller_qualification',
+      '11.45h (prb_hist_0012 shape) is Fast AND the seller thread stalled — previously misrouted to slow_response_gap because 11.45h > the old 6h cutoff'
+    );
+
+    // The 16h boundary itself, both sides — must agree with grading.mjs's
+    // own inclusive "lagHours <= 16" test exactly, not a re-derived value.
+    assert.strictEqual(
+      pickHeroJourney(baseIntelligence({ response_hours: 16, seller_recognition: '', follow_ups: 1 }), baseDiagnosis()),
+      'fast_response_stalled_follow_up',
+      'exactly 16h is still Fast (inclusive boundary, matches grade B/D)'
+    );
+    assert.strictEqual(
+      pickHeroJourney(baseIntelligence({ response_hours: 16.01, seller_recognition: '', follow_ups: 1 }), baseDiagnosis()),
+      'slow_response_gap',
+      'just past 16h is Slow (matches grade E/F)'
+    );
+
+    // No response at all — independent of any response_hours value.
+    assert.strictEqual(
+      pickHeroJourney(baseIntelligence({ human_contact: 'none', response_hours: '' }), baseDiagnosis()),
+      'complete_miss',
+      'no response is complete_miss regardless of speed banding'
+    );
+
+    // Fast + no qualification, no seller thread at all — must land on the
+    // shallow/stalled journey, never a speed-gap label.
+    assert.strictEqual(
+      pickHeroJourney(baseIntelligence({ response_hours: 3, seller_recognition: '', viewing_progression: 'invited', buyer_qualification: 'none', follow_ups: 1 }), baseDiagnosis()),
+      'fast_response_stalled_follow_up',
+      'fast response with no buyer qualification is fast-but-shallow, not a response-speed gap'
+    );
+
+    // Strong handling (blank primary_problem) is decided before any speed
+    // banding is even consulted — confirmed again here at a fast response
+    // time specifically, so a future change to the speed logic can't
+    // accidentally start routing strong probes through it.
+    assert.strictEqual(
+      pickHeroJourney(baseIntelligence({ response_hours: 0.53 }), baseDiagnosis({ primary_problem: '', novus_opportunity: 'None evidenced' })),
+      'strong_handling_no_opportunity',
+      'a blank primary_problem short-circuits before response-speed banding, even at a fast response time'
+    );
+
+    ok('hero_journey response-speed banding matches lib/grading.mjs\'s own >1h/<=16h Fast boundary exactly, including at both edges of 16h, and never mislabels a fast probe as a response-speed gap');
+  }
+
   console.log(`\n${passed} checks passed.`);
 }
 
