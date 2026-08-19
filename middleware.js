@@ -12,6 +12,11 @@
 // verified by provider signature, not by this human password. Keeping the two
 // auth schemes separate is deliberate.
 //
+// api/novus/intelligence/finalize.js (the probe-finalisation Vercel Cron entry
+// point) is skipped for the same reason: Vercel Cron calls it on its own
+// schedule with no human present to supply the Basic Auth credential — it
+// authenticates itself with NOVUS_CRON_SECRET instead (see that file).
+//
 // Env: NOVUS_BASIC_AUTH_USER, NOVUS_BASIC_AUTH_PASS
 
 export const config = {
@@ -32,6 +37,10 @@ export default function middleware(req) {
 
   // Future webhook endpoints authenticate by provider signature, not Basic Auth.
   if (pathname.startsWith('/api/novus/webhooks')) return;
+
+  // The probe-finalisation Cron endpoint authenticates by NOVUS_CRON_SECRET,
+  // not Basic Auth — see api/novus/intelligence/finalize.js.
+  if (pathname === '/api/novus/intelligence/finalize') return;
 
   const user = process.env.NOVUS_BASIC_AUTH_USER;
   const pass = process.env.NOVUS_BASIC_AUTH_PASS;
