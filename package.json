@@ -22,7 +22,8 @@
     "novus:probe-interpretation-selftest": "node scripts/novus-probe-interpretation-selftest.mjs",
     "novus:probe-diagnosis-selftest": "node scripts/novus-probe-diagnosis-selftest.mjs",
     "novus:diagnosis-persistence-selftest": "node scripts/novus-diagnosis-persistence-selftest.mjs",
-    "novus:lifecycle-selftest": "node scripts/novus-lifecycle-selftest.mjs"
+    "novus:lifecycle-selftest": "node scripts/novus-lifecycle-selftest.mjs",
+    "novus:match-status-recompute-selftest": "node scripts/novus-match-status-recompute-selftest.mjs"
   },
   "dependencies": {
     "@vercel/oidc": "^3.8.4",
