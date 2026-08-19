@@ -27,6 +27,25 @@
 // Optional body: { "force_ai": true } — re-runs AI interpretation/diagnosis
 // on every probe, even ones already interpreted/diagnosed. Use after a
 // prompt change; otherwise leave unset so a routine rebuild costs no AI calls.
+//
+// BATCHING (fixes 504 FUNCTION_INVOCATION_TIMEOUT on large historical
+// datasets): the deterministic pass and the sheet writes are cheap and
+// batched, but the AI interpretation/diagnosis calls are awaited one probe
+// at a time and are the only part slow enough to blow the maxDuration below.
+// So each invocation only runs up to `batch_size` AI calls total (shared
+// between interpretation and diagnosis), then returns with `complete: false`
+// and a `remaining` count instead of pushing through the whole dataset.
+// Resumability needs no cursor: "needs AI" is defined by a blank
+// communication_quality/diagnosis_summary field on the row itself
+// (lib/intelligence-rebuild.mjs, lib/diagnosis-rebuild.mjs), so simply
+// calling this endpoint again continues from wherever the last call stopped
+// — same idempotent upsert-by-probe_id as before, safe to rerun, never
+// duplicates a row, never touches manual_override'd communications. The
+// Apps Script button (google-apps-script/RebuildIntelligence.gs) loops this
+// call until `complete: true` and reports one aggregated final result.
+//
+// Optional body: { "batch_size": N } — override the per-invocation AI-call
+// budget (default below / NOVUS_REBUILD_BATCH_SIZE). Mainly for tests.
 
 import { getRepo } from '../../../lib/sheets.mjs';
 import { rebuildAllIntelligence } from '../../../lib/intelligence-rebuild.mjs';
@@ -36,6 +55,11 @@ import { requireAuth } from '../_auth.mjs';
 
 export const maxDuration = 60;
 
+// Conservative default: ~2-3s per AI call observed in practice, so 15 calls
+// leaves comfortable headroom under the 60s maxDuration for the batch's
+// reads/writes and any slower-than-average calls.
+const DEFAULT_BATCH_SIZE = 15;
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -44,6 +68,9 @@ export default async function handler(req, res) {
   const body = typeof req.body === 'string' ? safeParse(req.body) : req.body || {};
   const probeId = String(body.probe_id || '').trim();
   const forceAi = body.force_ai === true;
+  const batchSize = Number.isFinite(Number(body.batch_size)) && Number(body.batch_size) > 0
+    ? Number(body.batch_size)
+    : Number(process.env.NOVUS_REBUILD_BATCH_SIZE) || DEFAULT_BATCH_SIZE;
 
   try {
     const repo = getRepo();
@@ -56,15 +83,22 @@ export default async function handler(req, res) {
       return res.status(200).json(result);
     }
 
-    const intelligenceSummary = await rebuildAllIntelligence(repo, { forceAi });
+    const intelligenceSummary = await rebuildAllIntelligence(repo, { forceAi, maxAiCalls: batchSize });
+
+    // Diagnosis gets whatever's left of this invocation's AI-call budget
+    // after interpretation spent its share, so one call never runs more
+    // than `batch_size` AI calls total.
+    const diagnosisBudget = Math.max(0, batchSize - intelligenceSummary.ai_interpretations_run);
 
     // DIAGNOSIS prompts need the probe's property/price for context —
     // loaded once here rather than inside the rebuild loop.
     const probeRecords = await repo.getRecords('PROBES', 'probe_id');
     const probesById = new Map(probeRecords.map((r) => [r.obj.probe_id, r.obj]));
 
-    const diagnosisSummary = await rebuildAllDiagnosis(repo, probesById, { forceAi });
-    const response = { ...intelligenceSummary, diagnosis: diagnosisSummary };
+    const diagnosisSummary = await rebuildAllDiagnosis(repo, probesById, { forceAi, maxAiCalls: diagnosisBudget });
+    const complete = intelligenceSummary.remaining_interpretations === 0
+      && diagnosisSummary.remaining_diagnoses === 0;
+    const response = { ...intelligenceSummary, diagnosis: diagnosisSummary, complete, batch_size: batchSize };
 
     return res.status(200).json(response);
   } catch (err) {
