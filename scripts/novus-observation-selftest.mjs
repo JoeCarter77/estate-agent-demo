@@ -14,6 +14,7 @@ import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { classifyCommunication } from '../lib/classification.mjs';
 import { computeObservation, groupContactAttempts } from '../lib/observation.mjs';
 import { gradeObservation } from '../lib/grading.mjs';
+import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 
 const PROBES_HEADER = [
   'probe_id','probe_reference','agency_id','portal','property_address','property_url',
@@ -34,13 +35,11 @@ const COMMUNICATIONS_HEADER = [
 ];
 const INTELLIGENCE_HEADER = [
   'intelligence_id','agency_id','probe_id','observation_status','observation_deadline',
-  'auto_acknowledgement','auto_ack_timestamp','crm_detected','crm_name','crm_evidence',
-  'first_human_touch','first_human_touch_at','human_lag_hours','callback_attempts',
-  'successful_conversations','voicemail_count','inbound_sms_count','email_touch_count',
-  'follow_up_count','follow_up_channels','last_touch_at','days_chased','booking_attempt',
-  'contact_quality','proactive_reactive','persistence_profile','channels_used','grade',
-  'grade_reason','tier','tier_reason','sales_angle','segment','ai_evidence_summary','ai_confidence',
-  'manual_override','override_reason','observation_closed_at','created_at','updated_at',
+  'observation_closed_at','human_contact','response_hours','first_human_response_at',
+  'contact_attempts','follow_ups','channels_used',
+  'viewing_progression','buyer_qualification','buyer_questions_asked','seller_recognition',
+  'communication_quality','did_well','missed','evidence',
+  'grade','grade_reason','created_at','updated_at',
 ];
 
 // ── In-memory fake of the Google Sheets values API ────────────────────────────
@@ -132,10 +131,27 @@ const PROBE_SENT = '2026-08-01T21:00:00.000Z'; // ~9pm, per Source Master §7
 async function run() {
   process.env.NOVUS_BASIC_AUTH_USER = 'novus';
   process.env.NOVUS_BASIC_AUTH_PASS = 'test-pass';
+  // This suite is hermetic (no network, no creds) but recomputeProbeObservation()
+  // now always makes one AI interpretation call. Stub it with a fixed,
+  // schema-valid response — this suite asserts on the deterministic A-H
+  // engine, not on AI interpretation content.
+  __setAiCallerForTests(async () => ({
+    viewing_progression: 'none', buyer_questions_asked: [], seller_recognition: 'none',
+    communication_quality: 'generic', did_well: '', missed: '', evidence: [],
+  }));
   // observation/recompute.js was folded into intelligence/rebuild-all.js
   // (single-probe recompute when body.probe_id is present) to stay within
   // Vercel Hobby's 12-function limit — same handler, same behaviour.
   const { default: recompute } = await import('../api/novus/intelligence/rebuild-all.js');
+
+  // The V2 recompute result is flat (grade, grade_reason, observation_status,
+  // …) — it no longer nests a full `observation` object the way the old
+  // recompute response did. Read the deterministic INTELLIGENCE fields
+  // straight from the fake sheet instead, by probe_id.
+  function intelligenceFor(store, probeId) {
+    const rows = store.INTELLIGENCE.slice(2).map((r) => Object.fromEntries(INTELLIGENCE_HEADER.map((k, i) => [k, r[i]])));
+    return rows.find((r) => r.probe_id === probeId);
+  }
 
   function mockReq(body) {
     const creds = Buffer.from('novus:test-pass').toString('base64');
@@ -159,7 +175,7 @@ async function run() {
     const res = mockRes();
     await recompute(mockReq({ probe_id: probeId }), res);
     __setRepoForTests(null);
-    return res.body;
+    return { ...res.body, intelligence: intelligenceFor(store, probeId) };
   }
 
   // ── lib/classification.mjs — narrow deterministic rules (unchanged by this update) ──
@@ -236,7 +252,7 @@ async function run() {
       { occurred_at: iso(2 * DAY, PROBE_SENT), body_text: 'Just checking in again.' },
     ]);
     assert.strictEqual(body.grade, 'A', `expected A, got ${body.grade}: ${body.grade_reason}`);
-    assert.strictEqual(body.observation.follow_up_count, 1, 'one genuine follow-up attempt (2 days later, well outside 30min)');
+    assert.strictEqual(body.intelligence.follow_ups, 1, 'one genuine follow-up attempt (2 days later, well outside 30min)');
     ok('grade A: <=1h contact + 1 genuine follow-up attempt');
   }
 
@@ -248,7 +264,7 @@ async function run() {
       { occurred_at: iso(10 * HOUR + 45 * MIN, PROBE_SENT), body_text: 'Following up again.' },
     ]);
     assert.strictEqual(body.grade, 'B', `expected B, got ${body.grade}: ${body.grade_reason}`);
-    assert.strictEqual(body.observation.follow_up_count, 1);
+    assert.strictEqual(body.intelligence.follow_ups, 1);
     ok('grade B: >1h,<=16h contact + 1 genuine follow-up attempt');
   }
 
@@ -262,13 +278,13 @@ async function run() {
       { occurred_at: iso(10 * MIN, PROBE_SENT), channel: 'sms', body_text: 'Please call me back to arrange a viewing.' },
     ]);
     assert.strictEqual(body.grade, 'C', `expected C, got ${body.grade}: ${body.grade_reason}`);
-    assert.strictEqual(body.observation.follow_up_count, 0, 'the SMS 1 minute after the call is the SAME attempt, not a follow-up');
-    assert.strictEqual(body.observation.contact_attempt_count, 1);
+    assert.strictEqual(body.intelligence.follow_ups, 0, 'the SMS 1 minute after the call is the SAME attempt, not a follow-up');
+    assert.strictEqual(body.intelligence.contact_attempts, 1);
     ok('grade C: <=1h contact + 0 genuine follow-ups (voicemail + SMS grouped into one attempt)');
   }
 
-  // ── inbound_sms_count / email_touch_count / channels_used ──
-  console.log('\ninbound_sms_count / email_touch_count / channels_used (SMS + Email evidence)');
+  // ── channels_used (SMS + Email evidence; per-channel counters retired in V2 — see docs/V2_COMMS_INTELLIGENCE_DIAGNOSIS_SCHEMA.md §3.L) ──
+  console.log('\nchannels_used (SMS + Email evidence)');
   {
     const body = await runProbeGrade('prb_sms_email', [
       { occurred_at: iso(10 * MIN, PROBE_SENT), channel: 'sms', body_text: 'Please call me back to arrange a viewing.' },
@@ -278,10 +294,8 @@ async function run() {
         from: 'no-reply@agency.co.uk', subject: 'We have received your enquiry', body_text: 'This is an automated response.',
       },
     ]);
-    assert.strictEqual(body.observation.inbound_sms_count, 1, 'one human SMS touch counted');
-    assert.strictEqual(body.observation.email_touch_count, 1, 'one human email touch counted; the automated email is excluded');
-    assert.strictEqual(body.observation.channels_used, 'sms,email', 'channels_used includes both sms and email');
-    ok('inbound_sms_count and email_touch_count count only human-contact touches; automated email excluded; channels_used includes sms + email');
+    assert.strictEqual(body.intelligence.channels_used, 'sms,email', 'channels_used includes both sms and email');
+    ok('channels_used includes both sms and email touches for a probe worked on both channels');
   }
 
   // ── Grade D: fast (>1h, <=16h) + non-persistent ──
@@ -291,7 +305,7 @@ async function run() {
       { occurred_at: iso(10 * HOUR, PROBE_SENT), body_text: 'Sorry for the delay, calling now.' },
     ]);
     assert.strictEqual(body.grade, 'D', `expected D, got ${body.grade}: ${body.grade_reason}`);
-    assert.strictEqual(body.observation.follow_up_count, 0);
+    assert.strictEqual(body.intelligence.follow_ups, 0);
     ok('grade D: >1h,<=16h contact + 0 genuine follow-ups');
   }
 
@@ -303,7 +317,7 @@ async function run() {
       { occurred_at: iso(3 * DAY, PROBE_SENT), body_text: 'Checking in again.' },
     ]);
     assert.strictEqual(body.grade, 'E', `expected E, got ${body.grade}: ${body.grade_reason}`);
-    assert.strictEqual(body.observation.follow_up_count, 1);
+    assert.strictEqual(body.intelligence.follow_ups, 1);
     ok('grade E: >16h contact + 1 genuine follow-up attempt');
   }
 
@@ -314,7 +328,7 @@ async function run() {
       { occurred_at: iso(20 * HOUR, PROBE_SENT), body_text: 'Sorry for the delay, calling now.' },
     ]);
     assert.strictEqual(body.grade, 'F', `expected F, got ${body.grade}: ${body.grade_reason}`);
-    assert.strictEqual(body.observation.follow_up_count, 0);
+    assert.strictEqual(body.intelligence.follow_ups, 0);
     ok('grade F: >16h contact + 0 genuine follow-ups');
   }
 
@@ -325,7 +339,7 @@ async function run() {
       { occurred_at: iso(5 * MIN, PROBE_SENT), from: 'no-reply@agency.co.uk', subject: 'We have received your enquiry', body_text: 'This is an automated response.' },
     ]);
     assert.strictEqual(body.grade, 'G', `expected G, got ${body.grade}: ${body.grade_reason}`);
-    assert.strictEqual(body.observation.first_human_touch, 'no', 'no human contact');
+    assert.strictEqual(body.intelligence.human_contact, 'automated_only', 'auto-ack only — no human contact, but not silence either');
     ok('grade G: auto-ack only, no human contact');
   }
 
@@ -416,12 +430,10 @@ async function run() {
     const res1 = mockRes();
     await recompute(mockReq({ probe_id: 'prb_i' }), res1);
     assert.strictEqual(res1.body.grade, 'A');
-    assert.strictEqual(res1.body.observation.follow_up_count, 2, 'two genuinely separate follow-up attempts (2 days, 4 days apart)');
-    assert.strictEqual(res1.body.communications_updated, 3, 'first run classifies all 3 rows');
+    assert.strictEqual(intelligenceFor(store, 'prb_i').follow_ups, 2, 'two genuinely separate follow-up attempts (2 days, 4 days apart)');
+    assert.strictEqual(res1.body.communications_updated, 3, 'first run classifies all 3 rows (automated_or_human)');
     assert.strictEqual(store.INTELLIGENCE.length, 3, 'exactly one INTELLIGENCE data row created');
-    // API response shape: communications_updated is a SIBLING of observation, not nested inside it.
     assert.ok('communications_updated' in res1.body, 'communications_updated present at top level');
-    assert.ok(!('communications_updated' in res1.body.observation), 'communications_updated NOT nested inside observation');
     const intelligenceIdAfterFirst = res1.body.intelligence_id;
 
     const res2 = mockRes();
@@ -468,8 +480,9 @@ async function run() {
     const res1 = mockRes();
     await recompute(mockReq({ probe_id: 'prb_recalc' }), res1);
     assert.strictEqual(res1.body.grade, 'C', `expected C before follow-up, got ${res1.body.grade}`);
-    assert.strictEqual(res1.body.observation.contact_attempt_count, 1);
-    assert.strictEqual(res1.body.observation.follow_up_count, 0);
+    const intel1 = intelligenceFor(store, 'prb_recalc');
+    assert.strictEqual(intel1.contact_attempts, 1);
+    assert.strictEqual(intel1.follow_ups, 0);
     const intelligenceIdBeforeFollowUp = res1.body.intelligence_id;
 
     // A genuine follow-up communication arrives via the normal webhook path
@@ -486,9 +499,10 @@ async function run() {
     const res2 = mockRes();
     await recompute(mockReq({ probe_id: 'prb_recalc' }), res2);
     assert.strictEqual(res2.body.grade, 'A', `expected A after genuine follow-up, got ${res2.body.grade}: ${res2.body.grade_reason}`);
-    assert.strictEqual(res2.body.observation.contact_attempt_count, 2, 'the 74-minute-later SMS starts contact attempt 2');
-    assert.strictEqual(res2.body.observation.follow_up_count, 1, 'exactly one genuine follow-up attempt');
-    assert.strictEqual(res2.body.observation.human_lag_hours, res1.body.observation.human_lag_hours, 'human_lag_hours unchanged — still measured from the first human touch');
+    const intel2 = intelligenceFor(store, 'prb_recalc');
+    assert.strictEqual(intel2.contact_attempts, 2, 'the 74-minute-later SMS starts contact attempt 2');
+    assert.strictEqual(intel2.follow_ups, 1, 'exactly one genuine follow-up attempt');
+    assert.strictEqual(intel2.response_hours, intel1.response_hours, 'response_hours unchanged — still measured from the first human touch');
     assert.strictEqual(res2.body.intelligence_id, intelligenceIdBeforeFollowUp, 'same INTELLIGENCE row recalculated in place, not duplicated');
     assert.strictEqual(store.INTELLIGENCE.length, 3, 'still exactly one INTELLIGENCE data row after recalculation');
 

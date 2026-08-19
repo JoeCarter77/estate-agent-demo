@@ -1,153 +1,146 @@
-// scripts/novus-diagnosis-selftest.mjs — hermetic test for the Diagnosis
-// layer (lib/diagnosis.mjs + lib/diagnosis-rebuild.mjs), no network, no creds.
+// scripts/novus-diagnosis-selftest.mjs — hermetic test (no network, no
+// creds) for the full-rebuild path lib/diagnosis-rebuild.mjs (V2 schema §4/§6).
 //
 // Same in-memory fake-Sheets pattern as scripts/novus-rebuild-all-selftest.mjs.
+// The AI half of the pipeline is stubbed; this suite checks:
+//   - only CLOSED observations get diagnosed; open ones are skipped
+//   - AI diagnosis runs exactly once per probe that has never been diagnosed
+//     (diagnosis_summary blank) — a probe already diagnosed is left alone
+//   - a second rebuild makes ZERO further AI calls
+//   - force_ai:true re-runs every closed probe regardless
 //
-// Run: npm run novus:diagnosis-selftest
+// Run: npm run novus:probe-diagnosis-selftest -- covers the unit; this one
+// covers the batch-rebuild orchestration: npm run novus:diagnosis-selftest
 
 import assert from 'node:assert';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
+import { __setAiCallerForTests } from '../lib/ai-client.mjs';
+import { rebuildAllDiagnosis } from '../lib/diagnosis-rebuild.mjs';
 
 const INTELLIGENCE_HEADER = [
-  'intelligence_id', 'agency_id', 'probe_id', 'observation_status', 'observation_deadline',
-  'grade', 'grade_reason', 'human_lag_hours', 'follow_up_count', 'channels_used', 'days_chased',
+  'intelligence_id', 'agency_id', 'probe_id', 'observation_status',
+  'grade', 'grade_reason', 'human_contact', 'response_hours', 'contact_attempts', 'follow_ups',
+  'channels_used', 'viewing_progression', 'buyer_qualification', 'buyer_questions_asked',
+  'seller_recognition', 'communication_quality', 'did_well', 'missed', 'evidence',
   'created_at', 'updated_at',
 ];
 const DIAGNOSIS_HEADER = [
-  'diagnosis_id', 'agency_id', 'probe_id', 'grade', 'tier', 'primary_problem',
-  'evidence_summary', 'commercial_implication', 'recommended_solution', 'sales_angle',
-  'created_at', 'updated_at',
+  'diagnosis_id', 'agency_id', 'probe_id',
+  'primary_problem', 'primary_evidence', 'secondary_problem', 'secondary_evidence',
+  'strengths', 'missed_opportunities', 'commercial_implication', 'novus_opportunity',
+  'diagnosis_summary', 'created_at', 'updated_at',
 ];
 
 function makeFakeSheet() {
   const store = {
-    INTELLIGENCE: [INTELLIGENCE_HEADER.slice(), ['SCHEMA NOTE', 'Derived behaviour and official decisions.']],
-    DIAGNOSIS: [DIAGNOSIS_HEADER.slice(), ['SCHEMA NOTE', 'Commercial read of a closed Intelligence record.']],
+    INTELLIGENCE: [INTELLIGENCE_HEADER.slice(), ['SCHEMA NOTE', 'Fixture']],
+    DIAGNOSIS: [DIAGNOSIS_HEADER.slice(), ['SCHEMA NOTE', 'Fixture']],
   };
-  const calls = { get: 0, append: 0, update: 0, batchUpdate: 0 };
   function tabOf(range) { return String(range).split('!')[0]; }
   function startRowOf(range) {
     const m = String(range).match(/!\D+(\d+)/);
     return m ? parseInt(m[1], 10) : null;
   }
   const valuesApi = {
-    async get(range) {
-      calls.get += 1;
-      const tab = tabOf(range);
-      return (store[tab] || []).map((r) => r.slice());
-    },
+    async get(range) { return (store[tabOf(range)] || []).map((r) => r.slice()); },
     async append(range, rows) {
-      calls.append += 1;
       const tab = tabOf(range);
       store[tab] = store[tab] || [];
       for (const r of rows) store[tab].push(r.slice());
       return { updates: { updatedRows: rows.length } };
     },
     async update(range, rows) {
-      calls.update += 1;
-      const tab = tabOf(range);
-      const start = startRowOf(range);
+      const tab = tabOf(range); const start = startRowOf(range);
       store[tab] = store[tab] || [];
       rows.forEach((r, i) => { store[tab][start - 1 + i] = r.slice(); });
-      return { updatedRows: rows.length };
     },
     async batchUpdate(data) {
-      calls.batchUpdate += 1;
       for (const { range, values } of data) {
-        const tab = tabOf(range);
-        const start = startRowOf(range);
+        const tab = tabOf(range); const start = startRowOf(range);
         store[tab] = store[tab] || [];
         values.forEach((row, i) => { store[tab][start - 1 + i] = row.slice(); });
       }
-      return { totalUpdatedCells: data.reduce((n, d) => n + d.values[0].length, 0) };
     },
   };
-  return { store, valuesApi, calls };
+  return { store, repo: createRepo(valuesApi) };
 }
 
-function seedIntelligence(store, { probe_id, agency_id = 'ag_1', observation_status, grade, grade_reason = 'test reason.' }) {
-  const row = INTELLIGENCE_HEADER.map((key) => {
-    if (key === 'intelligence_id') return `itl_${probe_id}`;
-    if (key === 'agency_id') return agency_id;
-    if (key === 'probe_id') return probe_id;
-    if (key === 'observation_status') return observation_status;
-    if (key === 'grade') return grade;
-    if (key === 'grade_reason') return grade_reason;
-    if (key === 'follow_up_count') return 0;
-    return '';
-  });
-  store.INTELLIGENCE.push(row);
-}
+function row(header, obj) { return header.map((k) => obj[k] ?? ''); }
+function toObj(header, r) { return Object.fromEntries(header.map((k, i) => [k, r[i]])); }
 
 let passed = 0;
 function ok(msg) { passed++; console.log('  ✓ ' + msg); }
 
 async function run() {
-  const { rebuildAllDiagnosis } = await import('../lib/diagnosis-rebuild.mjs');
+  console.log('lib/diagnosis-rebuild.mjs — hermetic selftest\n');
 
-  console.log('\nDiagnosis rebuild: mixed grade/status set');
-  const { store, valuesApi, calls } = makeFakeSheet();
-  __setRepoForTests(createRepo(valuesApi));
-  const repo = createRepo(valuesApi);
+  const { store, repo } = makeFakeSheet();
+  __setRepoForTests(repo);
 
-  seedIntelligence(store, { probe_id: 'prb_open', observation_status: 'observing', grade: 'pending' });
-  seedIntelligence(store, { probe_id: 'prb_closed_h', observation_status: 'closed', grade: 'H' });
-  seedIntelligence(store, { probe_id: 'prb_closed_a', observation_status: 'closed', grade: 'A' });
-  seedIntelligence(store, { probe_id: 'prb_closed_c', observation_status: 'closed', grade: 'C' });
-  // REGRESSION: sheet-sourced values with incidental whitespace/case (manual
-  // edit, copy/paste) must still be recognised — this was the exact bug
-  // that made every closed row silently produce zero Diagnosis rows.
-  seedIntelligence(store, { probe_id: 'prb_closed_whitespace', observation_status: ' Closed ', grade: ' h ' });
+  // Closed, never diagnosed.
+  store.INTELLIGENCE.push(row(INTELLIGENCE_HEADER, {
+    intelligence_id: 'itl_a', agency_id: 'agc_a', probe_id: 'prb_a', observation_status: 'closed',
+    grade: 'F', human_contact: 'yes', response_hours: 63.6,
+  }));
+  // Still observing — must be skipped entirely.
+  store.INTELLIGENCE.push(row(INTELLIGENCE_HEADER, {
+    intelligence_id: 'itl_b', agency_id: 'agc_b', probe_id: 'prb_b', observation_status: 'observing',
+    grade: 'pending', human_contact: 'none',
+  }));
+  // Closed, already diagnosed on a prior run.
+  store.INTELLIGENCE.push(row(INTELLIGENCE_HEADER, {
+    intelligence_id: 'itl_c', agency_id: 'agc_c', probe_id: 'prb_c', observation_status: 'closed',
+    grade: 'A', human_contact: 'yes', response_hours: 0.5,
+  }));
+  store.DIAGNOSIS.push(row(DIAGNOSIS_HEADER, {
+    diagnosis_id: 'dgn_c', agency_id: 'agc_c', probe_id: 'prb_c',
+    diagnosis_summary: 'Already diagnosed on a prior run.', novus_opportunity: 'None evidenced',
+    created_at: '2026-08-01T00:00:00.000Z',
+  }));
 
-  const summary1 = await rebuildAllDiagnosis(repo);
+  let aiCallCount = 0;
+  __setAiCallerForTests(async () => {
+    aiCallCount += 1;
+    return {
+      primary_problem: '63.6 hours to first contact.', primary_evidence: '63.6h response time.',
+      secondary_problem: '', secondary_evidence: '',
+      strengths: '', missed_opportunities: 'Both opportunities left untaken.',
+      commercial_implication: 'Specific to this agency.', novus_opportunity: 'Core (front desk)',
+      diagnosis_summary: 'Slow and generic.',
+    };
+  });
 
-  assert.strictEqual(calls.get, 2, 'exactly one read per table (INTELLIGENCE, DIAGNOSIS)');
-  assert.strictEqual(calls.update, 0, 'no legacy per-row update() calls');
-  assert.strictEqual(calls.append, 0, 'no legacy per-row append() calls');
-  ok('diagnosis rebuild reads each table exactly once and writes only via batchUpdate');
+  const probesById = new Map();
+  const first = await rebuildAllDiagnosis(repo, probesById);
+  assert.strictEqual(first.skipped_not_closed, 1, 'the still-observing probe is skipped');
+  assert.strictEqual(first.ai_diagnoses_run, 1, 'only prb_a (closed, never diagnosed) triggers an AI call');
+  assert.strictEqual(aiCallCount, 1);
+  ok('only closed, never-diagnosed probes are diagnosed on a routine rebuild');
 
-  assert.strictEqual(summary1.skipped_not_closed, 1, 'open observation skipped (no Diagnosis for it)');
-  assert.strictEqual(summary1.diagnosis_created, 4, 'one Diagnosis created per closed observation');
-  assert.strictEqual(summary1.diagnosis_updated, 0);
-  ok('only closed observations get a Diagnosis');
+  const diagRecords = store.DIAGNOSIS.slice(2).map((r) => toObj(DIAGNOSIS_HEADER, r));
+  const a = diagRecords.find((r) => r.probe_id === 'prb_a');
+  const c = diagRecords.find((r) => r.probe_id === 'prb_c');
+  assert.strictEqual(a.primary_problem, '63.6 hours to first contact.');
+  assert.strictEqual(c.diagnosis_summary, 'Already diagnosed on a prior run.', 'prb_c keeps its prior diagnosis untouched');
+  assert.strictEqual(diagRecords.find((r) => r.probe_id === 'prb_b'), undefined, 'no DIAGNOSIS row is ever created for an open observation');
+  ok('a newly-diagnosed probe is written correctly and a prior diagnosis is never overwritten by a routine rebuild');
 
-  const rows = await repo.getRecords('DIAGNOSIS', 'diagnosis_id');
-  const byProbe = Object.fromEntries(rows.map((r) => [r.obj.probe_id, r.obj]));
+  // ── Second rebuild: zero further AI calls ──
+  aiCallCount = 0;
+  const second = await rebuildAllDiagnosis(repo, probesById);
+  assert.strictEqual(second.ai_diagnoses_run, 0, 'a second rebuild makes no further AI calls');
+  assert.strictEqual(aiCallCount, 0);
+  ok('a second rebuild is fully idempotent: zero AI calls');
 
-  assert.strictEqual(byProbe.prb_open, undefined, 'no Diagnosis row exists for the still-open probe');
-  assert.strictEqual(byProbe.prb_closed_h.tier, 'Core', 'grade H routes to Core');
-  assert.strictEqual(byProbe.prb_closed_a.tier, 'Growth', 'grade A routes to Growth');
-  assert.strictEqual(byProbe.prb_closed_c.tier, 'Core', 'grade C routes to Core');
-  assert.ok(byProbe.prb_closed_h.primary_problem.length > 0);
-  assert.ok(byProbe.prb_closed_h.evidence_summary.includes('test reason.'), 'evidence_summary reuses the existing grade_reason, invents nothing new');
-  assert.ok(byProbe.prb_closed_h.commercial_implication.length > 0);
-  assert.ok(byProbe.prb_closed_h.recommended_solution.length > 0);
-  assert.ok(byProbe.prb_closed_h.sales_angle.length > 0);
-  ok('Diagnosis fields populated correctly per grade -> tier routing table');
+  // ── force_ai re-runs every closed probe ──
+  const forced = await rebuildAllDiagnosis(repo, probesById, { forceAi: true });
+  assert.strictEqual(forced.ai_diagnoses_run, 2, 'force_ai re-diagnoses both closed probes, including the already-diagnosed one');
+  ok('force_ai:true re-runs diagnosis for every closed probe');
 
-  assert.strictEqual(byProbe.prb_closed_whitespace.tier, 'Core', 'grade " h " (whitespace/case) still routes correctly, grade H -> Core');
-  assert.strictEqual(byProbe.prb_closed_whitespace.grade, 'H', 'grade is normalized to "H" in the written row');
-  ok('a closed observation with whitespace/case around observation_status/grade still produces a Diagnosis row (the reported bug)');
-
-  // ── Idempotency: rebuilding again updates in place, never duplicates ──
-  const summary2 = await rebuildAllDiagnosis(repo);
-  assert.strictEqual(summary2.diagnosis_created, 0, 'second run creates nothing new');
-  assert.strictEqual(summary2.diagnosis_updated, 4, 'second run updates the existing 4 rows in place');
-  const rowsAfter = await repo.getRecords('DIAGNOSIS', 'diagnosis_id');
-  assert.strictEqual(rowsAfter.length, 4, 'still exactly 4 Diagnosis rows — no duplicates');
-  ok('rebuilding Diagnosis twice is idempotent — one row per probe_id, updated not duplicated');
-
-  // ── Grade change on re-close must update the existing Diagnosis row ──
-  const idx = store.INTELLIGENCE.findIndex((r) => r[2] === 'prb_closed_c');
-  store.INTELLIGENCE[idx][INTELLIGENCE_HEADER.indexOf('grade')] = 'A';
-  const summary3 = await rebuildAllDiagnosis(repo);
-  assert.strictEqual(summary3.diagnosis_updated, 4);
-  const rowsAfter3 = await repo.getRecords('DIAGNOSIS', 'diagnosis_id');
-  const updatedC = rowsAfter3.find((r) => r.obj.probe_id === 'prb_closed_c').obj;
-  assert.strictEqual(updatedC.tier, 'Growth', 'Diagnosis reflects the recomputed grade after another Intelligence rebuild');
-  ok('rebuilding Diagnosis after Intelligence changes updates the SAME row with the new grade/tier');
-
-  console.log(`\n✅ All ${passed} checks passed.\n`);
+  console.log(`\n${passed} checks passed.`);
 }
 
-run().catch((err) => { console.error('\n❌ SELFTEST FAILED:\n', err); process.exit(1); });
+run().catch((err) => {
+  console.error('FAILED:', err);
+  process.exitCode = 1;
+});
