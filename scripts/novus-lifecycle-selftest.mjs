@@ -82,6 +82,12 @@ const DIAGNOSIS_HEADER = [
   'strengths', 'missed_opportunities', 'commercial_implication', 'novus_opportunity',
   'diagnosis_summary', 'created_at', 'updated_at',
 ];
+const PERSONALISATION_HEADER = [
+  'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
+  'personalised_opener', 'quotes_used', 'novus_counterfactual', 'wider_leakage',
+  'systemic_promise', 'why_novus', 'objection_response', 'demo_intro',
+  'created_at', 'updated_at',
+];
 
 function makeFakeSheet() {
   const store = {
@@ -89,6 +95,8 @@ function makeFakeSheet() {
     COMMUNICATIONS: [COMMUNICATIONS_HEADER.slice(), ['SCHEMA NOTE', 'Fixture']],
     INTELLIGENCE: [INTELLIGENCE_HEADER.slice(), ['SCHEMA NOTE', 'Fixture']],
     DIAGNOSIS: [DIAGNOSIS_HEADER.slice(), ['SCHEMA NOTE', 'Fixture']],
+    PERSONALISATION: [PERSONALISATION_HEADER.slice(), ['SCHEMA NOTE', 'Fixture']],
+    AGENCIES: [['agency_id'], ['SCHEMA NOTE', 'Fixture']],
   };
   function tabOf(range) { return String(range).split('!')[0]; }
   function startRowOf(range) {
@@ -138,10 +146,25 @@ const OLD_TIMESTAMP = '2020-01-01T09:00:00.000Z';
 // registers (see lib/probe-interpretation.mjs / lib/probe-diagnosis.mjs).
 let interpretCallCount = 0;
 let diagnoseCallCount = 0;
+let personaliseCallCount = 0;
 function installAiStub() {
   interpretCallCount = 0;
   diagnoseCallCount = 0;
+  personaliseCallCount = 0;
   __setAiCallerForTests(async ({ tool, prompt }) => {
+    if (tool?.name === 'record_probe_personalisation') {
+      personaliseCallCount += 1;
+      return {
+        personalised_opener: 'stub opener',
+        quotes_used: [],
+        novus_counterfactual: 'stub counterfactual',
+        wider_leakage: '',
+        systemic_promise: 'stub systemic promise',
+        why_novus: 'stub why novus',
+        objection_response: '',
+        demo_intro: 'stub demo intro',
+      };
+    }
     if (tool?.name === 'record_probe_diagnosis') {
       diagnoseCallCount += 1;
       const zeroContact = /Human contact: none/.test(prompt);
