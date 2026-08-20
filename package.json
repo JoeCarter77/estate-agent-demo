@@ -23,6 +23,7 @@
     "novus:probe-diagnosis-selftest": "node scripts/novus-probe-diagnosis-selftest.mjs",
     "novus:probe-personalisation-selftest": "node scripts/novus-probe-personalisation-selftest.mjs",
     "novus:diagnosis-persistence-selftest": "node scripts/novus-diagnosis-persistence-selftest.mjs",
+    "novus:diagnosis-findings-flow-selftest": "node scripts/novus-diagnosis-findings-flow-selftest.mjs",
     "novus:lifecycle-selftest": "node scripts/novus-lifecycle-selftest.mjs",
     "novus:match-status-recompute-selftest": "node scripts/novus-match-status-recompute-selftest.mjs",
     "novus:occurred-at-fallback-selftest": "node scripts/novus-occurred-at-fallback-selftest.mjs"

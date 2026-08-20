@@ -1,11 +1,11 @@
 # COMMUNICATIONS → INTELLIGENCE → DIAGNOSIS — Proposed V2 (demo-ready)
 
-**Status: PROPOSAL. Nothing implemented. No code and no sheet changed.**
+**Status: IMPLEMENTED.** `COMMUNICATIONS`/`INTELLIGENCE`/`DIAGNOSIS` per §1–§4; `DIAGNOSIS_FINDINGS` per §4a; `PERSONALISATION` per §4b.
 
 Scope: `COMMUNICATIONS`, `INTELLIGENCE`, `DIAGNOSIS`.
-Not in scope: Personalisation, Demo, SEND DEMO, Instantly, Outreach, `AGENCIES`, `PROBES`, `RAW_EVENTS`, `ACTIONS`.
+Not in scope: Demo, SEND DEMO, Instantly, Outreach, `AGENCIES`, `PROBES`, `RAW_EVENTS`, `ACTIONS`. (`DIAGNOSIS_FINDINGS` and `PERSONALISATION` were added to this document in §4a/§4b when the Personalisation layer was rebuilt — see those sections.)
 
-Totals: **`COMMUNICATIONS` +0 columns**, **`INTELLIGENCE` 20 fields**, **`DIAGNOSIS` 9 fields**. Two AI calls per probe. No fingerprint layer, no fourth tab.
+Totals: **`COMMUNICATIONS` +0 columns**, **`INTELLIGENCE` 20 fields**, **`DIAGNOSIS` 8 fields + `DIAGNOSIS_FINDINGS` 5 fields**, **`PERSONALISATION` 15 fields**. Two AI calls per probe for `COMMUNICATIONS`→`DIAGNOSIS`, plus one for `PERSONALISATION`. No fingerprint layer.
 
 ---
 
@@ -110,13 +110,13 @@ Plus `created_at` / `updated_at` as row plumbing.
 
 ---
 
-## 4. `DIAGNOSIS` — 9 fields, one row per probe
+## 4. `DIAGNOSIS` — 8 fields, one row per probe
 
 Written only when `observation_status = closed`. Reads the `INTELLIGENCE` row and nothing else — no new evidence, no counts, no grade.
 
 | # | Field | Derivation |
 |---|---|---|
-| 1 | `findings` | Every genuine, distinct, evidence-backed problem the probe reveals — **0 to 4 items**, most commercially damaging first, stored as a JSON array of `{ finding, evidence, significance_note }`. **An empty array is a legal, meaningful value** — see §5. Each item's `evidence` is mandatory whenever `finding` is non-empty (same evidence-gating discipline as the old primary/secondary fields, applied per item). `significance_note` says why this specific finding matters commercially and whether the agency would likely notice it themselves — the raw material Personalisation needs to judge and rank findings, not a whole-probe sentence. |
+| 1 | `findings` | Every genuine, distinct, evidence-backed problem the probe reveals — **0 to 4 items**, most commercially damaging first. **Persisted to the separate `DIAGNOSIS_FINDINGS` tab, one row per finding** (§4a) — the `DIAGNOSIS` row itself carries no `findings` column. In transit between `lib/probe-diagnosis.mjs` and `lib/diagnosis-rebuild.mjs` it is a JSON array of `{ finding, evidence, significance_note }`. **An empty array is a legal, meaningful value** — see §5. Each item's `evidence` is mandatory whenever `finding` is non-empty (same evidence-gating discipline as the old primary/secondary fields, applied per item). `significance_note` says why this specific finding matters commercially and whether the agency would likely notice it themselves — the raw material Personalisation needs to judge and rank findings, not a whole-probe sentence. |
 | 2 | `strengths` | What they did well, from `INTELLIGENCE.did_well` + the numbers. May legitimately be the longest field on the row. |
 | 3 | `missed_opportunities` | Named commercial value that was on the table and not taken — the BUYING and SELLING opportunities from §1, specifically. |
 | 4 | `commercial_implication` | What this costs *this* agency. Must contain at least one probe-specific fact — the property, a time, their own words. A sentence that would read identically for another agency is rejected. |
@@ -128,6 +128,73 @@ Plus `diagnosis_id`, `agency_id`, `probe_id`, `created_at`, `updated_at`.
 **Retired:** `grade` and `tier` (grade lives on `INTELLIGENCE`; tier is `novus_opportunity`'s job now), `evidence_summary` (the concatenated blob), `recommended_solution`, `sales_angle` (the 8 canned strings).
 
 **Superseded (this revision):** the original `primary_problem`/`primary_evidence`/`secondary_problem`/`secondary_evidence` four-field shape capped Diagnosis at exactly one or two discrete problems. It's replaced by the `findings` array above so a probe whose evidence genuinely supports three or four distinct problems isn't forced to compress them into two, or bury the rest inside the `missed_opportunities` prose blob. This is additive to the pipeline described below — no new AI call, no change to `INTELLIGENCE`, no change to the grade — Diagnosis still states *what* the genuine findings are and *why each matters*; it does not decide which of them make the strongest combined story. That selection is the Personalisation layer's job, one level up.
+
+---
+
+## 4a. `DIAGNOSIS_FINDINGS` — 5 fields, one row per finding
+
+`DIAGNOSIS` holds the whole-probe commercial read. The `findings` array is 0–4
+*separate*, independently evidence-backed items, so it does not fit one cell of
+that row — it is persisted here instead, one row each.
+
+| # | Field | Derivation |
+|---|---|---|
+| 1 | `probe_id` | The link back to `PROBES` / `DIAGNOSIS`. One probe has 0–4 rows here. |
+| 2 | `finding_index` | 1-based, in the order Diagnosis ranked them: **1 = most commercially damaging**. |
+| 3 | `finding` | The finding itself, verbatim from `findings[]`. |
+| 4 | `evidence` | The specific fact or quote this one finding rests on. Mandatory — a row without it is never written, and is dropped on the way back out. |
+| 5 | `significance_note` | Why this specific finding matters commercially. The raw material Personalisation ranks on. |
+
+Written by `lib/diagnosis-rebuild.mjs` in the **same batch write** as the
+`DIAGNOSIS` row — no extra request, no AI call, and a diagnosis can never be
+written without its findings. Upserted per `(probe_id, finding_index)`, so a
+re-run overwrites in place and blanks any surplus row from a longer previous
+run. Read back by `lib/personalisation-rebuild.mjs`. Nothing invents a finding
+here: these rows are exactly the items that survived §4's evidence gate.
+
+---
+
+## 4b. `PERSONALISATION` — 15 fields, one row per probe
+
+One step further on: `DIAGNOSIS` says *what the genuine findings are*;
+`PERSONALISATION` decides **what the story is**, and writes the email from it.
+One AI call, no re-diagnosis, no second engine.
+
+| # | Field | Derivation |
+|---|---|---|
+| 1 | `hero_journey` | DET — the audit/demo journey, a lookup from Intelligence shape + whether findings exist. Never asked of the model. |
+| 2 | `primary_narrative` | The single strongest commercially consequential story, **combining several findings into one broader problem** where they are really one problem. Not "finding #1". |
+| 3 | `narrative_finding_indexes` | Which `DIAGNOSIS_FINDINGS.finding_index` values that narrative combined, e.g. `1,2,3`. Validated against the findings that exist — a claimed index that doesn't exist is dropped. |
+| 4 | `supporting_findings` | The genuine findings left *outside* the narrative. Forced empty when the narrative already covers them all. |
+| 5 | `evidence` | Verbatim quotes from the raw communications, each proven a literal substring of the message it cites. |
+| 6 | `commercial_story` | What the narrative costs *this* agency. May use the probe's own property value; may never carry any other monetary figure. |
+| 7 | `fair_observation` | Genuinely good handling, acknowledged — so the email disarms rather than grades. Blank when Diagnosis records no strengths; the plain `We never received a reply.` when there was no human contact. |
+| 8 | `novus_counterfactual` | What NOVUS would have done at *this* moment. Matches the handling, rather than inventing a gap, when the handling was strong. |
+| 9–11 | `email_main_point`, `email_consequence`, `email_wider_consequence` | The email's variable beats. Both consequences are normalised to open with "That means"; the wider one is optional. |
+| 12 | `email_body` | The assembled email — **built in code** from the locked structure, so its shape cannot drift. `{{first_name}}` stays a merge field; the enquiry date and property are substituted from `PROBES`. |
+
+Plus `personalisation_id`, `agency_id`, `probe_id`, `created_at`, `updated_at`.
+
+**Retired from `PERSONALISATION`:** `personalised_opener` (superseded by
+`email_main_point` + `primary_narrative`), `quotes_used` (renamed `evidence`),
+`wider_leakage` (the wider consequence is now `email_wider_consequence`, and
+"leakage" language is out), `systemic_promise`, `why_novus`, `objection_response`,
+`demo_intro` — the email's only job is to earn the full breakdown, not to sell
+NOVUS or a demo.
+
+**The locked email structure** (assembled by `buildEmailBody`, one blank line
+between each; every optional beat drops out cleanly when unsupported):
+
+```
+Hi {{first_name}},
+We sent your team an enquiry on {date} about {property}.
+{fair observation — or "We never received a reply."}   (optional)
+{main point}
+That means {immediate commercial consequence}.
+That means {wider commercial consequence}.             (optional)
+There were also a couple of other things ...           (only if supporting_findings)
+I've put together the full breakdown ...               (CTA)
+```
 
 ---
 
@@ -155,6 +222,18 @@ webhook → RAW_EVENTS → deterministic agency + probe match → COMMUNICATIONS
   3. AI        fields 11–18 — one call, because evidence just changed
   4. WRITE     upsert the one INTELLIGENCE row for this probe
   5. DIAGNOSE  if observation_status = closed → one AI call → upsert the DIAGNOSIS row
+                                               + one DIAGNOSIS_FINDINGS row per finding
+                                                 (same batch write — see §4a)
+  6. PERSONALISE  if the DIAGNOSIS is finalised → one AI call, reading the whole
+                  DIAGNOSIS row + its DIAGNOSIS_FINDINGS rows + the probe facts +
+                  the raw communications → upsert the PERSONALISATION row and its
+                  assembled email (§4b)
+```
+
+The full pipeline is therefore:
+
+```
+PROBE → DIAGNOSIS → DIAGNOSIS_FINDINGS → PERSONALISATION → EMAIL → personalised audit / demo journey
 ```
 
 ### Rebuild Intelligence

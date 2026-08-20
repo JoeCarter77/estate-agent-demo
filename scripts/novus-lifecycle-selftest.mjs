@@ -84,10 +84,12 @@ const DIAGNOSIS_HEADER = [
 ];
 const PERSONALISATION_HEADER = [
   'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
-  'personalised_opener', 'quotes_used', 'novus_counterfactual', 'wider_leakage',
-  'systemic_promise', 'why_novus', 'objection_response', 'demo_intro',
+  'primary_narrative', 'narrative_finding_indexes', 'supporting_findings', 'evidence',
+  'commercial_story', 'fair_observation', 'novus_counterfactual',
+  'email_main_point', 'email_consequence', 'email_wider_consequence', 'email_body',
   'created_at', 'updated_at',
 ];
+const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding', 'evidence', 'significance_note'];
 
 function makeFakeSheet() {
   const store = {
@@ -96,6 +98,7 @@ function makeFakeSheet() {
     INTELLIGENCE: [INTELLIGENCE_HEADER.slice(), ['SCHEMA NOTE', 'Fixture']],
     DIAGNOSIS: [DIAGNOSIS_HEADER.slice(), ['SCHEMA NOTE', 'Fixture']],
     PERSONALISATION: [PERSONALISATION_HEADER.slice(), ['SCHEMA NOTE', 'Fixture']],
+    DIAGNOSIS_FINDINGS: [DIAGNOSIS_FINDINGS_HEADER.slice()],
     AGENCIES: [['agency_id'], ['SCHEMA NOTE', 'Fixture']],
   };
   function tabOf(range) { return String(range).split('!')[0]; }
@@ -137,6 +140,14 @@ function findRow(store, tab, header, probeId) {
 let passed = 0;
 function ok(msg) { passed++; console.log('  ✓ ' + msg); }
 
+// Blocks until Date.now() is past the millisecond `timestamp` was taken in, so
+// a freshly-written updated_at is guaranteed to differ from it.
+async function waitForNewMillisecond(timestamp) {
+  const t = new Date(timestamp).getTime();
+  if (!Number.isFinite(t)) return;
+  while (Date.now() <= t) await new Promise((r) => setTimeout(r, 1));
+}
+
 // Far enough in the past that resolveObservationDeadline()'s 4-day window
 // has always closed, regardless of when this test runs.
 const OLD_TIMESTAMP = '2020-01-01T09:00:00.000Z';
@@ -155,14 +166,16 @@ function installAiStub() {
     if (tool?.name === 'record_probe_personalisation') {
       personaliseCallCount += 1;
       return {
-        personalised_opener: 'stub opener',
-        quotes_used: [],
+        primary_narrative: 'stub narrative',
+        narrative_finding_indexes: [1],
+        supporting_findings: '',
+        evidence_quotes: [],
+        commercial_story: 'stub commercial story',
+        fair_observation: '',
         novus_counterfactual: 'stub counterfactual',
-        wider_leakage: '',
-        systemic_promise: 'stub systemic promise',
-        why_novus: 'stub why novus',
-        objection_response: '',
-        demo_intro: 'stub demo intro',
+        email_main_point: 'stub main point',
+        email_consequence: 'That means stub consequence.',
+        email_wider_consequence: '',
       };
     }
     if (tool?.name === 'record_probe_diagnosis') {
@@ -388,6 +401,12 @@ async function run() {
   }));
 
   const beforeForce = { interpret: interpretCallCount, diagnose: diagnoseCallCount };
+  // updated_at has millisecond resolution, and two rebuild passes in the same
+  // process can land inside the same millisecond — which made the "prb_open
+  // was actually re-touched" assertion below fail intermittently even though
+  // the row HAD been rewritten. Wait for the clock to leave that millisecond
+  // so the comparison measures a rewrite rather than the scheduler.
+  await waitForNewMillisecond(openBeforeForce.updated_at);
   const forced = await runRebuildPass(repo, { forceAi: true });
 
   assert.strictEqual(forced.diagnosis.ai_diagnoses_run, 1, 'the not-yet-finalised prb_undiagnosed gets diagnosed');
