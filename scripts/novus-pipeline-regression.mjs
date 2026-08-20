@@ -43,8 +43,7 @@ import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 __setAiCallerForTests(async ({ tool }) => {
   if (tool.name === 'record_probe_diagnosis') {
     return {
-      primary_problem: 'Stubbed primary problem for pipeline-regression.', primary_evidence: 'Stubbed evidence.',
-      secondary_problem: '', secondary_evidence: '',
+      findings: [{ finding: 'Stubbed finding for pipeline-regression.', evidence: 'Stubbed evidence.', significance_note: 'Stubbed significance.' }],
       strengths: 'Stubbed strengths.', missed_opportunities: 'Stubbed missed opportunity.',
       commercial_implication: 'Stubbed commercial implication.', novus_opportunity: 'Core (front desk)',
       diagnosis_summary: 'Stubbed diagnosis summary — pipeline-regression checks rebuild mechanics, not AI content.',

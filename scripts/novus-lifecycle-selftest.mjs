@@ -78,7 +78,7 @@ const INTELLIGENCE_HEADER = [
 ];
 const DIAGNOSIS_HEADER = [
   'diagnosis_id', 'agency_id', 'probe_id',
-  'primary_problem', 'primary_evidence', 'secondary_problem', 'secondary_evidence',
+  'findings',
   'strengths', 'missed_opportunities', 'commercial_implication', 'novus_opportunity',
   'diagnosis_summary', 'created_at', 'updated_at',
 ];
@@ -170,17 +170,18 @@ function installAiStub() {
       const zeroContact = /Human contact: none/.test(prompt);
       return zeroContact
         ? {
-            primary_problem: 'No agency contact was recorded at any point during the 4-day observation window.',
-            primary_evidence: 'Human contact: none; response_hours blank; contact_attempts 0.',
-            secondary_problem: '', secondary_evidence: '',
+            findings: [{
+              finding: 'No agency contact was recorded at any point during the 4-day observation window.',
+              evidence: 'Human contact: none; response_hours blank; contact_attempts 0.',
+              significance_note: 'Total silence the agency has no internal visibility into.',
+            }],
             strengths: '', missed_opportunities: 'Both the viewing and the declared property to sell went entirely unanswered.',
             commercial_implication: 'This agency never engaged with this specific enquiry at all.',
             novus_opportunity: 'Core (front desk)',
             diagnosis_summary: 'Zero agency contact throughout the entire 4-day observation window — the enquiry was never answered on any channel.',
           }
         : {
-            primary_problem: '', primary_evidence: '',
-            secondary_problem: '', secondary_evidence: '',
+            findings: [],
             strengths: 'Responded and engaged across the communications received.',
             missed_opportunities: '', commercial_implication: 'Handled promptly for this specific enquiry.',
             novus_opportunity: 'None evidenced',

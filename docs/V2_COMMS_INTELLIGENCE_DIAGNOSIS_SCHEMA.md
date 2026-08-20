@@ -116,19 +116,18 @@ Written only when `observation_status = closed`. Reads the `INTELLIGENCE` row an
 
 | # | Field | Derivation |
 |---|---|---|
-| 1 | `primary_problem` | The single most commercially damaging thing the evidence shows. **Blank is a legal, meaningful value** — see §5. Written for this probe, never selected from a list. |
-| 2 | `primary_evidence` | The quote or the number it rests on. Mandatory whenever field 1 is non-empty. |
-| 3 | `secondary_problem` | The next most damaging, **only if the evidence supports a second one**. Often blank. |
-| 4 | `secondary_evidence` | Same rule as field 2. |
-| 5 | `strengths` | What they did well, from `INTELLIGENCE.did_well` + the numbers. May legitimately be the longest field on the row. |
-| 6 | `missed_opportunities` | Named commercial value that was on the table and not taken — the BUYING and SELLING opportunities from §1, specifically. |
-| 7 | `commercial_implication` | What this costs *this* agency. Must contain at least one probe-specific fact — the property, a time, their own words. A sentence that would read identically for another agency is rejected. |
-| 8 | `novus_opportunity` | Where NOVUS actually fits, given the evidence. `Core (front desk)`, `Growth (valuation list / seller conversion)`, or **`None evidenced`** when the probe genuinely doesn't establish one. |
-| 9 | `diagnosis_summary` | The two-or-three-sentence commercial read, generated from fields 1–8. This is the sentence Joe says on the call. |
+| 1 | `findings` | Every genuine, distinct, evidence-backed problem the probe reveals — **0 to 4 items**, most commercially damaging first, stored as a JSON array of `{ finding, evidence, significance_note }`. **An empty array is a legal, meaningful value** — see §5. Each item's `evidence` is mandatory whenever `finding` is non-empty (same evidence-gating discipline as the old primary/secondary fields, applied per item). `significance_note` says why this specific finding matters commercially and whether the agency would likely notice it themselves — the raw material Personalisation needs to judge and rank findings, not a whole-probe sentence. |
+| 2 | `strengths` | What they did well, from `INTELLIGENCE.did_well` + the numbers. May legitimately be the longest field on the row. |
+| 3 | `missed_opportunities` | Named commercial value that was on the table and not taken — the BUYING and SELLING opportunities from §1, specifically. |
+| 4 | `commercial_implication` | What this costs *this* agency. Must contain at least one probe-specific fact — the property, a time, their own words. A sentence that would read identically for another agency is rejected. |
+| 5 | `novus_opportunity` | Where NOVUS actually fits, given the evidence. `Core (front desk)`, `Growth (valuation list / seller conversion)`, or **`None evidenced`** when the probe genuinely doesn't establish one. |
+| 6 | `diagnosis_summary` | The two-or-three-sentence commercial read, generated from fields 1–5. This is the sentence Joe says on the call. |
 
 Plus `diagnosis_id`, `agency_id`, `probe_id`, `created_at`, `updated_at`.
 
 **Retired:** `grade` and `tier` (grade lives on `INTELLIGENCE`; tier is `novus_opportunity`'s job now), `evidence_summary` (the concatenated blob), `recommended_solution`, `sales_angle` (the 8 canned strings).
+
+**Superseded (this revision):** the original `primary_problem`/`primary_evidence`/`secondary_problem`/`secondary_evidence` four-field shape capped Diagnosis at exactly one or two discrete problems. It's replaced by the `findings` array above so a probe whose evidence genuinely supports three or four distinct problems isn't forced to compress them into two, or bury the rest inside the `missed_opportunities` prose blob. This is additive to the pipeline described below — no new AI call, no change to `INTELLIGENCE`, no change to the grade — Diagnosis still states *what* the genuine findings are and *why each matters*; it does not decide which of them make the strongest combined story. That selection is the Personalisation layer's job, one level up.
 
 ---
 
@@ -189,6 +188,8 @@ Two AI calls per probe, once. Roughly 30 live probes → ~60 calls to populate t
 ---
 
 ## 7. Worked examples from the live data
+
+*(Written against the original `primary_problem`/`secondary_problem` shape — still accurate on content and reasoning, since §4's `findings` array is the same evidence-gated judgement, just no longer capped at two items. Where an example below shows a "primary" and a "secondary" problem, read those as the first two entries of `findings`.)*
 
 ### 7.1 Barn Field — `RM-0031`, Ensum Brown (strong handling, real speed problem)
 

@@ -13,7 +13,7 @@
 //     writes one anyway — stripInventedCurrency() removes it deterministically
 //   - hero_journey is picked deterministically from Intelligence/Diagnosis
 //     shape, never by asking the model
-//   - a strong-handling probe (blank primary_problem) is never turned into
+//   - a strong-handling probe (no findings) is never turned into
 //     a manufactured weakness
 //
 // Run: npm run novus:probe-personalisation-selftest
@@ -53,10 +53,10 @@ function baseIntelligence(overrides = {}) {
 
 function baseDiagnosis(overrides = {}) {
   return {
-    primary_problem: 'Nothing reached the enquiry for 17.8 hours.',
-    primary_evidence: 'Probe 22:34 -> first human contact 16:25 next day = 17.85 hours.',
-    secondary_problem: 'The declared seller was asked about their position and never offered a valuation.',
-    secondary_evidence: 'No valuation, appraisal or valuer mentioned in either message.',
+    findings: JSON.stringify([
+      { finding: 'Nothing reached the enquiry for 17.8 hours.', evidence: 'Probe 22:34 -> first human contact 16:25 next day = 17.85 hours.', significance_note: 'A response-speed gap that recurs on every out-of-hours enquiry.' },
+      { finding: 'The declared seller was asked about their position and never offered a valuation.', evidence: 'No valuation, appraisal or valuer mentioned in either message.', significance_note: 'An off-market instruction lead recognised in words and then dropped.' },
+    ]),
     strengths: 'Voicemail and email inside 81 seconds across two channels.',
     missed_opportunities: 'An off-market instruction recognised in words and never converted to a valuation.',
     commercial_implication: 'A £375,000 Chevington enquiry sat untouched from 11:34pm until nearly 5:30pm the next day.',
@@ -115,7 +115,7 @@ async function run() {
     ok('stripInventedCurrency leaves currency-free text untouched and empties text that is only a currency claim');
   }
 
-  // ── Strong handling (blank primary_problem) is never turned into a manufactured weakness ──
+  // ── Strong handling (no findings) is never turned into a manufactured weakness ──
   {
     __setAiCallerForTests(async () => ({
       personalised_opener: 'You answered Barn Field in under an hour and asked eight qualification questions.',
@@ -127,7 +127,7 @@ async function run() {
       objection_response: '',
       demo_intro: 'Here is your strongest response, now guaranteed at scale.',
     }));
-    const strongDiagnosis = baseDiagnosis({ primary_problem: '', primary_evidence: '', secondary_problem: '', secondary_evidence: '', novus_opportunity: 'Growth (valuation list / seller conversion)' });
+    const strongDiagnosis = baseDiagnosis({ findings: '[]', novus_opportunity: 'Growth (valuation list / seller conversion)' });
     const result = await personaliseProbe(PROBE, baseIntelligence({ response_hours: 0.9, follow_ups: 1 }), strongDiagnosis, COMMS, {});
     assert.strictEqual(result.wider_leakage, '', 'no manufactured leakage claim for a well-handled probe');
     assert.strictEqual(result.objection_response, '', 'no manufactured objection for a well-handled probe');
@@ -140,11 +140,11 @@ async function run() {
     assert.strictEqual(pickHeroJourney(baseIntelligence({ human_contact: 'none' }), baseDiagnosis()), 'complete_miss');
     assert.strictEqual(pickHeroJourney(baseIntelligence({ human_contact: 'automated_only' }), baseDiagnosis()), 'automated_ack_only');
     assert.strictEqual(
-      pickHeroJourney(baseIntelligence(), baseDiagnosis({ primary_problem: '', novus_opportunity: 'Growth (valuation list / seller conversion)' })),
+      pickHeroJourney(baseIntelligence(), baseDiagnosis({ findings: '[]', novus_opportunity: 'Growth (valuation list / seller conversion)' })),
       'strong_handling_database_opportunity'
     );
     assert.strictEqual(
-      pickHeroJourney(baseIntelligence(), baseDiagnosis({ primary_problem: '', novus_opportunity: 'None evidenced' })),
+      pickHeroJourney(baseIntelligence(), baseDiagnosis({ findings: '[]', novus_opportunity: 'None evidenced' })),
       'strong_handling_no_opportunity'
     );
     assert.strictEqual(pickHeroJourney(baseIntelligence({ response_hours: 17.85 }), baseDiagnosis()), 'slow_response_gap');
@@ -162,7 +162,7 @@ async function run() {
   // ── hero_journey response-speed regression: aligned to lib/grading.mjs's
   // own ">1h and <=16h = Fast, >16h = Slow" boundary (Source Master §10),
   // not a second, independently-chosen threshold. Every case below has a
-  // non-blank primary_problem (a real Diagnosis finding), since the speed
+  // at least one real Diagnosis finding, since the speed
   // band only matters once "handled well" has already been ruled out. ──
   {
     // Real, previously-misclassified cases (all genuinely Fast per the
@@ -217,14 +217,14 @@ async function run() {
       'fast response with no buyer qualification is fast-but-shallow, not a response-speed gap'
     );
 
-    // Strong handling (blank primary_problem) is decided before any speed
+    // Strong handling (no findings) is decided before any speed
     // banding is even consulted — confirmed again here at a fast response
     // time specifically, so a future change to the speed logic can't
     // accidentally start routing strong probes through it.
     assert.strictEqual(
-      pickHeroJourney(baseIntelligence({ response_hours: 0.53 }), baseDiagnosis({ primary_problem: '', novus_opportunity: 'None evidenced' })),
+      pickHeroJourney(baseIntelligence({ response_hours: 0.53 }), baseDiagnosis({ findings: '[]', novus_opportunity: 'None evidenced' })),
       'strong_handling_no_opportunity',
-      'a blank primary_problem short-circuits before response-speed banding, even at a fast response time'
+      'no findings short-circuits before response-speed banding, even at a fast response time'
     );
 
     ok('hero_journey response-speed banding matches lib/grading.mjs\'s own >1h/<=16h Fast boundary exactly, including at both edges of 16h, and never mislabels a fast probe as a response-speed gap');

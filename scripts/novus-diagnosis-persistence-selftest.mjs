@@ -51,8 +51,7 @@ const INTELLIGENCE_HEADER = [
   'grade', 'grade_reason',
 ];
 const DIAGNOSIS_HEADER = [
-  'probe_id', 'probe_ref', 'agency_id', 'primary_problem', 'primary_evidence',
-  'secondary_problem', 'secondary_evidence', 'strengths', 'missed_opportunities',
+  'probe_id', 'probe_ref', 'agency_id', 'findings', 'strengths', 'missed_opportunities',
   'commercial_implication', 'novus_opportunity', 'diagnosis_summary',
 ];
 const PROBES_HEADER = [
@@ -118,8 +117,7 @@ async function run() {
   __setAiCallerForTests(async ({ tool }) => {
     if (tool.name === 'record_probe_diagnosis') {
       return {
-        primary_problem: 'Stubbed problem.', primary_evidence: 'Stubbed evidence.',
-        secondary_problem: '', secondary_evidence: '',
+        findings: [{ finding: 'Stubbed problem.', evidence: 'Stubbed evidence.', significance_note: 'Stubbed significance.' }],
         strengths: '', missed_opportunities: 'Stubbed.', commercial_implication: 'Stubbed.',
         novus_opportunity: 'Core (front desk)', diagnosis_summary: 'Stubbed diagnosis.',
       };

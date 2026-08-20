@@ -27,7 +27,7 @@ const INTELLIGENCE_HEADER = [
 ];
 const DIAGNOSIS_HEADER = [
   'diagnosis_id', 'agency_id', 'probe_id',
-  'primary_problem', 'primary_evidence', 'secondary_problem', 'secondary_evidence',
+  'findings',
   'strengths', 'missed_opportunities', 'commercial_implication', 'novus_opportunity',
   'diagnosis_summary', 'created_at', 'updated_at',
 ];
@@ -103,8 +103,7 @@ async function run() {
   __setAiCallerForTests(async () => {
     aiCallCount += 1;
     return {
-      primary_problem: '63.6 hours to first contact.', primary_evidence: '63.6h response time.',
-      secondary_problem: '', secondary_evidence: '',
+      findings: [{ finding: '63.6 hours to first contact.', evidence: '63.6h response time.', significance_note: 'A repeat pattern the agency is unlikely to notice on its own.' }],
       strengths: '', missed_opportunities: 'Both opportunities left untaken.',
       commercial_implication: 'Specific to this agency.', novus_opportunity: 'Core (front desk)',
       diagnosis_summary: 'Slow and generic.',
@@ -121,7 +120,7 @@ async function run() {
   const diagRecords = store.DIAGNOSIS.slice(2).map((r) => toObj(DIAGNOSIS_HEADER, r));
   const a = diagRecords.find((r) => r.probe_id === 'prb_a');
   const c = diagRecords.find((r) => r.probe_id === 'prb_c');
-  assert.strictEqual(a.primary_problem, '63.6 hours to first contact.');
+  assert.strictEqual(JSON.parse(a.findings)[0].finding, '63.6 hours to first contact.');
   assert.strictEqual(c.diagnosis_summary, 'Already diagnosed on a prior run.', 'prb_c keeps its prior diagnosis untouched');
   assert.strictEqual(diagRecords.find((r) => r.probe_id === 'prb_b'), undefined, 'no DIAGNOSIS row is ever created for an open observation');
   ok('a newly-diagnosed probe is written correctly and a prior diagnosis is never overwritten by a routine rebuild');

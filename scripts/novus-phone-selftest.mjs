@@ -20,7 +20,7 @@ import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 __setAiCallerForTests(async ({ tool }) => {
   if (tool.name === 'record_probe_diagnosis') {
     return {
-      primary_problem: '', primary_evidence: '', secondary_problem: '', secondary_evidence: '',
+      findings: [],
       strengths: '', missed_opportunities: '', commercial_implication: '',
       novus_opportunity: 'None evidenced', diagnosis_summary: 'Stubbed for a hermetic test.',
     };
