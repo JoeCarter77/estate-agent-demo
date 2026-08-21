@@ -57,7 +57,7 @@ const INTELLIGENCE_HEADER = [
 ];
 const DIAGNOSIS_HEADER = [
   'diagnosis_id', 'agency_id', 'probe_id',
-  'primary_problem', 'primary_evidence', 'secondary_problem', 'secondary_evidence',
+  'findings',
   'strengths', 'missed_opportunities', 'commercial_implication', 'novus_opportunity',
   'diagnosis_summary', 'created_at', 'updated_at',
 ];
@@ -202,7 +202,7 @@ async function run() {
   __setAiCallerForTests(async () => {
     diagnosisAiCallCount += 1;
     return {
-      primary_problem: '', primary_evidence: '', secondary_problem: '', secondary_evidence: '',
+      findings: [],
       strengths: 'Fast, warm response.', missed_opportunities: '',
       commercial_implication: 'Specific to this agency.', novus_opportunity: 'None evidenced',
       diagnosis_summary: 'Good outcome, nothing to flag.',

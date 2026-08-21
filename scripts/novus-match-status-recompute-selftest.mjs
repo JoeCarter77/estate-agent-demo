@@ -22,7 +22,7 @@ import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 __setAiCallerForTests(async ({ tool }) => {
   if (tool.name === 'record_probe_diagnosis') {
     return {
-      primary_problem: '', primary_evidence: '', secondary_problem: '', secondary_evidence: '',
+      findings: [],
       strengths: '', missed_opportunities: '', commercial_implication: '',
       novus_opportunity: 'None evidenced', diagnosis_summary: 'Stubbed for a hermetic test.',
     };
@@ -75,8 +75,8 @@ const INTELLIGENCE_HEADER = [
   'manual_override','override_reason','observation_closed_at','created_at','updated_at',
 ];
 const DIAGNOSIS_HEADER = [
-  'diagnosis_id','agency_id','probe_id','primary_problem','primary_evidence','secondary_problem',
-  'secondary_evidence','strengths','missed_opportunities','commercial_implication',
+  'diagnosis_id','agency_id','probe_id','findings',
+  'strengths','missed_opportunities','commercial_implication',
   'novus_opportunity','diagnosis_summary','created_at','updated_at',
 ];
 
