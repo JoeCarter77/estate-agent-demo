@@ -8,7 +8,10 @@
 //   - the separate no-response structure, which exists because a probe that
 //     was never replied to has no conversation to describe
 //   - optional paragraphs are omitted entirely, never left as blank gaps
-//   - "That meant " is the ONE piece of grammar assembled in code
+//   - the FIXED OPENING WORDS this layer owns — "I want to say upfront that ",
+//     "What stood out, though, was ", "That meant ", "That also meant " —
+//     joined onto the lower-case continuations Personalisation returns, and
+//     never printed twice
 //   - merge fields: enquiry_date and property_address are resolved here,
 //     {{first_name}} deliberately is not
 //   - a row that cannot make a complete, honest email assembles nothing at
@@ -22,6 +25,7 @@ import {
   assembleEmail, isSendable, normaliseVariant, openingLine,
   ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, FIRST_NAME_MERGE_FIELD, NO_REPLY_LINE,
   NO_RESPONSE_BREAKDOWN_LINE, NO_RESPONSE_CTA_LINE, SIGN_OFF, THAT_MEANT_PREFIX,
+  THAT_ALSO_MEANT_PREFIX, FAIR_OBSERVATION_PREFIX, MAIN_FINDING_PREFIX, withPrefix,
 } from '../lib/email-assembly.mjs';
 
 let passed = 0;
@@ -35,9 +39,10 @@ function fullRow(overrides = {}) {
     email_variant: 'normal',
     enquiry_date: '18 August',
     property_address: '14 Oak Road',
-    fair_observation: 'You got back to me quickly and followed up three times across phone and email.',
-    main_finding: 'What stood out, though, was that each follow-up essentially asked me to get back to you, rather than giving me a clear next step. I had also mentioned a property of my own that I was considering selling, but that never really came into the conversation.',
+    fair_observation: 'you got back to me quickly and followed up three times across phone and email.',
+    main_finding: 'that each follow-up essentially asked me to get back to you, rather than giving me a clear next step.',
     commercial_consequence: "the £425,000 enquiry wasn't just a potential buyer — there was also a potential seller instruction sitting inside it that never got explored.",
+    wider_observation: '',
     wider_consequence: '',
     additional_findings_hook: ADDITIONAL_FINDINGS_HOOK_LINE,
     ...overrides,
@@ -54,7 +59,8 @@ function noResponseRow(overrides = {}) {
     fair_observation: '',
     main_finding: '',
     commercial_consequence: 'a buyer who was ready to view never got as far as a conversation.',
-    wider_consequence: 'It also meant the property I said I had of my own was never picked up as a valuation.',
+    wider_observation: '',
+    wider_consequence: 'the property I said I had of my own was never picked up as a valuation.',
     additional_findings_hook: '',
     ...overrides,
   };
@@ -70,14 +76,14 @@ function run() {
     assert.strictEqual(body, [
       'Hi {{first_name}},',
       'We sent your team an enquiry on 18 August about 14 Oak Road.',
-      row.fair_observation,
-      row.main_finding,
+      `I want to say upfront that ${row.fair_observation}`,
+      `What stood out, though, was ${row.main_finding}`,
       `That meant ${row.commercial_consequence}`,
       ADDITIONAL_FINDINGS_HOOK_LINE,
       "I've put together a personalised breakdown of what we found. Happy to send it over if you'd like to see it.",
       'Joe',
     ].join('\n\n'));
-    ok('the normal structure assembles exactly as locked: intro, fair observation, main finding, "That meant" consequence, the additional-findings tease, the locked CTA, sign-off');
+    ok('the normal structure assembles exactly as locked: intro, "I want to say upfront that" fair observation, "What stood out, though, was" main finding, "That meant" consequence, the additional-findings tease, the locked CTA, sign-off');
   }
 
   // ── The CTA is locked copy, and is never called an audit ──
@@ -93,13 +99,13 @@ function run() {
   // ── Optional paragraphs are omitted, never left as blank gaps ──
   {
     const minimal = assembleEmail(fullRow({
-      fair_observation: '', wider_consequence: '', additional_findings_hook: '',
+      fair_observation: '', wider_observation: '', wider_consequence: '', additional_findings_hook: '',
     }));
     const row = fullRow();
     assert.strictEqual(minimal, [
       'Hi {{first_name}},',
       'We sent your team an enquiry on 18 August about 14 Oak Road.',
-      row.main_finding,
+      `What stood out, though, was ${row.main_finding}`,
       `That meant ${row.commercial_consequence}`,
       CTA_LINE,
       'Joe',
@@ -108,16 +114,44 @@ function run() {
     ok('every optional paragraph is dropped entirely when empty — the email closes up rather than showing a gap');
   }
 
-  // ── A wider consequence gets its own paragraph, after the first one ──
+  // ── The wider beat: the observation, then its separate consequence ──
   {
     const body = assembleEmail(fullRow({
       commercial_consequence: 'the enquiry was getting attention, but it was not really being progressed.',
-      wider_consequence: 'It also meant a potential seller instruction mentioned in the same enquiry was never explored.',
+      wider_observation: "I'd also mentioned that I had a property of my own that I was considering selling, but that never really came into the conversation.",
+      wider_consequence: 'a potential seller instruction sitting inside the same enquiry was never explored.',
     }));
-    assert.ok(body.indexOf(THAT_MEANT_PREFIX) < body.indexOf('It also meant'), 'the wider consequence follows the first one');
-    assert.ok(body.includes('\n\nIt also meant a potential seller instruction mentioned in the same enquiry was never explored.\n\n'),
-      'and stands as its own paragraph');
-    ok('a wider consequence is its own paragraph, immediately after the "That meant" consequence it widens');
+    assert.ok(body.indexOf(THAT_MEANT_PREFIX) < body.indexOf("I'd also mentioned"), 'the wider observation follows the first consequence');
+    assert.ok(body.indexOf("I'd also mentioned") < body.indexOf(THAT_ALSO_MEANT_PREFIX), 'and its own consequence follows it');
+    assert.ok(body.includes("\n\nI'd also mentioned that I had a property of my own that I was considering selling, but that never really came into the conversation.\n\n"),
+      'the observation stands as its own paragraph, exactly as written');
+    assert.ok(body.includes('\n\nThat also meant a potential seller instruction sitting inside the same enquiry was never explored.\n\n'),
+      'and the wider consequence is opened by the fixed wording this layer owns');
+    assert.ok(body.indexOf(THAT_ALSO_MEANT_PREFIX) < body.indexOf(ADDITIONAL_FINDINGS_HOOK_LINE), 'both sit before the curiosity line');
+
+    // Either half may be absent on its own.
+    const observationOnly = assembleEmail(fullRow({ wider_observation: 'I had a property of my own to sell too.', wider_consequence: '' }));
+    assert.ok(observationOnly.includes('\n\nI had a property of my own to sell too.\n\n'));
+    assert.ok(!observationOnly.includes(THAT_ALSO_MEANT_PREFIX), 'no wider consequence, no "That also meant" paragraph');
+    ok('the wider beat is two independent optional paragraphs — the observation as its own sentence, then "That also meant" + its distinct consequence');
+  }
+
+  // ── A fixed prefix is never printed twice ──
+  {
+    const doubled = assembleEmail(fullRow({
+      fair_observation: 'I want to say upfront that you got back to me quickly.',
+      main_finding: 'What stood out, though, was that nobody asked my timescale.',
+      commercial_consequence: 'That meant the valuation was never offered.',
+      wider_consequence: 'That also meant the seller side went unexplored.',
+    }));
+    for (const prefix of [FAIR_OBSERVATION_PREFIX, MAIN_FINDING_PREFIX, THAT_MEANT_PREFIX, THAT_ALSO_MEANT_PREFIX]) {
+      assert.strictEqual((doubled.match(new RegExp(prefix.trim(), 'g')) || []).length, 1,
+        `"${prefix.trim()}" appears exactly once even though the stored field already carried it`);
+    }
+    assert.strictEqual(withPrefix(THAT_MEANT_PREFIX, 'the lead went cold.'), 'That meant the lead went cold.');
+    assert.strictEqual(withPrefix(THAT_MEANT_PREFIX, 'That meant the lead went cold.'), 'That meant the lead went cold.');
+    assert.strictEqual(withPrefix(THAT_MEANT_PREFIX, ''), '', 'an empty continuation produces no paragraph at all');
+    ok('withPrefix joins the fixed opener to the continuation and never stutters, so a stored row written before a prefix moved into this layer still reads correctly');
   }
 
   // ── "That meant " is the ONE piece of grammar assembled in code ──
@@ -135,9 +169,9 @@ function run() {
       main_finding: 'each follow-up asked me to chase',  // ditto
     });
     const body = assembleEmail(row);
-    assert.ok(body.includes('\n\nyou came back fast\n\n'), 'the fair observation is passed through byte-for-byte');
-    assert.ok(body.includes('\n\neach follow-up asked me to chase\n\n'), 'and so is the main finding');
-    ok('the assembler never repairs, capitalises or punctuates a sentence — sentence-ready copy is Personalisation\'s contract, not this layer\'s job');
+    assert.ok(body.includes('\n\nI want to say upfront that you came back fast\n\n'), 'the fair observation is passed through byte-for-byte after the fixed opener');
+    assert.ok(body.includes('\n\nWhat stood out, though, was each follow-up asked me to chase\n\n'), 'and so is the main finding');
+    ok('the assembler adds the fixed opener and nothing else — it never repairs, capitalises or punctuates a sentence, because sentence-ready copy is Personalisation\'s contract');
   }
 
   // ── The no-response structure ──
@@ -149,7 +183,7 @@ function run() {
       'We sent your team an enquiry on 18 August about 14 Oak Road.',
       'We never received a reply.',
       `That meant ${row.commercial_consequence}`,
-      row.wider_consequence,
+      `That also meant ${row.wider_consequence}`,
       "We found a couple of things that may explain it, so we've put together a short breakdown that might be useful.",
       "Happy to send it over if you'd like to see it.",
       'Joe',
@@ -167,6 +201,7 @@ function run() {
       additional_findings_hook: ADDITIONAL_FINDINGS_HOOK_LINE,
     }));
     assert.ok(!body.includes('You came back to me quickly.'), 'a stray fair observation is not printed');
+    assert.ok(!body.includes(FAIR_OBSERVATION_PREFIX), 'and neither is its fixed opener — there was no interaction to praise');
     assert.ok(!body.includes('The reply did not mention the property.'), 'nor a stray main finding — there was no reply to describe');
     assert.ok(!body.includes(ADDITIONAL_FINDINGS_HOOK_LINE), 'and the tease is not stacked on top of the breakdown line that already says it');
     assert.ok(!body.includes(CTA_LINE), 'the normal CTA is not used');
@@ -213,7 +248,7 @@ function run() {
     assert.strictEqual(normaliseVariant(''), 'normal');
     assert.strictEqual(normaliseVariant(undefined), 'normal');
     assert.strictEqual(normaliseVariant('NO_RESPONSE'), 'normal', 'only the exact marker switches structure');
-    assert.ok(assembleEmail(fullRow({ email_variant: 'something_else' })).includes(fullRow().main_finding),
+    assert.ok(assembleEmail(fullRow({ email_variant: 'something_else' })).includes(`${MAIN_FINDING_PREFIX}${fullRow().main_finding}`),
       'an unknown variant still assembles the normal, conversation-describing email');
     assert.ok(!assembleEmail(fullRow({ email_variant: '' })).includes(NO_REPLY_LINE),
       'and never claims we received no reply when the row describes a conversation');

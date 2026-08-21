@@ -5,7 +5,7 @@
 Scope: `COMMUNICATIONS`, `INTELLIGENCE`, `DIAGNOSIS`.
 Not in scope: Demo, SEND DEMO, Outreach, `AGENCIES`, `PROBES`, `RAW_EVENTS`, `ACTIONS`. (`DIAGNOSIS_FINDINGS` and `PERSONALISATION` were added to this document in §4a/§4b when the Personalisation layer was rebuilt — see those sections.)
 
-Totals: **`COMMUNICATIONS` +0 columns**, **`INTELLIGENCE` 20 fields**, **`DIAGNOSIS` 8 fields + `DIAGNOSIS_FINDINGS` 5 fields**, **`PERSONALISATION` 20 fields**. Two AI calls per probe for `COMMUNICATIONS`→`DIAGNOSIS`, plus one for `PERSONALISATION`. No fingerprint layer.
+Totals: **`COMMUNICATIONS` +0 columns**, **`INTELLIGENCE` 20 fields**, **`DIAGNOSIS` 8 fields + `DIAGNOSIS_FINDINGS` 5 fields**, **`PERSONALISATION` 21 fields**. Two AI calls per probe for `COMMUNICATIONS`→`DIAGNOSIS`, plus one for `PERSONALISATION`. No fingerprint layer.
 
 ---
 
@@ -147,14 +147,44 @@ that row — it is persisted here instead, one row each.
 
 Written by `lib/diagnosis-rebuild.mjs` in the **same batch write** as the
 `DIAGNOSIS` row — no extra request, no AI call, and a diagnosis can never be
-written without its findings. Upserted per `(probe_id, finding_index)`, so a
-re-run overwrites in place and blanks any surplus row from a longer previous
-run. Read back by `lib/personalisation-rebuild.mjs`. Nothing invents a finding
-here: these rows are exactly the items that survived §4's evidence gate.
+written without its findings. `lib/observation-recompute.mjs` (the single-probe
+/ webhook path) writes them through the **same writer**, so a diagnosis
+finalised by that path is never frozen findings-less. Read back by
+`lib/personalisation-rebuild.mjs`. Nothing invents a finding here: these rows
+are exactly the items that survived §4's evidence gate.
+
+### The write invariant
+
+> **ONE rebuild → ONE `DIAGNOSIS` row per probe → ONE `DIAGNOSIS_FINDINGS` row
+> per finding per probe → ONE `PERSONALISATION` row per probe.**
+> A probe with 8 findings leaves exactly 8 rows behind.
+
+This is *enforced*, not assumed, because it was once broken: a workbook
+carrying two `INTELLIGENCE` rows for one `probe_id` (e.g. `prb_x` and
+`prb_x `, which normalise to the same trimmed id) put that probe through the
+diagnosis loop **twice inside a single pass**. `DIAGNOSIS` survived it — both
+visits resolved through a `probe_id → row` map to the same row — while the
+findings writer re-derived "which rows does this probe already own?" from the
+table *snapshot* taken at the start of the pass, saw none of the first visit's
+rows, and appended a complete second copy. One rebuild, one HTTP request, `N`
+findings → `2N` rows. Three things now hold the invariant up:
+
+1. `rebuildAllDiagnosis` and `rebuildAllPersonalisation` visit each `probe_id`
+   **at most once per pass**, reporting any duplicate `INTELLIGENCE` rows as
+   `duplicate_intelligence_rows_skipped` rather than absorbing them silently.
+2. `createFindingsWriter` (`lib/diagnosis-findings.mjs`) keeps its row index
+   **live for the whole pass**, so a repeat write for a probe overwrites the
+   rows it already claimed, upserts per `(probe_id, finding_index)`, blanks any
+   surplus row from a longer previous run, and never hands out a row another
+   probe occupies.
+3. `repo.writeRowsBatch` collapses two writes to the same range, so a batch can
+   never carry contradictory instructions for one row.
+
+Regression suite: `npm run novus:findings-duplication-selftest`.
 
 ---
 
-## 4b. `PERSONALISATION` — 20 fields, one row per probe
+## 4b. `PERSONALISATION` — 21 fields, one row per probe
 
 One step further on: `DIAGNOSIS` says *what the genuine findings are*;
 `PERSONALISATION` decides **what the story is**, and writes it as
@@ -167,13 +197,36 @@ commercially, and we found some other interesting things too. The reader should
 think *"fair enough, I can see what they mean"*, and then *"what else did they
 find?"*.
 
-**Sentence-ready is the contract.** Every email field is already grammatically
-complete copy that drops straight into the email — never a label like
-`Poor follow-up` or `Weak qualification` (those are Diagnosis concepts, not
-email copy), never a fragment the code has to repair. The **only** deliberate
-act of grammar downstream is `"That meant "` + `commercial_consequence`, which
-is why that one field is a bare continuation and every other field is a whole
-sentence.
+**The single rule at the centre of this layer.** *Do not optimise for
+describing problems. Optimise for revealing missed opportunities.* For every
+finding, the question is: **because this happened, what did the agency fail to
+find out, progress, convert, or uncover?** The answer to *that* is what the
+email is made of — which is why `commercial_consequence`, not `main_finding`,
+is the field this layer exists to get right, and why a consequence that merely
+rephrases the finding is refused in code (`consequenceGoesBeyondFinding`).
+
+**Sentence-ready is the contract.** Every email field is copy that drops
+straight into the email with no repair — never a label like `Poor follow-up`
+or `Weak qualification` (those are Diagnosis concepts, not email copy), never a
+fragment the code has to fix up.
+
+**The grammar contract.** The assembler owns the **fixed opening words** of
+four paragraphs, so those four fields are stored as **lower-case
+continuations** and every other narrative field is a whole sentence:
+
+| Fixed wording (assembler) | Field (continuation) |
+|---|---|
+| `I want to say upfront that ` | `fair_observation` |
+| `What stood out, though, was ` | `main_finding` |
+| `That meant ` | `commercial_consequence` |
+| `That also meant ` | `wider_consequence` |
+| *(none — its own sentence)* | `wider_observation` |
+
+`asContinuation()` enforces the first four (a prefix the model wrote is
+stripped in either tense, the first letter is lower-cased — except the pronoun
+"I" and genuine acronyms — and terminal punctuation is guaranteed);
+`asStandaloneSentence()` enforces the last. `withPrefix()` in the assembler is
+the backstop against a prefix ever printing twice.
 
 **Voice.** The email is written *to* the agency by the person who actually sent
 the enquiry: they are "you", we are "I"/"me"/"we". Detached third-person
@@ -201,12 +254,13 @@ are never shown to a prospect. **Email copy** is read by a real estate agent.
 | 7 | `enquiry_date` | DET — the probe's own `probe_timestamp`, formatted `18 August` in Europe/London so an evening probe keeps the date the agency would recognise. |
 | 8 | `property_address` | DET — `PROBES.property_address`, stripped of the analyst's trailing bracketed note (which can contain a stray price). **Blank when the address was never established**, which makes the row unsendable (field 14). |
 | 9 | `email_variant` | DET — `no_response` when `INTELLIGENCE.human_contact` is `none`, otherwise `normal`. Selects the email structure (§4c). |
-| 10 | `fair_observation` | **Optional.** A complete sentence or short paragraph acknowledging something genuinely good — *"You got back to me quickly and followed up three times across phone and email."* Blank when Diagnosis records no strengths, when it reads as detached commentary, or in the no-response case. |
-| 11 | `main_finding` | The actual failure as natural, sentence-ready copy — *"What stood out, though, was that each follow-up essentially asked me to get back to you, rather than giving me a clear next step."* Where several findings are really one story, they are woven into this so it reads as one thing that happened. Blank in the no-response case. |
-| 12 | `commercial_consequence` | Why the failure mattered commercially, in terms of the viewing, valuation, seller instruction, progression or conversion. **Stored as the bare continuation** — the assembler supplies `"That meant "`, so any prefix the model writes is stripped (`stripThatMeantPrefix`, either tense). |
-| 13 | `wider_consequence` | **Optional.** A genuinely *distinct* second commercial consequence, as a standalone sentence — *"It also meant a potential seller instruction mentioned in the same enquiry was never explored."* A value that merely restates field 12 is dropped rather than printed twice (`distinctWiderConsequence`). Never forced. |
-| 14 | `additional_findings_hook` | DET — **not AI-authored.** One fixed tease line ("There were a couple of other things from the enquiry that caught our attention too.") shown only when a real finding sits outside the primary narrative; blank otherwise, and always blank in the no-response case. It must **not** reveal what the other findings were — that is the question the email exists to provoke. |
-| 15 | `email_body` | DET — the complete email, assembled by `lib/email-assembly.mjs` from fields 7–14 (§4c). **Blank when the row cannot make a complete, honest email**, which is the signal that a human should look. |
+| 10 | `fair_observation` | **Optional. Continuation of `"I want to say upfront that "`.** Its job is to *disarm*: something genuinely good, backed by the strongest specific evidence available — *"…you followed up properly — three attempts across phone and email inside 14.5 hours, with my name and Fox Cottage referenced correctly and a clear way to get back in touch."* Specific, but not a dump of every positive detail. Blank when Diagnosis records no strengths, when it reads as detached commentary, when it **sneaks criticism in** with *eventually / although / despite / however* (`readsAsSnuckCriticism`), or in the no-response case. |
+| 11 | `main_finding` | **Continuation of `"What stood out, though, was "`.** The most important thing not handled well: specific, grounded in what actually happened, understandable without the underlying analysis, written from the enquiry's perspective, and about **behaviour** rather than an abstract business judgement (*"Your qualification process was weak"* is wrong). Where several findings are really one story, they are woven into this so it reads as one thing that happened. Blank in the no-response case. |
+| 12 | `commercial_consequence` | **Continuation of `"That meant "`. The most important field in the email.** Answers *"so what did this actually mean for the agency?"*: what happened → what opportunity should have been captured → what was not captured or progressed → why that matters. It must **not paraphrase field 11** — one that restates it is dropped, which makes the row unsendable (field 16) rather than sending an email that describes a problem and never says what it cost. |
+| 13 | `wider_observation` | **Optional.** A standalone sentence naming a second thing the enquiry carried that never came into the conversation — *"I'd also mentioned that I had a property of my own that I was considering selling, but that never really came into the conversation."* Never invented to fill the field. |
+| 14 | `wider_consequence` | **Optional. Continuation of `"That also meant "`.** One level beyond field 12, only when there is a genuinely *distinct* second commercial implication — *"…a potential seller instruction sitting inside the same enquiry was never explored."* A value that merely restates field 12 is dropped rather than printed twice (`distinctWiderConsequence`). If the main consequence tells the whole story, this stays empty. Never forced. |
+| 15 | `additional_findings_hook` | DET — **not AI-authored.** One fixed tease line ("There were a couple of other things from the enquiry that caught our attention too.") shown only when a real finding sits outside the primary narrative; blank otherwise, and always blank in the no-response case. It must **not** reveal what the other findings were — that is the question the email exists to provoke. |
+| 16 | `email_body` | DET — the complete email, assembled by `lib/email-assembly.mjs` from fields 7–15 (§4c). **Blank when the row cannot make a complete, honest email**, which is the signal that a human should look. |
 
 Plus `personalisation_id`, `agency_id`, `probe_id`, `created_at`, `updated_at`.
 
@@ -223,6 +277,12 @@ never forced onto an enquiry that did not say so.
 `email_secondary_hook` (renamed `additional_findings_hook`), and
 `commercial_story` — superseded by `commercial_consequence` /
 `wider_consequence`, which say the same thing in copy the email can use.
+
+**Added:** `wider_observation` — the standalone sentence that sets up
+`wider_consequence` (the *"I'd also mentioned…"* line). If the live
+`PERSONALISATION` tab has no `wider_observation` column, the value is simply
+not persisted; `email_body` is assembled and stored at write time, so the sent
+email is unaffected, but the column should be added to keep the row complete.
 
 ---
 
@@ -242,13 +302,15 @@ Hi {{first_name}},
 
 We sent your team an enquiry on {enquiry_date} about {property_address}.
 
-{fair_observation}                  (optional)
+I want to say upfront that {fair_observation}        (optional)
 
-{main_finding}
+What stood out, though, was {main_finding}
 
 That meant {commercial_consequence}
 
-{wider_consequence}                 (optional)
+{wider_observation}                 (optional)
+
+That also meant {wider_consequence} (optional)
 
 {additional_findings_hook}          (optional)
 
@@ -274,7 +336,9 @@ We never received a reply.
 
 That meant {commercial_consequence}
 
-{wider_consequence}                 (optional)
+{wider_observation}                 (optional)
+
+That also meant {wider_consequence} (optional)
 
 We found a couple of things that may explain it, so we've put together a short
 breakdown that might be useful.
@@ -292,8 +356,13 @@ reworded so the offer makes sense when there was nothing to discuss.
 
 - **The CTA is locked** and never AI-authored. It is a *breakdown*, never an
   "audit" — the assembler's own test asserts the word never appears.
-- `commercial_consequence` never begins with "That meant"/"That means" — the
-  assembler already says it, and repeating it reads as a stutter.
+- **The fixed openers are never printed twice.** Each of the four prefixed
+  fields is stored as a continuation with any prefix the model wrote stripped,
+  and `withPrefix()` in the assembler refuses to double one that survived.
+- **`fair_observation` is either genuinely fair or absent** — hedged praise
+  (*eventually / although / despite / however*) is dropped, not repaired.
+- **`commercial_consequence` must go beyond `main_finding`** — a restatement is
+  dropped, and the row then assembles no email at all.
 - No field may carry a greeting, sign-off, CTA, transition, or merge-field
   syntax of its own.
 - No field may carry our internal reasoning about the analysis. A model asked

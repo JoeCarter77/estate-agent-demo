@@ -41,10 +41,12 @@ import {
   personaliseProbe, pickHeroJourney, stripUnbackedCurrency,
   normalizeCurrencyFigure, formatEnquiryDate, cleanAddressForEmail,
   stripThatMeantPrefix, readsAsInternalReasoning, readsAsDetachedThirdPerson,
-  distinctWiderConsequence, emailPropertyAddress,
+  distinctWiderConsequence, emailPropertyAddress, readsAsSnuckCriticism,
+  consequenceGoesBeyondFinding,
 } from '../lib/probe-personalisation.mjs';
 import {
-  ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE, THAT_MEANT_PREFIX, assembleEmail,
+  ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE, THAT_MEANT_PREFIX,
+  THAT_ALSO_MEANT_PREFIX, FAIR_OBSERVATION_PREFIX, MAIN_FINDING_PREFIX, assembleEmail,
 } from '../lib/email-assembly.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 
@@ -116,6 +118,7 @@ function stubResult(overrides = {}) {
     novus_counterfactual: 'At 22:34, NOVUS would have replied in the same 81 seconds your team used — eleven hours earlier — and offered the valuation in the same breath.',
     main_finding: 'Nothing reached us for about 18 hours, and when it did, the property I mentioned selling never came up again.',
     commercial_consequence: 'the £375,000 enquiry went cold overnight and the valuation behind it was never offered.',
+    wider_observation: '',
     wider_consequence: '',
     // additional_findings_hook is deliberately absent: the model is no longer
     // asked for it at all — see the dedicated test proving that even if a
@@ -286,11 +289,13 @@ async function run() {
       assert.strictEqual(result.fair_observation, '', `detached third person "${detached}" never reaches the email`);
       assert.ok(!result.email_body.includes(detached), 'and never reaches the assembled body either');
     }
-    // The same observation written to them survives untouched.
+    // The same observation written to them survives — as the lower-case
+    // continuation the assembler prints after "I want to say upfront that ".
     __setAiCallerForTests(async () => stubResult({ fair_observation: "You didn't let this one go cold — you came back twice." }));
     const kept = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
-    assert.strictEqual(kept.fair_observation, "You didn't let this one go cold — you came back twice.", 'the second-person version is kept exactly as written');
-    ok('a fair observation written as detached commentary about the agency is dropped, while the same point addressed to them as "you" survives untouched');
+    assert.strictEqual(kept.fair_observation, "you didn't let this one go cold — you came back twice.", 'the second-person version survives, de-capitalised to continue the fixed opener');
+    assert.ok(kept.email_body.includes("I want to say upfront that you didn't let this one go cold"), 'and reads as one sentence after the assembler\'s fixed opener');
+    ok('a fair observation written as detached commentary about the agency is dropped, while the same point addressed to them as "you" survives as a continuation of the fixed opener');
   }
 
   // readsAsDetachedThirdPerson as a unit — and that it does not eat copy that
@@ -369,12 +374,13 @@ async function run() {
     assert.ok(!('email_consequence' in result));
     assert.ok(!('email_secondary_hook' in result));
 
-    // The sentence-ready fields, exactly as the model wrote them.
+    // The sentence-ready fields. The three that follow a fixed opener come
+    // back as lower-case continuations of it, whatever case the model used.
     assert.strictEqual(result.enquiry_date, '17 August');
     assert.strictEqual(result.property_address, 'Barn Field, Chevington, IP29');
     assert.strictEqual(result.email_variant, 'normal');
-    assert.strictEqual(result.fair_observation, 'You picked this up on two channels inside 81 seconds of each other and asked good questions.');
-    assert.strictEqual(result.main_finding, 'Nothing reached us for about 18 hours, and when it did, the property I mentioned selling never came up again.');
+    assert.strictEqual(result.fair_observation, 'you picked this up on two channels inside 81 seconds of each other and asked good questions.');
+    assert.strictEqual(result.main_finding, 'nothing reached us for about 18 hours, and when it did, the property I mentioned selling never came up again.');
     assert.strictEqual(result.commercial_consequence, 'the £375,000 enquiry went cold overnight and the valuation behind it was never offered.');
     assert.strictEqual(result.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE);
 
@@ -383,6 +389,7 @@ async function run() {
       fair_observation: result.fair_observation,
       main_finding: result.main_finding,
       commercial_consequence: result.commercial_consequence,
+      wider_observation: result.wider_observation,
       wider_consequence: result.wider_consequence,
       additional_findings_hook: result.additional_findings_hook,
     })) {
@@ -391,26 +398,32 @@ async function run() {
       assert.ok(!/NOVUS|leakage/i.test(value), `${name} does not mention NOVUS or leakage`);
     }
 
-    // Sentence-ready: the code never has to repair a field. The ONE piece of
-    // grammar assembled downstream is "That meant " + the consequence.
+    // THE GRAMMAR CONTRACT. Four fields are continuations of an opener the
+    // assembler owns, so each must start lower case; wider_observation is the
+    // one narrative field that stands alone, so it must be capitalised. All of
+    // them must be terminated.
     for (const [name, value] of Object.entries({
       fair_observation: result.fair_observation,
       main_finding: result.main_finding,
+      commercial_consequence: result.commercial_consequence,
       wider_consequence: result.wider_consequence,
     })) {
       if (!value) continue;
-      assert.ok(/^[A-Z"']/.test(value), `${name} opens as a sentence`);
+      assert.ok(/^[a-z£"']/.test(value), `${name} is the lower-case continuation its fixed opener needs`);
       assert.ok(/[.!?]$/.test(value), `${name} closes as a sentence`);
     }
-    assert.ok(/^[a-z£]/.test(result.commercial_consequence), 'commercial_consequence is the lower-case continuation "That meant " needs');
+    if (result.wider_observation) {
+      assert.ok(/^[A-Z"']/.test(result.wider_observation), 'wider_observation is a standalone sentence, so it is capitalised');
+      assert.ok(/[.!?]$/.test(result.wider_observation), 'and terminated');
+    }
 
     // And the email is exactly the assembly of those fields, in the locked order.
     assert.strictEqual(result.email_body, assembleEmail(result), 'email_body is the deterministic assembly of the fields beside it');
     assert.strictEqual(result.email_body, [
       'Hi {{first_name}},',
       'We sent your team an enquiry on 17 August about Barn Field, Chevington, IP29.',
-      result.fair_observation,
-      result.main_finding,
+      `${FAIR_OBSERVATION_PREFIX}${result.fair_observation}`,
+      `${MAIN_FINDING_PREFIX}${result.main_finding}`,
       `${THAT_MEANT_PREFIX}${result.commercial_consequence}`,
       ADDITIONAL_FINDINGS_HOOK_LINE,
       CTA_LINE,
@@ -450,6 +463,14 @@ async function run() {
     assert.strictEqual(stripThatMeantPrefix('the lead went cold'), 'the lead went cold.');
     assert.strictEqual(stripThatMeantPrefix('That meant'), '');
     assert.strictEqual(stripThatMeantPrefix(''), '');
+    // A bare "A" is all-capitals by every naive test, but it is the article,
+    // not an acronym — "That meant A potential seller instruction..." is the
+    // failure this guards.
+    assert.strictEqual(stripThatMeantPrefix('That meant A potential seller instruction was never explored.'),
+      'a potential seller instruction was never explored.');
+    assert.strictEqual(stripThatMeantPrefix("That meant I'd told you something you never picked up."),
+      "I'd told you something you never picked up.", 'the pronoun "I" is never lower-cased');
+    assert.strictEqual(stripThatMeantPrefix('That meant EPC questions went unasked.'), 'EPC questions went unasked.');
     ok('stripThatMeantPrefix removes the prefix in either tense, restores lower case without mangling an acronym, and guarantees terminal punctuation');
   }
 
@@ -461,9 +482,11 @@ async function run() {
       wider_consequence: 'it also meant a potential seller instruction sitting inside the same enquiry was never explored',
     }));
     const distinct = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
-    assert.strictEqual(distinct.wider_consequence, 'It also meant a potential seller instruction sitting inside the same enquiry was never explored.',
-      'a genuinely distinct second consequence is kept, as its own standalone sentence');
-    assert.ok(distinct.email_body.includes('\n\nIt also meant a potential seller instruction'), 'and it gets its own paragraph in the email');
+    assert.strictEqual(distinct.wider_consequence, 'a potential seller instruction sitting inside the same enquiry was never explored.',
+      'a genuinely distinct second consequence is kept, as the continuation of the assembler\'s "That also meant "');
+    assert.ok(distinct.email_body.includes('\n\nThat also meant a potential seller instruction sitting inside the same enquiry was never explored.'),
+      'and it gets its own paragraph, opened by the fixed wording the assembler owns');
+    assert.ok(!/That also meant [Ii]t also meant/.test(distinct.email_body), 'the prefix is never printed twice');
 
     // The realistic failure: an optional field filled with the same point again.
     __setAiCallerForTests(async () => stubResult({
@@ -479,18 +502,82 @@ async function run() {
     __setAiCallerForTests(async () => stubResult({ wider_consequence: '' }));
     const absent = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
     assert.strictEqual(absent.wider_consequence, '', 'an empty wider consequence stays empty');
-    ok('wider_consequence is kept only when it is a genuinely distinct second consequence, capitalised as its own paragraph — a reworded restatement or an empty value simply drops that paragraph');
+    ok('wider_consequence is kept only when it is a genuinely distinct second consequence, as the lower-case continuation of the fixed "That also meant " — a reworded restatement or an empty value simply drops that paragraph');
   }
 
   // distinctWiderConsequence as a unit.
   {
     assert.strictEqual(distinctWiderConsequence('it also meant the valuation was never offered', 'the viewing never happened.'),
-      'It also meant the valuation was never offered.');
+      'the valuation was never offered.');
+    assert.strictEqual(distinctWiderConsequence('That also meant the valuation was never offered.', 'the viewing never happened.'),
+      'the valuation was never offered.', 'the fixed prefix is stripped in either wording');
     assert.strictEqual(distinctWiderConsequence('The viewing never happened.', 'the viewing never happened.'), '');
     assert.strictEqual(distinctWiderConsequence('The viewing never happened, and nor did anything else.', 'the viewing never happened.'), '',
       'a value that merely wraps the primary consequence is still a restatement');
     assert.strictEqual(distinctWiderConsequence('', 'the viewing never happened.'), '');
-    ok('distinctWiderConsequence keeps a real second consequence as a standalone sentence and drops a restatement of the first');
+    ok('distinctWiderConsequence keeps a real second consequence as the continuation "That also meant " needs, and drops a restatement of the first');
+  }
+
+  // ── THE FAIR OBSERVATION MUST BE GENUINELY FAIR ──────────────────────────
+  //    Paragraph 1's only job is to disarm. A hedge word smuggles the
+  //    criticism forward into it, and "I want to say upfront that you
+  //    eventually got back to me" is not a compliment — so the paragraph is
+  //    dropped rather than sent hedged.
+  {
+    for (const hedged of [
+      'you eventually came back to me.',
+      'you replied quickly, although the reply said very little.',
+      'you followed up despite the delay.',
+      'you got back to me the same day, however briefly.',
+    ]) {
+      __setAiCallerForTests(async () => stubResult({ fair_observation: hedged }));
+      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+      assert.strictEqual(result.fair_observation, '', `hedged praise "${hedged}" is not printed`);
+      assert.ok(!result.email_body.includes(FAIR_OBSERVATION_PREFIX), 'and its fixed opener does not appear with nothing behind it');
+    }
+    assert.strictEqual(readsAsSnuckCriticism('you came back inside the hour and referenced the property correctly.'), false,
+      'genuine, unhedged praise is untouched');
+    assert.strictEqual(readsAsSnuckCriticism(''), false);
+    ok('a fair observation that sneaks criticism in with eventually/although/despite/however is dropped rather than sent — paragraph 1 is either genuinely fair or absent');
+  }
+
+  // ── "That meant ..." MUST BE A CONSEQUENCE, NOT THE FINDING AGAIN ────────
+  //    The single rule at the centre of this layer: reveal what the agency
+  //    failed to find out, progress, convert or uncover. A consequence that
+  //    is the finding reworded answers nothing, so it is refused — and a row
+  //    without a consequence assembles no email at all, which is the signal
+  //    for a human to look.
+  {
+    const finding = 'that nobody asked me a single question about my position.';
+    for (const restatement of [
+      'nobody asked me a single question about my position.',
+      'That meant nobody asked me a single question about my position.',
+      'nobody asked me a single question about my position, at any point in the conversation.',
+    ]) {
+      __setAiCallerForTests(async () => stubResult({ main_finding: finding, commercial_consequence: restatement }));
+      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+      assert.strictEqual(result.commercial_consequence, '', `"${restatement}" is a restatement of the finding, not a consequence`);
+      assert.strictEqual(result.email_body, '', 'so no email is assembled — a human needs to look at this probe');
+    }
+
+    // A real consequence — what was not captured or progressed — survives.
+    __setAiCallerForTests(async () => stubResult({
+      main_finding: finding,
+      commercial_consequence: 'a viewing slot was committed before anyone knew whether the buyer could proceed, and the valuation sitting inside the same enquiry was never reached.',
+    }));
+    const kept = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    assert.ok(kept.commercial_consequence.startsWith('a viewing slot was committed'), 'a genuine consequence is kept');
+    assert.ok(kept.email_body.includes('That meant a viewing slot was committed'), 'and reads correctly after the fixed prefix');
+
+    // The unit, including the cases that must NOT trip: a consequence that
+    // merely reuses the finding's vocabulary is normal and correct.
+    assert.strictEqual(consequenceGoesBeyondFinding('the enquiry went cold.', 'that the enquiry went cold.'), false);
+    assert.strictEqual(consequenceGoesBeyondFinding('the enquiry went cold overnight and the valuation was never offered.', 'that the enquiry went cold.'), false,
+      'a consequence that wholly contains the finding is still a restatement');
+    assert.strictEqual(consequenceGoesBeyondFinding('you never found out whether I could proceed on the enquiry.', 'that nobody asked about my position.'), true,
+      'sharing vocabulary is not restating');
+    assert.strictEqual(consequenceGoesBeyondFinding('', 'that the enquiry went cold.'), false, 'an empty consequence never passes');
+    ok('a commercial consequence that only rephrases the finding is refused — the email says what the failure cost, or it is not sent at all');
   }
 
   // ── Our internal reasoning must never be merged into a real email ──
@@ -551,7 +638,7 @@ async function run() {
     assert.ok(result.main_finding, 'main_finding is populated, not blanked by the absence phrasing');
     assert.ok(result.commercial_consequence, 'commercial_consequence is populated too');
     assert.ok(result.email_body, 'and a real email is assembled from them');
-    assert.ok(result.email_body.includes('There is no qualifying question'), 'the actual sentence reaches the email');
+    assert.ok(result.email_body.includes('What stood out, though, was there is no qualifying question'), 'the actual sentence reaches the email, after the fixed opener');
     ok('a main_finding/commercial_consequence phrased as an honest "there is no ..." absence is never blanked, and still produces a sendable email');
   }
 
@@ -573,7 +660,7 @@ async function run() {
     assert.strictEqual(result.email_body, [
       'Hi {{first_name}},',
       'We sent your team an enquiry on 17 August about Barn Field, Chevington, IP29.',
-      result.main_finding,
+      `${MAIN_FINDING_PREFIX}${result.main_finding}`,
       `${THAT_MEANT_PREFIX}${result.commercial_consequence}`,
       CTA_LINE,
       'Joe',
