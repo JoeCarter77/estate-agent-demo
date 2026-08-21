@@ -185,7 +185,7 @@ template in Instantly (§4c) and read by a real estate agent.
 | 10 | `fair_observation` | Genuinely good handling, acknowledged — so the email disarms rather than grades. Blank when Diagnosis records no strengths; the plain `We never received a reply.` when there was no human contact. |
 | 11 | `email_main_point` | The main specific failure from this enquiry, in one or two sentences a person could read aloud. |
 | 12 | `email_consequence` | The strongest commercially meaningful consequence of that failure, grounded in this probe's own facts. **Stored as the bare continuation** — the template supplies "That means " itself, so any prefix the model writes is stripped (`stripThatMeansPrefix`). |
-| 13 | `email_secondary_hook` | OPTIONAL. One sentence on a genuinely separate second finding. Forced blank unless a real finding sits outside the primary narrative. Never a second consequence, never a claim about the agency as a whole. |
+| 13 | `email_secondary_hook` | DET — **not AI-authored.** A single fixed intrigue line ("There were also a couple of other things from this enquiry that caught our attention.") shown only when a real finding sits outside the primary narrative; blank otherwise. Deliberately not free text: it is a tease, not a second paragraph of analysis, and never a second consequence or a claim about the agency as a whole. |
 
 Plus `personalisation_id`, `agency_id`, `probe_id`, `created_at`, `updated_at`.
 
@@ -236,6 +236,9 @@ in the pipeline. Consequences enforced in code, not just prompted for:
   blanks any such value rather than merging it into a real email.
 - Optional variables come back **blank**, so the template simply renders
   nothing in that slot.
+- `email_secondary_hook` is never free text the model writes — it is one
+  fixed intrigue line or blank (§4b field 13), so it can never turn into a
+  second paragraph of analysis.
 
 ---
 

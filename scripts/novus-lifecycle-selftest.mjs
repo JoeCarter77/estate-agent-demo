@@ -176,7 +176,9 @@ function installAiStub() {
         novus_counterfactual: 'stub counterfactual',
         email_main_point: 'stub main point',
         email_consequence: 'stub consequence.',
-        email_secondary_hook: '',
+        // email_secondary_hook is deliberately absent: it is never AI-authored
+        // (see lib/probe-personalisation.mjs's SECONDARY_HOOK_LINE) — a
+        // fixture returning one here would be ignored anyway.
       };
     }
     if (tool?.name === 'record_probe_diagnosis') {

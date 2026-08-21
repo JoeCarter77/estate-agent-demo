@@ -35,8 +35,11 @@ import {
   personaliseProbe, pickHeroJourney, stripUnbackedCurrency,
   normalizeCurrencyFigure, formatEnquiryDate, cleanAddressForEmail,
   stripThatMeansPrefix, readsAsInternalReasoning, emailPropertyAddress,
+  _internal,
 } from '../lib/probe-personalisation.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
+
+const { SECONDARY_HOOK_LINE } = _internal;
 
 let passed = 0;
 function ok(msg) { passed++; console.log('  ✓ ' + msg); }
@@ -107,7 +110,9 @@ function stubResult(overrides = {}) {
     novus_counterfactual: 'At 22:34, NOVUS would have replied in the same 81 seconds your team used — eleven hours earlier — and offered the valuation in the same breath.',
     email_main_point: 'Nothing reached us for about 18 hours, and when it did, the property we mentioned selling never came up again.',
     email_consequence: 'the enquiry went cold overnight and the valuation was never offered.',
-    email_secondary_hook: 'Nobody followed up after that first call either.',
+    // email_secondary_hook is deliberately absent: the model is no longer
+    // asked for it at all — see the dedicated test proving that even if a
+    // caller injects one anyway, it is ignored.
     ...overrides,
   };
 }
@@ -144,30 +149,43 @@ async function run() {
   }
 
   // ── Several findings combine into ONE primary narrative; the leftover
-  //    becomes the supporting finding, and only then can the email's
-  //    optional secondary hook be populated ──
+  //    becomes the supporting finding, and only then does the email's
+  //    secondary hook show its one fixed intrigue line ──
   {
     __setAiCallerForTests(async () => stubResult());
     const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
     assert.strictEqual(result.narrative_finding_indexes, '1,2', 'the narrative records which findings it combined');
     assert.ok(result.supporting_findings.includes('no follow-up'), 'the finding left out of the narrative survives as a supporting finding');
-    assert.strictEqual(result.email_secondary_hook, 'Nobody followed up after that first call either.',
-      'the secondary hook is populated because a genuine finding is actually left over');
-    ok('multiple findings combine into one primary narrative, the leftover finding becomes a supporting finding, and the email secondary hook follows from that');
+    assert.strictEqual(result.email_secondary_hook, SECONDARY_HOOK_LINE,
+      'the fixed intrigue line appears because a genuine finding is actually left over');
+    ok('multiple findings combine into one primary narrative, the leftover finding becomes a supporting finding, and the email secondary hook\'s fixed intrigue line follows from that');
   }
 
   // ── Nothing left over -> no supporting findings, and the secondary hook
-  //    cannot be populated with nothing behind it ──
+  //    stays blank — never populated with nothing behind it ──
   {
     __setAiCallerForTests(async () => stubResult({
       narrative_finding_indexes: [1, 2, 3],
       supporting_findings: 'There were several other issues worth mentioning.', // model padding
-      email_secondary_hook: 'A few other things also stood out.', // model padding
     }));
     const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
     assert.strictEqual(result.supporting_findings, '', 'no finding is left over, so supporting_findings is forced empty');
-    assert.strictEqual(result.email_secondary_hook, '', 'and the padded secondary hook is discarded with it');
-    ok('when the narrative already covers every finding, both the padded supporting_findings and the padded email secondary hook are discarded');
+    assert.strictEqual(result.email_secondary_hook, '', 'and the secondary hook stays blank alongside it');
+    ok('when the narrative already covers every finding, both the padded supporting_findings and the secondary hook are empty');
+  }
+
+  // ── email_secondary_hook is NEVER free text: even if the model returns one
+  //    anyway, it is ignored — only the fixed line or blank can appear ──
+  {
+    __setAiCallerForTests(async () => ({
+      ...stubResult(),
+      email_secondary_hook: 'A detailed paragraph explaining the second finding and why it matters commercially.',
+    }));
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    assert.strictEqual(result.email_secondary_hook, SECONDARY_HOOK_LINE,
+      'a model-written secondary hook is discarded entirely in favour of the fixed intrigue line');
+    assert.ok(!result.email_secondary_hook.includes('detailed paragraph'), 'model-authored analysis never reaches this field');
+    ok('email_secondary_hook is deterministic — a genuine finding outside the narrative always yields exactly the fixed intrigue line, never AI-written analysis, however the model responds');
   }
 
   // ── A claimed finding number that does not exist is discarded ──
@@ -250,7 +268,6 @@ async function run() {
     __setAiCallerForTests(async () => stubResult({
       fair_observation: 'Your team did their best under the circumstances.',
       evidence_quotes: [],
-      email_secondary_hook: '',
     }));
     const noReplyIntelligence = baseIntelligence({ human_contact: 'none', response_hours: '', contact_attempts: 0, channels_used: '' });
     const noReplyFindings = [{ finding_index: 1, finding: 'The enquiry was never replied to.', evidence: 'No communications recorded in the 4-day window.', significance_note: 'A buyer and a seller lead both lost in silence.' }];
@@ -269,7 +286,6 @@ async function run() {
       supporting_findings: 'There were still a few things that could have gone better.', // model padding
       commercial_story: 'Nothing was lost here.',
       novus_counterfactual: 'NOVUS would have matched this response exactly, every time, regardless of who is on shift.',
-      email_secondary_hook: 'A few other things also stood out.', // model padding
     }));
     const strongDiagnosis = baseDiagnosis({ novus_opportunity: 'Growth (valuation list / seller conversion)' });
     const result = await personaliseProbe(PROBE, baseIntelligence({ response_hours: 0.9, follow_ups: 1 }), strongDiagnosis, [], COMMS, {});
@@ -296,7 +312,7 @@ async function run() {
     assert.strictEqual(result.fair_observation, 'Once your team did pick this up, they used two channels inside 81 seconds and asked good questions.');
     assert.strictEqual(result.email_main_point, 'Nothing reached us for about 18 hours, and when it did, the property we mentioned selling never came up again.');
     assert.strictEqual(result.email_consequence, 'the enquiry went cold overnight and the valuation was never offered.');
-    assert.strictEqual(result.email_secondary_hook, 'Nobody followed up after that first call either.');
+    assert.strictEqual(result.email_secondary_hook, SECONDARY_HOOK_LINE);
 
     // None of them may carry template furniture the template already supplies.
     for (const [name, value] of Object.entries({
@@ -376,11 +392,10 @@ async function run() {
     __setAiCallerForTests(async () => stubResult({
       narrative_finding_indexes: [1, 2, 3],
       fair_observation: '',
-      email_secondary_hook: '',
     }));
     const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis({ strengths: '' }), baseFindings(), COMMS, {});
     assert.strictEqual(result.fair_observation, '', 'an unsupported fair observation is blank');
-    assert.strictEqual(result.email_secondary_hook, '', 'an unsupported secondary hook is blank');
+    assert.strictEqual(result.email_secondary_hook, '', 'with every finding covered by the narrative, the secondary hook stays blank');
     // The mandatory beats are still there.
     assert.ok(result.email_main_point, 'the main point is still populated');
     assert.ok(result.email_consequence, 'the consequence is still populated');
