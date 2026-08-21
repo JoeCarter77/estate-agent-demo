@@ -522,7 +522,37 @@ async function run() {
     assert.strictEqual(readsAsInternalReasoning('Nothing reached us for about 18 hours.'), false);
     assert.strictEqual(readsAsInternalReasoning('We never received a reply.'), false);
     assert.strictEqual(readsAsInternalReasoning(''), false);
-    ok('readsAsInternalReasoning catches notes-to-ourselves without eating legitimate prospect-facing copy');
+    // REGRESSION (real 3-probe test run): an earlier version matched a broad
+    // "there is/are no ..." pattern intended to catch "there is no strength
+    // to point to here", and it also caught ordinary honest descriptions of
+    // an absence — exactly the sentences main_finding and
+    // commercial_consequence are SUPPOSED to contain — silently blanking
+    // both fields (and, downstream, email_body) on real probes that never
+    // touched a diagnosis label or an internal-reasoning phrase at all.
+    for (const legitimate of [
+      'There is no question asked about your budget or timescale.',
+      'There is no qualifying question asked before inviting you to view.',
+      'There is nothing in the reply that moves the enquiry forward.',
+      'What stood out was that there is no clear next step given to us at any point.',
+    ]) {
+      assert.strictEqual(readsAsInternalReasoning(legitimate), false, `"${legitimate}" is honest prospect-facing copy, not internal reasoning`);
+    }
+    ok('readsAsInternalReasoning catches notes-to-ourselves without eating legitimate prospect-facing copy, including ordinary "there is no ..." sentences describing a genuine absence');
+  }
+
+  // ── REGRESSION: a main_finding that describes a genuine absence in plain
+  //    "there is no ..." language survives all the way to a sendable email ──
+  {
+    __setAiCallerForTests(async () => stubResult({
+      main_finding: 'There is no qualifying question asked before inviting you to view.',
+      commercial_consequence: 'there is no way of knowing whether the viewing slot went to someone who could actually buy.',
+    }));
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    assert.ok(result.main_finding, 'main_finding is populated, not blanked by the absence phrasing');
+    assert.ok(result.commercial_consequence, 'commercial_consequence is populated too');
+    assert.ok(result.email_body, 'and a real email is assembled from them');
+    assert.ok(result.email_body.includes('There is no qualifying question'), 'the actual sentence reaches the email');
+    ok('a main_finding/commercial_consequence phrased as an honest "there is no ..." absence is never blanked, and still produces a sendable email');
   }
 
   // ── The optional beats really are optional (blank, not absent) ──

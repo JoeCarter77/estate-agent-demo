@@ -23,6 +23,7 @@
     "novus:probe-diagnosis-selftest": "node scripts/novus-probe-diagnosis-selftest.mjs",
     "novus:probe-personalisation-selftest": "node scripts/novus-probe-personalisation-selftest.mjs",
     "novus:email-assembly-selftest": "node scripts/novus-email-assembly-selftest.mjs",
+    "novus:probe-id-whitespace-selftest": "node scripts/novus-probe-id-whitespace-selftest.mjs",
     "novus:diagnosis-persistence-selftest": "node scripts/novus-diagnosis-persistence-selftest.mjs",
     "novus:diagnosis-findings-flow-selftest": "node scripts/novus-diagnosis-findings-flow-selftest.mjs",
     "novus:rebuild-targeting-selftest": "node scripts/novus-rebuild-targeting-selftest.mjs",
