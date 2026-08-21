@@ -85,8 +85,9 @@ const DIAGNOSIS_HEADER = [
 const PERSONALISATION_HEADER = [
   'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
   'primary_narrative', 'narrative_finding_indexes', 'supporting_findings', 'evidence',
-  'commercial_story', 'fair_observation', 'novus_counterfactual',
-  'email_main_point', 'email_consequence', 'email_wider_consequence', 'email_body',
+  'commercial_story', 'novus_counterfactual',
+  'enquiry_date', 'property_address', 'fair_observation',
+  'email_main_point', 'email_consequence', 'email_secondary_hook',
   'created_at', 'updated_at',
 ];
 const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding', 'evidence', 'significance_note'];
@@ -174,8 +175,8 @@ function installAiStub() {
         fair_observation: '',
         novus_counterfactual: 'stub counterfactual',
         email_main_point: 'stub main point',
-        email_consequence: 'That means stub consequence.',
-        email_wider_consequence: '',
+        email_consequence: 'stub consequence.',
+        email_secondary_hook: '',
       };
     }
     if (tool?.name === 'record_probe_diagnosis') {

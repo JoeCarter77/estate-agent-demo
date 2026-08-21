@@ -1,7 +1,7 @@
 // scripts/novus-diagnosis-findings-flow-selftest.mjs — hermetic end-to-end
 // test (no network, no creds) for the data flow this change introduces:
 //
-//   DIAGNOSIS -> DIAGNOSIS_FINDINGS -> PERSONALISATION -> EMAIL
+//   DIAGNOSIS -> DIAGNOSIS_FINDINGS -> PERSONALISATION -> EMAIL VARIABLES
 //
 // It runs the REAL rebuild path (lib/rebuild-pass.mjs, i.e. exactly what the
 // "Rebuild Intelligence" button and the finalisation cron call) over an
@@ -20,9 +20,9 @@
 //      order — and nothing is invented along the way
 //   2. Personalisation reads that complete set back for the right probe, and
 //      combines them rather than defaulting to finding #1
-//   3. each probe gets a genuinely different story and a different email —
-//      the failure mode the spec doc calls out ("fix the logic if different
-//      agencies are coming out too similar")
+//   3. each probe gets a genuinely different story and different email
+//      variables — the failure mode the spec doc calls out ("fix the logic if
+//      different agencies are coming out too similar")
 //   4. the whole flow is idempotent: a second rebuild makes no AI calls,
 //      writes no duplicate findings rows, and changes nothing
 //
@@ -62,8 +62,9 @@ const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding', 'evid
 const PERSONALISATION_HEADER = [
   'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
   'primary_narrative', 'narrative_finding_indexes', 'supporting_findings', 'evidence',
-  'commercial_story', 'fair_observation', 'novus_counterfactual',
-  'email_main_point', 'email_consequence', 'email_wider_consequence', 'email_body',
+  'commercial_story', 'novus_counterfactual',
+  'enquiry_date', 'property_address', 'fair_observation',
+  'email_main_point', 'email_consequence', 'email_secondary_hook',
   'created_at', 'updated_at',
 ];
 const AGENCIES_HEADER = ['agency_id', 'agency_name', 'branch_count', 'live_listing_count', 'primary_contact_name'];
@@ -155,8 +156,8 @@ const SCENARIOS = [
       commercial_story: 'A £310,000 enquiry that also declared a property to sell went entirely unanswered.',
       fair_observation: 'Your team have clearly been busy.',
       email_main_point: 'We never heard anything back.',
-      email_consequence: 'That means both the viewing and the property we mentioned selling went nowhere.',
-      email_wider_consequence: '',
+      email_consequence: 'both the viewing and the property we mentioned selling went nowhere.',
+      email_secondary_hook: '',
     },
     expect: { hero_journey: 'complete_miss', fair_observation: 'We never received a reply.', findings: 1 },
   },
@@ -176,8 +177,8 @@ const SCENARIOS = [
       commercial_story: 'A same-day reply that answered nothing left a £265,000 enquiry exactly where it started.',
       fair_observation: 'You did come back to us the same day, which plenty of agencies do not.',
       email_main_point: 'We got a reply the same day, but it did not mention the property or anything we had asked.',
-      email_consequence: 'That means the enquiry stalled despite your team being quick off the mark.',
-      email_wider_consequence: '',
+      email_consequence: 'the enquiry stalled despite your team being quick off the mark.',
+      email_secondary_hook: '',
     },
     expect: { hero_journey: 'fast_response_stalled_follow_up', findings: 1 },
   },
@@ -195,8 +196,8 @@ const SCENARIOS = [
       commercial_story: 'Nothing was lost here at all.',
       fair_observation: 'Your team called back in 36 minutes and booked the viewing and the valuation in one go.',
       email_main_point: 'Honestly, this one was handled really well.',
-      email_consequence: 'That means the only question worth asking is whether every enquiry gets the same treatment.',
-      email_wider_consequence: '',
+      email_consequence: 'the only question worth asking is whether every enquiry gets the same treatment.',
+      email_secondary_hook: '',
     },
     expect: { hero_journey: 'strong_handling_database_opportunity', findings: 0 },
   },
@@ -216,8 +217,8 @@ const SCENARIOS = [
       commercial_story: 'A £445,000 viewing was booked while the instruction sitting behind it went unmentioned.',
       fair_observation: 'On the buying side this was genuinely well handled — booked in two hours with proper questions.',
       email_main_point: 'We mentioned we had a property to sell, and it never came up again.',
-      email_consequence: 'That means you booked the viewing and left the instruction on the table.',
-      email_wider_consequence: '',
+      email_consequence: 'you booked the viewing and left the instruction on the table.',
+      email_secondary_hook: '',
     },
     expect: { hero_journey: 'weak_seller_qualification', findings: 1 },
   },
@@ -237,8 +238,8 @@ const SCENARIOS = [
       commercial_story: 'A viewing slot on a £289,000 property was committed to a completely unqualified buyer.',
       fair_observation: 'You did ring back the same day.',
       email_main_point: 'We were invited to view without being asked anything at all about our position.',
-      email_consequence: 'That means a viewing slot went to someone nobody had checked could buy.',
-      email_wider_consequence: '',
+      email_consequence: 'a viewing slot went to someone nobody had checked could buy.',
+      email_secondary_hook: '',
     },
     expect: { hero_journey: 'fast_response_stalled_follow_up', findings: 1 },
   },
@@ -258,8 +259,8 @@ const SCENARIOS = [
       commercial_story: 'Four attempts of real effort on a £372,000 enquiry produced no viewing.',
       fair_observation: 'Four attempts across two channels is more persistence than most agencies manage.',
       email_main_point: 'Your team chased us four times, but never actually offered us a viewing.',
-      email_consequence: 'That means all that effort ended without the one step that moves a sale forward.',
-      email_wider_consequence: '',
+      email_consequence: 'all that effort ended without the one step that moves a sale forward.',
+      email_secondary_hook: '',
     },
     expect: { hero_journey: 'fast_response_stalled_follow_up', findings: 1 },
   },
@@ -284,8 +285,8 @@ const SCENARIOS = [
       commercial_story: 'A £615,000 enquiry was answered a day late by a message that moved nothing forward.',
       fair_observation: 'The reply did at least name the right property, which is more than some manage.',
       email_main_point: 'It took about a day for anything to come back, and when it did it did not ask us anything or offer us a viewing.',
-      email_consequence: 'That means the enquiry was answered without ever being moved forward.',
-      email_wider_consequence: 'That means any enquiry arriving in the evening is likely landing the same way.',
+      email_consequence: 'the enquiry was answered without ever being moved forward.',
+      email_secondary_hook: 'The property we said we had to sell was never mentioned either.',
     },
     expect: { hero_journey: 'slow_response_gap', findings: 4, narrative_finding_indexes: '1,2,3' },
   },
@@ -435,12 +436,12 @@ async function run() {
     const p = personalisationFor(store, 'prb_combine');
     assert.strictEqual(p.narrative_finding_indexes, '1,2,3', 'three findings combined into the primary narrative');
     assert.ok(p.supporting_findings.includes('property we said we had to sell'), 'the fourth stays a supporting finding');
-    assert.ok(p.email_body.includes('There were also a couple of other things'), 'so the email\'s optional line is earned');
+    assert.ok(p.email_secondary_hook, 'so the email\'s optional secondary hook is earned');
     assert.strictEqual(findingsFor(store, 'prb_combine').length, 4, 'all four findings remain available for the audit');
     ok('a probe with four findings combines three into one broader narrative and keeps the fourth as a supporting finding — not simply finding #1');
   }
 
-  // ── 5. Each probe shape gets its own journey, story and email ──
+  // ── 5. Each probe shape gets its own journey, story and email variables ──
   {
     for (const s of SCENARIOS) {
       const p = personalisationFor(store, s.probe_id);
@@ -450,23 +451,36 @@ async function run() {
         assert.strictEqual(p.fair_observation, s.expect.fair_observation, `${s.key}: fair observation`);
       }
       assert.ok(p.primary_narrative, `${s.key}: has a primary narrative`);
-      assert.ok(p.email_body.startsWith('Hi {{first_name}},\n\nWe sent your team an enquiry on 1 January about '), `${s.key}: the email opens with the locked two lines`);
-      assert.ok(p.email_body.includes(s.address), `${s.key}: naming this probe's own property`);
-      assert.ok(p.email_body.trimEnd().endsWith("Happy to send it over if you want to take a look."), `${s.key}: and ends on the CTA`);
-      assert.ok(!/NOVUS|leakage/i.test(p.email_body), `${s.key}: the email does not sell NOVUS`);
+
+      // The merge variables the fixed Instantly template needs.
+      assert.strictEqual(p.enquiry_date, '1 January', `${s.key}: enquiry_date is the probe's own date`);
+      assert.strictEqual(p.property_address, s.address, `${s.key}: property_address is this probe's own property`);
+      assert.ok(p.email_main_point, `${s.key}: the main point is populated`);
+      assert.ok(p.email_consequence, `${s.key}: the consequence is populated`);
+      assert.ok(!/^that means/i.test(p.email_consequence), `${s.key}: the consequence never repeats the template's "That means"`);
+
+      // No email furniture anywhere — the template owns all of it.
+      const vars = [p.fair_observation, p.email_main_point, p.email_consequence, p.email_secondary_hook].join(' ');
+      assert.ok(!/Hi \{\{first_name\}\}|personalised audit|free of charge/i.test(vars), `${s.key}: no greeting or CTA leaks into a variable`);
+      assert.ok(!/NOVUS|leakage/i.test(vars), `${s.key}: the email variables do not sell NOVUS`);
     }
-    const bodies = SCENARIOS.map((s) => personalisationFor(store, s.probe_id).email_body);
-    assert.strictEqual(new Set(bodies).size, SCENARIOS.length, 'all seven emails are genuinely different');
+    // No PERSONALISATION row carries an email body column at all.
+    assert.ok(!PERSONALISATION_HEADER.includes('email_body'), 'the schema has no email_body column');
+
+    const stories = SCENARIOS.map((s) => {
+      const p = personalisationFor(store, s.probe_id);
+      return [p.fair_observation, p.email_main_point, p.email_consequence, p.email_secondary_hook].join('|');
+    });
+    assert.strictEqual(new Set(stories).size, SCENARIOS.length, 'all seven sets of email variables are genuinely different');
     const journeys = new Set(SCENARIOS.map((s) => personalisationFor(store, s.probe_id).hero_journey));
     assert.ok(journeys.size >= 4, `the seven probes spread across ${journeys.size} distinct journeys, not one`);
-    ok(`all seven probe shapes produce a distinct email and spread across ${journeys.size} distinct audit/demo journeys — no two agencies get the same story`);
+    ok(`all seven probe shapes produce distinct email variables and spread across ${journeys.size} distinct audit/demo journeys — no two agencies get the same story`);
   }
 
   // ── 6. The no-response probe says so, plainly, with nothing invented ──
   {
     const p = personalisationFor(store, 'prb_none');
     assert.strictEqual(p.fair_observation, 'We never received a reply.', 'the plain line replaces the model\'s invented praise');
-    assert.ok(p.email_body.includes('We never received a reply.'));
     assert.strictEqual(p.evidence, '', 'nothing was said, so nothing is quoted');
     ok('the no-response probe simply says we never received a reply, and quotes nothing');
   }
