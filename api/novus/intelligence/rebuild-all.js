@@ -51,6 +51,18 @@
 //
 // Optional body: { "batch_size": N } — override the per-invocation AI-call
 // budget (default below / NOVUS_REBUILD_BATCH_SIZE). Mainly for tests.
+//
+// Optional body: { "probe_ids": ["prb_...", "prb_..."] } — restricts the full
+// rebuild (Intelligence, then Diagnosis, then Personalisation) to exactly
+// this list of probes; every other probe on the sheet is left untouched.
+// Distinct from the singular "probe_id" above: that one is the older,
+// separate single-probe recompute path (webhook-shaped, no Diagnosis
+// findings persistence, no Personalisation); "probe_ids" runs the real
+// three-step batch pipeline, just narrowed to a known set. Exists because a
+// full, untargeted rebuild will personalise EVERY already-diagnosed probe on
+// an otherwise-empty PERSONALISATION tab, not just the ones you meant to
+// test — see lib/personalisation-rebuild.mjs's file header. Ignored if
+// "probe_id" (singular) is also present, since that short-circuits first.
 
 import { getRepo } from '../../../lib/sheets.mjs';
 import { runRebuildPass } from '../../../lib/rebuild-pass.mjs';
@@ -71,6 +83,9 @@ export default async function handler(req, res) {
 
   const body = typeof req.body === 'string' ? safeParse(req.body) : req.body || {};
   const probeId = String(body.probe_id || '').trim();
+  const probeIds = Array.isArray(body.probe_ids)
+    ? body.probe_ids.map((id) => String(id || '').trim()).filter(Boolean)
+    : null;
   const forceAi = body.force_ai === true;
   const batchSize = Number.isFinite(Number(body.batch_size)) && Number(body.batch_size) > 0
     ? Number(body.batch_size)
@@ -87,9 +102,9 @@ export default async function handler(req, res) {
       return res.status(200).json(result);
     }
 
-    const summary = await runRebuildPass(repo, { forceAi, maxAiCalls: batchSize });
+    const summary = await runRebuildPass(repo, { forceAi, maxAiCalls: batchSize, probeIds: probeIds || undefined });
 
-    return res.status(200).json({ ...summary, batch_size: batchSize });
+    return res.status(200).json({ ...summary, batch_size: batchSize, ...(probeIds ? { targeted_probe_ids: probeIds } : {}) });
   } catch (err) {
     console.error('intelligence rebuild-all error:', err);
     return res.status(500).json({ error: err.message || 'Failed to rebuild intelligence' });
