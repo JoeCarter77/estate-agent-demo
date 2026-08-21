@@ -7,9 +7,13 @@
 // already there). One row per probe_id; ?agency_id= returns that agency's
 // most recently created row, since an agency can have more than one probe.
 //
-// This is the single "feed" point the Email Plan (a human copying the fields
-// onto a call/email) and any future Demo wiring both read from, so they draw
-// from the same Personalisation narrative instead of drifting apart. It does
+// This is the single "feed" point the outreach email and any future Demo
+// wiring both read from, so they draw from the same Personalisation narrative
+// instead of drifting apart. The row carries both the sentence-ready copy and
+// `email_body`, the complete email already assembled from it by
+// lib/email-assembly.mjs — so sending is a copy of one field, not a human
+// reassembling paragraphs. A BLANK `email_body` means that probe could not
+// produce a complete, honest email and needs a human to look at it. It does
 // not touch index.html/api/lead.js's separate legacy demo data source.
 //
 // Same NOVUS_BASIC_AUTH guard as the rest of /api/novus/*.

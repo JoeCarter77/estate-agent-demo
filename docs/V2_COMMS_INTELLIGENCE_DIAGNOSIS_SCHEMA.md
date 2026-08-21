@@ -1,11 +1,11 @@
 # COMMUNICATIONS → INTELLIGENCE → DIAGNOSIS — Proposed V2 (demo-ready)
 
-**Status: IMPLEMENTED.** `COMMUNICATIONS`/`INTELLIGENCE`/`DIAGNOSIS` per §1–§4; `DIAGNOSIS_FINDINGS` per §4a; `PERSONALISATION` per §4b; the email template per §4c.
+**Status: IMPLEMENTED.** `COMMUNICATIONS`/`INTELLIGENCE`/`DIAGNOSIS` per §1–§4; `DIAGNOSIS_FINDINGS` per §4a; `PERSONALISATION` per §4b; the email structure per §4c.
 
 Scope: `COMMUNICATIONS`, `INTELLIGENCE`, `DIAGNOSIS`.
-Not in scope: Demo, SEND DEMO, Instantly, Outreach, `AGENCIES`, `PROBES`, `RAW_EVENTS`, `ACTIONS`. (`DIAGNOSIS_FINDINGS` and `PERSONALISATION` were added to this document in §4a/§4b when the Personalisation layer was rebuilt — see those sections.)
+Not in scope: Demo, SEND DEMO, Outreach, `AGENCIES`, `PROBES`, `RAW_EVENTS`, `ACTIONS`. (`DIAGNOSIS_FINDINGS` and `PERSONALISATION` were added to this document in §4a/§4b when the Personalisation layer was rebuilt — see those sections.)
 
-Totals: **`COMMUNICATIONS` +0 columns**, **`INTELLIGENCE` 20 fields**, **`DIAGNOSIS` 8 fields + `DIAGNOSIS_FINDINGS` 5 fields**, **`PERSONALISATION` 18 fields**. Two AI calls per probe for `COMMUNICATIONS`→`DIAGNOSIS`, plus one for `PERSONALISATION`. No fingerprint layer.
+Totals: **`COMMUNICATIONS` +0 columns**, **`INTELLIGENCE` 20 fields**, **`DIAGNOSIS` 8 fields + `DIAGNOSIS_FINDINGS` 5 fields**, **`PERSONALISATION` 20 fields**. Two AI calls per probe for `COMMUNICATIONS`→`DIAGNOSIS`, plus one for `PERSONALISATION`. No fingerprint layer.
 
 ---
 
@@ -154,91 +154,166 @@ here: these rows are exactly the items that survived §4's evidence gate.
 
 ---
 
-## 4b. `PERSONALISATION` — 18 fields, one row per probe
+## 4b. `PERSONALISATION` — 20 fields, one row per probe
 
 One step further on: `DIAGNOSIS` says *what the genuine findings are*;
-`PERSONALISATION` decides **what the story is**, and produces the variables the
-outreach email merges in. One AI call, no re-diagnosis, no second engine.
+`PERSONALISATION` decides **what the story is**, and writes it as
+sentence-ready copy. One AI call, no re-diagnosis, no second engine.
 
-The row splits in two. **Internal** fields drive the audit and the demo and are
-never shown to a prospect. **Email variables** are merged verbatim into a fixed
-template in Instantly (§4c) and read by a real estate agent.
+**What the email is for.** It is not selling NOVUS. Its only job is to make the
+agency curious enough to ask to see what we found. It reads like: we sent you
+an enquiry, here is what happened from our side, here is what that meant
+commercially, and we found some other interesting things too. The reader should
+think *"fair enough, I can see what they mean"*, and then *"what else did they
+find?"*.
 
-### Internal — the audit / demo / our own reasoning
+**Sentence-ready is the contract.** Every email field is already grammatically
+complete copy that drops straight into the email — never a label like
+`Poor follow-up` or `Weak qualification` (those are Diagnosis concepts, not
+email copy), never a fragment the code has to repair. The **only** deliberate
+act of grammar downstream is `"That meant "` + `commercial_consequence`, which
+is why that one field is a bare continuation and every other field is a whole
+sentence.
+
+**Voice.** The email is written *to* the agency by the person who actually sent
+the enquiry: they are "you", we are "I"/"me"/"we". Detached third-person
+commentary ("They didn't let this one go cold") is the failure mode and is
+blanked by `readsAsDetachedThirdPerson()`.
+
+The row splits in two. **Internal** fields drive the breakdown and the demo and
+are never shown to a prospect. **Email copy** is read by a real estate agent.
+
+### Internal — the breakdown / demo / our own reasoning
 
 | # | Field | Derivation |
 |---|---|---|
-| 1 | `hero_journey` | DET — the audit/demo journey, a lookup from Intelligence shape + whether findings exist. Never asked of the model. |
-| 2 | `primary_narrative` | The single strongest commercially consequential story, **combining several findings into one broader problem** where they are really one problem. Not "finding #1". |
-| 3 | `narrative_finding_indexes` | Which `DIAGNOSIS_FINDINGS.finding_index` values that narrative combined, e.g. `1,2,3`. Validated against the findings that exist — a claimed index that doesn't exist is dropped. |
+| 1 | `hero_journey` | DET — the breakdown/demo journey, a lookup from Intelligence shape + whether findings exist. Never asked of the model. |
+| 2 | `primary_narrative` | The single strongest commercially consequential story. **Combining several findings into one broader problem is the normal answer, not the exception** — most enquiries contain more than one useful finding. Not "finding #1". |
+| 3 | `narrative_finding_indexes` | Which `DIAGNOSIS_FINDINGS.finding_index` values that narrative combined, e.g. `1,2,4`. Validated against the findings that exist — a claimed index that doesn't exist is dropped. |
 | 4 | `supporting_findings` | The genuine findings left *outside* the narrative. Forced empty when the narrative already covers them all. |
 | 5 | `evidence` | Verbatim quotes from the raw communications, each proven a literal substring of the message it cites. |
-| 6 | `commercial_story` | What the narrative costs *this* agency. May use the probe's own property value; may never carry any other monetary figure. |
-| 7 | `novus_counterfactual` | What NOVUS would have done at *this* moment. Matches the handling, rather than inventing a gap, when the handling was strong. |
+| 6 | `novus_counterfactual` | What NOVUS would have done at *this* moment. Matches the handling, rather than inventing a gap, when the handling was strong. |
 
-### Email variables — merged into the fixed template, read by the prospect
+### Email copy — sentence-ready, read by the prospect
 
 | # | Field | Derivation |
 |---|---|---|
-| 8 | `enquiry_date` | DET — the probe's own `probe_timestamp`, formatted `11 August` in Europe/London so an evening probe keeps the date the agency would recognise. |
-| 9 | `property_address` | DET — `PROBES.property_address`, stripped of the analyst's trailing bracketed note (which can contain a stray price). **Blank when the address was never established** — the template can't drop the "about …" clause, so a blank here means the probe is not safe to send and a human decides. |
-| 10 | `fair_observation` | Genuinely good handling, acknowledged — so the email disarms rather than grades. Blank when Diagnosis records no strengths; the plain `We never received a reply.` when there was no human contact. |
-| 11 | `email_main_point` | The main specific failure from this enquiry, in one or two sentences a person could read aloud. |
-| 12 | `email_consequence` | The strongest commercially meaningful consequence of that failure, grounded in this probe's own facts. **Stored as the bare continuation** — the template supplies "That means " itself, so any prefix the model writes is stripped (`stripThatMeansPrefix`). |
-| 13 | `email_secondary_hook` | DET — **not AI-authored.** A single fixed intrigue line ("There were also a couple of other things from this enquiry that caught our attention.") shown only when a real finding sits outside the primary narrative; blank otherwise. Deliberately not free text: it is a tease, not a second paragraph of analysis, and never a second consequence or a claim about the agency as a whole. |
+| 7 | `enquiry_date` | DET — the probe's own `probe_timestamp`, formatted `18 August` in Europe/London so an evening probe keeps the date the agency would recognise. |
+| 8 | `property_address` | DET — `PROBES.property_address`, stripped of the analyst's trailing bracketed note (which can contain a stray price). **Blank when the address was never established**, which makes the row unsendable (field 14). |
+| 9 | `email_variant` | DET — `no_response` when `INTELLIGENCE.human_contact` is `none`, otherwise `normal`. Selects the email structure (§4c). |
+| 10 | `fair_observation` | **Optional.** A complete sentence or short paragraph acknowledging something genuinely good — *"You got back to me quickly and followed up three times across phone and email."* Blank when Diagnosis records no strengths, when it reads as detached commentary, or in the no-response case. |
+| 11 | `main_finding` | The actual failure as natural, sentence-ready copy — *"What stood out, though, was that each follow-up essentially asked me to get back to you, rather than giving me a clear next step."* Where several findings are really one story, they are woven into this so it reads as one thing that happened. Blank in the no-response case. |
+| 12 | `commercial_consequence` | Why the failure mattered commercially, in terms of the viewing, valuation, seller instruction, progression or conversion. **Stored as the bare continuation** — the assembler supplies `"That meant "`, so any prefix the model writes is stripped (`stripThatMeantPrefix`, either tense). |
+| 13 | `wider_consequence` | **Optional.** A genuinely *distinct* second commercial consequence, as a standalone sentence — *"It also meant a potential seller instruction mentioned in the same enquiry was never explored."* A value that merely restates field 12 is dropped rather than printed twice (`distinctWiderConsequence`). Never forced. |
+| 14 | `additional_findings_hook` | DET — **not AI-authored.** One fixed tease line ("There were a couple of other things from the enquiry that caught our attention too.") shown only when a real finding sits outside the primary narrative; blank otherwise, and always blank in the no-response case. It must **not** reveal what the other findings were — that is the question the email exists to provoke. |
+| 15 | `email_body` | DET — the complete email, assembled by `lib/email-assembly.mjs` from fields 7–14 (§4c). **Blank when the row cannot make a complete, honest email**, which is the signal that a human should look. |
 
 Plus `personalisation_id`, `agency_id`, `probe_id`, `created_at`, `updated_at`.
 
+**The seller side** is considered explicitly. When our enquiry said we also had
+a property of our own to sell, that enquiry was not just a potential buyer —
+there was a valuation and an instruction sitting inside it — and that is often
+the sharpest part of `commercial_consequence` or `wider_consequence`. It is
+never forced onto an enquiry that did not say so.
+
 **Retired from `PERSONALISATION`:** `personalised_opener`, `quotes_used`
 (renamed `evidence`), `wider_leakage`, `systemic_promise`, `why_novus`,
-`objection_response`, `demo_intro`, `email_wider_consequence` (one enquiry
-never evidences an agency-wide claim), and `email_body` — **this layer no
-longer assembles an email at all**, see §4c.
+`objection_response`, `demo_intro`, `email_main_point` (renamed
+`main_finding`), `email_consequence` (renamed `commercial_consequence`),
+`email_secondary_hook` (renamed `additional_findings_hook`), and
+`commercial_story` — superseded by `commercial_consequence` /
+`wider_consequence`, which say the same thing in copy the email can use.
 
 ---
 
-## 4c. The email — a fixed template in Instantly
+## 4c. The email — a fixed structure in `lib/email-assembly.mjs`
 
-The email is **not** generated. It lives in Instantly as one fixed template
-that a human controls, and Personalisation only fills its merge fields:
+The email is **not** generated as a blob by the AI, and it does not live in a
+template in another product. The *sentences* come from Personalisation; the
+*shape* is fixed, so it lives in code where a human controls it:
+`assembleEmail()` owns the intro, the paragraph order, which optional
+paragraphs appear, which structure to use, the locked CTA and the merge fields.
+Nothing in the assembler rewrites an AI sentence.
+
+### The normal structure
 
 ```
 Hi {{first_name}},
 
-We sent your team an enquiry on {{enquiry_date}} about {{property_address}}.
+We sent your team an enquiry on {enquiry_date} about {property_address}.
 
-{{fair_observation}}
+{fair_observation}                  (optional)
 
-{{email_main_point}}
+{main_finding}
 
-That means {{email_consequence}}
+That meant {commercial_consequence}
 
-{{email_secondary_hook}}
+{wider_consequence}                 (optional)
 
-I've put together a personalised audit for you guys. Let me know if you want
-me to shoot it over — free of charge.
+{additional_findings_hook}          (optional)
+
+I've put together a personalised breakdown of what we found. Happy to send it
+over if you'd like to see it.
 
 Joe
 ```
 
-The separation is the point: *wording* is a copywriting decision that belongs
-in one place, while *what is true about this probe* is a judgement that belongs
-in the pipeline. Consequences enforced in code, not just prompted for:
+### The no-response structure (`email_variant = no_response`)
 
-- `email_consequence` never begins with "That means" — the template already
-  says it, and repeating it reads as a stutter.
-- No variable may carry a greeting, sign-off, CTA, transition, or merge-field
+A probe that was never replied to has no conversation to describe, so it gets
+its own shape rather than a normal email with empty paragraphs. **The failure
+IS the silence**, so nothing is invented to fill it: no imagined replies, no
+imagined conversation, and no extra communication findings.
+
+```
+Hi {{first_name}},
+
+We sent your team an enquiry on {enquiry_date} about {property_address}.
+
+We never received a reply.
+
+That meant {commercial_consequence}
+
+{wider_consequence}                 (optional)
+
+We found a couple of things that may explain it, so we've put together a short
+breakdown that might be useful.
+
+Happy to send it over if you'd like to see it.
+
+Joe
+```
+
+The wider consequence still applies here — a seller/valuation opportunity our
+own enquiry explicitly declared is still lost — and the closing lines are
+reworded so the offer makes sense when there was nothing to discuss.
+
+### Consequences enforced in code, not just prompted for
+
+- **The CTA is locked** and never AI-authored. It is a *breakdown*, never an
+  "audit" — the assembler's own test asserts the word never appears.
+- `commercial_consequence` never begins with "That meant"/"That means" — the
+  assembler already says it, and repeating it reads as a stutter.
+- No field may carry a greeting, sign-off, CTA, transition, or merge-field
   syntax of its own.
-- No variable may carry our internal reasoning about the analysis. A model
-  asked for a fair observation when there is nothing fair to say will often
-  explain *itself* ("there is no strength to point to here") instead of
-  returning the empty string it was asked for; `readsAsInternalReasoning()`
-  blanks any such value rather than merging it into a real email.
-- Optional variables come back **blank**, so the template simply renders
-  nothing in that slot.
-- `email_secondary_hook` is never free text the model writes — it is one
-  fixed intrigue line or blank (§4b field 13), so it can never turn into a
-  second paragraph of analysis.
+- No field may carry our internal reasoning about the analysis. A model asked
+  for a fair observation when there is nothing fair to say will often explain
+  *itself* ("there is no strength to point to here") instead of returning the
+  empty string it was asked for; `readsAsInternalReasoning()` blanks any such
+  value rather than sending it.
+- Optional paragraphs are **omitted entirely** when blank — the email closes
+  up rather than leaving a gap.
+- `additional_findings_hook` is never free text the model writes — one fixed
+  tease line or blank — so it can never turn into a second paragraph of
+  analysis, a second consequence, or a reveal of the findings it exists to
+  tease.
+- `{{first_name}}` is the **only** unresolved merge field in the assembled
+  body; `enquiry_date` and `property_address` are resolved from the probe's own
+  facts.
+- A row missing anything its structure needs (no address, no date, no
+  consequence, or no main finding in the normal structure) assembles **no
+  email at all**. A blank `email_body` means a human decides, never a
+  half-written email.
 
 ---
 
@@ -270,14 +345,14 @@ webhook → RAW_EVENTS → deterministic agency + probe match → COMMUNICATIONS
                                                  (same batch write — see §4a)
   6. PERSONALISE  if the DIAGNOSIS is finalised → one AI call, reading the whole
                   DIAGNOSIS row + its DIAGNOSIS_FINDINGS rows + the probe facts +
-                  the raw communications → upsert the PERSONALISATION row and its
-                  email merge variables (§4b, §4c)
+                  the raw communications → upsert the PERSONALISATION row, its
+                  sentence-ready email copy and the assembled email (§4b, §4c)
 ```
 
 The full pipeline is therefore:
 
 ```
-PROBE → DIAGNOSIS → DIAGNOSIS_FINDINGS → PERSONALISATION → EMAIL → personalised audit / demo journey
+PROBE → DIAGNOSIS → DIAGNOSIS_FINDINGS → PERSONALISATION → EMAIL → personalised breakdown / demo journey
 ```
 
 ### Rebuild Intelligence

@@ -65,9 +65,10 @@ const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding', 'evid
 const PERSONALISATION_HEADER = [
   'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
   'primary_narrative', 'narrative_finding_indexes', 'supporting_findings', 'evidence',
-  'commercial_story', 'novus_counterfactual',
-  'enquiry_date', 'property_address', 'fair_observation',
-  'email_main_point', 'email_consequence', 'email_secondary_hook',
+  'novus_counterfactual',
+  'enquiry_date', 'property_address', 'email_variant',
+  'fair_observation', 'main_finding', 'commercial_consequence', 'wider_consequence',
+  'additional_findings_hook', 'email_body',
   'created_at', 'updated_at',
 ];
 const AGENCIES_HEADER = ['agency_id', 'agency_name'];
@@ -188,9 +189,9 @@ function installAiStub() {
       if (m) personalisedProbeIds.push(m[0]);
       return {
         primary_narrative: 'Stub narrative.', narrative_finding_indexes: [], supporting_findings: '',
-        evidence_quotes: [], commercial_story: 'Stub story.', fair_observation: '',
-        novus_counterfactual: 'Stub counterfactual.', email_main_point: 'Stub main point.',
-        email_consequence: 'stub consequence.',
+        evidence_quotes: [], fair_observation: '',
+        novus_counterfactual: 'Stub counterfactual.', main_finding: 'Stub main finding.',
+        commercial_consequence: 'stub consequence.', wider_consequence: '',
       };
     }
     interpretCalls += 1;

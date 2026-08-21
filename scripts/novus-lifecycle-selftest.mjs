@@ -85,9 +85,10 @@ const DIAGNOSIS_HEADER = [
 const PERSONALISATION_HEADER = [
   'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
   'primary_narrative', 'narrative_finding_indexes', 'supporting_findings', 'evidence',
-  'commercial_story', 'novus_counterfactual',
-  'enquiry_date', 'property_address', 'fair_observation',
-  'email_main_point', 'email_consequence', 'email_secondary_hook',
+  'novus_counterfactual',
+  'enquiry_date', 'property_address', 'email_variant',
+  'fair_observation', 'main_finding', 'commercial_consequence', 'wider_consequence',
+  'additional_findings_hook', 'email_body',
   'created_at', 'updated_at',
 ];
 const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding', 'evidence', 'significance_note'];
@@ -171,14 +172,15 @@ function installAiStub() {
         narrative_finding_indexes: [1],
         supporting_findings: '',
         evidence_quotes: [],
-        commercial_story: 'stub commercial story',
         fair_observation: '',
         novus_counterfactual: 'stub counterfactual',
-        email_main_point: 'stub main point',
-        email_consequence: 'stub consequence.',
-        // email_secondary_hook is deliberately absent: it is never AI-authored
-        // (see lib/probe-personalisation.mjs's SECONDARY_HOOK_LINE) — a
-        // fixture returning one here would be ignored anyway.
+        main_finding: 'stub main finding.',
+        commercial_consequence: 'stub consequence.',
+        wider_consequence: '',
+        // additional_findings_hook is deliberately absent: it is never
+        // AI-authored (see lib/email-assembly.mjs's
+        // ADDITIONAL_FINDINGS_HOOK_LINE) — a fixture returning one here
+        // would be ignored anyway.
       };
     }
     if (tool?.name === 'record_probe_diagnosis') {
