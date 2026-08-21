@@ -63,6 +63,18 @@
 // an otherwise-empty PERSONALISATION tab, not just the ones you meant to
 // test — see lib/personalisation-rebuild.mjs's file header. Ignored if
 // "probe_id" (singular) is also present, since that short-circuits first.
+// Also accepts a comma-separated string ("prb_a,prb_b") in case the caller's
+// tooling can't easily send a JSON array. If "probe_ids" is present in the
+// body but resolves to zero usable ids (wrong type, empty array, empty
+// string), the request 400s explicitly rather than silently falling back to
+// an untargeted full rebuild — the whole point of this field is to avoid an
+// accidental full rebuild, so a malformed value for it must never quietly
+// behave as if it had been omitted.
+//
+// A body that arrives as text but isn't valid JSON (e.g. mangled by shell
+// quoting) also 400s explicitly now, with the parse error, instead of being
+// silently treated as an empty body — the same reasoning: a request meant to
+// be scoped by probe_ids must never silently degrade into a full rebuild.
 
 import { getRepo } from '../../../lib/sheets.mjs';
 import { runRebuildPass } from '../../../lib/rebuild-pass.mjs';
@@ -76,16 +88,62 @@ export const maxDuration = 60;
 // reads/writes and any slower-than-average calls.
 const DEFAULT_BATCH_SIZE = 15;
 
+// req.body as Vercel hands it to us can be: already-parsed JSON (object —
+// the common case, when Content-Type: application/json was set correctly
+// and the platform's own parser succeeded), a raw string (some proxies/
+// tools, or a Content-Type the platform didn't recognise as JSON), a Buffer,
+// or undefined/null/'' (no body at all). Throws on a non-empty string/Buffer
+// that isn't valid JSON, instead of silently discarding it — see the "Also
+// accepts..." note above for why that matters specifically for probe_ids.
+function parseBody(req) {
+  const raw = req.body;
+  if (raw === undefined || raw === null || raw === '') return {};
+  if (typeof raw === 'object' && !Buffer.isBuffer(raw)) return raw;
+  const text = Buffer.isBuffer(raw) ? raw.toString('utf8') : String(raw);
+  if (!text.trim()) return {};
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    throw new Error(`Invalid JSON body: ${err.message}`);
+  }
+}
+
+// undefined -> not present at all (the untargeted-rebuild default).
+// Array -> each entry trimmed to a string, blanks dropped.
+// Comma-separated string -> same, split first.
+// Anything else present (number, object, boolean, empty array/string after
+// trimming) -> invalid: true, so the caller can 400 rather than silently
+// running an untargeted rebuild.
+function normalizeProbeIds(raw) {
+  if (raw === undefined) return { present: false, ids: null, invalid: false };
+  const list = Array.isArray(raw) ? raw : (typeof raw === 'string' ? raw.split(',') : null);
+  if (list === null) return { present: true, ids: null, invalid: true };
+  const ids = list.map((id) => String(id ?? '').trim()).filter(Boolean);
+  return { present: true, ids, invalid: ids.length === 0 };
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!requireAuth(req, res)) return;
 
-  const body = typeof req.body === 'string' ? safeParse(req.body) : req.body || {};
+  let body;
+  try {
+    body = parseBody(req);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
   const probeId = String(body.probe_id || '').trim();
-  const probeIds = Array.isArray(body.probe_ids)
-    ? body.probe_ids.map((id) => String(id || '').trim()).filter(Boolean)
-    : null;
+  // probe_ids is genuinely ignored (not even validated) once the singular
+  // probe_id short-circuits below — matches the documented precedence.
+  const probeIdsField = probeId ? { present: false, ids: null, invalid: false } : normalizeProbeIds(body.probe_ids);
+  if (probeIdsField.invalid) {
+    return res.status(400).json({
+      error: 'probe_ids must be a non-empty array of probe_id strings (or a non-empty comma-separated string)',
+    });
+  }
+  const probeIds = probeIdsField.ids;
   const forceAi = body.force_ai === true;
   const batchSize = Number.isFinite(Number(body.batch_size)) && Number(body.batch_size) > 0
     ? Number(body.batch_size)
@@ -110,5 +168,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message || 'Failed to rebuild intelligence' });
   }
 }
-
-function safeParse(s) { try { return JSON.parse(s); } catch { return {}; } }
