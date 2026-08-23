@@ -37,7 +37,8 @@ import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import { runRebuildPass } from '../lib/rebuild-pass.mjs';
 import {
   ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE, NO_RESPONSE_BREAKDOWN_LINE,
-  NO_RESPONSE_CTA_LINE, THAT_MEANT_PREFIX, assembleEmail,
+  NO_RESPONSE_CTA_LINE, THAT_MEANT_PREFIX, THAT_ALSO_MEANT_PREFIX,
+  FAIR_OBSERVATION_PREFIX, MAIN_FINDING_PREFIX, assembleEmail,
 } from '../lib/email-assembly.mjs';
 
 // ── The live workbook's actual headers ───────────────────────────────────────
@@ -71,7 +72,7 @@ const PERSONALISATION_HEADER = [
   'primary_narrative', 'narrative_finding_indexes', 'supporting_findings', 'evidence',
   'novus_counterfactual',
   'enquiry_date', 'property_address', 'email_variant',
-  'fair_observation', 'main_finding', 'commercial_consequence', 'wider_consequence',
+  'fair_observation', 'main_finding', 'commercial_consequence', 'wider_observation', 'wider_consequence',
   'additional_findings_hook', 'email_body',
   'created_at', 'updated_at',
 ];
@@ -164,6 +165,7 @@ const SCENARIOS = [
       fair_observation: 'Your team have clearly been busy.',
       main_finding: 'We never heard anything back.',
       commercial_consequence: 'a buyer ready to view this one never got as far as a conversation.',
+      wider_observation: 'We had also mentioned a property of our own that we were thinking of selling.',
       wider_consequence: 'It also meant the property we said we had of our own was never picked up as a valuation.',
     },
     // The no-response structure has no fair observation and no main finding —
@@ -474,7 +476,23 @@ async function run() {
       }
 
       // No email furniture anywhere — the assembler owns all of it.
-      const vars = [p.fair_observation, p.main_finding, p.commercial_consequence, p.wider_consequence].join(' ');
+      // THE GRAMMAR CONTRACT, across every probe shape: the four prefixed
+      // fields are lower-case continuations, wider_observation stands alone.
+      for (const [field, value] of Object.entries({
+        fair_observation: p.fair_observation,
+        main_finding: p.main_finding,
+        commercial_consequence: p.commercial_consequence,
+        wider_consequence: p.wider_consequence,
+      })) {
+        if (!value) continue;
+        assert.ok(/^[a-z£"']/.test(value), `${s.key}: ${field} is the lower-case continuation its fixed opener needs`);
+        assert.ok(/[.!?]$/.test(value), `${s.key}: ${field} is terminated`);
+      }
+      if (p.wider_observation) {
+        assert.ok(/^[A-Z"']/.test(p.wider_observation), `${s.key}: wider_observation is a standalone sentence`);
+      }
+
+      const vars = [p.fair_observation, p.main_finding, p.commercial_consequence, p.wider_observation, p.wider_consequence].join(' ');
       assert.ok(!/Hi \{\{first_name\}\}|personalised breakdown|happy to send it over/i.test(vars), `${s.key}: no greeting or CTA leaks into a field`);
       assert.ok(!/NOVUS|leakage/i.test(vars), `${s.key}: the email copy does not sell NOVUS`);
 
@@ -484,13 +502,23 @@ async function run() {
       assert.ok(p.email_body.startsWith('Hi {{first_name}},'), `${s.key}: the email opens with the merge field`);
       assert.ok(p.email_body.includes(`We sent your team an enquiry on 1 January about ${s.address}.`), `${s.key}: the intro names this probe's own date and property`);
       assert.ok(p.email_body.includes(`${THAT_MEANT_PREFIX}${p.commercial_consequence}`), `${s.key}: "That meant " is assembled in code, once`);
+      if (p.email_variant !== 'no_response') {
+        // The locked paragraph order from the brief: fair observation (when
+        // there is one), then the finding, then the consequence.
+        assert.ok(p.email_body.includes(`${MAIN_FINDING_PREFIX}${p.main_finding}`), `${s.key}: the finding opens with the fixed "What stood out, though, was"`);
+        assert.ok(p.email_body.indexOf(MAIN_FINDING_PREFIX) < p.email_body.indexOf(THAT_MEANT_PREFIX), `${s.key}: the finding comes before its consequence`);
+        if (p.fair_observation) {
+          assert.ok(p.email_body.includes(`${FAIR_OBSERVATION_PREFIX}${p.fair_observation}`), `${s.key}: the fair observation opens with the fixed "I want to say upfront that"`);
+          assert.ok(p.email_body.indexOf(FAIR_OBSERVATION_PREFIX) < p.email_body.indexOf(MAIN_FINDING_PREFIX), `${s.key}: fairness comes first`);
+        }
+      }
       assert.ok(p.email_body.endsWith('\n\nJoe'), `${s.key}: and signs off`);
       assert.ok(!/audit/i.test(p.email_body), `${s.key}: the email never calls it an audit`);
     }
 
     const stories = SCENARIOS.map((s) => {
       const p = personalisationFor(store, s.probe_id);
-      return [p.fair_observation, p.main_finding, p.commercial_consequence, p.wider_consequence].join('|');
+      return [p.fair_observation, p.main_finding, p.commercial_consequence, p.wider_observation, p.wider_consequence].join('|');
     });
     assert.strictEqual(new Set(stories).size, SCENARIOS.length, 'all seven sets of email copy are genuinely different');
     const bodies = new Set(SCENARIOS.map((s) => personalisationFor(store, s.probe_id).email_body));
@@ -516,7 +544,11 @@ async function run() {
     assert.ok(!body.includes(CTA_LINE), 'the normal CTA is not used here');
     assert.ok(!body.includes(ADDITIONAL_FINDINGS_HOOK_LINE), 'and the "couple of other things" hook is not repeated on top of it');
     assert.ok(body.indexOf(NO_REPLY_LINE) < body.indexOf(THAT_MEANT_PREFIX), 'the silence is stated before its consequence');
-    assert.ok(p.wider_consequence.startsWith('It also meant'), 'a seller opportunity our own enquiry declared still carries a wider consequence');
+    assert.strictEqual(p.wider_consequence, 'the property we said we had of our own was never picked up as a valuation.',
+      'a seller opportunity our own enquiry declared still carries a wider consequence, as the continuation of the fixed "That also meant "');
+    assert.ok(body.includes('\n\nWe had also mentioned a property of our own that we were thinking of selling.\n\n'),
+      'and the observation that set it up is its own paragraph');
+    assert.ok(body.includes(`\n\n${THAT_ALSO_MEANT_PREFIX}${p.wider_consequence}\n\n`), 'with the fixed wording supplied by the assembler, once');
     ok('the no-response probe gets its own fixed email structure — the plain no-reply line, no invented conversation, and a closing that makes sense when there was nothing to discuss');
   }
 
@@ -545,6 +577,65 @@ async function run() {
     assert.strictEqual(diagnoseCalls, SCENARIOS.length, 'one Diagnosis call per probe');
     assert.strictEqual(personaliseCalls, SCENARIOS.length, 'one Personalisation call per probe');
     ok('the flow costs exactly one Diagnosis call and one Personalisation call per probe — persisting findings added no AI call');
+  }
+
+  // ── 9. Personalisation never silently falls back to the Diagnosis prose ──
+  //    An empty findings list is a REAL state — it means Diagnosis found no
+  //    genuine problem, and the prompt says exactly that. So missing
+  //    DIAGNOSIS_FINDINGS rows must never look like it: that would quietly
+  //    tell the model a badly-handled enquiry was handled perfectly and let it
+  //    write the story off the Diagnosis prose instead. A diagnosed probe with
+  //    no rows falls back to the SAME findings out of its own DIAGNOSIS row's
+  //    findings cell — and says so in the summary.
+  {
+    const { store: store2, repo: repo2 } = makeFakeSheet();
+    __setRepoForTests(repo2);
+    installAiStub();
+    seed(store2);
+
+    const scenario = byAddress.get('Compound Gardens');
+    // The workbook this suite models has no DIAGNOSIS.findings column (it
+    // mirrors the live V2 header, where the findings live in their own tab).
+    // Recovery reads that cell, so this case adds it — which is also exactly
+    // the shape a probe diagnosed before DIAGNOSIS_FINDINGS existed has.
+    const DIAGNOSIS_HEADER_WITH_FINDINGS = [...DIAGNOSIS_HEADER, 'findings'];
+    store2.DIAGNOSIS[0] = DIAGNOSIS_HEADER_WITH_FINDINGS.slice();
+
+    // A probe finalised by a path that never wrote its findings rows: a
+    // non-blank diagnosis_summary (so it is frozen, and the rebuild will never
+    // regenerate it) with the findings only in the DIAGNOSIS row's own cell.
+    store2.DIAGNOSIS.push(row(DIAGNOSIS_HEADER_WITH_FINDINGS, {
+      probe_id: scenario.probe_id, agency_id: `agc_${scenario.key}`,
+      findings: JSON.stringify(scenario.findings),
+      strengths: scenario.strengths, missed_opportunities: 'Slow, unqualified, no viewing, seller ignored.',
+      commercial_implication: 'Specific to Compound Gardens.', novus_opportunity: 'Core (front desk)',
+      diagnosis_summary: 'Diagnosis for Compound Gardens.',
+    }));
+
+    const pass2 = await runRebuildPass(repo2, { maxAiCalls: 100, probeIds: [scenario.probe_id] });
+    assert.strictEqual(pass2.diagnosis.ai_diagnoses_run, 0, 'the probe is frozen, so it is not re-diagnosed');
+    assert.strictEqual(findingsFor(store2, scenario.probe_id).length, 0, 'and it genuinely has no DIAGNOSIS_FINDINGS rows');
+    assert.strictEqual(pass2.personalisation.findings_recovered_from_diagnosis_row, 1,
+      'the missing rows are reported, not absorbed in silence');
+    assert.strictEqual(pass2.personalisation.personalisations_with_findings, 1,
+      'and Personalisation ran WITH findings, not with an empty list');
+
+    const prompt = personalisationPrompts.get(scenario.probe_id);
+    for (const f of scenario.findings) {
+      assert.ok(prompt.includes(f.finding), 'every finding still reaches the Personalisation prompt');
+      assert.ok(prompt.includes(f.evidence), 'with its evidence');
+    }
+    assert.ok(!prompt.includes('(none — the evidence shows no genuine problem)'),
+      'the prompt never tells the model this enquiry had no genuine problem when it had four');
+
+    // And the primary path is unchanged: where the ROWS exist, they are what
+    // is used, and nothing is recovered from the diagnosis row.
+    assert.strictEqual(first.personalisation.findings_recovered_from_diagnosis_row, 0,
+      'the first pass, where every probe had its rows, recovered nothing');
+    assert.strictEqual(first.personalisation.personalisations_with_findings,
+      SCENARIOS.filter((s) => s.findings.length > 0).length,
+      'and every probe that has findings was personalised with them');
+    ok('Personalisation is driven by the persisted DIAGNOSIS_FINDINGS rows, and a diagnosed probe missing them recovers the same findings from its DIAGNOSIS row rather than silently reading as "no problem found"');
   }
 
   console.log(`\n${passed} checks passed.`);

@@ -26,6 +26,7 @@
     "novus:probe-id-whitespace-selftest": "node scripts/novus-probe-id-whitespace-selftest.mjs",
     "novus:diagnosis-persistence-selftest": "node scripts/novus-diagnosis-persistence-selftest.mjs",
     "novus:diagnosis-findings-flow-selftest": "node scripts/novus-diagnosis-findings-flow-selftest.mjs",
+    "novus:findings-duplication-selftest": "node scripts/novus-findings-duplication-selftest.mjs",
     "novus:rebuild-targeting-selftest": "node scripts/novus-rebuild-targeting-selftest.mjs",
     "novus:lifecycle-selftest": "node scripts/novus-lifecycle-selftest.mjs",
     "novus:match-status-recompute-selftest": "node scripts/novus-match-status-recompute-selftest.mjs",

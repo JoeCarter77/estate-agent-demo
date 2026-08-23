@@ -87,7 +87,7 @@ const PERSONALISATION_HEADER = [
   'primary_narrative', 'narrative_finding_indexes', 'supporting_findings', 'evidence',
   'novus_counterfactual',
   'enquiry_date', 'property_address', 'email_variant',
-  'fair_observation', 'main_finding', 'commercial_consequence', 'wider_consequence',
+  'fair_observation', 'main_finding', 'commercial_consequence', 'wider_observation', 'wider_consequence',
   'additional_findings_hook', 'email_body',
   'created_at', 'updated_at',
 ];
