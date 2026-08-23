@@ -187,11 +187,18 @@ function installAiStub() {
       personaliseCalls += 1;
       const m = prompt.match(/prb_hist_\d+/);
       if (m) personalisedProbeIds.push(m[0]);
+      // A COMPLETE answer, deliberately: this suite counts AI calls to prove
+      // targeting, and an answer that failed the email contract would be sent
+      // back for repair (lib/probe-personalisation.mjs), making one probe cost
+      // several calls and measuring the contract gate instead of the targeting.
       return {
+        story_reasoning: 'Stub reasoning.',
         primary_narrative: 'Stub narrative.', narrative_finding_indexes: [], supporting_findings: '',
-        evidence_quotes: [], fair_observation: '',
-        novus_counterfactual: 'Stub counterfactual.', main_finding: 'Stub main finding.',
-        commercial_consequence: 'stub consequence.', wider_consequence: '',
+        evidence_quotes: [], fair_observation: 'you did come back to us.',
+        // Note: no "finding"/"evidence" wording inside the EMAIL fields — the
+        // internal-reasoning guard blanks those, which would fail the contract.
+        novus_counterfactual: 'Stub counterfactual.', main_finding: 'that nobody asked what we were looking for.',
+        commercial_consequence: 'stub consequence.', wider_observation: '', wider_consequence: '',
       };
     }
     interpretCalls += 1;
