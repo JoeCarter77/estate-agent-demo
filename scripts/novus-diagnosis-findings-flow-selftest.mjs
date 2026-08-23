@@ -37,6 +37,7 @@ import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import { runRebuildPass } from '../lib/rebuild-pass.mjs';
 import {
   ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE,
+  NO_RESPONSE_BREAKDOWN_LINE, NO_RESPONSE_CTA_LINE, propertyReference,
   THAT_MEANT_PREFIX, THAT_ALSO_MEANT_PREFIX,
   FAIR_OBSERVATION_PREFIX, MAIN_FINDING_PREFIX, assembleEmail,
 } from '../lib/email-assembly.mjs';
@@ -173,7 +174,9 @@ const SCENARIOS = [
     // empty however the model answers, and the email switches structure.
     expect: {
       hero_journey: 'complete_miss', findings: 1, email_variant: 'no_response',
-      fair_observation: '', main_finding: '', additional_findings_hook: ADDITIONAL_FINDINGS_HOOK_LINE,
+      // The no-response variant closes with its own two lines, so the normal
+      // curiosity tease is not stored on top of them.
+      fair_observation: '', main_finding: '', additional_findings_hook: '',
     },
   },
   {
@@ -506,7 +509,10 @@ async function run() {
       // row — nothing is stored that the fields do not reproduce.
       assert.strictEqual(p.email_body, assembleEmail(p), `${s.key}: email_body is the deterministic assembly of this row`);
       assert.ok(p.email_body.startsWith('Hi {{first_name}},'), `${s.key}: the email opens with the merge field`);
-      assert.ok(p.email_body.includes(`We sent your team an enquiry on 1 January about ${s.address}.`), `${s.key}: the intro names this probe's own date and property`);
+      // propertyReference() decides the wording: a road-only address reads as
+      // "a house on Perry Street", never "about Perry Street".
+      assert.ok(p.email_body.includes(`We sent your team an enquiry on 1 January about ${propertyReference(s.address)}.`),
+        `${s.key}: the intro names this probe's own date and property`);
       assert.ok(p.email_body.includes(`${THAT_MEANT_PREFIX}${p.commercial_consequence}`), `${s.key}: "That meant " is assembled in code, once`);
       if (p.email_variant !== 'no_response') {
         // The locked paragraph order from the brief: fair observation (when
@@ -545,15 +551,16 @@ async function run() {
     // The fixed no-response shape, in order.
     const body = p.email_body;
     assert.ok(body.includes(`\n\n${NO_REPLY_LINE}\n\n`), 'the assembler supplies the plain no-reply line');
-    assert.ok(body.endsWith(`${ADDITIONAL_FINDINGS_HOOK_LINE}\n\n${CTA_LINE}\n\nJoe`),
-      'and it closes with the same locked two paragraphs as every other email');
+    assert.ok(body.endsWith(`${NO_RESPONSE_BREAKDOWN_LINE}\n\n${NO_RESPONSE_CTA_LINE}\n\nJoe`),
+      'and it closes with the no-response variant\'s own locked two paragraphs');
+    assert.ok(!body.includes(ADDITIONAL_FINDINGS_HOOK_LINE), 'never the normal tease on top of them');
     assert.ok(body.indexOf(NO_REPLY_LINE) < body.indexOf(THAT_MEANT_PREFIX), 'the silence is stated before its consequence');
     assert.strictEqual(p.wider_consequence, 'the property we said we had of our own was never picked up as a valuation.',
       'a seller opportunity our own enquiry declared still carries a wider consequence, as the continuation of the fixed "That also meant "');
     assert.ok(body.includes('\n\nWe had also mentioned a property of our own that we were thinking of selling.\n\n'),
       'and the observation that set it up is its own paragraph');
     assert.ok(body.includes(`\n\n${THAT_ALSO_MEANT_PREFIX}${p.wider_consequence}\n\n`), 'with the fixed wording supplied by the assembler, once');
-    ok('the no-response probe gets its own fixed email structure — the plain no-reply line, no invented conversation, its consequence, and the same locked closing as every other email');
+    ok('the no-response probe gets its own fixed email structure — the plain no-reply line, no invented conversation, its consequence, and its own locked closing');
   }
 
   // ── 7. Idempotent: a second rebuild changes nothing ──
