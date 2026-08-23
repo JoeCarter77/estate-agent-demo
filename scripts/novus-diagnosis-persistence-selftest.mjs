@@ -25,6 +25,13 @@
 // intelligence_id/diagnosis_id/created_at/updated_at columns at all) with 24
 // closed probes and 15 observing probes — the live numbers reported — and an
 // EMPTY DIAGNOSIS tab, then proves:
+//
+// Dates below are relative to Date.now() at run time, not hardcoded absolute
+// timestamps — an earlier version pinned them to specific 2026 dates, and
+// once the wall clock passed those dates the "still observing" probes'
+// observation_deadline was also in the past, so the library correctly (and
+// misleadingly) started reporting them as closed too. Relative offsets keep
+// this suite meaningful indefinitely.
 //   1. all 24 closed probes get a DIAGNOSIS row; none of the 15 observing ones do
 //   2. a second rebuild is idempotent — no duplicates, no further AI calls
 //   3. the same probe_id-matching fix keeps INTELLIGENCE itself idempotent
@@ -40,6 +47,12 @@ import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import { rebuildAllIntelligence } from '../lib/intelligence-rebuild.mjs';
 import { rebuildAllDiagnosis } from '../lib/diagnosis-rebuild.mjs';
 import { recomputeProbeObservation } from '../lib/observation-recompute.mjs';
+
+const NOW_MS = Date.now();
+const DAY_MS = 24 * 60 * 60 * 1000;
+// n days before/after "now" (this run's wall-clock time), as an ISO string.
+function daysAgo(n) { return new Date(NOW_MS - n * DAY_MS).toISOString(); }
+function daysFromNow(n) { return new Date(NOW_MS + n * DAY_MS).toISOString(); }
 
 // The user's actual live-sheet header, verbatim from the exported CSVs —
 // deliberately WITHOUT intelligence_id/diagnosis_id/created_at/updated_at.
@@ -135,11 +148,11 @@ async function run() {
     const probeId = `prb_closed_${i}`;
     store.PROBES.push(row(PROBES_HEADER, {
       probe_id: probeId, agency_id: `agc_${i}`, property_address: `${i} Closed Street`,
-      probe_timestamp: '2026-08-01T09:00:00.000Z', observation_deadline: '2026-08-05T09:00:00.000Z',
+      probe_timestamp: daysAgo(10), observation_deadline: daysAgo(6), // well past the 4-day window: closed
     }));
     store.COMMUNICATIONS.push(row(COMMUNICATIONS_HEADER, {
       communication_id: `com_closed_${i}`, agency_id: `agc_${i}`, probe_id: probeId,
-      occurred_at: '2026-08-01T20:00:00.000Z', channel: 'email',
+      occurred_at: daysAgo(10), channel: 'email',
       body_text: 'Thanks for your enquiry, please call us back.', match_status: 'matched',
     }));
   }
@@ -147,7 +160,7 @@ async function run() {
     const probeId = `prb_observing_${i}`;
     store.PROBES.push(row(PROBES_HEADER, {
       probe_id: probeId, agency_id: `agc_obs_${i}`, property_address: `${i} Observing Street`,
-      probe_timestamp: '2026-08-18T09:00:00.000Z', observation_deadline: '2026-08-22T09:00:00.000Z',
+      probe_timestamp: daysAgo(1), observation_deadline: daysFromNow(3), // window still open: observing
     }));
   }
 
@@ -194,8 +207,8 @@ async function run() {
   store.PROBES = store.PROBES.map((r) => {
     if (r[0] === 'prb_observing_1') {
       const obj = toObj(PROBES_HEADER, r);
-      obj.probe_timestamp = '2026-08-10T09:00:00.000Z';
-      obj.observation_deadline = '2026-08-14T09:00:00.000Z'; // now closed
+      obj.probe_timestamp = daysAgo(6);
+      obj.observation_deadline = daysAgo(2); // now closed
       return row(PROBES_HEADER, obj);
     }
     return r;

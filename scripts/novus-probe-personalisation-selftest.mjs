@@ -42,7 +42,7 @@ import {
   normalizeCurrencyFigure, formatEnquiryDate, cleanAddressForEmail,
   stripThatMeantPrefix, readsAsInternalReasoning, readsAsDetachedThirdPerson,
   distinctWiderConsequence, emailPropertyAddress, readsAsSnuckCriticism,
-  consequenceGoesBeyondFinding,
+  consequenceGoesBeyondFinding, extractProtectedWords,
 } from '../lib/probe-personalisation.mjs';
 import {
   ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE, THAT_MEANT_PREFIX,
@@ -578,6 +578,74 @@ async function run() {
       'sharing vocabulary is not restating');
     assert.strictEqual(consequenceGoesBeyondFinding('', 'that the enquiry went cold.'), false, 'an empty consequence never passes');
     ok('a commercial consequence that only rephrases the finding is refused — the email says what the failure cost, or it is not sent at all');
+  }
+
+  // ── PROPER NOUNS from this probe's own address/agency survive a
+  //    continuation unchanged — never forced to lower case ──────────────────
+  {
+    // PROBE.property_address is 'Barn Field, Chevington, IP29'.
+    assert.deepStrictEqual([...extractProtectedWords(PROBE, {})].sort(),
+      ['barn', 'chevington', 'field', 'ip'], 'protected words come from this probe\'s own address (including the postcode fragment)');
+    assert.deepStrictEqual([...extractProtectedWords(PROBE, { agency_name: 'Ensum Brown' })].sort(),
+      ['barn', 'brown', 'chevington', 'ensum', 'field', 'ip'], 'and the agency name too, when given');
+    assert.deepStrictEqual([...extractProtectedWords({}, {})], [], 'no probe, no agency: nothing protected');
+
+    __setAiCallerForTests(async () => stubResult({
+      main_finding: 'Barn Field was mentioned twice but never actually offered as a viewing.',
+      commercial_consequence: 'Chevington itself was never confirmed as the area I was searching in.',
+    }));
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    assert.strictEqual(result.main_finding, 'Barn Field was mentioned twice but never actually offered as a viewing.',
+      'a continuation opening with this probe\'s own proper noun keeps its capital, unlike an ordinary opening word');
+    assert.strictEqual(result.commercial_consequence, 'Chevington itself was never confirmed as the area I was searching in.');
+    assert.ok(result.email_body.includes('What stood out, though, was Barn Field was mentioned'),
+      'and it reads correctly in the assembled email — the fixed opener followed by a genuine proper noun, not a lower-cased one');
+
+    // An ordinary word that merely LOOKS like it could be a name, but isn't
+    // established by this probe's own address or agency, is still lower-cased.
+    __setAiCallerForTests(async () => stubResult({ main_finding: 'Nobody asked about my timescale at any point.' }));
+    const ordinary = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    assert.strictEqual(ordinary.main_finding, 'nobody asked about my timescale at any point.',
+      'an opening word not established as a proper noun by this probe is still de-capitalised');
+    ok('proper nouns from this probe\'s own property address or agency name survive a continuation capitalised; ordinary words do not');
+  }
+
+  // ── "That meant ..." must go beyond the finding even when it is a NEAR-
+  //    duplicate — the same handful of words lightly reworded, not just an
+  //    exact substring ──────────────────────────────────────────────────────
+  {
+    const finding = 'that nobody asked a single question about my position before inviting me to view.';
+    const nearDuplicate = 'nobody asked a single question about my position before I was invited to view.';
+    __setAiCallerForTests(async () => stubResult({ main_finding: finding, commercial_consequence: nearDuplicate }));
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    assert.strictEqual(result.commercial_consequence, '', 'a lightly reworded restatement is still refused, not just an exact substring');
+    assert.strictEqual(result.email_body, '', 'so the row is unsendable, same as an exact restatement');
+
+    // The unit: near-duplicate wording is caught; genuinely different wording
+    // that happens to share a few of the finding's own words is not.
+    assert.strictEqual(consequenceGoesBeyondFinding(nearDuplicate, finding), false);
+    assert.strictEqual(consequenceGoesBeyondFinding(
+      'a viewing slot was committed before anyone knew whether the buyer could proceed, and the valuation sitting inside the same enquiry was never reached.',
+      finding,
+    ), true, 'a genuinely different consequence that only shares a couple of nouns with the finding still passes');
+    // Two short sentences sharing a couple of words by coincidence must not trip it.
+    assert.strictEqual(consequenceGoesBeyondFinding('the valuation was never offered.', 'that nobody asked about my timescale.'), true,
+      'two short, unrelated sentences are never mistaken for a restatement');
+    ok('a commercial consequence that is a near-duplicate rewording of the finding is refused, not just an exact substring match');
+  }
+
+  // ── wider_consequence is refused the same way when it near-duplicates
+  //    the primary consequence ──────────────────────────────────────────────
+  {
+    assert.strictEqual(
+      distinctWiderConsequence(
+        'the enquiry was getting attention, but was not really being progressed at any point',
+        'the enquiry was getting attention but it was not really being progressed at any point',
+      ),
+      '',
+      'a near-duplicate reword of the primary consequence is dropped, not just an exact restatement',
+    );
+    ok('distinctWiderConsequence also catches a near-duplicate rewording of the primary consequence, not just an exact one');
   }
 
   // ── Our internal reasoning must never be merged into a real email ──
