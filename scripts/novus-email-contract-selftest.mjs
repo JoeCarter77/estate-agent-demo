@@ -21,6 +21,12 @@
 // the row must come back NOT SENDABLE with a named violation, rather than
 // producing an incomplete or dishonest email.
 //
+// And it covers THE CONTRACT GATE: the prb_hist_0004 / prb_hist_0009 pattern,
+// where the model wrote the commercial consequence into primary_narrative and
+// left commercial_consequence blank. That answer must be rejected and asked
+// again — with the gap named and its own reasoning handed back — until the
+// email is complete, rather than stored as an unsendable row.
+//
 // Run: npm run novus:email-contract-selftest
 
 import assert from 'node:assert';
@@ -166,6 +172,27 @@ const STORIES = {
   },
 };
 
+// Drives one probe through Personalisation with a caller the test controls, so
+// a multi-turn test can answer differently on the repair pass. Returns the row
+// alongside every prompt the layer actually sent.
+async function personaliseWithCaller(shape, caller, { probe: probeOverrides = {}, intelligence: intelligenceOverrides = {} } = {}) {
+  const prompts = [];
+  __setAiCallerForTests(async (args) => {
+    prompts.push(args.prompt);
+    return caller(prompts.length, args);
+  });
+  const findings = [{ finding_index: 1, finding: 'The enquiry was not progressed.', evidence: 'From the communications above.', significance_note: 'A live enquiry that stopped.' }];
+  const row = await personaliseProbe(
+    { ...PROBES[shape], ...probeOverrides },
+    intelligence(shape === 'silent' ? { human_contact: 'none', response_hours: '', contact_attempts: 0, channels_used: '', ...intelligenceOverrides } : intelligenceOverrides),
+    diagnosis(),
+    findings,
+    COMMS[shape],
+    {},
+  );
+  return { row, prompts, calls: prompts.length };
+}
+
 async function personalise(shape, storyOverrides = {}, intelligenceOverrides = {}, diagnosisOverrides = {}) {
   __setAiCallerForTests(async () => ({ ...STORIES[shape], ...storyOverrides }));
   const findings = [{ finding_index: 1, finding: 'The enquiry was not progressed.', evidence: 'From the communications above.', significance_note: 'A live enquiry that stopped.' }];
@@ -304,6 +331,100 @@ async function run() {
     assert.ok(unsendable.main_finding && unsendable.commercial_consequence, 'and so is the rest of the email copy');
     assert.ok(unsendable.novus_counterfactual, 'the counterfactual survives for the breakdown');
     ok('a row that fails the contract still carries its full story — the blank email_body flags it for a human, it does not throw the analysis away');
+  }
+
+  // ── THE prb_hist_0004 / prb_hist_0009 PATTERN ──────────────────────────
+  //    A strong narrative, a strong fair observation, a strong main finding, a
+  //    strong wider beat — and a BLANK commercial_consequence, with the
+  //    consequence sitting in prose inside primary_narrative. The model
+  //    understood it perfectly and put it in the wrong place. That answer must
+  //    be rejected and asked again, not stored as an unsendable row.
+  {
+    // prb_hist_0009's actual primary_narrative.
+    const NARRATIVE = 'The persistence went entirely into pushing a viewing, while the two things that would have told them who they were dealing with — his buying readiness and his selling potential — were left completely unexplored.';
+    const DISTILLED = 'nobody ever established how ready I actually was to buy, or that there was a second property to value sitting inside the same enquiry.';
+
+    const { row, prompts, calls } = await personaliseWithCaller('seller', (turn) => (turn === 1
+      // Turn 1: everything right except the field that carries the whole point.
+      ? { ...STORIES.seller, primary_narrative: NARRATIVE, commercial_consequence: '' }
+      // Turn 2: the same story, with the consequence distilled out of it.
+      : { ...STORIES.seller, primary_narrative: NARRATIVE, commercial_consequence: DISTILLED }));
+
+    assert.strictEqual(calls, 2, 'the blank consequence was rejected and the model was asked again, exactly once');
+    assert.strictEqual(row.commercial_consequence, DISTILLED, 'the accepted output carries the distilled commercial consequence');
+    assert.ok(isSendable(row), 'and the row is sendable');
+    assert.deepStrictEqual(emailContractViolations(row), [], 'with no contract violations left');
+    assert.ok(row.email_body.includes(`That meant ${DISTILLED}`), 'the email says what it meant, in the locked paragraph');
+    assert.ok(row.email_body.startsWith('Hi {{first_name}},'), 'and the full email is assembled');
+
+    // Nothing else was lost on the way through the repair pass.
+    assert.ok(row.fair_observation && row.main_finding, 'the fair observation and main finding survive');
+    assert.strictEqual(row.primary_narrative, NARRATIVE, 'and so does the internal narrative');
+
+    // The repair turn is what makes this work: the model gets its own
+    // reasoning back, and is told exactly what was wrong with the answer.
+    const repair = prompts[1];
+    assert.ok(repair.includes(NARRATIVE), 'the repair prompt hands the model its own narrative back to distil from');
+    assert.ok(/commercial_consequence came back EMPTY/.test(repair), 'and names the specific gap');
+    assert.ok(/primary_narrative and story_reasoning are INTERNAL/.test(repair), 'and restates that the narrative is not an email field');
+    assert.ok(repair.startsWith(prompts[0]), 'the repair turn is the same question again, not a different one');
+    ok('the 0004/0009 pattern — a consequence written into primary_narrative and left blank in commercial_consequence — is rejected and regenerated, and the accepted output is a complete, sendable email');
+  }
+
+  // ── The gate costs nothing on an answer that satisfies the contract ──
+  {
+    const clean = await personaliseWithCaller('seller', () => STORIES.seller);
+    assert.strictEqual(clean.calls, 1, 'a complete answer is accepted on the first call — no repair pass, no extra cost');
+    assert.ok(clean.row.email_body, 'and produces its email');
+
+    const silent = await personaliseWithCaller('silent', () => STORIES.silent);
+    assert.strictEqual(silent.calls, 1, 'the no-response variant needs no fair observation or main finding, so it never triggers a repair');
+
+    // A DATA problem is not a model problem: no number of AI calls will invent
+    // a property address the probe never established, so it is not retried.
+    const noAddress = await personaliseWithCaller('seller', () => STORIES.seller, { probe: { property_address: 'UNKNOWN — never established' } });
+    assert.strictEqual(noAddress.calls, 1, 'an unestablished address is not retried — it is a data problem, not a wrong answer');
+    assert.strictEqual(noAddress.row.email_body, '', 'and the row is unsendable, as before');
+    assert.ok(emailContractViolations(noAddress.row).includes('missing_property_address'));
+    // The caller's AI-call budget is billed by calls, not probes, so a batch
+    // capped at N calls still makes at most N even when rows need repair.
+    assert.strictEqual(clean.row.ai_calls_used, 1, 'an accepted first answer reports one AI call');
+    const repaired = await personaliseWithCaller('weak', (turn) => (turn === 1
+      ? { ...STORIES.weak, commercial_consequence: '' }
+      : STORIES.weak));
+    assert.strictEqual(repaired.row.ai_calls_used, repaired.calls, 'and a repaired row reports every call it actually took');
+    ok('the gate only spends AI calls on what asking again could actually fix — a satisfying answer costs one call, a missing property address is never retried, and every call is reported for the caller\'s budget');
+  }
+
+  // ── An answer that never satisfies the contract is bounded, and honest ──
+  {
+    const { row, calls } = await personaliseWithCaller('weak', () => ({ ...STORIES.weak, commercial_consequence: '' }));
+    assert.strictEqual(calls, 3, 'the repair pass is bounded — it does not loop forever on a model that will not fill the field');
+    assert.strictEqual(row.commercial_consequence, '', 'nothing is invented to fill the gap');
+    assert.strictEqual(row.email_body, '', 'so the row stays unsendable and a human gets to look at it');
+    assert.ok(row.primary_narrative && row.main_finding && row.fair_observation,
+      'and the rest of the story is still stored, rather than the whole analysis being thrown away');
+    ok('a probe the model never completes is asked at most three times, then stored unsendable with its full story — never invented, never looped on');
+  }
+
+  // ── The repair pass names what was wrong, not just that something was ──
+  {
+    // Rejected for a different reason each time: a hedged compliment, then a
+    // consequence that only restates the finding.
+    const hedged = await personaliseWithCaller('weak', (turn) => (turn === 1
+      ? { ...STORIES.weak, fair_observation: 'you eventually got back to me.' }
+      : STORIES.weak));
+    assert.strictEqual(hedged.calls, 2);
+    assert.ok(/hedged the compliment/.test(hedged.prompts[1]), 'a hedged fair observation is sent back as a hedge, not as a blank');
+    assert.ok(hedged.row.email_body, 'and the honest rewrite is accepted');
+
+    const restated = await personaliseWithCaller('weak', (turn) => (turn === 1
+      ? { ...STORIES.weak, commercial_consequence: STORIES.weak.main_finding }
+      : STORIES.weak));
+    assert.strictEqual(restated.calls, 2);
+    assert.ok(/restated main_finding/.test(restated.prompts[1]), 'a consequence that repeats the finding is sent back as a restatement, not as a blank');
+    assert.ok(restated.row.email_body, 'and the real consequence is accepted');
+    ok('each rejection tells the model what actually went wrong — blank, hedged, or a restatement — because a model asked simply to try again reproduces the same answer');
   }
 
   // ── The model reasons about the story BEFORE it fills the variables ──
