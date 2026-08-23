@@ -2,20 +2,23 @@
 // creds, no AI) for lib/email-assembly.mjs: the deterministic assembler that
 // turns ONE finalised PERSONALISATION row into the final outreach email.
 //
-// Personalisation writes the sentences; this layer decides the shape. So this
-// suite proves the shape, and only the shape:
-//   - the locked normal structure, in the locked order, with the locked CTA
-//   - the separate no-response structure, which exists because a probe that
-//     was never replied to has no conversation to describe
-//   - optional paragraphs are omitted entirely, never left as blank gaps
+// Personalisation writes the sentences; this layer decides the shape. The
+// shape is LOCKED, so this suite proves the shape, and only the shape:
+//   - VARIANT 2 (normal), in the locked paragraph order
+//   - VARIANT 1 (no response), which exists because a probe that was never
+//     replied to has no conversation to describe
+//   - the final two paragraphs — the curiosity transition and the CTA — are
+//     locked, identical, and present in BOTH variants every time
 //   - the FIXED OPENING WORDS this layer owns — "I want to say upfront that ",
 //     "What stood out, though, was ", "That meant ", "That also meant " —
 //     joined onto the lower-case continuations Personalisation returns, and
 //     never printed twice
+//   - the wider beat is a PAIR: no observation, no "That also meant"
 //   - merge fields: enquiry_date and property_address are resolved here,
 //     {{first_name}} deliberately is not
-//   - a row that cannot make a complete, honest email assembles nothing at
-//     all, rather than an email with a hole in it
+//   - THE SENDABILITY CONTRACT: a normal email needs fair_observation,
+//     main_finding AND commercial_consequence, and a row missing any of them
+//     assembles nothing at all rather than an email with a hole in it
 //   - nothing in here rewrites a sentence Personalisation wrote
 //
 // Run: npm run novus:email-assembly-selftest
@@ -24,8 +27,8 @@ import assert from 'node:assert';
 import {
   assembleEmail, isSendable, normaliseVariant, openingLine,
   ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, FIRST_NAME_MERGE_FIELD, NO_REPLY_LINE,
-  NO_RESPONSE_BREAKDOWN_LINE, NO_RESPONSE_CTA_LINE, SIGN_OFF, THAT_MEANT_PREFIX,
-  THAT_ALSO_MEANT_PREFIX, FAIR_OBSERVATION_PREFIX, MAIN_FINDING_PREFIX, withPrefix,
+  SIGN_OFF, THAT_MEANT_PREFIX, THAT_ALSO_MEANT_PREFIX, FAIR_OBSERVATION_PREFIX,
+  MAIN_FINDING_PREFIX, withPrefix, emailContractViolations,
 } from '../lib/email-assembly.mjs';
 
 let passed = 0;
@@ -59,8 +62,8 @@ function noResponseRow(overrides = {}) {
     fair_observation: '',
     main_finding: '',
     commercial_consequence: 'a buyer who was ready to view never got as far as a conversation.',
-    wider_observation: '',
-    wider_consequence: 'the property I said I had of my own was never picked up as a valuation.',
+    wider_observation: "I'd also said I had a property of my own I was thinking of selling.",
+    wider_consequence: 'the valuation sitting inside the same enquiry was never picked up.',
     additional_findings_hook: '',
     ...overrides,
   };
@@ -96,22 +99,38 @@ function run() {
     ok('the call to action is the locked breakdown line — never an audit, never a sales offer');
   }
 
-  // ── Optional paragraphs are omitted, never left as blank gaps ──
+  // ── The locked final two paragraphs are ALWAYS both there ──
   {
-    const minimal = assembleEmail(fullRow({
-      fair_observation: '', wider_observation: '', wider_consequence: '', additional_findings_hook: '',
-    }));
+    for (const [why, row] of [
+      ['nothing beyond the primary narrative', fullRow({ additional_findings_hook: '' })],
+      ['a stored hook someone blanked', fullRow({ additional_findings_hook: '' })],
+      ['a stored hook someone rewrote', fullRow({ additional_findings_hook: 'We noticed four other problems with your process.' })],
+      ['the no-response variant', noResponseRow()],
+    ]) {
+      const body = assembleEmail(row);
+      assert.ok(body.includes(`\n\n${ADDITIONAL_FINDINGS_HOOK_LINE}\n\n${CTA_LINE}\n\n${SIGN_OFF}`),
+        `${why}: the locked transition and the locked CTA both close the email, in that order`);
+      assert.ok(!body.includes('four other problems'), `${why}: a stored hook is never printed as copy`);
+    }
+    ok('the final two paragraphs are locked and appear in every sendable email, in both variants — the transition is not conditional on a leftover finding, and the stored additional_findings_hook is never used as copy');
+  }
+
+  // ── Only the truly optional paragraphs are optional ──
+  {
+    const minimal = assembleEmail(fullRow({ wider_observation: '', wider_consequence: '' }));
     const row = fullRow();
     assert.strictEqual(minimal, [
       'Hi {{first_name}},',
       'We sent your team an enquiry on 18 August about 14 Oak Road.',
+      `I want to say upfront that ${row.fair_observation}`,
       `What stood out, though, was ${row.main_finding}`,
       `That meant ${row.commercial_consequence}`,
+      ADDITIONAL_FINDINGS_HOOK_LINE,
       CTA_LINE,
       'Joe',
     ].join('\n\n'));
-    assert.ok(!/\n\n\n/.test(minimal), 'no blank gap is left where an optional paragraph would have been');
-    ok('every optional paragraph is dropped entirely when empty — the email closes up rather than showing a gap');
+    assert.ok(!/\n\n\n/.test(minimal), 'no blank gap is left where the wider beat would have been');
+    ok('the wider beat is dropped entirely when empty — the email closes up rather than showing a gap');
   }
 
   // ── The wider beat: the observation, then its separate consequence ──
@@ -129,16 +148,28 @@ function run() {
       'and the wider consequence is opened by the fixed wording this layer owns');
     assert.ok(body.indexOf(THAT_ALSO_MEANT_PREFIX) < body.indexOf(ADDITIONAL_FINDINGS_HOOK_LINE), 'both sit before the curiosity line');
 
-    // Either half may be absent on its own.
+    // The observation can stand alone; the consequence cannot.
     const observationOnly = assembleEmail(fullRow({ wider_observation: 'I had a property of my own to sell too.', wider_consequence: '' }));
     assert.ok(observationOnly.includes('\n\nI had a property of my own to sell too.\n\n'));
     assert.ok(!observationOnly.includes(THAT_ALSO_MEANT_PREFIX), 'no wider consequence, no "That also meant" paragraph');
-    ok('the wider beat is two independent optional paragraphs — the observation as its own sentence, then "That also meant" + its distinct consequence');
+
+    // An ORPHAN wider consequence is the consequence of something the reader
+    // was never told, so it is dropped rather than printed.
+    for (const variant of ['normal', 'no_response']) {
+      const row = variant === 'normal'
+        ? fullRow({ wider_observation: '', wider_consequence: 'the valuation inside the same enquiry was never explored.' })
+        : noResponseRow({ wider_observation: '', wider_consequence: 'the valuation inside the same enquiry was never explored.' });
+      const orphan = assembleEmail(row);
+      assert.ok(!orphan.includes(THAT_ALSO_MEANT_PREFIX), `${variant}: "That also meant" needs an observation in front of it`);
+      assert.ok(!orphan.includes('never explored'), `${variant}: and the orphan consequence is not printed at all`);
+    }
+    ok('the wider beat is a PAIR — the observation can stand alone, but "That also meant" never prints without the observation it is the consequence of');
   }
 
   // ── A fixed prefix is never printed twice ──
   {
     const doubled = assembleEmail(fullRow({
+      wider_observation: 'I had a property of my own to sell too.',
       fair_observation: 'I want to say upfront that you got back to me quickly.',
       main_finding: 'What stood out, though, was that nobody asked my timescale.',
       commercial_consequence: 'That meant the valuation was never offered.',
@@ -174,7 +205,7 @@ function run() {
     ok('the assembler adds the fixed opener and nothing else — it never repairs, capitalises or punctuates a sentence, because sentence-ready copy is Personalisation\'s contract');
   }
 
-  // ── The no-response structure ──
+  // ── VARIANT 1: the no-response structure ──
   {
     const body = assembleEmail(noResponseRow());
     const row = noResponseRow();
@@ -183,31 +214,29 @@ function run() {
       'We sent your team an enquiry on 18 August about 14 Oak Road.',
       'We never received a reply.',
       `That meant ${row.commercial_consequence}`,
+      row.wider_observation,
       `That also meant ${row.wider_consequence}`,
-      "We found a couple of things that may explain it, so we've put together a short breakdown that might be useful.",
-      "Happy to send it over if you'd like to see it.",
+      ADDITIONAL_FINDINGS_HOOK_LINE,
+      CTA_LINE,
       'Joe',
     ].join('\n\n'));
-    ok('the no-response structure assembles as its own fixed shape: the plain no-reply line, the consequence, the wider consequence, and a closing that makes sense when there was no conversation');
+    ok('the no-response structure assembles as its own fixed shape: the plain no-reply line, the consequence, the optional wider beat, and then the same locked closing two paragraphs as every other email');
   }
 
-  // ── The no-response case never describes a conversation, and never
-  //    stacks the "couple of other things" tease on top of its own closing ──
+  // ── The no-response case never describes a conversation ──
   {
     const body = assembleEmail(noResponseRow({
       // A row that (wrongly) still carries normal-case copy must not print it.
       fair_observation: 'You came back to me quickly.',
       main_finding: 'The reply did not mention the property.',
-      additional_findings_hook: ADDITIONAL_FINDINGS_HOOK_LINE,
     }));
     assert.ok(!body.includes('You came back to me quickly.'), 'a stray fair observation is not printed');
     assert.ok(!body.includes(FAIR_OBSERVATION_PREFIX), 'and neither is its fixed opener — there was no interaction to praise');
     assert.ok(!body.includes('The reply did not mention the property.'), 'nor a stray main finding — there was no reply to describe');
-    assert.ok(!body.includes(ADDITIONAL_FINDINGS_HOOK_LINE), 'and the tease is not stacked on top of the breakdown line that already says it');
-    assert.ok(!body.includes(CTA_LINE), 'the normal CTA is not used');
-    assert.ok(body.includes(NO_RESPONSE_BREAKDOWN_LINE) && body.includes(NO_RESPONSE_CTA_LINE), 'the no-response closing is');
-    assert.strictEqual((body.match(/couple of/g) || []).length, 1, 'so "a couple of things" is offered exactly once');
-    ok('the no-response structure prints only what is true of silence — no conversation, no duplicated tease, and its own closing');
+    assert.ok(body.includes(NO_REPLY_LINE), 'the fixed no-reply line stands in their place');
+    assert.ok(body.includes(ADDITIONAL_FINDINGS_HOOK_LINE) && body.includes(CTA_LINE), 'and the same locked closing is used as in a normal email');
+    assert.strictEqual((body.match(/couple of/g) || []).length, 1, 'so "a couple of other things" is offered exactly once');
+    ok('the no-response structure prints only what is true of silence — no conversation, no invented praise — and closes with exactly the same locked two paragraphs');
   }
 
   // ── Merge fields ──
@@ -221,24 +250,34 @@ function run() {
     ok('the assembler resolves enquiry_date and property_address itself and leaves exactly one merge field, {{first_name}}, for the sending tool');
   }
 
-  // ── A row that cannot make a complete, honest email makes none ──
+  // ── THE SENDABILITY CONTRACT, enforced in code ──
   {
-    for (const [why, row] of [
-      ['no property address', fullRow({ property_address: '' })],
-      ['no enquiry date', fullRow({ enquiry_date: '' })],
-      ['no commercial consequence', fullRow({ commercial_consequence: '' })],
-      ['no main finding in the normal structure', fullRow({ main_finding: '' })],
-      ['no commercial consequence in the no-response structure', noResponseRow({ commercial_consequence: '' })],
+    for (const [why, row, expected] of [
+      ['no property address', fullRow({ property_address: '' }), 'missing_property_address'],
+      ['no enquiry date', fullRow({ enquiry_date: '' }), 'missing_enquiry_date'],
+      ['no commercial consequence', fullRow({ commercial_consequence: '' }), 'missing_commercial_consequence'],
+      ['no main finding in the normal structure', fullRow({ main_finding: '' }), 'missing_main_finding'],
+      ['no fair observation in the normal structure', fullRow({ fair_observation: '' }), 'missing_fair_observation'],
+      ['no commercial consequence in the no-response structure', noResponseRow({ commercial_consequence: '' }), 'missing_commercial_consequence'],
     ]) {
       assert.strictEqual(isSendable(row), false, `${why}: not sendable`);
+      assert.ok(emailContractViolations(row).includes(expected), `${why}: the violation is named as ${expected}`);
       assert.strictEqual(assembleEmail(row), '', `${why}: assembles nothing at all`);
     }
-    // The no-response structure needs no main finding — that is the point.
-    assert.strictEqual(isSendable(noResponseRow({ main_finding: '' })), true, 'the no-response structure needs no main finding');
-    assert.ok(assembleEmail(noResponseRow({ main_finding: '' })), 'and still assembles');
+
+    // A probe with human contact and no fair observation is the case the
+    // brief calls out by name: it fails validation rather than quietly
+    // sending a shorter email that opens on the criticism.
+    assert.deepStrictEqual(emailContractViolations(fullRow()), [], 'a complete normal row has no violations');
+    assert.deepStrictEqual(emailContractViolations(noResponseRow()), [], 'and neither does a complete no-response row');
+
+    // The no-response structure needs neither of the two — that is the point.
+    assert.strictEqual(isSendable(noResponseRow({ main_finding: '', fair_observation: '' })), true,
+      'the no-response structure needs no fair observation and no main finding');
+    assert.ok(assembleEmail(noResponseRow({ main_finding: '', fair_observation: '' })), 'and still assembles');
     assert.strictEqual(assembleEmail(null), '', 'a missing row assembles nothing');
     assert.strictEqual(assembleEmail({}), '', 'and so does an empty one');
-    ok('a row missing anything its structure needs assembles no email at all — a blank email_body is the signal that a human should look, never a half-written email');
+    ok('a normal email needs fair_observation, main_finding AND commercial_consequence — a row missing any of them is not sendable, names the violation, and assembles nothing at all rather than an email with a hole in it');
   }
 
   // ── An unrecognised variant is a normal email, never a silent reshape ──

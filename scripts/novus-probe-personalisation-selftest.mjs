@@ -45,7 +45,7 @@ import {
   consequenceGoesBeyondFinding, extractProtectedWords,
 } from '../lib/probe-personalisation.mjs';
 import {
-  ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE, THAT_MEANT_PREFIX,
+  ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE, THAT_MEANT_PREFIX, emailContractViolations,
   THAT_ALSO_MEANT_PREFIX, FAIR_OBSERVATION_PREFIX, MAIN_FINDING_PREFIX, assembleEmail,
 } from '../lib/email-assembly.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
@@ -173,32 +173,35 @@ async function run() {
     ok('multiple findings combine into one primary narrative, the leftover finding becomes a supporting finding, and the email\'s fixed additional-findings tease follows from that without giving the finding away');
   }
 
-  // ── Nothing left over -> no supporting findings, and the secondary hook
-  //    stays blank — never populated with nothing behind it ──
+  // ── Nothing left over -> no supporting findings, but the LOCKED closing
+  //    transition still appears: it is the hand-off into the breakdown, not a
+  //    claim that two more findings exist ──
   {
     __setAiCallerForTests(async () => stubResult({
       narrative_finding_indexes: [1, 2, 3],
       supporting_findings: 'There were several other issues worth mentioning.', // model padding
     }));
     const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
-    assert.strictEqual(result.supporting_findings, '', 'no finding is left over, so supporting_findings is forced empty');
-    assert.strictEqual(result.additional_findings_hook, '', 'and the additional-findings hook stays blank alongside it');
-    assert.ok(!result.email_body.includes(ADDITIONAL_FINDINGS_HOOK_LINE), 'so that paragraph never appears in the email');
-    ok('when the narrative already covers every finding, both the padded supporting_findings and the additional-findings hook are empty, and the email simply omits that paragraph');
+    assert.strictEqual(result.supporting_findings, '', 'no finding is left over, so the INTERNAL supporting_findings is forced empty');
+    assert.strictEqual(result.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE,
+      'but the locked closing transition is still there — it is not conditional on a leftover finding');
+    assert.ok(result.email_body.includes(ADDITIONAL_FINDINGS_HOOK_LINE), 'and the email still carries that paragraph');
+    assert.ok(result.email_body.endsWith(`${ADDITIONAL_FINDINGS_HOOK_LINE}\n\n${CTA_LINE}\n\nJoe`),
+      'the locked final two paragraphs close the email');
+    ok('the locked closing transition appears even when the narrative already covers every finding — it is the curiosity hand-off into the breakdown, while the padded internal supporting_findings is still dropped');
   }
 
-  // ── additional_findings_hook is NEVER free text: even if the model returns
-  //    one anyway, it is ignored — only the fixed line or blank can appear ──
+  // ── additional_findings_hook is NEVER free text: whatever the model
+  //    returns, only the one locked line can appear ──
   {
-    __setAiCallerForTests(async () => ({
-      ...stubResult(),
-      additional_findings_hook: 'A detailed paragraph explaining the second finding and why it matters commercially.',
-    }));
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
-    assert.strictEqual(result.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE,
-      'a model-written hook is discarded entirely in favour of the fixed tease line');
-    assert.ok(!result.additional_findings_hook.includes('detailed paragraph'), 'model-authored analysis never reaches this field');
-    ok('additional_findings_hook is deterministic — a genuine finding outside the narrative always yields exactly the fixed tease line, never AI-written analysis, however the model responds');
+    for (const injected of ['A detailed paragraph explaining the second finding and why it matters commercially.', '']) {
+      __setAiCallerForTests(async () => ({ ...stubResult(), additional_findings_hook: injected }));
+      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+      assert.strictEqual(result.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE,
+        'a model-written hook is discarded entirely in favour of the locked line');
+      assert.ok(!result.email_body.includes('detailed paragraph'), 'model-authored analysis never reaches the email');
+    }
+    ok('additional_findings_hook is deterministic — always exactly the locked line, never AI-written analysis, however the model responds');
   }
 
   // ── A claimed finding number that does not exist is discarded ──
@@ -267,12 +270,37 @@ async function run() {
     ok('stripUnbackedCurrency keeps only the allowed property value, sentence by sentence, and normalizeCurrencyFigure equates £375,000 / 375000 / £375k');
   }
 
-  // ── Fair observation: never praise the Diagnosis records no strengths for ──
+  // ── Fair observation is MANDATORY wherever there was human contact ──
   {
-    __setAiCallerForTests(async () => stubResult({ fair_observation: 'Your team handled this really well throughout.' }));
+    // Diagnosis records the strengths worth writing up COMMERCIALLY, and the
+    // email's bar is far lower: any human contact at all leaves something
+    // factual to acknowledge. So an empty Diagnosis strengths field no longer
+    // suppresses the paragraph the brief makes mandatory.
+    __setAiCallerForTests(async () => stubResult({ fair_observation: 'you did get back to me, with an email asking what I was looking for.' }));
     const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis({ strengths: '' }), baseFindings(), COMMS, {});
-    assert.strictEqual(result.fair_observation, '', 'praise with no recorded strengths behind it is discarded');
-    ok('a fair observation the Diagnosis records no strengths for is never printed — the mirror of never manufacturing a weakness');
+    assert.strictEqual(result.fair_observation, 'you did get back to me, with an email asking what I was looking for.',
+      'a small, factual acknowledgement survives even when Diagnosis recorded no commercial strength');
+    assert.ok(result.email_body.includes('I want to say upfront that you did get back to me'), 'and opens the email');
+    ok('the fair observation is mandatory for any probe with human contact — a weak interaction still has something factual to acknowledge, so it is no longer gated on Diagnosis recording a commercial strength');
+  }
+
+  // ── ...and a probe with human contact that ends up WITHOUT one is not
+  //    sendable, rather than sending an email that opens on the criticism ──
+  {
+    for (const [why, injected] of [
+      ['the model returned nothing', ''],
+      ['it was detached third-person commentary', 'They came back quickly and chased twice.'],
+      ['it hedged the compliment', 'you eventually came back to me.'],
+    ]) {
+      __setAiCallerForTests(async () => stubResult({ fair_observation: injected }));
+      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+      assert.strictEqual(result.fair_observation, '', `${why}: nothing is printed`);
+      assert.strictEqual(result.email_body, '', `${why}: and no email is assembled at all`);
+      assert.ok(emailContractViolations(result).includes('missing_fair_observation'), `${why}: the violation names the missing fair observation`);
+      assert.ok(result.main_finding && result.commercial_consequence,
+        `${why}: the rest of the story is still recorded for the human who now has to look at it`);
+    }
+    ok('a normal probe left without a fair observation — blank, detached, or hedged — fails the contract: email_body is empty and the violation is named, rather than an email going out that opens on criticism');
   }
 
   // ── VOICE: the email is written TO the agency, by the person who sent the
@@ -317,6 +345,7 @@ async function run() {
       fair_observation: 'Your team did their best under the circumstances.',
       main_finding: 'When you finally called back, the questions you asked were the right ones.',
       commercial_consequence: 'a buyer who was ready to view never got as far as a conversation.',
+      wider_observation: "I'd also said I had a property of my own I was thinking of selling.",
       wider_consequence: 'It also meant the property I said I had of my own was never picked up as a valuation.',
       evidence_quotes: [],
     }));
@@ -330,7 +359,8 @@ async function run() {
     assert.strictEqual(result.email_variant, 'no_response', 'the email switches to its own structure');
     assert.strictEqual(result.fair_observation, '', 'there was no handling to be fair about, so nothing is invented');
     assert.strictEqual(result.main_finding, '', 'and the model\'s invented conversation is discarded outright — the failure is the silence');
-    assert.strictEqual(result.additional_findings_hook, '', 'the "couple of other things" tease is not stacked on top of the no-response closing');
+    assert.strictEqual(result.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE,
+      'the locked closing transition is used here too — both variants end the same way');
     assert.strictEqual(result.hero_journey, 'complete_miss', 'the journey is the complete-miss one');
     assert.strictEqual(result.evidence, '', 'nothing was ever said, so there is no evidence to quote');
 
@@ -339,8 +369,8 @@ async function run() {
     assert.ok(!result.email_body.includes('called back'), 'no invented conversation reaches the email');
     assert.ok(result.email_body.includes('That meant a buyer who was ready to view never got as far as a conversation.'), 'the consequence of the silence still lands');
     assert.ok(result.email_body.includes('never picked up as a valuation'), 'and a seller opportunity our own enquiry declared still carries a wider consequence');
-    assert.ok(!result.email_body.includes(CTA_LINE), 'the normal CTA does not appear');
-    assert.ok(/Happy to send it over if you'd like to see it\.\n\nJoe$/.test(result.email_body), 'the no-response closing still makes the offer');
+    assert.ok(result.email_body.endsWith(`${ADDITIONAL_FINDINGS_HOOK_LINE}\n\n${CTA_LINE}\n\nJoe`),
+      'and it closes with exactly the same locked two paragraphs as every other email');
     ok('a probe that was never replied to switches to the no-response email structure — no fair observation, no invented conversation, just the silence, its consequence and an offer that makes sense');
   }
 
@@ -355,7 +385,8 @@ async function run() {
     const strongDiagnosis = baseDiagnosis({ novus_opportunity: 'Growth (valuation list / seller conversion)' });
     const result = await personaliseProbe(PROBE, baseIntelligence({ response_hours: 0.9, follow_ups: 1 }), strongDiagnosis, [], COMMS, {});
     assert.strictEqual(result.supporting_findings, '', 'no findings means nothing can be a supporting finding');
-    assert.strictEqual(result.additional_findings_hook, '', 'and no manufactured additional-findings tease either');
+    assert.strictEqual(result.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE,
+      'but the locked closing transition still runs — it hands off to the breakdown rather than claiming more findings');
     assert.strictEqual(result.narrative_finding_indexes, '', 'no finding numbers are claimed');
     assert.ok(result.novus_counterfactual.includes('matched'), 'the counterfactual matches strong handling instead of inventing a gap');
     assert.strictEqual(result.hero_journey, 'strong_handling_database_opportunity', 'and the journey is the strong-handling one');
@@ -474,23 +505,26 @@ async function run() {
     ok('stripThatMeantPrefix removes the prefix in either tense, restores lower case without mangling an acronym, and guarantees terminal punctuation');
   }
 
-  // ── wider_consequence: optional, and only when genuinely a SECOND
-  //    consequence rather than the first one reworded ──
+  // ── wider_consequence: optional, paired with wider_observation, and only
+  //    when genuinely a SECOND consequence rather than the first reworded ──
   {
+    const WIDER_OBSERVATION = "I'd also mentioned that I had a property of my own that I was considering selling, but that never really came into the conversation.";
     __setAiCallerForTests(async () => stubResult({
       commercial_consequence: 'the enquiry was getting attention but was not really being progressed.',
+      wider_observation: WIDER_OBSERVATION,
       wider_consequence: 'it also meant a potential seller instruction sitting inside the same enquiry was never explored',
     }));
     const distinct = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
     assert.strictEqual(distinct.wider_consequence, 'a potential seller instruction sitting inside the same enquiry was never explored.',
       'a genuinely distinct second consequence is kept, as the continuation of the assembler\'s "That also meant "');
-    assert.ok(distinct.email_body.includes('\n\nThat also meant a potential seller instruction sitting inside the same enquiry was never explored.'),
-      'and it gets its own paragraph, opened by the fixed wording the assembler owns');
+    assert.ok(distinct.email_body.includes(`\n\n${WIDER_OBSERVATION}\n\nThat also meant a potential seller instruction sitting inside the same enquiry was never explored.`),
+      'and it follows the observation it belongs to, opened by the fixed wording the assembler owns');
     assert.ok(!/That also meant [Ii]t also meant/.test(distinct.email_body), 'the prefix is never printed twice');
 
     // The realistic failure: an optional field filled with the same point again.
     __setAiCallerForTests(async () => stubResult({
       commercial_consequence: 'the enquiry was getting attention but was not really being progressed.',
+      wider_observation: WIDER_OBSERVATION,
       wider_consequence: 'The enquiry was getting attention but was not really being progressed.',
     }));
     const echoed = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
@@ -498,11 +532,24 @@ async function run() {
     assert.strictEqual((echoed.email_body.match(/was not really being progressed/g) || []).length, 1,
       'so the same point appears exactly once in the email');
 
-    // Genuinely absent stays absent — the field is never forced.
-    __setAiCallerForTests(async () => stubResult({ wider_consequence: '' }));
+    // THE PAIR: a wider consequence with no observation in front of it is the
+    // consequence of something the reader was never told, so it is dropped
+    // here rather than left for the assembler to skip.
+    __setAiCallerForTests(async () => stubResult({
+      wider_observation: '',
+      wider_consequence: 'a potential seller instruction sitting inside the same enquiry was never explored.',
+    }));
+    const orphan = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    assert.strictEqual(orphan.wider_observation, '', 'no observation was returned');
+    assert.strictEqual(orphan.wider_consequence, '', 'so its consequence is dropped too — the wider beat is a pair');
+    assert.ok(!orphan.email_body.includes('That also meant'), 'and that paragraph never appears in the email');
+
+    // Genuinely absent stays absent — neither field is ever forced.
+    __setAiCallerForTests(async () => stubResult({ wider_observation: '', wider_consequence: '' }));
     const absent = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
     assert.strictEqual(absent.wider_consequence, '', 'an empty wider consequence stays empty');
-    ok('wider_consequence is kept only when it is a genuinely distinct second consequence, as the lower-case continuation of the fixed "That also meant " — a reworded restatement or an empty value simply drops that paragraph');
+    assert.strictEqual(absent.wider_observation, '', 'and so does an empty wider observation');
+    ok('the wider beat is a pair: the consequence is kept only when it follows a real observation AND is genuinely a second consequence, as the lower-case continuation of the fixed "That also meant "');
   }
 
   // distinctWiderConsequence as a unit.
@@ -710,30 +757,32 @@ async function run() {
     ok('a main_finding/commercial_consequence phrased as an honest "there is no ..." absence is never blanked, and still produces a sendable email');
   }
 
-  // ── The optional beats really are optional (blank, not absent) ──
+  // ── Only the wider beat is optional — the rest of the normal email is not ──
   {
     __setAiCallerForTests(async () => stubResult({
       narrative_finding_indexes: [1, 2, 3],
-      fair_observation: '',
+      wider_observation: '',
       wider_consequence: '',
     }));
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis({ strengths: '' }), baseFindings(), COMMS, {});
-    assert.strictEqual(result.fair_observation, '', 'an unsupported fair observation is blank');
-    assert.strictEqual(result.wider_consequence, '', 'an absent wider consequence is blank');
-    assert.strictEqual(result.additional_findings_hook, '', 'with every finding covered by the narrative, the hook stays blank');
-    // The mandatory beats are still there.
-    assert.ok(result.main_finding, 'the main finding is still populated');
-    assert.ok(result.commercial_consequence, 'the consequence is still populated');
-    // And the email simply omits the optional paragraphs — no blank gaps.
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    assert.strictEqual(result.wider_observation, '', 'an absent wider observation is blank');
+    assert.strictEqual(result.wider_consequence, '', 'and so is its consequence');
+    // The mandatory beats are all there.
+    assert.ok(result.fair_observation, 'the fair observation is populated');
+    assert.ok(result.main_finding, 'the main finding is populated');
+    assert.ok(result.commercial_consequence, 'the consequence is populated');
+    // The email drops the wider paragraphs — and nothing else.
     assert.strictEqual(result.email_body, [
       'Hi {{first_name}},',
       'We sent your team an enquiry on 17 August about Barn Field, Chevington, IP29.',
+      `${FAIR_OBSERVATION_PREFIX}${result.fair_observation}`,
       `${MAIN_FINDING_PREFIX}${result.main_finding}`,
       `${THAT_MEANT_PREFIX}${result.commercial_consequence}`,
+      ADDITIONAL_FINDINGS_HOOK_LINE,
       CTA_LINE,
       'Joe',
-    ].join('\n\n'), 'the optional paragraphs are omitted entirely, not left as blank gaps');
-    ok('the optional email fields come back blank and the assembler simply drops those paragraphs, while the mandatory ones stay populated');
+    ].join('\n\n'), 'the wider paragraphs are omitted entirely, not left as blank gaps, and the locked closing still runs');
+    ok('the wider beat is the only optional part of a normal email — it comes back blank and the assembler drops those two paragraphs, while every mandatory beat and the locked closing stay');
   }
 
   // ── The property address the template merges is prospect-safe ──

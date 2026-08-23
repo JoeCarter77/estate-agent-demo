@@ -36,8 +36,8 @@ import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import { runRebuildPass } from '../lib/rebuild-pass.mjs';
 import {
-  ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE, NO_RESPONSE_BREAKDOWN_LINE,
-  NO_RESPONSE_CTA_LINE, THAT_MEANT_PREFIX, THAT_ALSO_MEANT_PREFIX,
+  ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE,
+  THAT_MEANT_PREFIX, THAT_ALSO_MEANT_PREFIX,
   FAIR_OBSERVATION_PREFIX, MAIN_FINDING_PREFIX, assembleEmail,
 } from '../lib/email-assembly.mjs';
 
@@ -173,7 +173,7 @@ const SCENARIOS = [
     // empty however the model answers, and the email switches structure.
     expect: {
       hero_journey: 'complete_miss', findings: 1, email_variant: 'no_response',
-      fair_observation: '', main_finding: '', additional_findings_hook: '',
+      fair_observation: '', main_finding: '', additional_findings_hook: ADDITIONAL_FINDINGS_HOOK_LINE,
     },
   },
   {
@@ -212,7 +212,10 @@ const SCENARIOS = [
       commercial_consequence: 'the only question worth asking is whether every enquiry gets the same treatment.',
       wider_consequence: '',
     },
-    expect: { hero_journey: 'strong_handling_database_opportunity', findings: 0, additional_findings_hook: '' },
+    // No findings left over, but the closing transition is locked copy that
+    // runs in every email — it hands off to the breakdown rather than
+    // claiming a number of other findings.
+    expect: { hero_journey: 'strong_handling_database_opportunity', findings: 0, additional_findings_hook: ADDITIONAL_FINDINGS_HOOK_LINE },
   },
   {
     key: 'missed_seller',
@@ -292,7 +295,10 @@ const SCENARIOS = [
       primary_narrative: 'The enquiry waited overnight, and the reply that eventually arrived asked nothing and offered nothing — it acknowledged the property and stopped there.',
       narrative_finding_indexes: [1, 2, 3],
       supporting_findings: 'The property we said we had to sell was never mentioned either.',
-      fair_observation: 'The reply did at least name the right property, which is more than some manage.',
+      // "did at least name the right property" would be a backhanded
+      // compliment — the hedge guard rejects it, and the email would then be
+      // unsendable rather than opening on criticism.
+      fair_observation: 'You did reply, and the reply named the right property.',
       main_finding: 'It took about a day for anything to come back, and when it did it did not ask us anything or offer us a viewing.',
       commercial_consequence: 'the £615,000 enquiry was getting attention, but it was not really being progressed.',
       wider_consequence: '',
@@ -539,17 +545,15 @@ async function run() {
     // The fixed no-response shape, in order.
     const body = p.email_body;
     assert.ok(body.includes(`\n\n${NO_REPLY_LINE}\n\n`), 'the assembler supplies the plain no-reply line');
-    assert.ok(body.includes(NO_RESPONSE_BREAKDOWN_LINE), 'the closing explains the breakdown in terms that make sense with no conversation');
-    assert.ok(body.includes(NO_RESPONSE_CTA_LINE), 'and still offers to send it over');
-    assert.ok(!body.includes(CTA_LINE), 'the normal CTA is not used here');
-    assert.ok(!body.includes(ADDITIONAL_FINDINGS_HOOK_LINE), 'and the "couple of other things" hook is not repeated on top of it');
+    assert.ok(body.endsWith(`${ADDITIONAL_FINDINGS_HOOK_LINE}\n\n${CTA_LINE}\n\nJoe`),
+      'and it closes with the same locked two paragraphs as every other email');
     assert.ok(body.indexOf(NO_REPLY_LINE) < body.indexOf(THAT_MEANT_PREFIX), 'the silence is stated before its consequence');
     assert.strictEqual(p.wider_consequence, 'the property we said we had of our own was never picked up as a valuation.',
       'a seller opportunity our own enquiry declared still carries a wider consequence, as the continuation of the fixed "That also meant "');
     assert.ok(body.includes('\n\nWe had also mentioned a property of our own that we were thinking of selling.\n\n'),
       'and the observation that set it up is its own paragraph');
     assert.ok(body.includes(`\n\n${THAT_ALSO_MEANT_PREFIX}${p.wider_consequence}\n\n`), 'with the fixed wording supplied by the assembler, once');
-    ok('the no-response probe gets its own fixed email structure — the plain no-reply line, no invented conversation, and a closing that makes sense when there was nothing to discuss');
+    ok('the no-response probe gets its own fixed email structure — the plain no-reply line, no invented conversation, its consequence, and the same locked closing as every other email');
   }
 
   // ── 7. Idempotent: a second rebuild changes nothing ──
