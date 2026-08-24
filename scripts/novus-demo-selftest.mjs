@@ -39,7 +39,7 @@ import assert from 'node:assert';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import demoHandler from '../api/demo.js';
 import {
-  ANALYTICS_COLUMNS, DEMOS_HEADER, buildDemoRow, buildDemoSlug, buildObservedEvents,
+  ANALYTICS_COLUMNS, DEMOS_HEADER, buildDemoRow, buildDemoSlug, buildObservedEvents, stripUnsafeSellerValue,
   formatResponseTime, formatChannels, reviewReasonsFor, selectCommunicationEvidence,
   sentenceCase, statusFromReasons, toRenderReady,
 } from '../lib/demos.mjs';
@@ -474,9 +474,16 @@ async function run() {
     assert.strictEqual(built.response_time, '23 minutes');
     ok('response_hours 0.38 renders as "23 minutes"');
 
-    assert.ok(built.demo_hook.includes('23 minutes'), 'the hook credits the real response time');
-    assert.strictEqual(built.demo_reveal, "The buyer was handled. The potential instruction wasn't.");
-    ok('the hook is data-aware and the reveal is the locked journey line');
+    // THE FIRST FIVE SECONDS. The opening names what the team genuinely did
+    // (3 attempts, a slot offered) AND the opportunity nobody worked — both
+    // derived from this probe's own INTELLIGENCE ordinals.
+    assert.strictEqual(
+      built.demo_hook,
+      'Your team followed up and progressed the viewing. But the potential vendor declared in the same enquiry was never qualified.',
+    );
+    assert.ok(!/missed instruction/i.test(built.demo_hook), 'a declared vendor is never a definite missed instruction');
+    assert.strictEqual(built.demo_reveal, "The buyer was worked. The potential vendor wasn't.");
+    ok('the opening names what the team did and what was never qualified, from this probe\'s own data');
 
     // Prospect-facing copy comes from PERSONALISATION, raised to a sentence —
     // never rewritten.
@@ -485,47 +492,60 @@ async function run() {
     ok('positive observation and consequence are PERSONALISATION copy, sentence-cased only');
 
     const events = JSON.parse(built.observed_events_json);
-    assert.ok(events.length >= 4 && events.length <= 7, `expected a SHORT event list, got ${events.length}`);
-    assert.deepStrictEqual(events[0], { label: 'Enquiry submitted', detail: '17 August, 23:34', tone: 'neutral' });
-    assert.ok(events.some((e) => e.label === 'Property to sell declared'));
+    const metrics = events.filter((e) => e.kind === 'metric');
+    const artefacts = events.filter((e) => e.kind === 'evidence');
 
-    // REAL EVIDENCE, not aggregate counts: the response and follow-up events
-    // now quote the actual COMMUNICATIONS rows (via selectCommunicationEvidence,
-    // zero AI — see Part N), so the old "3 contact attempts / Across phone and
-    // email" line is gone in favour of the specific messages it was standing in for.
-    const firstResponse = events.find((e) => e.label === 'First response — phone');
-    assert.ok(firstResponse, 'the first human touch (the voicemail) is shown as evidence');
-    assert.strictEqual(firstResponse.detail, "\"Hi, it's Rosa from Ensum Brown, calling about Barn Field. Give us a call back.\"");
-    assert.strictEqual(firstResponse.tone, 'good');
-    const followUp = events.find((e) => e.label === 'Follow-up — phone');
-    assert.ok(followUp, 'the strongest follow-up (the second call) is shown as evidence');
-    assert.ok(followUp.detail.includes('Saturday or Sunday'), 'the follow-up detail is a real excerpt, not a generic count');
-    assert.ok(!events.some((e) => e.label === '3 contact attempts'), 'the old generic count line is gone once real evidence exists');
-    ok('the response and follow-up events are real COMMUNICATIONS excerpts, not generic counts');
+    // THE QUANTIFIED SUMMARY — read in about three seconds, every line a fact
+    // this probe's own INTELLIGENCE row establishes.
+    assert.deepStrictEqual(metrics.map((m) => m.label), [
+      '2 opportunities',
+      '3 contact attempts',
+      'Viewing slot offered',
+      'Seller position asked about, never taken further',
+      'No valuation progression',
+    ]);
+    assert.strictEqual(metrics[1].detail, 'phone and email');
+    assert.deepStrictEqual(metrics.map((m) => m.tone), ['neutral', 'good', 'good', 'gap', 'gap']);
+    ok('the evidence is a compact metric strip: what happened, and the two things that did not');
 
-    assert.ok(events.some((e) => e.label === 'Viewing slot offered' && e.tone === 'good'));
-    const sellerEvent = events.find((e) => e.label.startsWith('Seller position asked about'));
-    assert.ok(sellerEvent && sellerEvent.tone === 'gap', 'the unconverted seller position is the gap');
-    ok('the observed-event list is short, real, and marks exactly one gap');
+    // THE MINIMUM REAL PROOF — the declaration as submitted, and ONE actual
+    // message. Two more quotes proved nothing the first did not.
+    assert.strictEqual(artefacts.length, 2, `beat 2 shows the minimum proof, got ${artefacts.length} artefacts`);
+    assert.strictEqual(artefacts[0].label, 'Declared inside the enquiry itself');
+    assert.strictEqual(artefacts[0].detail, 'Declared: has a property to sell — it is not yet on the market');
+    assert.strictEqual(artefacts[1].label, 'First response — phone');
+    assert.strictEqual(artefacts[1].detail, "\"Hi, it's Rosa from Ensum Brown, calling about Barn Field. Give us a call back.\"");
+    assert.ok(!events.some((e) => e.label === 'Enquiry submitted'), 'the enquiry timestamp is on the property card, not repeated as a row');
+    ok('one real message carries the proof, alongside the declaration exactly as it was submitted');
 
     const detected = JSON.parse(built.novus_detected_json);
     const decisions = JSON.parse(built.novus_decisions_json);
     const actions = JSON.parse(built.novus_actions_json);
-    assert.ok(detected.length > 0 && detected.length <= 3);
-    assert.ok(decisions.length > 0 && decisions.length <= 3);
-    assert.ok(actions.length > 0 && actions.length <= 3);
-    ok('UNDERSTANDS / DECIDES / ACTS are each capped at three lines');
-
-    assert.ok(decisions[0].detail.includes('market appraisal'),
-      'the DECIDES beat leads with this probe\'s own novus_counterfactual');
-    ok('DECIDES leads with PERSONALISATION.novus_counterfactual, not a template');
+    // UNDERSTAND -> DECIDE -> ACT stays the visual signature; the operating
+    // manual around it does not. Two lines per stage, and no stage carries a
+    // sentence longer than the label it explains.
+    assert.deepStrictEqual(detected.map((d) => d.label), ['Buyer + declared vendor', 'Seller position still unknown']);
+    assert.deepStrictEqual(decisions.map((d) => d.label), [
+      'Progress both opportunities',
+      'Qualify the seller position while the enquiry is still live',
+    ]);
+    assert.deepStrictEqual(actions.map((a) => a.label), [
+      'Qualifies · follows up · books',
+      'Or routes the right opportunity to your team',
+    ]);
+    const longest = [...detected, ...decisions, ...actions].reduce((n, i) => Math.max(n, (i.detail || '').length), 0);
+    assert.ok(longest <= 60, `beat 3 details must stay glanceable, longest was ${longest} chars`);
+    ok('UNDERSTANDS / DECIDES / ACTS are two glanceable lines each, not an operating manual');
 
     assert.ok(actions.some((a) => a.owner === 'novus') && actions.some((a) => a.owner === 'team'));
     ok('ACTS names both what NOVUS does and what routes to the team');
 
-    assert.ok(built.cta_headline.includes('Ensum Brown'));
-    assert.ok(built.systemic_bridge.includes('not replace them'));
-    ok('the CTA names the agency and the bridge line is the locked copy');
+    assert.strictEqual(
+      built.cta_headline,
+      'We found this from one enquiry. See where NOVUS could be finding more opportunity across Ensum Brown.',
+    );
+    assert.ok(built.systemic_bridge.includes('not in place of them'));
+    ok('the CTA gives a reason to book, and the bridge line is the locked copy');
 
     assert.deepStrictEqual(reasons, [], `unexpected review reasons: ${reasons.join(' | ')}`);
     assert.strictEqual(status, 'ready');
@@ -1181,22 +1201,30 @@ async function run() {
     ok('long text is mechanically truncated with an ellipsis; short text is shown verbatim in full');
   }
   {
-    // buildObservedEvents(): when COMMUNICATIONS produce evidence, it REPLACES
-    // the old generic response/attempts lines (Part B proves this end-to-end);
-    // when there is nothing to draw from, the old generic summary still runs —
-    // this is the regression guard for every existing caller.
+    // buildObservedEvents(): the metric strip is built from INTELLIGENCE alone,
+    // so a probe with no matched COMMUNICATIONS still shows the quantified
+    // summary — it simply has no real message to put behind it.
     const events = buildObservedEvents({
       intelligence: { contact_attempts: '2', channels_used: 'voice,email' },
       sellerDeclared: false,
-      enquiryDate: '1 August',
-      enquiryTime: '09:00',
       responseTime: '10 minutes',
       communications: [],
     });
-    assert.ok(events.some((e) => e.label === 'Your team responded' && e.detail === '10 minutes later'));
-    assert.ok(events.some((e) => e.label === '2 contact attempts'));
+    assert.ok(events.every((e) => e.kind === 'metric'));
+    assert.ok(events.some((e) => e.label === '2 contact attempts' && e.detail === 'phone and email'));
     assert.ok(!events.some((e) => e.label.startsWith('First response')));
-    ok('with no matched COMMUNICATIONS, the old INTELLIGENCE-only summary still renders unchanged');
+    ok('with no matched COMMUNICATIONS the metric strip still stands, with no artefact behind it');
+
+    // A probe that never declared a seller carries no seller metrics at all —
+    // "2 opportunities" and "No valuation progression" would both be untrue.
+    assert.ok(!events.some((e) => e.label === '2 opportunities'));
+    assert.ok(!events.some((e) => e.label === 'No valuation progression'));
+
+    // Nothing established at all: no attempts, no ordinals, no messages. The
+    // strip is empty rather than padded, and the demo is flagged for review by
+    // reviewReasonsFor() rather than shipping a page with no evidence on it.
+    assert.deepStrictEqual(buildObservedEvents({ intelligence: {}, sellerDeclared: false, communications: [] }), []);
+    ok('a metric is only shown where the underlying field genuinely established it');
   }
 
   // ══ Part O — display formatting ═══════════════════════════════════════════
@@ -1217,6 +1245,64 @@ async function run() {
     assert.strictEqual(sentenceCase('you came back inside 23 minutes.'), 'You came back inside 23 minutes.');
     assert.strictEqual(sentenceCase(''), '');
     ok('sentenceCase raises the first letter and rewrites nothing else');
+  }
+
+  // ══ Part P — the listing price is never the enquirer's own house ══════════
+  console.log("\nPart P — no invented valuations in prospect-facing copy");
+  {
+    // PERSONALISATION is allowed to cite the confirmed listing price to give
+    // the BUYER enquiry a scale. Attaching that same figure to the VENDOR
+    // opportunity asserts a value for a property nobody has valued — the one
+    // claim this demo must never make.
+    assert.strictEqual(
+      stripUnsafeSellerValue('a potential £650,000 seller instruction sitting inside the same enquiry was never explored.'),
+      'a potential seller instruction sitting inside the same enquiry was never explored.',
+    );
+    assert.strictEqual(
+      stripUnsafeSellerValue('the £375,000 valuation opportunity was never progressed.'),
+      'the valuation opportunity was never progressed.',
+    );
+    ok('a figure attached to the seller opportunity is removed; the point it was making survives');
+
+    // Removing the figure must leave a sentence, not a stump.
+    assert.strictEqual(
+      stripUnsafeSellerValue('An instruction inside a £420,000 enquiry was left on the table.'),
+      'An instruction inside an enquiry was left on the table.',
+    );
+    ok('the article is repaired, so the sentence still reads');
+
+    // Buyer-side money IS the price of the listing they enquired about.
+    const buyerSide = 'you had a £225,000 buyer enquiry in front of you without establishing whether I was ready to move';
+    assert.strictEqual(stripUnsafeSellerValue(buyerSide), buyerSide);
+    assert.strictEqual(stripUnsafeSellerValue('a valuation was never booked.'), 'a valuation was never booked.');
+    assert.strictEqual(stripUnsafeSellerValue(''), '');
+    ok('buyer-side money and money-free copy are left exactly as PERSONALISATION wrote them');
+  }
+  {
+    // End to end: the rule runs at COMPILE time, so an unsafe sentence can
+    // never reach a DEMOS row — and nothing is written back into the email.
+    const { store } = makeWorkbook();
+    seedWeakSeller(store, { propertyUrl: '' });
+    const probe = Object.fromEntries(PROBES_HEADER.map((k, i) => [k, store.PROBES[2][i] ?? '']));
+    const intelligence = Object.fromEntries(INTELLIGENCE_HEADER.map((k, i) => [k, store.INTELLIGENCE[1][i] ?? '']));
+    const personalisation = Object.fromEntries(PERSONALISATION_HEADER.map((k, i) => [k, store.PERSONALISATION[1][i] ?? '']));
+    personalisation.commercial_consequence =
+      'a potential £375,000 seller instruction inside the same enquiry was never explored.';
+
+    const { row: built } = buildDemoRow({
+      probe, agency: { agency_name: 'Ensum Brown' }, intelligence, findings: [], personalisation,
+      communications: [], now: '2026-08-24T10:00:00.000Z',
+    });
+    assert.ok(!built.commercial_consequence.includes('£'), 'no invented valuation reaches the row');
+    assert.strictEqual(
+      built.commercial_consequence,
+      'A potential seller instruction inside the same enquiry was never explored.',
+    );
+    assert.ok(
+      personalisation.commercial_consequence.includes('£375,000'),
+      'PERSONALISATION is never rewritten — the email is unaffected',
+    );
+    ok('the demo compiles money-safe copy without touching the personalisation it came from');
   }
 
   __setRepoForTests(null);
