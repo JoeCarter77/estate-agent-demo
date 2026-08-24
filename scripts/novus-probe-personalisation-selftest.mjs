@@ -43,6 +43,7 @@ import {
   stripThatMeantPrefix, readsAsInternalReasoning, readsAsDetachedThirdPerson,
   distinctWiderConsequence, emailPropertyAddress, readsAsSnuckCriticism, stripInventedLoss,
   consequenceGoesBeyondFinding, extractProtectedWords,
+  withComplementiser, readsAsSpeculation,
 } from '../lib/probe-personalisation.mjs';
 import {
   ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE, THAT_MEANT_PREFIX, emailContractViolations,
@@ -567,7 +568,10 @@ async function run() {
     assert.strictEqual(result.property_address, 'Barn Field, Chevington, IP29');
     assert.strictEqual(result.email_variant, 'normal');
     assert.strictEqual(result.fair_observation, 'you picked this up on two channels inside 81 seconds of each other and asked good questions.');
-    assert.strictEqual(result.main_finding, 'nothing reached us for about 18 hours, and when it did, the property I mentioned selling never came up again.');
+    // "was nothing reached us for about 18 hours" is a dropped word; the
+    // complementiser the fixed prefix needs is restored in code — see
+    // withComplementiser() in lib/probe-personalisation.mjs.
+    assert.strictEqual(result.main_finding, 'that nothing reached us for about 18 hours, and when it did, the property I mentioned selling never came up again.');
     assert.strictEqual(result.commercial_consequence, 'the £375,000 enquiry went cold overnight and the valuation behind it was never offered.');
     assert.strictEqual(result.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE);
 
@@ -814,17 +818,17 @@ async function run() {
       commercial_consequence: 'Chevington itself was never confirmed as the area I was searching in.',
     }));
     const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
-    assert.strictEqual(result.main_finding, 'Barn Field was mentioned twice but never actually offered as a viewing.',
-      'a continuation opening with this probe\'s own proper noun keeps its capital, unlike an ordinary opening word');
+    assert.strictEqual(result.main_finding, 'that Barn Field was mentioned twice but never actually offered as a viewing.',
+      'a continuation opening with this probe\'s own proper noun keeps its capital, unlike an ordinary opening word (the "that" is the fixed opener\'s complementiser)');
     assert.strictEqual(result.commercial_consequence, 'Chevington itself was never confirmed as the area I was searching in.');
-    assert.ok(result.email_body.includes('What stood out, though, was Barn Field was mentioned'),
+    assert.ok(result.email_body.includes('What stood out, though, was that Barn Field was mentioned'),
       'and it reads correctly in the assembled email — the fixed opener followed by a genuine proper noun, not a lower-cased one');
 
     // An ordinary word that merely LOOKS like it could be a name, but isn't
     // established by this probe's own address or agency, is still lower-cased.
     __setAiCallerForTests(async () => stubResult({ main_finding: 'Nobody asked about my timescale at any point.' }));
     const ordinary = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
-    assert.strictEqual(ordinary.main_finding, 'nobody asked about my timescale at any point.',
+    assert.strictEqual(ordinary.main_finding, 'that nobody asked about my timescale at any point.',
       'an opening word not established as a proper noun by this probe is still de-capitalised');
     ok('proper nouns from this probe\'s own property address or agency name survive a continuation capitalised; ordinary words do not');
   }
@@ -925,7 +929,7 @@ async function run() {
     assert.ok(result.main_finding, 'main_finding is populated, not blanked by the absence phrasing');
     assert.ok(result.commercial_consequence, 'commercial_consequence is populated too');
     assert.ok(result.email_body, 'and a real email is assembled from them');
-    assert.ok(result.email_body.includes('What stood out, though, was there is no qualifying question'), 'the actual sentence reaches the email, after the fixed opener');
+    assert.ok(result.email_body.includes('What stood out, though, was that there is no qualifying question'), 'the actual sentence reaches the email, after the fixed opener and its complementiser');
     ok('a main_finding/commercial_consequence phrased as an honest "there is no ..." absence is never blanked, and still produces a sendable email');
   }
 
@@ -1151,6 +1155,133 @@ async function run() {
       'an empty findings list short-circuits before response-speed banding, even at a fast response time'
     );
     ok('hero_journey response-speed banding matches lib/grading.mjs\'s own >1h/<=16h Fast boundary exactly, including at both edges of 16h, and never mislabels a fast probe as a response-speed gap');
+  }
+
+
+  // ── COPY POLISH 1: "What stood out, though, was ___" reads as a sentence ──
+  //
+  // The 0005-0010 outputs carried the dropped-word shape: "was across all
+  // three emails...", "was I'd also told you...", "was it took over 63
+  // hours...". Each needs the complementiser, and prompting alone does not
+  // hold it, so it is restored in code once the continuation is shaped.
+  {
+    // The three live shapes, exactly as reported.
+    for (const [written, expected] of [
+      ['across all three emails, nobody asked me a single question about my position.',
+        'that across all three emails, nobody asked me a single question about my position.'],
+      ["I'd also told you I had a property of my own to sell.",
+        "that I'd also told you I had a property of my own to sell."],
+      ['it took over 63 hours for anything at all to come back.',
+        'that it took over 63 hours for anything at all to come back.'],
+    ]) {
+      assert.strictEqual(withComplementiser(written), expected);
+      __setAiCallerForTests(async () => stubResult({ main_finding: written }));
+      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+      assert.strictEqual(result.main_finding, expected, 'the stored continuation carries the complementiser');
+      assert.ok(result.email_body.includes(`${MAIN_FINDING_PREFIX}${expected}`),
+        'and the assembled email reads "What stood out, though, was that ..."');
+    }
+    ok('COPY POLISH — a main_finding clause written without "that" gets it back, so "was it took over 63 hours" reads as "was that it took over 63 hours"');
+  }
+
+  // ── ...and never where it would be wrong ──────────────────────────────────
+  {
+    // Already carries it: never "that that".
+    assert.strictEqual(withComplementiser('that the conversation never established my position.'),
+      'that the conversation never established my position.', 'a continuation that already says "that" is untouched');
+    assert.strictEqual(withComplementiser(withComplementiser('it took 63 hours.')), 'that it took 63 hours.',
+      'and the repair is idempotent — running it twice never doubles the word');
+
+    // Shapes "was" takes directly, where "that" would be a grammatical error.
+    for (const nominal of [
+      'how quickly the viewing was offered, and how little came after it.',
+      'what the reply left out entirely.',
+      'whether I could actually proceed was never established.',
+      'the speed of the reply, and nothing else.',
+      'a single automated acknowledgement, and nothing after it.',
+      'your fastest reply of the three, by some distance.',
+    ]) {
+      assert.strictEqual(withComplementiser(nominal), nominal, `"${nominal.slice(0, 34)}..." is left exactly as written`);
+    }
+
+    // A proper noun this probe established: a clause gets "that", a noun
+    // phrase built on the same name does not.
+    const protectedWords = extractProtectedWords(PROBE, {});
+    assert.strictEqual(withComplementiser('Barn Field was mentioned twice but never offered as a viewing.', protectedWords),
+      'that Barn Field was mentioned twice but never offered as a viewing.', 'a clause opening with the property name gets the complementiser');
+    assert.strictEqual(withComplementiser('Barn Field, mentioned twice and never offered.', protectedWords),
+      'Barn Field, mentioned twice and never offered.', 'a NOUN PHRASE opening with the same name does not');
+    ok('COPY POLISH — "that" is never added where it would be wrong: no "that that", and wh-clauses, noun phrases and predicate nominals are left exactly as written');
+  }
+
+  // ── COPY POLISH 2: consequences stay grounded in the enquiry ──────────────
+  //
+  // The 0005-0010 outputs included "leaving it open for me to lose interest
+  // or go and view something similar elsewhere" — nothing in the findings
+  // evidences any of that. The enquiry establishes what the agency did and
+  // did not do, never what the buyer then did.
+  {
+    const speculative = 'you had a live enquiry sitting there unqualified, leaving it open for me to lose interest or go and view something similar elsewhere.';
+    const grounded = 'nobody established whether I could proceed, so the viewing was never booked and the enquiry was never qualified.';
+
+    assert.strictEqual(readsAsSpeculation(speculative), true, 'invented buyer behaviour is caught');
+    assert.strictEqual(readsAsSpeculation(grounded), false, '...and an evidenced consequence is not');
+
+    let prompts = [];
+    __setAiCallerForTests(async ({ prompt }) => {
+      prompts.push(prompt);
+      return stubResult({ commercial_consequence: prompts.length === 1 ? speculative : grounded });
+    });
+    const repaired = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+    assert.strictEqual(prompts.length, 2, 'a speculative consequence is rejected and asked for again, not printed');
+    assert.ok(prompts[1].includes('speculated about what I would have done next'),
+      'and the repair note says exactly what was wrong with it');
+    assert.ok(prompts[1].includes('it stayed unqualified, the viewing was never booked or progressed'),
+      '...and what a grounded consequence says instead');
+    assert.strictEqual(repaired.commercial_consequence, grounded, 'the grounded rewrite is what gets stored');
+    assert.ok(repaired.email_body.includes(`${THAT_MEANT_PREFIX}${grounded}`), 'and it is what the prospect reads');
+    ok('COPY POLISH — a consequence that speculates about losing interest or viewing elsewhere is refused and repaired into an evidenced one');
+  }
+
+  // ── ...across the shapes the live outputs actually produced ───────────────
+  {
+    for (const invented of [
+      'the enquiry was left open for me to lose interest.',
+      'I would have gone elsewhere without anyone noticing.',
+      'the buyer might have booked something similar with another agent instead.',
+      'nothing stopped me moving on to a competitor.',
+      'I gave up waiting and viewed a property somewhere else.',
+    ]) {
+      assert.strictEqual(readsAsSpeculation(invented), true, `"${invented.slice(0, 40)}..." is invented prospect behaviour`);
+    }
+    // ...while the hard, evidenced consequences the email is built from stay
+    // untouched. These are the four grounded shapes the brief names.
+    for (const evidenced of [
+      'the enquiry was never qualified — nobody established my budget, my funding or my timescale.',
+      'the viewing was never booked, and nothing established when it should have happened.',
+      'a potential seller instruction sitting inside the same enquiry was never explored.',
+      'nobody established what should happen next with me at all.',
+      'you had a live buyer enquiry in front of you and the conversation never established where I was in the process.',
+      'the enquiry went cold overnight and the valuation behind it was never offered.',
+    ]) {
+      assert.strictEqual(readsAsSpeculation(evidenced), false, `"${evidenced.slice(0, 40)}..." is evidenced, not speculation`);
+    }
+    ok('COPY POLISH — the speculation guard catches invented buyer behaviour without eating the evidenced, hard-hitting consequences the email is built from');
+  }
+
+  // ── ...and the OPTIONAL wider consequence is dropped rather than retried ──
+  {
+    __setAiCallerForTests(async () => stubResult({
+      wider_finding_index: 2,
+      wider_observation: "I'd also said in the enquiry that I had a property of my own to sell.",
+      wider_consequence: 'a valuation I might have gone elsewhere for was never even discussed.',
+    }));
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+    assert.strictEqual(result.wider_consequence, '', 'a speculative wider consequence is dropped');
+    assert.ok(result.wider_observation, 'the observation it belonged to still stands on its own');
+    assert.ok(!result.email_body.includes(THAT_ALSO_MEANT_PREFIX), 'and the paragraph never reaches the email');
+    assert.ok(result.email_body, 'the email is still sendable — the wider beat is optional, so this costs no retry');
+    ok('COPY POLISH — a speculative WIDER consequence is dropped rather than retried, because that beat is optional');
   }
 
   console.log(`\n${passed} checks passed.`);
