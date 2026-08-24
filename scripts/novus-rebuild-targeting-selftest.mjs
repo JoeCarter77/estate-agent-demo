@@ -61,10 +61,12 @@ const DIAGNOSIS_HEADER = [
   'probe_id', 'probe_ref', 'agency_id', 'strengths', 'missed_opportunities',
   'commercial_implication', 'novus_opportunity', 'diagnosis_summary',
 ];
-const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding', 'evidence', 'significance_note'];
+const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding_type', 'finding', 'evidence', 'significance_note'];
 const PERSONALISATION_HEADER = [
   'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
-  'primary_narrative', 'narrative_finding_indexes', 'supporting_findings', 'evidence',
+  'primary_narrative', 'narrative_finding_indexes',
+  'positive_finding_index', 'main_finding_index', 'wider_finding_index',
+  'supporting_findings', 'evidence',
   'novus_counterfactual',
   'enquiry_date', 'property_address', 'email_variant',
   'fair_observation', 'main_finding', 'commercial_consequence', 'wider_observation', 'wider_consequence',
@@ -178,7 +180,8 @@ function installAiStub() {
       const m = prompt.match(/prb_hist_\d+/);
       if (m) diagnosedProbeIds.push(m[0]);
       return {
-        findings: [{ finding: 'Stub finding.', evidence: 'Stub evidence.', significance_note: 'Stub significance.' }],
+        findings: [{ finding_type: 'problem', finding: 'Stub finding.', evidence: 'Stub evidence.', significance_note: 'Stub significance.' }],
+        positive_findings: [{ finding: 'Stub positive.', evidence: 'Stub positive evidence.', significance_note: 'Stub positive significance.' }],
         strengths: 'Stub strengths.', missed_opportunities: '', commercial_implication: 'Stub implication.',
         novus_opportunity: 'Core (front desk)', diagnosis_summary: 'Freshly regenerated diagnosis.',
       };
@@ -193,8 +196,13 @@ function installAiStub() {
       // several calls and measuring the contract gate instead of the targeting.
       return {
         story_reasoning: 'Stub reasoning.',
-        primary_narrative: 'Stub narrative.', narrative_finding_indexes: [], supporting_findings: '',
-        evidence_quotes: [], fair_observation: 'you did come back to us.',
+        primary_narrative: 'Stub narrative.', supporting_findings: '',
+        // A complete answer now includes the SELECTION: an answer that names
+        // no main finding where one exists is sent back for repair, which
+        // would make one probe cost several calls and turn this suite into a
+        // measurement of the contract gate instead of the targeting.
+        positive_finding_index: 2, main_finding_index: 1, wider_finding_index: null,
+        fair_observation: 'you did come back to us.',
         // Note: no "finding"/"evidence" wording inside the EMAIL fields — the
         // internal-reasoning guard blanks those, which would fail the contract.
         novus_counterfactual: 'Stub counterfactual.', main_finding: 'that nobody asked what we were looking for.',

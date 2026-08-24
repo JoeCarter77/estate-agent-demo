@@ -71,10 +71,12 @@ const DIAGNOSIS_HEADER = [
   'diagnosis_id', 'agency_id', 'probe_id', 'findings', 'strengths', 'missed_opportunities',
   'commercial_implication', 'novus_opportunity', 'diagnosis_summary', 'created_at', 'updated_at',
 ];
-const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding', 'evidence', 'significance_note'];
+const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding_type', 'finding', 'evidence', 'significance_note'];
 const PERSONALISATION_HEADER = [
   'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
-  'primary_narrative', 'narrative_finding_indexes', 'supporting_findings', 'evidence',
+  'primary_narrative', 'narrative_finding_indexes',
+  'positive_finding_index', 'main_finding_index', 'wider_finding_index',
+  'supporting_findings', 'evidence',
   'novus_counterfactual',
   'enquiry_date', 'property_address', 'email_variant',
   'fair_observation', 'main_finding', 'commercial_consequence', 'wider_observation', 'wider_consequence',
@@ -194,6 +196,10 @@ function installAi(findingsByTag) {
       const tag = Object.keys(findingsByTag).find((t) => prompt.includes(t)) || Object.keys(findingsByTag)[0];
       return {
         findings: findingsByTag[tag],
+        // This suite is about ROW duplication, not story quality — one
+        // positive keeps the shape realistic without changing the counts it
+        // measures (findingsByTag lengths are asserted separately).
+        positive_findings: [],
         strengths: 'Replied the same day.',
         missed_opportunities: 'No qualifying question asked.',
         commercial_implication: 'A viewing slot went to an unqualified buyer.',
@@ -205,8 +211,8 @@ function installAi(findingsByTag) {
       personaliseCalls += 1;
       return {
         primary_narrative: 'You replied the same day but never asked a single qualifying question.',
-        narrative_finding_indexes: [1], supporting_findings: 'There were other gaps too.',
-        evidence_quotes: [],
+        positive_finding_index: null, main_finding_index: 1, wider_finding_index: null,
+        supporting_findings: 'There were other gaps too.',
         fair_observation: 'you did reply the same day.',
         main_finding: 'that nobody asked anything about my position before inviting me to view.',
         commercial_consequence: 'a viewing slot went to someone nobody had checked could actually buy.',

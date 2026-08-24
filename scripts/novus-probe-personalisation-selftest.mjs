@@ -100,21 +100,26 @@ function baseDiagnosis(overrides = {}) {
 }
 
 // The DIAGNOSIS_FINDINGS rows for this probe, in finding_index order —
-// exactly the shape lib/diagnosis-findings.mjs reads back out of the tab.
+// exactly the shape lib/diagnosis-findings.mjs reads back out of the tab,
+// including finding_type. Problems and opportunities come first (so index 1
+// still means "most commercially damaging"), positives after them.
 function baseFindings() {
   return [
-    { finding_index: 1, finding: 'Nothing reached the enquiry for 17.8 hours.', evidence: 'Probe 22:34 -> first human contact 16:25 next day = 17.85 hours.', significance_note: 'A response-speed gap that recurs on every out-of-hours enquiry.' },
-    { finding_index: 2, finding: 'The declared seller was asked about their position and never offered a valuation.', evidence: 'No valuation, appraisal or valuer mentioned in either message.', significance_note: 'An off-market instruction lead recognised in words and then dropped.' },
-    { finding_index: 3, finding: 'No follow-up was made after the single first contact.', evidence: 'follow_ups = 0 against contact_attempts = 1.', significance_note: 'The viewing was never actually secured.' },
+    { finding_index: 1, finding_type: 'problem', finding: 'Nothing reached the enquiry for 17.8 hours.', evidence: 'Probe 22:34 -> first human contact 16:25 next day = 17.85 hours.', significance_note: 'A response-speed gap that recurs on every out-of-hours enquiry.' },
+    { finding_index: 2, finding_type: 'opportunity', finding: 'The declared seller was asked about their position and never offered a valuation.', evidence: 'No valuation, appraisal or valuer mentioned in either message.', significance_note: 'An off-market instruction lead recognised in words and then dropped.' },
+    { finding_index: 3, finding_type: 'problem', finding: 'No follow-up was made after the single first contact.', evidence: 'follow_ups = 0 against contact_attempts = 1.', significance_note: 'The viewing was never actually secured.' },
+    { finding_index: 4, finding_type: 'positive', finding: 'The enquiry was picked up on two channels within 81 seconds of each other.', evidence: 'A voicemail at 16:25:30 and an email at 16:26:51.', significance_note: 'Shows the front desk moves properly once it engages.' },
   ];
 }
 
 function stubResult(overrides = {}) {
   return {
+    story_reasoning: '1. Positive: finding 4. 2. Main: finding 1. 3. The enquiry went cold. 4. Wider: finding 2. 5. The valuation was never reached.',
+    positive_finding_index: 4,
+    main_finding_index: 1,
+    wider_finding_index: null,
     primary_narrative: 'The enquiry sat for 17.8 hours, and when contact finally came it opened a seller conversation it never closed.',
-    narrative_finding_indexes: [1, 2],
     supporting_findings: 'There was also no follow-up after that single first contact.',
-    evidence_quotes: [],
     fair_observation: 'You picked this up on two channels inside 81 seconds of each other and asked good questions.',
     novus_counterfactual: 'At 22:34, NOVUS would have replied in the same 81 seconds your team used — eleven hours earlier — and offered the valuation in the same breath.',
     main_finding: 'Nothing reached us for about 18 hours, and when it did, the property I mentioned selling never came up again.',
@@ -128,45 +133,123 @@ function stubResult(overrides = {}) {
   };
 }
 
+// The prompt shape this change REPLACED, reconstructed here so the size
+// reduction is measured against something concrete rather than asserted. It is
+// the pre-change buildPrompt: probe facts + the full INTELLIGENCE block + the
+// findings + the full DIAGNOSIS block + the scale fact + every raw message.
+function legacyPromptSize(probe, intelligence, diagnosis, findings, communications) {
+  const findingsBlock = findings
+    .map((f) => `  Finding ${f.finding_index}: ${f.finding}\n     Evidence: ${f.evidence}\n     Why it matters: ${f.significance_note}`)
+    .join('\n');
+  const commsBlock = communications
+    .map((c, i) => `--- Message ${i + 1} | communication_id: ${c.communication_id} | channel: ${c.channel} | occurred_at: ${c.occurred_at} ---\n${[c.subject, c.body_text, c.transcript, c.raw_content].filter(Boolean).join('\n')}`)
+    .join('\n\n');
+  return [
+    '=== THE ENQUIRY (probe facts — these are the facts the email opens with) ===',
+    `Property address: ${probe.property_address}`,
+    `Property value: ${probe.property_price}`,
+    `Enquiry sent: ${probe.probe_timestamp} (17 August)`,
+    `What the enquiry said: ${probe.enquiry_text}`,
+    '',
+    '=== INTELLIGENCE (settled interpretation — do not re-derive) ===',
+    `Grade (reference only): ${intelligence.grade} — ${intelligence.grade_reason}`,
+    `Response: ${intelligence.human_contact}, ${intelligence.response_hours} hours to first human contact`,
+    `Contact attempts: ${intelligence.contact_attempts}, follow-ups after the first: ${intelligence.follow_ups}, channels: ${intelligence.channels_used}`,
+    `Viewing progression: ${intelligence.viewing_progression}; buyer qualification: ${intelligence.buyer_qualification} (${intelligence.buyer_questions_asked})`,
+    `Seller/vendor recognition: ${intelligence.seller_recognition}`,
+    `Communication quality: ${intelligence.communication_quality}`,
+    `What they did well: ${intelligence.did_well}`,
+    `What they missed: ${intelligence.missed}`,
+    '',
+    '=== DIAGNOSIS FINDINGS (every genuine, independently evidence-backed finding — this is the complete set; decide which of these combine into the story) ===',
+    findingsBlock,
+    '',
+    '=== DIAGNOSIS (the rest of the settled commercial conclusion — do not re-derive) ===',
+    `Strengths: ${diagnosis.strengths}`,
+    `Missed opportunities: ${diagnosis.missed_opportunities}`,
+    `Commercial implication: ${diagnosis.commercial_implication}`,
+    `NOVUS opportunity: ${diagnosis.novus_opportunity}`,
+    `Diagnosis summary: ${diagnosis.diagnosis_summary}`,
+    '',
+    '=== SCALE FACT (the only number about this agency you may cite; draw no arithmetic from it) ===\n42 live listings currently on the market',
+    '',
+    '=== RAW COMMUNICATIONS (quote from here, verbatim) ===',
+    commsBlock,
+  ].join('\n').length;
+}
+
 async function run() {
   console.log('lib/probe-personalisation.mjs — hermetic selftest\n');
 
-  // ── The COMPLETE Diagnosis picture + probe facts reach the one AI call ──
+  // ── PHASE 3: THE PERSONALISATION INPUT IS PROBE FACTS + FINDINGS, AND
+  //    NOTHING ELSE. Everything the model used to be handed twice — the
+  //    INTELLIGENCE interpretation, the DIAGNOSIS prose, every raw message in
+  //    full — is gone from the prompt, and what is left is what a correct
+  //    email genuinely needs. ──
   {
     let seenPrompt = '';
     __setAiCallerForTests(async ({ prompt }) => { seenPrompt = prompt; return stubResult(); });
-    await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, { live_listing_count: 42 });
+    await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), { live_listing_count: 42 });
 
+    // WHAT IS IN: every finding, typed and numbered, with its evidence and
+    // its significance note.
     for (const finding of baseFindings()) {
       assert.ok(seenPrompt.includes(finding.finding), `finding ${finding.finding_index} reached the prompt`);
       assert.ok(seenPrompt.includes(finding.evidence), `finding ${finding.finding_index}'s evidence reached the prompt`);
       assert.ok(seenPrompt.includes(finding.significance_note), `finding ${finding.finding_index}'s significance reached the prompt`);
+      assert.ok(seenPrompt.includes(`Finding ${finding.finding_index} [${finding.finding_type.toUpperCase()}]`),
+        `finding ${finding.finding_index} is labelled with its type, so it can be selected by number and validated by type`);
     }
-    // Not just findings[] — the rest of the Diagnosis row too.
-    assert.ok(seenPrompt.includes('Voicemail and email inside 81 seconds'), 'strengths reached the prompt');
-    assert.ok(seenPrompt.includes('An off-market instruction recognised in words'), 'missed_opportunities reached the prompt');
-    assert.ok(seenPrompt.includes('A Chevington enquiry sat untouched'), 'commercial_implication reached the prompt');
-    assert.ok(seenPrompt.includes('Core (front desk)'), 'novus_opportunity reached the prompt');
-    assert.ok(seenPrompt.includes('Strong front desk, wrong hours.'), 'diagnosis_summary reached the prompt');
     // The probe/enquiry facts the email itself is built from.
     assert.ok(seenPrompt.includes('Barn Field, Chevington, IP29'), 'property address reached the prompt');
     assert.ok(seenPrompt.includes('£375,000'), 'property value reached the prompt');
     assert.ok(seenPrompt.includes('17 August'), 'the enquiry date reached the prompt');
     assert.ok(seenPrompt.includes('has a property to sell'), 'the enquiry text reached the prompt');
-    // The actual interaction, verbatim.
-    assert.ok(seenPrompt.includes('See what your position is at the moment.'), 'the raw communications reached the prompt');
+    // The one code-computed fact about the agency.
     assert.ok(seenPrompt.includes('42 live listings'), 'the code-computed scale fact reached the prompt');
-    ok('the complete Diagnosis picture (all findings + strengths, missed_opportunities, commercial_implication, novus_opportunity, summary), the probe facts and the raw interaction all reach the single AI call');
+    // ...and which of the two locked structures is being written, decided in
+    // code from human_contact rather than inferred from a layer the model can
+    // no longer see.
+    assert.ok(seenPrompt.includes('EMAIL VARIANT: NORMAL'), 'the email variant is stated, not left to be inferred');
+
+    // WHAT IS OUT: the three upstream layers, in full.
+    assert.ok(!seenPrompt.includes('Voicemail and email inside 81 seconds'), 'the DIAGNOSIS strengths prose is gone');
+    assert.ok(!seenPrompt.includes('An off-market instruction recognised in words'), 'missed_opportunities prose is gone');
+    assert.ok(!seenPrompt.includes('A Chevington enquiry sat untouched'), 'commercial_implication prose is gone');
+    assert.ok(!seenPrompt.includes('Strong front desk, wrong hours.'), 'diagnosis_summary prose is gone');
+    assert.ok(!seenPrompt.includes('Core (front desk)'), 'novus_opportunity is gone — it is a code-side hero-journey input, not a story input');
+    assert.ok(!seenPrompt.includes('Two channels used inside 81 seconds of each other.'), 'INTELLIGENCE did_well prose is gone');
+    assert.ok(!seenPrompt.includes('No valuation was ever offered.'), 'INTELLIGENCE missed prose is gone');
+    assert.ok(!seenPrompt.includes('Slow human contact'), 'the grade reason is gone');
+    assert.ok(!/buyer qualification|Viewing progression|Communication quality/i.test(seenPrompt), 'the INTELLIGENCE interpretation fields are gone');
+    assert.ok(!seenPrompt.includes('See what your position is at the moment.'), 'the raw communications are gone');
+    assert.ok(!seenPrompt.includes('Are you on the market or renting for example?'), 'every raw message is gone, not just the first');
+    assert.ok(!/communication_id/.test(seenPrompt), 'and so is the message scaffolding around them');
+    ok('the story-generation call receives ONLY the probe facts, the email variant, the typed findings and the scale fact — the DIAGNOSIS prose, the INTELLIGENCE prose and every raw communication are gone from the prompt');
+  }
+
+  // ── ...and the reduction is real, not cosmetic ───────────────────────────
+  {
+    let seenPrompt = '';
+    __setAiCallerForTests(async ({ prompt }) => { seenPrompt = prompt; return stubResult(); });
+    await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), { live_listing_count: 42 });
+    const before = legacyPromptSize(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS);
+    assert.ok(seenPrompt.length < before * 0.75,
+      `the input is materially smaller (${before} -> ${seenPrompt.length} chars), not reorganised`);
+    ok(`the Personalisation input is materially smaller than the layered one it replaces (${before} -> ${seenPrompt.length} characters on this fixture)`);
   }
 
   // ── Several findings combine into ONE primary narrative; the leftover
   //    becomes the supporting finding, and only then does the email's
   //    secondary hook show its one fixed intrigue line ──
   {
-    __setAiCallerForTests(async () => stubResult());
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
-    assert.strictEqual(result.narrative_finding_indexes, '1,2', 'the narrative records which findings it combined');
-    assert.ok(result.supporting_findings.includes('no follow-up'), 'the finding left out of the narrative survives as a supporting finding');
+    __setAiCallerForTests(async () => stubResult({ wider_finding_index: 2, wider_observation: "I'd also said I had a property of my own to sell.", wider_consequence: 'a valuation sitting inside the same enquiry was never explored.' }));
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+    assert.strictEqual(result.narrative_finding_indexes, '1,2,4', 'the narrative records exactly the findings the three beats were selected from');
+    assert.strictEqual(result.positive_finding_index, 4, 'and the selection is stored beat by beat');
+    assert.strictEqual(result.main_finding_index, 1);
+    assert.strictEqual(result.wider_finding_index, 2);
+    assert.ok(result.supporting_findings.includes('no follow-up'), 'the story finding left out of the selection survives as a supporting finding');
     assert.strictEqual(result.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE,
       'the fixed tease line appears because a genuine finding is actually left over');
     assert.ok(!/follow-up/i.test(result.additional_findings_hook),
@@ -178,12 +261,18 @@ async function run() {
   //    transition still appears: it is the hand-off into the breakdown, not a
   //    claim that two more findings exist ──
   {
+    // Two story findings and a positive: selecting main + wider covers every
+    // story finding there is, so nothing can be left over.
+    const twoStoryFindings = baseFindings().filter((f) => f.finding_index !== 3);
     __setAiCallerForTests(async () => stubResult({
-      narrative_finding_indexes: [1, 2, 3],
+      wider_finding_index: 2,
+      wider_observation: "I'd also said I had a property of my own to sell.",
+      wider_consequence: 'a valuation sitting inside the same enquiry was never explored.',
       supporting_findings: 'There were several other issues worth mentioning.', // model padding
     }));
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
-    assert.strictEqual(result.supporting_findings, '', 'no finding is left over, so the INTERNAL supporting_findings is forced empty');
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), twoStoryFindings, {});
+    assert.strictEqual(result.supporting_findings, '', 'no story finding is left over, so the INTERNAL supporting_findings is forced empty');
+    assert.strictEqual(result.narrative_finding_indexes, '1,2,4', 'and the selection covers them all');
     assert.strictEqual(result.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE,
       'but the locked closing transition is still there — it is not conditional on a leftover finding');
     assert.ok(result.email_body.includes(ADDITIONAL_FINDINGS_HOOK_LINE), 'and the email still carries that paragraph');
@@ -197,7 +286,7 @@ async function run() {
   {
     for (const injected of ['A detailed paragraph explaining the second finding and why it matters commercially.', '']) {
       __setAiCallerForTests(async () => ({ ...stubResult(), additional_findings_hook: injected }));
-      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
       assert.strictEqual(result.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE,
         'a model-written hook is discarded entirely in favour of the locked line');
       assert.ok(!result.email_body.includes('detailed paragraph'), 'model-authored analysis never reaches the email');
@@ -205,27 +294,81 @@ async function run() {
     ok('additional_findings_hook is deterministic — always exactly the locked line, never AI-written analysis, however the model responds');
   }
 
-  // ── A claimed finding number that does not exist is discarded ──
+  // ── PHASE 6: a selected finding number that does not exist is refused ──
+  //    A hallucinated index would make the audit trail back to
+  //    DIAGNOSIS_FINDINGS lie about which finding the email rests on, so it is
+  //    never silently kept — the model is asked again, and an answer that
+  //    still cannot name a real finding leaves the row unsendable.
   {
-    __setAiCallerForTests(async () => stubResult({ narrative_finding_indexes: [1, 7, 2, 1] }));
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
-    assert.strictEqual(result.narrative_finding_indexes, '1,2', 'finding 7 does not exist and is dropped; the duplicate is collapsed');
-    ok('the narrative can only claim finding numbers that genuinely exist, so the audit trail back to DIAGNOSIS_FINDINGS cannot lie');
+    let calls = 0;
+    __setAiCallerForTests(async () => { calls += 1; return stubResult({ main_finding_index: 7 }); });
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+    assert.strictEqual(calls, 3, 'the impossible index is rejected and re-asked, up to the bounded retry limit');
+    assert.strictEqual(result.main_finding_index, '', 'finding 7 does not exist, so nothing is stored as the main selection');
+    assert.strictEqual(result.narrative_finding_indexes, '4', 'and only the selections that resolve reach the audit trail');
+    ok('a selected finding number that does not exist is refused rather than stored, so the audit trail back to DIAGNOSIS_FINDINGS cannot lie');
   }
 
-  // ── A quote that is not a literal substring of the cited message is dropped ──
+  // ── PHASE 6: the positive beat can only be written from a POSITIVE
+  //    finding, and the main story only from a problem/opportunity ──
+  {
+    let calls = 0;
+    __setAiCallerForTests(async () => { calls += 1; return stubResult({ positive_finding_index: 1 }); });
+    const wrongPositive = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+    assert.strictEqual(calls, 3, 'a problem picked as the fair observation\'s positive is sent back');
+    assert.strictEqual(wrongPositive.positive_finding_index, '', 'and is never stored as a positive selection');
+
+    calls = 0;
+    __setAiCallerForTests(async () => { calls += 1; return stubResult({ main_finding_index: 4 }); });
+    const wrongMain = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+    assert.strictEqual(calls, 3, 'a positive picked as the main story is sent back too');
+    assert.strictEqual(wrongMain.main_finding_index, '', 'and is never stored as the main story');
+    ok('the positive index must be a POSITIVE finding and the main index a PROBLEM or OPPORTUNITY — a mistyped selection is refused, never stored');
+  }
+
+  // ── PHASE 6: a probe whose findings carry no positive at all (every row
+  //    written before finding_type existed) still personalises normally ──
+  {
+    const legacyFindings = baseFindings()
+      .filter((f) => f.finding_type !== 'positive')
+      .map(({ finding_type, ...rest }) => rest); // eslint-disable-line no-unused-vars
+    let calls = 0;
+    __setAiCallerForTests(async () => { calls += 1; return stubResult({ positive_finding_index: null }); });
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), legacyFindings, {});
+    assert.strictEqual(calls, 1, 'no positive exists to select, so a null positive index is a correct answer and costs one call');
+    assert.strictEqual(result.positive_finding_index, '', 'nothing is stored as the positive selection');
+    assert.ok(result.fair_observation, 'the fair observation is still written and still mandatory');
+    assert.ok(result.email_body, 'and the email is still sendable');
+    ok('a legacy findings list with no positive rows still produces a sendable email — the positive index is optional exactly when no positive exists');
+  }
+
+  // ── PHASE 6: EVIDENCE IS GROUNDED BY CONSTRUCTION ────────────────────────
+  //    The model is no longer asked for quotes at all — it never sees a raw
+  //    message, so there is nothing for it to misquote. The stored evidence is
+  //    the evidence of the findings the story actually selected, and nothing
+  //    else can get in.
   {
     __setAiCallerForTests(async () => stubResult({
-      evidence_quotes: [
-        { quote: 'See what your position is at the moment.', communication_id: 'com_1' }, // genuine
-        { quote: 'We will absolutely smash this valuation for you', communication_id: 'com_2' }, // fabricated
-      ],
+      wider_finding_index: 2,
+      wider_observation: "I'd also said I had a property of my own to sell.",
+      wider_consequence: 'a valuation sitting inside the same enquiry was never explored.',
+      // A model that invents a quote anyway has nowhere to put it: the field
+      // does not exist on the tool.
+      evidence_quotes: [{ quote: 'We will absolutely smash this valuation for you', communication_id: 'com_2' }],
     }));
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
-    assert.ok(result.evidence.includes('See what your position is at the moment.'), 'the genuine quote survives');
-    assert.ok(!result.evidence.includes('smash this valuation'), 'the fabricated quote is dropped');
-    assert.ok(result.evidence.includes('2026-08-18T16:25:30Z'), 'the surviving quote carries its channel and timestamp');
-    ok('a quote not literally present in its cited communication is discarded, a genuine one survives with channel + timestamp');
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+
+    assert.ok(result.evidence.includes('Probe 22:34 -> first human contact 16:25 next day = 17.85 hours.'),
+      "the main finding's own evidence is recorded");
+    assert.ok(result.evidence.includes('No valuation, appraisal or valuer mentioned in either message.'),
+      "the wider finding's own evidence is recorded");
+    assert.ok(result.evidence.includes('A voicemail at 16:25:30 and an email at 16:26:51.'),
+      "the positive finding's own evidence is recorded");
+    assert.ok(!result.evidence.includes('follow_ups = 0'),
+      'an unselected finding\'s evidence is not — the record is what this email rests on, not everything known');
+    assert.ok(!result.evidence.includes('smash this valuation'), 'an invented quote has nowhere to enter from');
+    assert.ok(/^Finding 1:/.test(result.evidence), 'and each piece is labelled with the finding it came from');
+    ok('the stored evidence is exactly the evidence of the findings the story selected — grounded by construction, with no quote for the model to fabricate');
   }
 
   // ── Currency: the probe's own property value is allowed; an invented fee
@@ -235,7 +378,7 @@ async function run() {
       primary_narrative: 'The £375,000 Chevington enquiry waited overnight. That is roughly £11,250 in fees at 3%.',
       commercial_consequence: 'That meant you likely lost around £9,000 of commission on this one enquiry.',
     }));
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.ok(result.primary_narrative.includes('£375,000'), 'the probe\'s own property value survives');
     assert.ok(!result.primary_narrative.includes('11,250'), 'the invented fee assumption is stripped');
     assert.strictEqual(result.commercial_consequence, '', 'an invented commission figure takes the whole sentence with it');
@@ -251,7 +394,7 @@ async function run() {
       primary_narrative: 'A £375,000 instruction was left on the table. The seller lead was simply dropped.',
     }));
     const priceless = { ...PROBE, property_price: '' };
-    const result = await personaliseProbe(priceless, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const result = await personaliseProbe(priceless, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.ok(!/£/.test(result.primary_narrative), 'with no property value on file, no currency figure survives');
     assert.ok(result.primary_narrative.includes('seller lead was simply dropped'), 'the qualitative sentence alongside it is kept');
     ok('a probe with no property value on file can carry no currency figure at all, while the qualitative sentence beside it survives');
@@ -278,7 +421,7 @@ async function run() {
     // factual to acknowledge. So an empty Diagnosis strengths field no longer
     // suppresses the paragraph the brief makes mandatory.
     __setAiCallerForTests(async () => stubResult({ fair_observation: 'you did get back to me, with an email asking what I was looking for.' }));
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis({ strengths: '' }), baseFindings(), COMMS, {});
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis({ strengths: '' }), baseFindings(), {});
     assert.strictEqual(result.fair_observation, 'you did get back to me, with an email asking what I was looking for.',
       'a small, factual acknowledgement survives even when Diagnosis recorded no commercial strength');
     assert.ok(result.email_body.includes('I want to say upfront that you did get back to me'), 'and opens the email');
@@ -294,7 +437,7 @@ async function run() {
       ['it hedged the compliment', 'you eventually came back to me.'],
     ]) {
       __setAiCallerForTests(async () => stubResult({ fair_observation: injected }));
-      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
       assert.strictEqual(result.fair_observation, '', `${why}: nothing is printed`);
       assert.strictEqual(result.email_body, '', `${why}: and no email is assembled at all`);
       assert.ok(emailContractViolations(result).includes('missing_fair_observation'), `${why}: the violation names the missing fair observation`);
@@ -314,14 +457,14 @@ async function run() {
       'Their team used two channels inside 81 seconds.',
     ]) {
       __setAiCallerForTests(async () => stubResult({ fair_observation: detached }));
-      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
       assert.strictEqual(result.fair_observation, '', `detached third person "${detached}" never reaches the email`);
       assert.ok(!result.email_body.includes(detached), 'and never reaches the assembled body either');
     }
     // The same observation written to them survives — as the lower-case
     // continuation the assembler prints after "I want to say upfront that ".
     __setAiCallerForTests(async () => stubResult({ fair_observation: "You didn't let this one go cold — you came back twice." }));
-    const kept = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const kept = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.strictEqual(kept.fair_observation, "you didn't let this one go cold — you came back twice.", 'the second-person version survives, de-capitalised to continue the fixed opener');
     assert.ok(kept.email_body.includes("I want to say upfront that you didn't let this one go cold"), 'and reads as one sentence after the assembler\'s fixed opener');
     ok('a fair observation written as detached commentary about the agency is dropped, while the same point addressed to them as "you" survives as a continuation of the fixed opener');
@@ -343,6 +486,9 @@ async function run() {
   // ── No response at all: the email simply says we never received a reply ──
   {
     __setAiCallerForTests(async () => stubResult({
+      positive_finding_index: 1,
+      main_finding_index: 1,
+      wider_finding_index: 3,
       fair_observation: 'Your team did their best under the circumstances.',
       main_finding: 'When you finally called back, the questions you asked were the right ones.',
       commercial_consequence: 'a buyer who was ready to view never got as far as a conversation.',
@@ -352,10 +498,14 @@ async function run() {
     }));
     const noReplyIntelligence = baseIntelligence({ human_contact: 'none', response_hours: '', contact_attempts: 0, channels_used: '' });
     const noReplyFindings = [
-      { finding_index: 1, finding: 'The enquiry was never replied to.', evidence: 'No communications recorded in the 4-day window.', significance_note: 'A buyer and a seller lead both lost in silence.' },
-      { finding_index: 2, finding: 'No automated acknowledgement was sent either.', evidence: 'Zero communications of any kind.', significance_note: 'Nothing caught the enquiry at all.' },
+      { finding_index: 1, finding_type: 'problem', finding: 'The enquiry was never replied to.', evidence: 'No communications recorded in the 4-day window.', significance_note: 'A buyer and a seller lead both lost in silence.' },
+      { finding_index: 2, finding_type: 'problem', finding: 'No automated acknowledgement was sent either.', evidence: 'Zero communications of any kind.', significance_note: 'Nothing caught the enquiry at all.' },
+      // The wider beat is written FROM a finding, so a seller opportunity the
+      // email is allowed to raise has to exist as one. If Diagnosis never
+      // recorded it, the email cannot invent it — which is the point.
+      { finding_index: 3, finding_type: 'opportunity', finding: 'A declared property to sell was never picked up as a valuation.', evidence: 'The enquiry declared a property to sell; nothing was ever sent back.', significance_note: 'A valuation opportunity lost in the same silence.' },
     ];
-    const result = await personaliseProbe(PROBE, noReplyIntelligence, baseDiagnosis({ strengths: '' }), noReplyFindings, [], {});
+    const result = await personaliseProbe(PROBE, noReplyIntelligence, baseDiagnosis({ strengths: '' }), noReplyFindings, {});
 
     assert.strictEqual(result.email_variant, 'no_response', 'the email switches to its own structure');
     assert.strictEqual(result.fair_observation, '', 'there was no handling to be fair about, so nothing is invented');
@@ -363,7 +513,11 @@ async function run() {
     assert.strictEqual(result.additional_findings_hook, '',
       'the no-response variant has its own closing, so the normal tease is not stored on top of it');
     assert.strictEqual(result.hero_journey, 'complete_miss', 'the journey is the complete-miss one');
-    assert.strictEqual(result.evidence, '', 'nothing was ever said, so there is no evidence to quote');
+    // Nothing was ever said, so the evidence is the ABSENCE the findings
+    // record — never a quote, because there is nothing to quote from.
+    assert.ok(result.evidence.includes('No communications recorded in the 4-day window.'),
+      "the evidence is the selected findings' own evidence: the silence itself, which is what the consequence rests on");
+    assert.ok(!/"/.test(result.evidence), 'and never a quote — there was nothing said to quote');
 
     // The email says it plainly, once, and never describes a conversation.
     assert.ok(result.email_body.includes(`\n\n${NO_REPLY_LINE}\n\n`), 'the assembler supplies the plain no-reply line');
@@ -385,7 +539,7 @@ async function run() {
       novus_counterfactual: 'NOVUS would have matched this response exactly, every time, regardless of who is on shift.',
     }));
     const strongDiagnosis = baseDiagnosis({ novus_opportunity: 'Growth (valuation list / seller conversion)' });
-    const result = await personaliseProbe(PROBE, baseIntelligence({ response_hours: 0.9, follow_ups: 1 }), strongDiagnosis, [], COMMS, {});
+    const result = await personaliseProbe(PROBE, baseIntelligence({ response_hours: 0.9, follow_ups: 1 }), strongDiagnosis, [], {});
     assert.strictEqual(result.supporting_findings, '', 'no findings means nothing can be a supporting finding');
     assert.strictEqual(result.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE,
       'but the locked closing transition still runs — it hands off to the breakdown rather than claiming more findings');
@@ -400,7 +554,7 @@ async function run() {
   //    email_body is exactly its deterministic assembly of these fields. ──
   {
     __setAiCallerForTests(async () => stubResult());
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
 
     assert.ok(!('commercial_story' in result), 'the retired commercial_story field is gone');
     assert.ok(!('email_main_point' in result), 'and so are the retired email_* variable names');
@@ -477,7 +631,7 @@ async function run() {
       'The enquiry went cold overnight',
     ]) {
       __setAiCallerForTests(async () => stubResult({ commercial_consequence: written }));
-      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
       assert.strictEqual(result.commercial_consequence, 'the enquiry went cold overnight.',
         `"${written}" normalises to the bare continuation`);
       assert.ok(!/^that mean(s|t)/i.test(result.commercial_consequence), 'and never repeats the prefix');
@@ -512,11 +666,12 @@ async function run() {
   {
     const WIDER_OBSERVATION = "I'd also mentioned that I had a property of my own that I was considering selling, but that never really came into the conversation.";
     __setAiCallerForTests(async () => stubResult({
+      wider_finding_index: 2,
       commercial_consequence: 'the enquiry was getting attention but was not really being progressed.',
       wider_observation: WIDER_OBSERVATION,
       wider_consequence: 'it also meant a potential seller instruction sitting inside the same enquiry was never explored',
     }));
-    const distinct = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const distinct = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.strictEqual(distinct.wider_consequence, 'a potential seller instruction sitting inside the same enquiry was never explored.',
       'a genuinely distinct second consequence is kept, as the continuation of the assembler\'s "That also meant "');
     assert.ok(distinct.email_body.includes(`\n\n${WIDER_OBSERVATION}\n\nThat also meant a potential seller instruction sitting inside the same enquiry was never explored.`),
@@ -525,11 +680,12 @@ async function run() {
 
     // The realistic failure: an optional field filled with the same point again.
     __setAiCallerForTests(async () => stubResult({
+      wider_finding_index: 2,
       commercial_consequence: 'the enquiry was getting attention but was not really being progressed.',
       wider_observation: WIDER_OBSERVATION,
       wider_consequence: 'The enquiry was getting attention but was not really being progressed.',
     }));
-    const echoed = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const echoed = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.strictEqual(echoed.wider_consequence, '', 'a restatement of the primary consequence is dropped, not printed twice');
     assert.strictEqual((echoed.email_body.match(/was not really being progressed/g) || []).length, 1,
       'so the same point appears exactly once in the email');
@@ -538,17 +694,31 @@ async function run() {
     // consequence of something the reader was never told, so it is dropped
     // here rather than left for the assembler to skip.
     __setAiCallerForTests(async () => stubResult({
+      wider_finding_index: 2,
       wider_observation: '',
       wider_consequence: 'a potential seller instruction sitting inside the same enquiry was never explored.',
     }));
-    const orphan = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const orphan = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.strictEqual(orphan.wider_observation, '', 'no observation was returned');
     assert.strictEqual(orphan.wider_consequence, '', 'so its consequence is dropped too — the wider beat is a pair');
     assert.ok(!orphan.email_body.includes('That also meant'), 'and that paragraph never appears in the email');
 
+    // UNGROUNDED: a wider beat the model wrote without selecting a finding for
+    // it is an invented finding, whatever it says, so it is not printed.
+    __setAiCallerForTests(async () => stubResult({
+      wider_finding_index: null,
+      wider_observation: WIDER_OBSERVATION,
+      wider_consequence: 'a potential seller instruction sitting inside the same enquiry was never explored.',
+    }));
+    const ungrounded = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+    assert.strictEqual(ungrounded.wider_observation, '', 'a wider observation with no finding behind it is not printed');
+    assert.strictEqual(ungrounded.wider_consequence, '', 'and neither is its consequence');
+    assert.ok(!ungrounded.email_body.includes('property of my own'), 'so nothing ungrounded reaches the email');
+    assert.ok(ungrounded.email_body, 'while the rest of the email is unaffected and still sendable');
+
     // Genuinely absent stays absent — neither field is ever forced.
     __setAiCallerForTests(async () => stubResult({ wider_observation: '', wider_consequence: '' }));
-    const absent = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const absent = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.strictEqual(absent.wider_consequence, '', 'an empty wider consequence stays empty');
     assert.strictEqual(absent.wider_observation, '', 'and so does an empty wider observation');
     ok('the wider beat is a pair: the consequence is kept only when it follows a real observation AND is genuinely a second consequence, as the lower-case continuation of the fixed "That also meant "');
@@ -580,7 +750,7 @@ async function run() {
       'you got back to me the same day, however briefly.',
     ]) {
       __setAiCallerForTests(async () => stubResult({ fair_observation: hedged }));
-      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
       assert.strictEqual(result.fair_observation, '', `hedged praise "${hedged}" is not printed`);
       assert.ok(!result.email_body.includes(FAIR_OBSERVATION_PREFIX), 'and its fixed opener does not appear with nothing behind it');
     }
@@ -604,7 +774,7 @@ async function run() {
       'nobody asked me a single question about my position, at any point in the conversation.',
     ]) {
       __setAiCallerForTests(async () => stubResult({ main_finding: finding, commercial_consequence: restatement }));
-      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
       assert.strictEqual(result.commercial_consequence, '', `"${restatement}" is a restatement of the finding, not a consequence`);
       assert.strictEqual(result.email_body, '', 'so no email is assembled — a human needs to look at this probe');
     }
@@ -614,7 +784,7 @@ async function run() {
       main_finding: finding,
       commercial_consequence: 'a viewing slot was committed before anyone knew whether the buyer could proceed, and the valuation sitting inside the same enquiry was never reached.',
     }));
-    const kept = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const kept = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.ok(kept.commercial_consequence.startsWith('a viewing slot was committed'), 'a genuine consequence is kept');
     assert.ok(kept.email_body.includes('That meant a viewing slot was committed'), 'and reads correctly after the fixed prefix');
 
@@ -643,7 +813,7 @@ async function run() {
       main_finding: 'Barn Field was mentioned twice but never actually offered as a viewing.',
       commercial_consequence: 'Chevington itself was never confirmed as the area I was searching in.',
     }));
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.strictEqual(result.main_finding, 'Barn Field was mentioned twice but never actually offered as a viewing.',
       'a continuation opening with this probe\'s own proper noun keeps its capital, unlike an ordinary opening word');
     assert.strictEqual(result.commercial_consequence, 'Chevington itself was never confirmed as the area I was searching in.');
@@ -653,7 +823,7 @@ async function run() {
     // An ordinary word that merely LOOKS like it could be a name, but isn't
     // established by this probe's own address or agency, is still lower-cased.
     __setAiCallerForTests(async () => stubResult({ main_finding: 'Nobody asked about my timescale at any point.' }));
-    const ordinary = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const ordinary = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.strictEqual(ordinary.main_finding, 'nobody asked about my timescale at any point.',
       'an opening word not established as a proper noun by this probe is still de-capitalised');
     ok('proper nouns from this probe\'s own property address or agency name survive a continuation capitalised; ordinary words do not');
@@ -666,7 +836,7 @@ async function run() {
     const finding = 'that nobody asked a single question about my position before inviting me to view.';
     const nearDuplicate = 'nobody asked a single question about my position before I was invited to view.';
     __setAiCallerForTests(async () => stubResult({ main_finding: finding, commercial_consequence: nearDuplicate }));
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.strictEqual(result.commercial_consequence, '', 'a lightly reworded restatement is still refused, not just an exact substring');
     assert.strictEqual(result.email_body, '', 'so the row is unsendable, same as an exact restatement');
 
@@ -708,7 +878,7 @@ async function run() {
       'N/A',
     ]) {
       __setAiCallerForTests(async () => stubResult({ fair_observation: leak, main_finding: leak }));
-      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+      const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
       assert.strictEqual(result.fair_observation, '', `internal reasoning "${leak}" never reaches fair_observation`);
       assert.strictEqual(result.main_finding, '', `nor main_finding`);
       assert.strictEqual(result.email_body, '', 'and with no main finding left, no email is assembled — a human decides');
@@ -751,7 +921,7 @@ async function run() {
       main_finding: 'There is no qualifying question asked before inviting you to view.',
       commercial_consequence: 'there is no way of knowing whether the viewing slot went to someone who could actually buy.',
     }));
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.ok(result.main_finding, 'main_finding is populated, not blanked by the absence phrasing');
     assert.ok(result.commercial_consequence, 'commercial_consequence is populated too');
     assert.ok(result.email_body, 'and a real email is assembled from them');
@@ -773,7 +943,7 @@ async function run() {
     __setAiCallerForTests(async () => stubResult({
       commercial_consequence: 'a £375,000 buyer enquiry sat overnight without anyone finding out whether I was ready to view.',
     }));
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.ok(result.commercial_consequence.includes('finding out whether I was ready to view'),
       'the sentence survives intact');
     assert.ok(result.email_body.includes('That meant a £375,000 buyer enquiry sat overnight'), 'and reaches the email');
@@ -804,7 +974,7 @@ async function run() {
     __setAiCallerForTests(async () => stubResult({
       commercial_consequence: 'you had a £375,000 buyer enquiry in front of you and never established my position. On a typical fee that is around £5,600 you never billed.',
     }));
-    const mixed = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const mixed = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.ok(mixed.commercial_consequence.includes('£375,000 buyer enquiry'), 'the property value survives');
     assert.ok(!/5,600|fee/i.test(mixed.commercial_consequence), 'the invented fee sentence does not');
     assert.ok(mixed.email_body, 'and the email is still sendable on the honest half');
@@ -823,7 +993,7 @@ async function run() {
       PROBE,
       baseIntelligence({ response_hours: 18.9, contact_attempts: 1, follow_ups: 0, communication_quality: 'generic' }),
       baseDiagnosis({ strengths: '' }),
-      baseFindings(), COMMS, {},
+      baseFindings(), {},
     );
     assert.strictEqual(result.fair_observation, 'you did get back to me with a phone call about my enquiry, rather than leaving it unanswered altogether.',
       'the small factual positive is stored exactly as written');
@@ -841,7 +1011,7 @@ async function run() {
       wider_observation: '',
       wider_consequence: '',
     }));
-    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
     assert.strictEqual(result.wider_observation, '', 'an absent wider observation is blank');
     assert.strictEqual(result.wider_consequence, '', 'and so is its consequence');
     // The mandatory beats are all there.
@@ -892,7 +1062,7 @@ async function run() {
     __setAiCallerForTests(async () => stubResult());
     const unaddressed = await personaliseProbe(
       { ...PROBE, property_address: 'UNKNOWN — auto-ack does not name a property' },
-      baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {},
+      baseIntelligence(), baseDiagnosis(), baseFindings(), {},
     );
     assert.strictEqual(unaddressed.property_address, '');
     assert.strictEqual(unaddressed.email_body, '', 'no address means no assembled email');

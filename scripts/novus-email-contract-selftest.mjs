@@ -162,6 +162,17 @@ function diagnosis(overrides = {}) {
   };
 }
 
+// The DIAGNOSIS_FINDINGS rows every shape here selects from. Since
+// Personalisation reads nothing but the probe facts and these rows, this is
+// the whole account of what happened as far as the email is concerned.
+function contractFindings() {
+  return [
+    { finding_index: 1, finding_type: 'problem', finding: 'The enquiry was not progressed.', evidence: 'No next step was agreed in any message.', significance_note: 'A live enquiry that stopped.' },
+    { finding_index: 2, finding_type: 'opportunity', finding: 'A declared property to sell was never turned into a valuation.', evidence: 'No valuation or appraisal was ever offered.', significance_note: 'An instruction opportunity left on the table.' },
+    { finding_index: 3, finding_type: 'positive', finding: 'The enquiry was answered by a person rather than ignored.', evidence: 'A human reply is recorded against the enquiry.', significance_note: 'Shows the front desk does pick enquiries up.' },
+  ];
+}
+
 // ── The three Personalisation outputs, at target quality ─────────────────────
 // This is what the AI is expected to produce for each shape under the rebuilt
 // contract: reasoning first, then the variables — tight, one job per sentence,
@@ -172,9 +183,10 @@ const STORIES = {
   silent: {
     story_reasoning: '1. Nothing came back at all, so there is nothing to acknowledge. 2. The enquiry was never picked up by anyone. 3. Nobody established whether I was ready to view, what my timescale was, or what would have got me through the door. 4. Yes — I said I had a property of my own to sell, not yet on the market. 5. That instruction opportunity was never explored either.',
     primary_narrative: 'Nothing came back across four days — no acknowledgement, no call, nothing — on an enquiry that carried both a buyer and a seller.',
-    narrative_finding_indexes: [1],
+    positive_finding_index: null,
+    main_finding_index: 1,
+    wider_finding_index: 2,
     supporting_findings: '',
-    evidence_quotes: [],
     fair_observation: '',
     main_finding: '',
     commercial_consequence: 'a £425,000 buyer enquiry sat for four days without anyone finding out whether I was ready to view, what my timescale was, or what it would have taken to get me through the door.',
@@ -185,9 +197,10 @@ const STORIES = {
   weak: {
     story_reasoning: '1. You did phone me back about the enquiry rather than ignoring it. 2. The call came almost 19 hours later, answered nothing I had asked, and asked nothing about me. 3. Nobody established whether I was ready to move, what I needed, or what should happen next. 4. Yes — I said I had a property of my own to sell. 5. That valuation and instruction were never explored.',
     primary_narrative: 'The call came the next morning and went nowhere: it answered none of the questions in the enquiry and asked none of its own.',
-    narrative_finding_indexes: [1],
+    positive_finding_index: 3,
+    main_finding_index: 1,
+    wider_finding_index: 2,
     supporting_findings: '',
-    evidence_quotes: [{ quote: 'Give us a ring back when you get a minute', communication_id: 'com_w1' }],
     fair_observation: 'you did get back to me with a phone call about my enquiry, rather than leaving it unanswered altogether.',
     main_finding: "that the call came almost 19 hours later, didn't answer what I'd asked about the property, and didn't ask me anything about my own situation.",
     commercial_consequence: 'you had a £225,000 buyer enquiry in front of you without establishing whether I was ready to move, what I needed from the property, or what should happen next.',
@@ -198,9 +211,10 @@ const STORIES = {
   seller: {
     story_reasoning: '1. You followed up quickly and persistently — three attempts across phone and email inside a day, with my name and Fox Cottage referenced correctly. 2. Every attempt pushed the viewing and asked nothing about me. 3. Nobody established whether I was in a position to move forward at all. 4. Yes — I said I had a property of my own to sell, not yet on the market. 5. That instruction opportunity was never explored.',
     primary_narrative: 'The persistence went entirely into pushing a viewing, while the two things that would have told them who they were dealing with — buying readiness and selling potential — were left completely unexplored.',
-    narrative_finding_indexes: [1],
+    positive_finding_index: 3,
+    main_finding_index: 1,
+    wider_finding_index: 2,
     supporting_findings: '',
-    evidence_quotes: [{ quote: 'I can get you booked in for a viewing whenever suits.', communication_id: 'com_s1' }],
     fair_observation: 'you did follow up with me quickly and persistently — three attempts by phone and email within a day, with my name and Fox Cottage referenced correctly and a clear invitation to book a viewing.',
     main_finding: 'that all three attempts focused on getting me to a viewing without asking anything about my budget, timescale, requirements or position as a buyer.',
     commercial_consequence: 'you had a £650,000 buyer enquiry in front of you without establishing whether I was actually in a position to move forward.',
@@ -219,13 +233,11 @@ async function personaliseWithCaller(shape, caller, { probe: probeOverrides = {}
     prompts.push(args.prompt);
     return caller(prompts.length, args);
   });
-  const findings = [{ finding_index: 1, finding: 'The enquiry was not progressed.', evidence: 'From the communications above.', significance_note: 'A live enquiry that stopped.' }];
   const row = await personaliseProbe(
     { ...PROBES[shape], ...probeOverrides },
     intelligence({ ...INTELLIGENCE[shape], ...intelligenceOverrides }),
     diagnosis(),
-    findings,
-    COMMS[shape],
+    contractFindings(),
     {},
   );
   return { row, prompts, calls: prompts.length };
@@ -233,13 +245,11 @@ async function personaliseWithCaller(shape, caller, { probe: probeOverrides = {}
 
 async function personalise(shape, storyOverrides = {}, intelligenceOverrides = {}, diagnosisOverrides = {}) {
   __setAiCallerForTests(async () => ({ ...STORIES[shape], ...storyOverrides }));
-  const findings = [{ finding_index: 1, finding: 'The enquiry was not progressed.', evidence: 'From the communications above.', significance_note: 'A live enquiry that stopped.' }];
   return personaliseProbe(
     PROBES[shape],
     intelligence({ ...INTELLIGENCE[shape], ...intelligenceOverrides }),
     diagnosis(diagnosisOverrides),
-    findings,
-    COMMS[shape],
+    contractFindings(),
     {},
   );
 }
@@ -542,15 +552,33 @@ async function run() {
       assert.ok(properties.indexOf('story_reasoning') < properties.indexOf(emailField),
         `story_reasoning is reasoned out before ${emailField} is written`);
     }
-    // The five questions themselves, in the schema rather than only in prose.
+    // The five questions themselves, in the schema rather than only in prose —
+    // now each one anchored to a finding NUMBER, because the story is selected
+    // from the findings list rather than composed over a pile of prose.
     const reasoning = TOOL.input_schema.properties.story_reasoning.description;
-    for (const question of ['genuinely do well', 'strongest primary missed opportunity', 'fail to establish', 'SEPARATE wider opportunity', 'mean commercially']) {
+    for (const question of ['strongest genuine thing to acknowledge', 'strongest main story', 'fail to establish', 'SEPARATE wider finding', 'mean commercially']) {
       assert.ok(reasoning.includes(question), `the reasoning field asks: ${question}`);
     }
+    assert.ok(reasoning.includes('CITING THE FINDING NUMBER'), 'and it makes the model name the finding behind each answer');
+    // The selection fields are asked for BEFORE any sentence is written.
+    for (const selectionField of ['positive_finding_index', 'main_finding_index', 'wider_finding_index']) {
+      assert.ok(required.includes(selectionField), `${selectionField} is required, not optional`);
+      assert.ok(properties.indexOf(selectionField) < properties.indexOf('fair_observation'),
+        `${selectionField} is chosen before any email variable is written`);
+    }
     // And the contract's own "never allow" rules are stated to the model too.
-    for (const rule of ['finding -> finding -> blank consequence', 'repeats the finding', 'disguised criticism', 'seller observation repeated back']) {
+    for (const rule of [
+      'finding -> finding -> blank consequence', 'repeats the finding', 'disguised criticism',
+      'seller observation repeated back',
+      'the same underlying finding used as both the main story and the wider beat',
+    ]) {
       assert.ok(SYSTEM_PROMPT.includes(rule), `the system prompt forbids: ${rule}`);
     }
+    // The three inputs the refactor removed are not described to the model
+    // either — a prompt that still talks about transcripts invites the model
+    // to reason from something it is no longer given.
+    assert.ok(!properties.includes('evidence_quotes'), 'the model is not asked for quotes it can no longer see');
+    assert.ok(SYSTEM_PROMPT.includes('YOUR ONLY SOURCE IS THE FINDINGS LIST'), 'and is told plainly what its only source is');
     // Mandatory means mandatory, in the prompt as well as in the code.
     assert.ok(TOOL.input_schema.properties.fair_observation.description.includes('MANDATORY'), 'fair_observation is described as mandatory');
     assert.ok(TOOL.input_schema.properties.commercial_consequence.description.includes('MANDATORY'), 'commercial_consequence is described as mandatory');

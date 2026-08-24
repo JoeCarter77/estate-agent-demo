@@ -67,10 +67,12 @@ const DIAGNOSIS_HEADER = [
   'probe_id', 'probe_ref', 'agency_id', 'strengths', 'missed_opportunities',
   'commercial_implication', 'novus_opportunity', 'diagnosis_summary',
 ];
-const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding', 'evidence', 'significance_note'];
+const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding_type', 'finding', 'evidence', 'significance_note'];
 const PERSONALISATION_HEADER = [
   'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
-  'primary_narrative', 'narrative_finding_indexes', 'supporting_findings', 'evidence',
+  'primary_narrative', 'narrative_finding_indexes',
+  'positive_finding_index', 'main_finding_index', 'wider_finding_index',
+  'supporting_findings', 'evidence',
   'novus_counterfactual',
   'enquiry_date', 'property_address', 'email_variant',
   'fair_observation', 'main_finding', 'commercial_consequence', 'wider_observation', 'wider_consequence',
@@ -156,12 +158,24 @@ const SCENARIOS = [
     intelligence: { human_contact: 'none', response_hours: '', contact_attempts: 0, follow_ups: 0, channels_used: '', viewing_progression: 'none', buyer_qualification: 'none', seller_recognition: 'none', communication_quality: 'poor', did_well: '', missed: 'Everything — no contact was made at all.', grade: 'H' },
     comms: [],
     findings: [
-      { finding: 'The enquiry was never replied to at all.', evidence: 'Zero communications recorded across the full 4-day observation window.', significance_note: 'Both the buyer and the declared seller lead were lost in silence.' },
+      { finding_type: 'problem', finding: 'The enquiry was never replied to at all.', evidence: 'Zero communications recorded across the full 4-day observation window.', significance_note: 'Both the buyer and the declared seller lead were lost in silence.' },
+      // The wider beat is written FROM a finding, so a seller opportunity the
+      // email is allowed to raise has to exist as one — Diagnosis records it,
+      // and Personalisation selects it. It cannot be invented downstream.
+      { finding_type: 'opportunity', finding: 'A declared property to sell was never picked up as a valuation.', evidence: 'The enquiry declared a property to sell; nothing came back at all.', significance_note: 'A valuation opportunity lost in the same silence.' },
     ],
     strengths: '',
+    // No human contact, so Diagnosis records no positive at all — the email
+    // must not be able to invent one.
+    positives: [],
     story: {
       primary_narrative: 'Nothing came back at all — not an automated acknowledgement, not a call, nothing, across four days.',
-      narrative_finding_indexes: [1],
+      // No positive exists to select. The main finding IS the silence — the
+      // consequence has to rest on something — and the seller opportunity is
+      // the genuinely separate wider beat.
+      positive_finding_index: null,
+      main_finding_index: 1,
+      wider_finding_index: 2,
       supporting_findings: '',
       fair_observation: 'Your team have clearly been busy.',
       main_finding: 'We never heard anything back.',
@@ -173,7 +187,7 @@ const SCENARIOS = [
     // there was no conversation to observe or narrate — so both are forced
     // empty however the model answers, and the email switches structure.
     expect: {
-      hero_journey: 'complete_miss', findings: 1, email_variant: 'no_response',
+      hero_journey: 'complete_miss', findings: 2, email_variant: 'no_response',
       // The no-response variant closes with its own two lines, so the normal
       // curiosity tease is not stored on top of them.
       fair_observation: '', main_finding: '', additional_findings_hook: '',
@@ -185,19 +199,22 @@ const SCENARIOS = [
     intelligence: { human_contact: 'yes', response_hours: 4.2, contact_attempts: 1, follow_ups: 0, channels_used: 'email', viewing_progression: 'none', buyer_qualification: 'none', seller_recognition: 'none', communication_quality: 'generic', did_well: 'Replied the same working day.', missed: 'The reply said nothing specific to this enquiry.', grade: 'D' },
     comms: [{ id: 'com_generic', channel: 'email', at: '2020-01-01T13:12:00.000Z', subject: 'Your enquiry', body: 'Thank you for your enquiry. One of our team will be in touch shortly.' }],
     findings: [
-      { finding: 'The only reply was a generic acknowledgement that engaged with nothing in the enquiry.', evidence: '"Thank you for your enquiry. One of our team will be in touch shortly." — the entire reply.', significance_note: 'A same-day reply that carried no information forward reads to the buyer as no reply.' },
+      { finding_type: 'problem', finding: 'The only reply was a generic acknowledgement that engaged with nothing in the enquiry.', evidence: '"Thank you for your enquiry. One of our team will be in touch shortly." — the entire reply.', significance_note: 'A same-day reply that carried no information forward reads to the buyer as no reply.' },
     ],
     strengths: 'Replied inside the same working day.',
+    positives: [{ finding: 'The enquiry was answered the same working day.', evidence: 'First human reply 4.2 hours after the enquiry.', significance_note: 'Shows enquiries are picked up quickly in working hours.' }],
     story: {
       primary_narrative: 'The reply arrived quickly but engaged with none of what the enquiry actually said.',
-      narrative_finding_indexes: [1],
+      positive_finding_index: 2,
+      main_finding_index: 1,
+      wider_finding_index: null,
       supporting_findings: '',
       fair_observation: 'You did come back to us the same day, which plenty of agencies do not.',
       main_finding: 'We got a reply the same day, but it did not mention the property or anything we had asked.',
       commercial_consequence: 'the enquiry stalled despite your team being quick off the mark.',
       wider_consequence: '',
     },
-    expect: { hero_journey: 'fast_response_stalled_follow_up', findings: 1, email_variant: 'normal' },
+    expect: { hero_journey: 'fast_response_stalled_follow_up', findings: 2, email_variant: 'normal' },
   },
   {
     key: 'good_handling',
@@ -206,9 +223,18 @@ const SCENARIOS = [
     comms: [{ id: 'com_good', channel: 'voice', at: '2020-01-01T09:36:00.000Z', transcript: 'Happy to get you booked in Thursday, and I can bring a valuation figure for your own place at the same time.' }],
     findings: [],
     strengths: 'Called back in 36 minutes, qualified the buyer fully, and booked both the viewing and the valuation.',
+    // Handled well: the ONLY findings this probe has are positives, and the
+    // hero journey must still read that as strong handling rather than as
+    // two problems.
+    positives: [
+      { finding: 'The callback came inside 36 minutes.', evidence: 'First human contact 0.6 hours after the enquiry.', significance_note: 'Shows the front desk answers fast.' },
+      { finding: 'Both the viewing and the valuation were booked on the same call.', evidence: 'Viewing progression booked; valuation booked.', significance_note: 'Shows both sides of the enquiry were converted.' },
+    ],
     story: {
       primary_narrative: 'This was handled about as well as an enquiry can be — the question is whether it happens every time, not just this time.',
-      narrative_finding_indexes: [],
+      positive_finding_index: 1,
+      main_finding_index: null,
+      wider_finding_index: null,
       supporting_findings: '',
       fair_observation: 'Your team called back in 36 minutes and booked the viewing and the valuation in one go.',
       main_finding: 'Honestly, this one was handled really well.',
@@ -218,7 +244,7 @@ const SCENARIOS = [
     // No findings left over, but the closing transition is locked copy that
     // runs in every email — it hands off to the breakdown rather than
     // claiming a number of other findings.
-    expect: { hero_journey: 'strong_handling_database_opportunity', findings: 0, additional_findings_hook: ADDITIONAL_FINDINGS_HOOK_LINE },
+    expect: { hero_journey: 'strong_handling_database_opportunity', findings: 2, additional_findings_hook: ADDITIONAL_FINDINGS_HOOK_LINE },
   },
   {
     key: 'missed_seller',
@@ -226,19 +252,22 @@ const SCENARIOS = [
     intelligence: { human_contact: 'yes', response_hours: 2.1, contact_attempts: 2, follow_ups: 1, channels_used: 'email', viewing_progression: 'booked', buyer_qualification: 'thorough', buyer_questions_asked: 'budget; finance; timescale', seller_recognition: 'none', communication_quality: 'strong', did_well: 'Fast, well-qualified, viewing booked.', missed: 'The declared property to sell was never acknowledged.', grade: 'B' },
     comms: [{ id: 'com_seller', channel: 'email', at: '2020-01-01T11:06:00.000Z', subject: 'Viewing confirmed', body: 'Great, I have you in for Thursday at 2pm. Could you confirm your budget and how you are funding the purchase?' }],
     findings: [
-      { finding: 'The declared property to sell was never acknowledged in any contact.', evidence: 'Seller recognition recorded as none across both emails; no valuation, appraisal or valuer mentioned.', significance_note: 'An off-market instruction was handed over and never picked up.' },
+      { finding_type: 'opportunity', finding: 'The declared property to sell was never acknowledged in any contact.', evidence: 'Seller recognition recorded as none across both emails; no valuation, appraisal or valuer mentioned.', significance_note: 'An off-market instruction was handed over and never picked up.' },
     ],
     strengths: 'Fast, well-qualified on the buying side, viewing booked inside two hours.',
+    positives: [{ finding: 'The buying side was qualified properly and the viewing was booked inside two hours.', evidence: 'Budget, finance and timescale all asked; viewing booked 2.1 hours in.', significance_note: 'Shows the buying side of the process works.' }],
     story: {
       primary_narrative: 'The buying side was handled well and the selling side was never touched — the instruction was mentioned in the enquiry and never came up again.',
-      narrative_finding_indexes: [1],
+      positive_finding_index: 2,
+      main_finding_index: 1,
+      wider_finding_index: null,
       supporting_findings: '',
       fair_observation: 'On the buying side this was genuinely well handled — booked in two hours with proper questions.',
       main_finding: 'We mentioned we had a property to sell, and it never came up again.',
       commercial_consequence: "the £445,000 enquiry was not just a potential buyer — there was a potential seller instruction sitting inside it that never got explored.",
       wider_consequence: '',
     },
-    expect: { hero_journey: 'weak_seller_qualification', findings: 1 },
+    expect: { hero_journey: 'weak_seller_qualification', findings: 2 },
   },
   {
     key: 'weak_qualification',
@@ -246,19 +275,22 @@ const SCENARIOS = [
     intelligence: { human_contact: 'yes', response_hours: 3.4, contact_attempts: 1, follow_ups: 0, channels_used: 'voice', viewing_progression: 'invited', buyer_qualification: 'none', buyer_questions_asked: '', seller_recognition: '', communication_quality: 'generic', did_well: 'Rang back the same day.', missed: 'No qualifying question of any kind was asked.', grade: 'D' },
     comms: [{ id: 'com_qual', channel: 'voice', at: '2020-01-01T12:24:00.000Z', transcript: 'Give us a ring back when you want to come and see it.' }],
     findings: [
-      { finding: 'Not one qualifying question was asked before inviting a viewing.', evidence: 'Buyer qualification recorded as none; no question on budget, finance, timescale or position in the single call.', significance_note: 'The viewing slot is committed with no idea whether the buyer can proceed.' },
+      { finding_type: 'problem', finding: 'Not one qualifying question was asked before inviting a viewing.', evidence: 'Buyer qualification recorded as none; no question on budget, finance, timescale or position in the single call.', significance_note: 'The viewing slot is committed with no idea whether the buyer can proceed.' },
     ],
     strengths: 'Rang back the same day.',
+    positives: [{ finding: 'The enquiry was rung back the same day.', evidence: 'A voice callback 3.4 hours after the enquiry.', significance_note: 'Shows enquiries do get picked up by a person.' }],
     story: {
       primary_narrative: 'A viewing was offered without a single question about whether we could actually buy.',
-      narrative_finding_indexes: [1],
+      positive_finding_index: 2,
+      main_finding_index: 1,
+      wider_finding_index: null,
       supporting_findings: '',
       fair_observation: 'You did ring back the same day.',
       main_finding: 'We were invited to view without being asked anything at all about our position.',
       commercial_consequence: 'a viewing slot went to someone nobody had checked could buy.',
       wider_consequence: '',
     },
-    expect: { hero_journey: 'fast_response_stalled_follow_up', findings: 1 },
+    expect: { hero_journey: 'fast_response_stalled_follow_up', findings: 2 },
   },
   {
     key: 'poor_progression',
@@ -266,19 +298,22 @@ const SCENARIOS = [
     intelligence: { human_contact: 'yes', response_hours: 9.8, contact_attempts: 4, follow_ups: 3, channels_used: 'voice,email', viewing_progression: 'none', buyer_qualification: 'minimal', buyer_questions_asked: 'timescale', seller_recognition: '', communication_quality: 'generic', did_well: 'Four contact attempts across two channels — genuinely persistent.', missed: 'None of the four attempts offered a viewing.', grade: 'B' },
     comms: [{ id: 'com_progress', channel: 'voice', at: '2020-01-01T18:48:00.000Z', transcript: 'Just chasing up on your enquiry, give us a call back when you get a moment.' }],
     findings: [
-      { finding: 'Four contact attempts never once offered a viewing.', evidence: 'contact_attempts 4, follow_ups 3, viewing_progression none.', significance_note: 'Real persistence spent without ever asking for the thing that moves the sale forward.' },
+      { finding_type: 'problem', finding: 'Four contact attempts never once offered a viewing.', evidence: 'contact_attempts 4, follow_ups 3, viewing_progression none.', significance_note: 'Real persistence spent without ever asking for the thing that moves the sale forward.' },
     ],
     strengths: 'Four contact attempts across two channels — genuinely persistent.',
+    positives: [{ finding: 'The team followed up persistently.', evidence: 'Four attempts across phone and email.', significance_note: 'Shows strong persistence.' }],
     story: {
       primary_narrative: 'Your team chased four times and never once offered a viewing.',
-      narrative_finding_indexes: [1],
+      positive_finding_index: 2,
+      main_finding_index: 1,
+      wider_finding_index: null,
       supporting_findings: '',
       fair_observation: 'Four attempts across two channels is more persistence than most agencies manage.',
       main_finding: 'Your team chased us four times, and each one essentially asked us to get back to you, rather than putting a viewing in front of us.',
       commercial_consequence: 'all that effort ended without the one step that moves a sale forward.',
       wider_consequence: '',
     },
-    expect: { hero_journey: 'fast_response_stalled_follow_up', findings: 1 },
+    expect: { hero_journey: 'fast_response_stalled_follow_up', findings: 2 },
   },
   {
     key: 'combining',
@@ -286,29 +321,45 @@ const SCENARIOS = [
     intelligence: { human_contact: 'yes', response_hours: 21.4, contact_attempts: 1, follow_ups: 0, channels_used: 'email', viewing_progression: 'none', buyer_qualification: 'none', buyer_questions_asked: '', seller_recognition: 'none', communication_quality: 'generic', did_well: 'The reply did name the correct property.', missed: 'Slow, unqualified, no viewing, seller ignored.', grade: 'F' },
     comms: [{ id: 'com_combine', channel: 'email', at: '2020-01-02T06:24:00.000Z', subject: 'Compound Gardens', body: 'Thanks for your interest in Compound Gardens. Let us know if you would like any further information.' }],
     findings: [
-      { finding: 'Nothing reached the enquiry for 21.4 hours.', evidence: 'Probe 09:00 -> first human contact 06:24 the next day = 21.4 hours.', significance_note: 'Overnight enquiries are not being picked up until the following morning.' },
-      { finding: 'No qualifying question was asked at any point.', evidence: 'Buyer qualification recorded as none; no questions in the single reply.', significance_note: 'The agency has no idea whether this buyer can proceed.' },
-      { finding: 'No viewing was ever offered.', evidence: 'viewing_progression none across the single contact.', significance_note: 'The enquiry was answered without being advanced.' },
-      { finding: 'The declared property to sell went unmentioned in the reply.', evidence: 'Seller recognition none; no valuation mentioned anywhere in the single email.', significance_note: 'A second, larger opportunity in the same enquiry was not seen at all.' },
+      { finding_type: 'problem', finding: 'Nothing reached the enquiry for 21.4 hours.', evidence: 'Probe 09:00 -> first human contact 06:24 the next day = 21.4 hours.', significance_note: 'Overnight enquiries are not being picked up until the following morning.' },
+      { finding_type: 'problem', finding: 'No qualifying question was asked at any point.', evidence: 'Buyer qualification recorded as none; no questions in the single reply.', significance_note: 'The agency has no idea whether this buyer can proceed.' },
+      { finding_type: 'problem', finding: 'No viewing was ever offered.', evidence: 'viewing_progression none across the single contact.', significance_note: 'The enquiry was answered without being advanced.' },
+      { finding_type: 'opportunity', finding: 'The declared property to sell went unmentioned in the reply.', evidence: 'Seller recognition none; no valuation mentioned anywhere in the single email.', significance_note: 'A second, larger opportunity in the same enquiry was not seen at all.' },
     ],
     strengths: 'The reply did at least name the correct property.',
+    positives: [{ finding: 'The reply named the correct property.', evidence: 'The email subject and body both name Compound Gardens.', significance_note: 'Shows the enquiry was at least read.' }],
     story: {
       // Deliberately combines three findings into one broader story and
       // leaves the fourth as a supporting finding.
       primary_narrative: 'The enquiry waited overnight, and the reply that eventually arrived asked nothing and offered nothing — it acknowledged the property and stopped there.',
-      narrative_finding_indexes: [1, 2, 3],
-      supporting_findings: 'The property we said we had to sell was never mentioned either.',
+      // The main story is the overnight gap (1); the seller opportunity (4)
+      // is a genuinely different event, so it is the wider beat.
+      positive_finding_index: 5,
+      main_finding_index: 1,
+      wider_finding_index: 4,
+      supporting_findings: 'Nothing was asked about our position, and no viewing was ever offered.',
       // "did at least name the right property" would be a backhanded
       // compliment — the hedge guard rejects it, and the email would then be
       // unsendable rather than opening on criticism.
       fair_observation: 'You did reply, and the reply named the right property.',
       main_finding: 'It took about a day for anything to come back, and when it did it did not ask us anything or offer us a viewing.',
       commercial_consequence: 'the £615,000 enquiry was getting attention, but it was not really being progressed.',
-      wider_consequence: '',
+      wider_observation: "I'd also said in the enquiry that I had a property of my own to sell that wasn't yet on the market.",
+      wider_consequence: 'a potential seller instruction sitting inside the same enquiry was never explored.',
     },
-    expect: { hero_journey: 'slow_response_gap', findings: 4, narrative_finding_indexes: '1,2,3' },
+    expect: { hero_journey: 'slow_response_gap', findings: 5, narrative_finding_indexes: '1,4,5' },
   },
 ];
+
+// The findings this scenario should leave in DIAGNOSIS_FINDINGS, in the order
+// lib/probe-diagnosis.mjs persists them: problems and opportunities first (so
+// finding_index 1 is still "most commercially damaging"), positives after.
+function expectedFindings(scenario) {
+  return [
+    ...scenario.findings,
+    ...(scenario.positives || []).map((f) => ({ ...f, finding_type: 'positive' })),
+  ];
+}
 
 const byAddress = new Map(SCENARIOS.map((s) => [s.address, s]));
 
@@ -328,6 +379,7 @@ function installAiStub() {
       diagnoseCalls += 1;
       return {
         findings: scenario.findings,
+        positive_findings: scenario.positives || [],
         strengths: scenario.strengths,
         missed_opportunities: scenario.intelligence.missed || '',
         commercial_implication: `Specific to ${scenario.address}.`,
@@ -338,7 +390,7 @@ function installAiStub() {
     if (tool.name === 'record_probe_personalisation') {
       personaliseCalls += 1;
       personalisationPrompts.set(scenario.probe_id, prompt);
-      return { evidence_quotes: [], ...scenario.story };
+      return { ...scenario.story };
     }
     // Intelligence interpretation — deterministic fields are already seeded,
     // this only needs to satisfy the interpretation step.
@@ -397,7 +449,7 @@ async function run() {
 
   // ── 1. Every finding lands in DIAGNOSIS_FINDINGS, linked by probe_id ──
   {
-    const expectedTotal = SCENARIOS.reduce((n, s) => n + s.findings.length, 0);
+    const expectedTotal = SCENARIOS.reduce((n, s) => n + expectedFindings(s).length, 0);
     const allRows = rowsOf(store, 'DIAGNOSIS_FINDINGS', DIAGNOSIS_FINDINGS_HEADER);
     assert.strictEqual(allRows.length, expectedTotal, `DIAGNOSIS_FINDINGS holds all ${expectedTotal} findings`);
     assert.strictEqual(first.diagnosis.findings_written, expectedTotal, 'the rebuild reports the same count it wrote');
@@ -405,16 +457,30 @@ async function run() {
 
     for (const s of SCENARIOS) {
       const rows = findingsFor(store, s.probe_id);
-      assert.strictEqual(rows.length, s.findings.length, `${s.key}: one row per finding`);
+      const expected = expectedFindings(s);
+      assert.strictEqual(rows.length, expected.length, `${s.key}: one row per finding, positives included`);
       rows.forEach((r, i) => {
         assert.strictEqual(Number(r.finding_index), i + 1, `${s.key}: findings are numbered in Diagnosis's own order from 1`);
-        assert.strictEqual(r.finding, s.findings[i].finding, `${s.key}: finding ${i + 1} text is persisted verbatim`);
-        assert.strictEqual(r.evidence, s.findings[i].evidence, `${s.key}: finding ${i + 1} keeps its own evidence`);
-        assert.strictEqual(r.significance_note, s.findings[i].significance_note, `${s.key}: finding ${i + 1} keeps its significance note`);
+        assert.strictEqual(r.finding_type, expected[i].finding_type, `${s.key}: finding ${i + 1} carries its type`);
+        assert.strictEqual(r.finding, expected[i].finding, `${s.key}: finding ${i + 1} text is persisted verbatim`);
+        assert.strictEqual(r.evidence, expected[i].evidence, `${s.key}: finding ${i + 1} keeps its own evidence`);
+        assert.strictEqual(r.significance_note, expected[i].significance_note, `${s.key}: finding ${i + 1} keeps its significance note`);
       });
+      // Problems and opportunities always come before positives, so an index
+      // written to a sheet before positives existed still means what it did.
+      const firstPositive = rows.findIndex((r) => r.finding_type === 'positive');
+      if (firstPositive !== -1) {
+        assert.ok(rows.slice(firstPositive).every((r) => r.finding_type === 'positive'),
+          `${s.key}: positives are appended after the story findings, never interleaved`);
+      }
     }
-    // Nothing invented: the well-handled probe contributes no rows at all.
-    assert.strictEqual(findingsFor(store, 'prb_good').length, 0, 'a probe with no findings writes no findings rows');
+    // Nothing invented: the well-handled probe contributes no PROBLEM rows at
+    // all — only the positives that record why it was well handled.
+    assert.deepStrictEqual(findingsFor(store, 'prb_good').map((r) => r.finding_type), ['positive', 'positive'],
+      'a probe with no problems writes only its positive findings');
+    // ...and the silent one has no positive to invent from.
+    assert.strictEqual(findingsFor(store, 'prb_none').filter((r) => r.finding_type === 'positive').length, 0,
+      'a probe nobody replied to has no positive finding at all');
     ok(`every findings[] item reaches DIAGNOSIS_FINDINGS — ${expectedTotal} rows across ${SCENARIOS.length} probes, one row per finding, linked by probe_id, and none invented`);
   }
 
@@ -449,15 +515,24 @@ async function run() {
     ok('Personalisation receives exactly its own probe\'s complete findings set, with no cross-probe leakage');
   }
 
-  // ── 4. Several findings combine into ONE narrative, not just finding #1 ──
+  // ── 4. A five-finding probe SELECTS its three beats, and the beats are
+  //    three genuinely different findings — not finding #1 three times ──
   {
     const p = personalisationFor(store, 'prb_combine');
-    assert.strictEqual(p.narrative_finding_indexes, '1,2,3', 'three findings combined into the primary narrative');
-    assert.ok(p.supporting_findings.includes('property we said we had to sell'), 'the fourth stays a supporting finding');
+    assert.strictEqual(p.narrative_finding_indexes, '1,4,5', 'the narrative records exactly the findings the three beats rest on');
+    assert.strictEqual(String(p.positive_finding_index), '5', 'the fair observation comes from the positive finding');
+    assert.strictEqual(String(p.main_finding_index), '1', 'the main story from the overnight gap');
+    assert.strictEqual(String(p.wider_finding_index), '4', 'and the wider beat from the seller opportunity — a different event');
+    assert.notStrictEqual(p.main_finding_index, p.wider_finding_index, 'the main and wider beats are never the same finding');
+    assert.ok(p.supporting_findings.includes('no viewing was ever offered'), 'the story findings left outside the selection stay supporting findings');
     assert.strictEqual(p.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE, 'the email\'s additional-findings hook is exactly the fixed tease line, never AI-written analysis');
-    assert.ok(!p.additional_findings_hook.includes('property we said we had to sell'), 'and it never reveals what the leftover finding actually was');
-    assert.strictEqual(findingsFor(store, 'prb_combine').length, 4, 'all four findings remain available for the audit');
-    ok('a probe with four findings combines three into one broader narrative and keeps the fourth as a supporting finding — not simply finding #1');
+    assert.ok(!p.additional_findings_hook.includes('viewing'), 'and it never reveals what the leftover finding actually was');
+    assert.strictEqual(findingsFor(store, 'prb_combine').length, 5, 'all five findings remain available for the audit');
+    // The evidence recorded is the evidence of the findings selected — not a
+    // quote the model produced from a transcript it never saw.
+    assert.ok(p.evidence.includes('Probe 09:00 -> first human contact 06:24 the next day = 21.4 hours.'),
+      'the stored evidence is the selected findings\' own evidence');
+    ok('a probe with five findings selects three distinct ones — a positive, a main story and a genuinely different wider beat — and keeps the rest as supporting findings');
   }
 
   // ── 5. Each probe shape gets its own journey, story and email variables ──
@@ -546,7 +621,12 @@ async function run() {
     assert.strictEqual(p.email_variant, 'no_response', 'it uses the no-response structure, not a normal email with gaps');
     assert.strictEqual(p.fair_observation, '', 'the model\'s invented praise is discarded — there was no handling to be fair about');
     assert.strictEqual(p.main_finding, '', 'and no main finding is narrated — the failure is the silence itself');
-    assert.strictEqual(p.evidence, '', 'nothing was said, so nothing is quoted');
+    // Nothing was said, so the evidence is the ABSENCE the findings record.
+    // It is never a quote — there is nothing to quote from — and it is not
+    // empty either: the consequence of the silence still rests on something.
+    assert.ok(p.evidence.includes('Zero communications recorded across the full 4-day observation window.'),
+      "the evidence is the selected findings' own evidence: the silence itself");
+    assert.ok(!p.evidence.includes('"'), 'and nothing is quoted, because nothing was ever said');
 
     // The fixed no-response shape, in order.
     const body = p.email_body;
@@ -637,15 +717,15 @@ async function run() {
       assert.ok(prompt.includes(f.evidence), 'with its evidence');
     }
     assert.ok(!prompt.includes('(none — the evidence shows no genuine problem)'),
-      'the prompt never tells the model this enquiry had no genuine problem when it had four');
+      'the prompt never tells the model this enquiry had no genuine problem when it had five');
 
     // And the primary path is unchanged: where the ROWS exist, they are what
     // is used, and nothing is recovered from the diagnosis row.
     assert.strictEqual(first.personalisation.findings_recovered_from_diagnosis_row, 0,
       'the first pass, where every probe had its rows, recovered nothing');
     assert.strictEqual(first.personalisation.personalisations_with_findings,
-      SCENARIOS.filter((s) => s.findings.length > 0).length,
-      'and every probe that has findings was personalised with them');
+      SCENARIOS.filter((s) => expectedFindings(s).length > 0).length,
+      'and every probe that has findings was personalised with them — including the well-handled one, whose findings are all positives');
     ok('Personalisation is driven by the persisted DIAGNOSIS_FINDINGS rows, and a diagnosed probe missing them recovers the same findings from its DIAGNOSIS row rather than silently reading as "no problem found"');
   }
 
