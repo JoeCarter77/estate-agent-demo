@@ -6,9 +6,8 @@
 //   PERSONALISATION + PROBE -> EMAIL
 //
 // The sibling suite (novus:probe-personalisation-selftest) covers the guards
-// that were already there. This one covers the eight probe shapes the change
-// has to be right about, END TO END, asserting the COMPLETE email body for the
-// ones that matter:
+// that were already there. This one covers the core probe shapes plus the
+// copy-length contract and an evidence-heavy compression case, END TO END:
 //
 //   1. no response
 //   2. one genuine but weak response
@@ -40,6 +39,15 @@ import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 
 let passed = 0;
 function ok(msg) { passed++; console.log('  ✓ ' + msg); }
+
+function wordCount(text) {
+  return String(text || '').trim().split(/\s+/).filter(Boolean).length;
+}
+
+function assertOneSentence(text, label) {
+  const sentences = String(text || '').split(/[.!?]+(?:\s+|$)/).map((part) => part.trim()).filter(Boolean);
+  assert.strictEqual(sentences.length, 1, `${label}: one sentence, not an evidence summary`);
+}
 
 const PROBE = {
   probe_id: 'prb_sel_001',
@@ -152,7 +160,26 @@ function assertNoDuplicatedStory(row, label) {
 }
 
 async function run() {
-  console.log('Personalisation story selection — the eight probe shapes\n');
+  console.log('Personalisation story selection and copy tightening\n');
+
+  // ── COPY CONTRACT: same intelligence, fewer words ───────────────────────
+  {
+    const { TOOL, SYSTEM_PROMPT, CONSEQUENCE_TOOL, CONSEQUENCE_SYSTEM_PROMPT } = _internal;
+    const fields = TOOL.input_schema.properties;
+    assert.match(SYSTEM_PROMPT, /120–160 words IN TOTAL/, 'the whole normal email has an explicit target, including fixed copy');
+    assert.match(SYSTEM_PROMPT, /NEVER pad a clear story/, 'the target is never a reason to add copy');
+    assert.match(SYSTEM_PROMPT, /SAME INTELLIGENCE, FEWER WORDS, HARDER IMPACT/, 'the compression objective is explicit');
+    for (const field of ['fair_observation', 'main_finding', 'commercial_consequence']) {
+      assert.match(fields[field].description, /ONE concise sentence/, `${field}: schema requires one concise sentence`);
+    }
+    assert.match(fields.main_finding.description, /ONE decisive anchor/, 'main finding keeps one evidence anchor rather than a list');
+    assert.match(fields.wider_observation.description, /ONE short standalone sentence/, 'wider observation is one short sentence');
+    assert.match(fields.wider_consequence.description, /ONE short sentence/, 'wider consequence is one short sentence');
+    assert.match(CONSEQUENCE_TOOL.input_schema.properties.commercial_consequence.description, /ONE concise sentence/,
+      'the dedicated consequence repair has the same tightened contract');
+    assert.match(CONSEQUENCE_SYSTEM_PROMPT, /ONE concise sentence/, 'and its repair prompt cannot reintroduce verbosity');
+    ok('COPY CONTRACT — the schema and both generation prompts target a short complete email, one concise sentence per beat, no padding and no crude truncation');
+  }
 
   // ── 1. NO RESPONSE ────────────────────────────────────────────────────────
   {
@@ -195,6 +222,8 @@ async function run() {
       widerConsequence: story().wider_consequence,
     }), 'the complete no-response email body is exactly the locked structure');
     assertNoDuplicatedStory(row, 'no response');
+    assert.ok(wordCount(row.email_body) < 120, 'no-response copy stays shorter than the normal target');
+    assertOneSentence(row.commercial_consequence, 'no-response consequence');
     ok('1. NO RESPONSE — the email is the silence, its consequence and the declared seller beat; no positive is invented and no conversation is described');
   }
 
@@ -230,6 +259,10 @@ async function run() {
       consequence: 'a live buyer enquiry was closed off in one message without anyone establishing what I needed or what should happen next.',
     }), 'the complete email body is the three-beat structure with no wider paragraphs');
     assertNoDuplicatedStory(row, 'weak response');
+    assert.ok(wordCount(row.email_body) <= 160, 'positive + main only stays below the normal-email ceiling; it is not padded to 120');
+    assertOneSentence(row.fair_observation, 'positive + main: fair observation');
+    assertOneSentence(row.main_finding, 'positive + main: main finding');
+    assertOneSentence(row.commercial_consequence, 'positive + main: consequence');
     ok('2. ONE GENUINE BUT WEAK RESPONSE — a small factual positive still opens the email, and with only one problem there is no wider beat to pad with');
   }
 
@@ -256,6 +289,16 @@ async function run() {
       widerConsequence: story().wider_consequence,
     }), 'the complete email body carries the full five-beat structure');
     assertNoDuplicatedStory(row, 'strong + seller');
+    assert.ok(wordCount(row.email_body) >= 120 && wordCount(row.email_body) <= 160,
+      'persistent multi-channel + seller copy lands inside the normal target range');
+    for (const [field, value] of [
+      ['fair observation', row.fair_observation], ['main finding', row.main_finding],
+      ['commercial consequence', row.commercial_consequence], ['wider observation', row.wider_observation],
+      ['wider consequence', row.wider_consequence],
+    ]) assertOneSentence(value, `strong + seller: ${field}`);
+    assert.match(row.fair_observation, /three times.*phone and email/i, 'the useful attempt count and multi-channel fact survive compression');
+    assert.match(row.commercial_consequence, /£425,000/, 'the property value still makes the scale obvious');
+    assert.match(row.wider_consequence, /seller instruction/, 'the evidenced seller opportunity is retained');
     ok('3. STRONG RESPONSE + SEPARATE SELLER OPPORTUNITY — the positive, the qualification gap and the seller opportunity are three different findings, so all five paragraphs are earned');
   }
 
@@ -387,7 +430,48 @@ async function run() {
     ok('8. PROPERTY VALUE ABSENT — no monetary figure survives anywhere, the qualitative half of the sentence does, and the email is still sendable');
   }
 
-  // ── PHASE 8: what this costs, measured rather than claimed ────────────────
+  // ── 9. LONG EVIDENCE-HEAVY INPUT, SHORT SPECIFIC COPY ────────────────────
+  {
+    const evidenceHeavy = [
+      {
+        finding_index: 1, finding_type: 'problem',
+        finding: 'The delayed response never established the buyer position.',
+        evidence: 'The enquiry arrived Monday at 09:03. A voicemail arrived Thursday at 00:19, over 63 hours later, followed by an email at 00:22. Neither asked about budget, funding, timescale, current position, requirements, chain status or readiness to proceed.',
+        significance_note: 'A delayed live buyer enquiry remained wholly unqualified.',
+      },
+      {
+        finding_index: 2, finding_type: 'positive',
+        finding: 'The eventual response correctly referenced the enquiry.',
+        evidence: 'The voicemail and email used my name, named Fox Cottage, supplied the branch number and offered a viewing.',
+        significance_note: 'Shows the enquiry was found and handled personally once picked up.',
+      },
+    ];
+    const { row } = await personalise({
+      rows: evidenceHeavy,
+      result: story({
+        positive_finding_index: 2,
+        main_finding_index: 1,
+        wider_finding_index: null,
+        fair_observation: 'you did pick the enquiry up personally and referenced Fox Cottage correctly.',
+        main_finding: 'that it took over 63 hours to reply without establishing my position as a buyer.',
+        commercial_consequence: 'you had a £425,000 buyer enquiry in front of you without knowing whether I could proceed.',
+        wider_observation: '',
+        wider_consequence: '',
+      }),
+    });
+    assert.ok(row.email_body, 'the evidence-heavy probe remains sendable');
+    assert.ok(wordCount(row.email_body) <= 160, 'long source evidence does not turn into a long email');
+    assert.match(row.main_finding, /63 hours/, 'the decisive delay survives');
+    assert.match(row.commercial_consequence, /£425,000/, 'and so does the commercially useful property value');
+    assert.doesNotMatch(row.email_body, /budget, funding, timescale|chain status|branch number/,
+      'detail lists that do not change the commercial story are not replayed');
+    assertOneSentence(row.fair_observation, 'evidence-heavy: fair observation');
+    assertOneSentence(row.main_finding, 'evidence-heavy: main finding');
+    assertOneSentence(row.commercial_consequence, 'evidence-heavy: consequence');
+    ok('9. EVIDENCE-HEAVY CASE — the decisive 63-hour delay and £425,000 scale survive while the detail inventory stays out of the email');
+  }
+
+  // ── PHASE 10: what this costs, measured rather than claimed ───────────────
   {
     const { prompts } = await personalise({ result: story() });
     const { SYSTEM_PROMPT } = _internal;
