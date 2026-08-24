@@ -29,7 +29,7 @@ import {
   ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, FIRST_NAME_MERGE_FIELD, NO_REPLY_LINE,
   SIGN_OFF, THAT_MEANT_PREFIX, THAT_ALSO_MEANT_PREFIX, FAIR_OBSERVATION_PREFIX,
   MAIN_FINDING_PREFIX, withPrefix, emailContractViolations, propertyReference,
-  withMainFindingPrefix,
+  withMainFindingPrefix, hasUnresolvedPlaceholder,
   NO_RESPONSE_BREAKDOWN_LINE, NO_RESPONSE_CTA_LINE,
 } from '../lib/email-assembly.mjs';
 
@@ -293,9 +293,31 @@ function run() {
 
     assert.strictEqual(openingLine('10 August', 'Perry Street'), 'We sent your team an enquiry on 10 August about a house on Perry Street.');
     assert.strictEqual(openingLine('10 August', '14 Perry Street'), 'We sent your team an enquiry on 10 August about 14 Perry Street.');
+    assert.strictEqual(propertyReference('4'), '', 'a bare house number is not a property reference');
+    assert.strictEqual(propertyReference('4A'), '', 'nor is a bare number with a suffix');
+    assert.strictEqual(propertyReference('Apt 16'), '', 'a subdivision without its evidenced building is incomplete');
+    assert.strictEqual(assembleEmail(fullRow({ property_address: '4' })), '', 'an incomplete numeric address leaves the email unsendable');
+    assert.ok(emailContractViolations(fullRow({ property_address: '4' })).includes('missing_property_address'));
     assert.ok(assembleEmail(fullRow({ property_address: 'Perry Street' })).includes('about a house on Perry Street.'),
       'and the assembled email opens on it');
     ok('the property wording is deterministic: a road-only address reads as "a house on Perry Street", an address that names the property is printed as it stands, and no house number is ever invented');
+  }
+
+  // ── Generated placeholders are never sendable prospect copy ──
+  {
+    for (const placeholder of ['<UNKNOWN>', 'UNKNOWN', '{{unresolved_value}}', '[PLACEHOLDER]', 'not provided']) {
+      const row = fullRow({ fair_observation: placeholder });
+      assert.strictEqual(hasUnresolvedPlaceholder(placeholder), true, `${placeholder}: recognised as unresolved`);
+      assert.strictEqual(isSendable(row), false, `${placeholder}: row is not sendable`);
+      assert.ok(emailContractViolations(row).includes('unresolved_placeholder'));
+      assert.strictEqual(assembleEmail(row), '', `${placeholder}: no email body is emitted`);
+    }
+    assert.strictEqual(hasUnresolvedPlaceholder('you replied and referenced the property correctly.'), false);
+    assert.strictEqual(hasUnresolvedPlaceholder(FIRST_NAME_MERGE_FIELD), true,
+      'a merge token is unresolved content when supplied by a generated field; the assembler alone owns the intentional greeting token');
+    assert.strictEqual(assembleEmail(fullRow({ wider_observation: '<UNKNOWN>', wider_consequence: '' })), '',
+      'an optional paragraph cannot smuggle a placeholder into an otherwise complete email');
+    ok('unknown and placeholder sentinels fail the email contract, including in optional prospect-facing paragraphs');
   }
 
   // ── Merge fields ──

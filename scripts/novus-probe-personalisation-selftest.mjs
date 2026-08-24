@@ -44,6 +44,7 @@ import {
   distinctWiderConsequence, emailPropertyAddress, readsAsSnuckCriticism, stripInventedLoss,
   consequenceGoesBeyondFinding, extractProtectedWords,
   readsAsSpeculativeProspectBehaviour,
+  readsAsPerspectiveInversion,
 } from '../lib/probe-personalisation.mjs';
 import {
   ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE, THAT_MEANT_PREFIX, emailContractViolations,
@@ -228,6 +229,18 @@ async function run() {
     assert.ok(!seenPrompt.includes('Are you on the market or renting for example?'), 'every raw message is gone, not just the first');
     assert.ok(!/communication_id/.test(seenPrompt), 'and so is the message scaffolding around them');
     ok('the story-generation call receives ONLY the probe facts, the email variant, the typed findings and the scale fact — the DIAGNOSIS prose, the INTELLIGENCE prose and every raw communication are gone from the prompt');
+  }
+
+  // ── Placeholder output is rejected and repaired like any other missing
+  //    required prospect-facing field ──────────────────────────────────────
+  {
+    __setAiCallerForTests(async () => stubResult({ fair_observation: '<UNKNOWN>' }));
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+    assert.strictEqual(result.fair_observation, '', 'the placeholder is blanked, not copied');
+    assert.strictEqual(result.email_body, '', 'and the row remains unsendable after bounded repair attempts');
+    assert.ok(emailContractViolations(result).includes('missing_fair_observation'));
+    assert.ok(!JSON.stringify(result).includes('<UNKNOWN>'), 'the placeholder reaches no stored prospect-facing field');
+    ok('an unresolved required value is rejected through the existing repair path and never reaches a sendable email');
   }
 
   // ── ...and the reduction is real, not cosmetic ───────────────────────────
@@ -483,6 +496,27 @@ async function run() {
     assert.strictEqual(readsAsDetachedThirdPerson('I mentioned a property of my own that I was thinking of selling.'), false);
     assert.strictEqual(readsAsDetachedThirdPerson(''), false);
     ok('readsAsDetachedThirdPerson catches commentary about the agency without eating copy that simply addresses them as "you"');
+  }
+
+  // ── The agency is the sender of its own follow-up, not its recipient ──
+  {
+    const inverted = 'you were sent three alternative properties that matched the enquiry.';
+    assert.strictEqual(readsAsPerspectiveInversion(inverted), true);
+    assert.strictEqual(readsAsPerspectiveInversion('you sent me three alternative properties that matched the enquiry.'), false,
+      'legitimate second-person reference to the agency remains valid');
+    assert.strictEqual(readsAsPerspectiveInversion('you received my enquiry and replied the same day.'), false,
+      'the agency can legitimately be the recipient of the original enquiry');
+
+    __setAiCallerForTests(async () => stubResult({ fair_observation: inverted }));
+    const rejected = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+    assert.strictEqual(rejected.fair_observation, '', 'the sender/recipient inversion is rejected');
+    assert.strictEqual(rejected.email_body, '', 'and cannot reach a sendable email');
+
+    __setAiCallerForTests(async () => stubResult({ fair_observation: 'I was sent three alternative properties that matched the enquiry.' }));
+    const grounded = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+    assert.strictEqual(grounded.fair_observation, 'I was sent three alternative properties that matched the enquiry.');
+    assert.ok(grounded.email_body.includes('I want to say upfront that I was sent three alternative properties'));
+    ok('observations keep the enquirer as recipient of agency follow-up without rewriting legitimate uses of "you"');
   }
 
   // ── No response at all: the email simply says we never received a reply ──
