@@ -33,7 +33,9 @@
     "novus:rebuild-targeting-selftest": "node scripts/novus-rebuild-targeting-selftest.mjs",
     "novus:lifecycle-selftest": "node scripts/novus-lifecycle-selftest.mjs",
     "novus:match-status-recompute-selftest": "node scripts/novus-match-status-recompute-selftest.mjs",
-    "novus:occurred-at-fallback-selftest": "node scripts/novus-occurred-at-fallback-selftest.mjs"
+    "novus:occurred-at-fallback-selftest": "node scripts/novus-occurred-at-fallback-selftest.mjs",
+    "novus:demo-selftest": "node scripts/novus-demo-selftest.mjs",
+    "novus:demo": "node scripts/novus-demo.mjs"
   },
   "dependencies": {
     "@vercel/oidc": "^3.8.4",

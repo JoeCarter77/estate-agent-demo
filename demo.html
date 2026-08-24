@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="description" content="NOVUS — what happened inside one real enquiry to your agency." />
+<title>NOVUS</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%2711%2016%2080%2080%27%3E%3Crect%20x%3D%2711%27%20y%3D%2716%27%20width%3D%2780%27%20height%3D%2780%27%20rx%3D%2716%27%20fill%3D%27%23172D67%27/%3E%3Cpath%20d%3D%27M29%2082%20L29%2046%20C29%2030%2050%2030%2050%2046%20L73%2082%20L73%2030%27%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%2711%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet" />
+<link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet" />
+<script src="https://assets.calendly.com/assets/external/widget.js" async></script>
+<style>
+  /* ═══════════════════════════════════════════════════════════════════════
+     NOVUS PERSONALISED DEMO — /demo/{demo_slug}
+     The visual language is grade-c-demo.html's, deliberately unchanged: same
+     navy field, same Inter/Fraunces pairing, same property card, evidence
+     components, connector animations and stepper. What is new here is the
+     four-beat structure and the fact that every word comes from one DEMOS row
+     rather than being hardcoded to a single agency.
+     ═══════════════════════════════════════════════════════════════════════ */
+  :root{
+    --navy:#0B1B3F; --navy-2:#172D67; --navy-3:#1E3A8A;
+    --ink:#0F172A; --ink-2:#475569; --ink-3:#64748B;
+    --paper:#FFFFFF; --paper-2:#F8FAFC; --paper-3:#F1F5F9;
+    --line:#E2E8F0; --line-hi:#CBD5E1;
+    --accent:#2563EB; --accent-hi:#3B82F6; --accent-lo:rgba(37,99,235,.08);
+    --green:#22C55E; --amber:#F59E0B; --red:#EF4444;
+    --cyan:#7DD3FC;
+    --serif:'Fraunces',serif;
+
+    /* ONE GLOBAL AXIS — every beat centres on the same x-coordinate */
+    --axis:560px;
+    --axis-wide:1120px;
+    --gutter:22px;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:'Inter',sans-serif; color:#fff; min-height:100vh;
+    background:
+      radial-gradient(120% 90% at 15% -10%, rgba(59,130,246,.25), transparent 55%),
+      radial-gradient(90% 70% at 100% 110%, rgba(30,58,138,.35), transparent 55%),
+      linear-gradient(165deg, var(--navy) 0%, var(--navy-2) 55%, #0D1A3D 100%);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  /* ── TOP CHROME ── */
+  .chrome{ position:fixed; top:0; left:0; right:0; z-index:50; height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 var(--gutter); background:linear-gradient(180deg, rgba(11,27,63,.72) 0%, rgba(11,27,63,0) 100%); backdrop-filter:blur(3px); }
+  .brand{ display:flex; align-items:center; gap:8px; }
+  .brand img{ height:17px; width:auto; filter:brightness(0) invert(1); opacity:.9; }
+  .brand-word{ font-size:.78rem; font-weight:800; letter-spacing:.03em; color:#fff; }
+  .chrome-agency{ font-size:.62rem; font-weight:600; letter-spacing:.04em; color:rgba(255,255,255,.42); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:38vw; text-align:right; }
+  .draft-flag{ font-size:.55rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#FDE68A; background:rgba(245,158,11,.18); border:1px solid rgba(245,158,11,.45); padding:2px 8px; border-radius:100px; margin-left:8px; }
+
+  /* ── JOURNEY RAIL — subtle, viewport-centred ── */
+  .journey{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; align-items:center; }
+  .jstep{ display:flex; align-items:center; gap:6px; background:none; border:none; font-family:'Inter',sans-serif; cursor:pointer; padding:4px 2px; }
+  .jstep-tick{ width:4px; height:4px; border-radius:50%; background:rgba(255,255,255,.22); flex-shrink:0; transition:background .35s ease, transform .35s ease, box-shadow .35s ease; }
+  .jstep-label{ font-size:.54rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.26); white-space:nowrap; transition:color .35s ease; }
+  .jstep.done .jstep-tick{ background:rgba(255,255,255,.45); }
+  .jstep.done .jstep-label{ color:rgba(255,255,255,.4); }
+  .jstep.on .jstep-tick{ background:#fff; transform:scale(1.6); box-shadow:0 0 0 3px rgba(255,255,255,.12); }
+  .jstep.on .jstep-label{ color:#fff; }
+  .jstep:hover .jstep-label{ color:rgba(255,255,255,.8); }
+  .jsep{ width:16px; height:1px; background:rgba(255,255,255,.14); margin:0 7px; flex-shrink:0; position:relative; overflow:hidden; }
+  .jsep::after{ content:''; position:absolute; inset:0; background:rgba(255,255,255,.45); transform:scaleX(0); transform-origin:left; transition:transform .45s cubic-bezier(.22,1,.36,1); }
+  .jsep.filled::after{ transform:scaleX(1); }
+
+  /* ── STAGE / SCENES ── */
+  .stage{ position:relative; min-height:100vh; }
+  .scene{
+    position:relative; min-height:100vh; width:100%;
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    padding:70px var(--gutter) 36px; opacity:0;
+  }
+  .scene.active{ display:flex; animation:scene-in .5s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes scene-in{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+  .scene-inner{ width:100%; max-width:var(--axis); margin:0 auto; display:flex; flex-direction:column; gap:13px; align-items:center; text-align:center; }
+  .scene-inner.wide{ max-width:var(--axis-wide); }
+
+  .eyebrow{ font-size:.6rem; font-weight:700; letter-spacing:.17em; text-transform:uppercase; color:#93C5FD; display:flex; align-items:center; gap:9px; }
+  .eyebrow::before{ content:''; width:18px; height:1px; background:#93C5FD; }
+  h1.scene-h{ font-family:var(--serif); font-size:clamp(1.28rem,2.5vw,1.75rem); font-weight:600; line-height:1.22; letter-spacing:-.01em; color:#fff; }
+  p.scene-sub{ font-size:.82rem; line-height:1.5; color:rgba(255,255,255,.66); max-width:470px; }
+  .micro-note{ font-size:.62rem; line-height:1.45; color:rgba(255,255,255,.32); max-width:440px; }
+
+  .stepper-btn{ display:inline-flex; align-items:center; gap:8px; background:#fff; color:var(--navy-2); border:none; border-radius:100px; padding:11px 20px; font-family:'Inter',sans-serif; font-size:.81rem; font-weight:800; cursor:pointer; box-shadow:0 8px 22px rgba(0,0,0,.26); transition:transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s; }
+  .stepper-btn:hover{ transform:translateY(-2px); box-shadow:0 13px 30px rgba(0,0,0,.32); }
+  .stepper-btn:active{ transform:translateY(0) scale(.98); }
+  .stepper-btn svg{ width:12px; height:12px; }
+
+  /* ═══ BEAT 1 — THE REAL EVENT ═══ */
+  .property-card{ width:100%; background:#fff; border-radius:15px; overflow:hidden; box-shadow:0 20px 46px rgba(0,0,0,.3); text-align:left; }
+  .property-visual{ position:relative; aspect-ratio:16/5.6; overflow:hidden; background:linear-gradient(155deg,#101A33 0%,#1C2D5C 45%,#233B7A 100%); }
+  .property-visual svg.placeholder{ position:absolute; inset:0; width:100%; height:100%; }
+  /* The real Rightmove hero photo, resolved ONCE at build time and stored on
+     the row. It fades in over the drawn placeholder, so a dead listing, a
+     blocked extraction or a broken CDN link degrades to exactly the card the
+     demo has always shown rather than to a gap. */
+  .property-photo{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .5s ease; }
+  .property-photo.loaded{ opacity:1; }
+  .property-visual::after{ content:''; position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.32) 0%, rgba(0,0,0,0) 38%, rgba(0,0,0,.5) 100%); pointer-events:none; }
+  .property-visual .grain{ position:absolute; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E"); opacity:.06; mix-blend-mode:overlay; }
+  .property-status{ position:absolute; z-index:2; top:10px; left:11px; font-size:.55rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#0F172A; background:rgba(255,255,255,.92); padding:4px 9px; border-radius:100px; }
+  .property-price-tag{ position:absolute; z-index:2; bottom:10px; left:11px; font-family:var(--serif); font-size:1.1rem; font-weight:600; color:#fff; text-shadow:0 2px 12px rgba(0,0,0,.55); }
+  .property-body{ padding:12px 14px 13px; display:flex; flex-direction:column; gap:7px; }
+  .property-addr{ font-size:.87rem; font-weight:800; color:var(--ink); }
+  .property-meta{ display:flex; flex-wrap:wrap; gap:5px; }
+  .property-meta span{ font-size:.62rem; font-weight:600; color:var(--ink-2); background:var(--paper-2); border:1px solid var(--line); padding:3px 8px; border-radius:100px; }
+  .property-agency-row{ display:flex; align-items:center; justify-content:space-between; padding-top:8px; border-top:1px solid var(--line); gap:10px; flex-wrap:wrap; }
+  .property-agency{ font-size:.67rem; color:var(--ink-3); }
+  .property-agency strong{ color:var(--ink); font-weight:700; }
+  .property-link{ font-size:.65rem; font-weight:600; color:var(--accent); text-decoration:none; white-space:nowrap; }
+  .property-link:hover{ text-decoration:underline; }
+
+  .hook-line{ font-family:var(--serif); font-size:clamp(.96rem,1.9vw,1.14rem); font-weight:600; line-height:1.42; color:#fff; max-width:500px; }
+
+  /* ═══ BEAT 2 — THE COMMERCIAL OPPORTUNITY ═══
+     A short factual ledger, NOT a transcript. Each row is one thing the
+     INTELLIGENCE row establishes; tone alone decides the colour. */
+  .facts{ width:100%; display:flex; flex-direction:column; gap:5px; }
+  .fact{ display:flex; align-items:baseline; gap:10px; text-align:left; padding:8px 12px; border-radius:9px; border:1px solid rgba(255,255,255,.11); background:rgba(255,255,255,.04); opacity:0; transform:translateY(6px); transition:opacity .4s ease, transform .4s ease; }
+  .fact.on{ opacity:1; transform:translateY(0); }
+  .fact-mark{ font-size:.72rem; line-height:1.4; flex-shrink:0; width:12px; }
+  .fact.good{ border-color:rgba(34,197,94,.3); background:rgba(34,197,94,.07); }
+  .fact.good .fact-mark{ color:#86EFAC; }
+  .fact.gap{ border-color:rgba(239,68,68,.34); background:rgba(239,68,68,.08); }
+  .fact.gap .fact-mark{ color:#FCA5A5; }
+  .fact.neutral .fact-mark{ color:rgba(255,255,255,.4); }
+  .fact-text{ display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .fact-label{ font-size:.755rem; font-weight:700; color:#fff; line-height:1.35; }
+  .fact.neutral .fact-label{ font-weight:600; color:rgba(255,255,255,.86); }
+  .fact-detail{ font-size:.635rem; color:rgba(255,255,255,.46); line-height:1.4; }
+
+  .credit{ width:100%; text-align:left; border-left:2px solid rgba(134,239,172,.5); padding:2px 0 2px 11px; }
+  .credit-cap{ font-size:.55rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:#86EFAC; }
+  .credit-body{ font-size:.755rem; line-height:1.5; color:rgba(255,255,255,.8); margin-top:3px; }
+
+  .verdict{ font-family:var(--serif); font-size:clamp(.96rem,1.9vw,1.14rem); font-weight:600; line-height:1.38; color:#fff; }
+  .verdict .bad{ color:#FCA5A5; }
+  .consequence{ font-size:.78rem; line-height:1.55; color:rgba(255,255,255,.7); max-width:490px; }
+  .consequence b{ color:#fff; font-weight:700; }
+
+  .branches{ display:flex; gap:14px; width:100%; max-width:430px; }
+  .branch{ flex:1; border-radius:14px; padding:13px 12px; border:1.5px solid; display:flex; flex-direction:column; gap:3px; align-items:center; }
+  .branch.ok{ border-color:rgba(34,197,94,.4); background:rgba(34,197,94,.07); }
+  .branch.no{ border-color:rgba(239,68,68,.4); background:rgba(239,68,68,.07); }
+  .br-mark{ font-size:1.1rem; line-height:1; }
+  .branch.ok .br-mark{ color:#86EFAC; } .branch.no .br-mark{ color:#FCA5A5; }
+  .br-who{ font-size:.55rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.4); }
+  .br-name{ font-size:.88rem; font-weight:800; color:#fff; letter-spacing:-.01em; }
+  .br-state{ font-size:.58rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; }
+  .branch.ok .br-state{ color:#86EFAC; } .branch.no .br-state{ color:#FCA5A5; }
+
+  /* ═══ BEAT 3 — UNDERSTANDS → DECIDES → ACTS ═══
+     Intelligence is the hero. Three stages, revealed in sequence, each one a
+     short list — never a simulated conversation. */
+  .fstep{ opacity:0; transform:translateY(7px); transition:opacity .45s ease, transform .45s ease; }
+  .fstep.on{ opacity:1; transform:translateY(0); }
+  .uda{ width:100%; display:flex; flex-direction:column; align-items:center; gap:0; }
+  .uda-stage{ width:100%; text-align:left; border:1px solid rgba(125,211,252,.26); background:linear-gradient(150deg, rgba(56,189,248,.09), rgba(30,58,138,.16)); border-radius:13px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+  .uda-head{ display:flex; align-items:center; gap:9px; }
+  .uda-num{ width:19px; height:19px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:.55rem; font-weight:800; color:var(--navy); background:var(--cyan); }
+  .uda-title{ font-size:.63rem; font-weight:800; letter-spacing:.15em; text-transform:uppercase; color:#fff; }
+  .uda-sub{ font-size:.6rem; color:rgba(255,255,255,.42); margin-left:auto; text-align:right; }
+  .uda-items{ display:flex; flex-direction:column; gap:7px; }
+  .uda-item{ display:flex; gap:9px; align-items:baseline; }
+  .uda-dot{ width:4px; height:4px; border-radius:50%; background:var(--cyan); flex-shrink:0; transform:translateY(-2px); box-shadow:0 0 6px rgba(125,211,252,.8); }
+  .uda-item-text{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .uda-label{ font-size:.745rem; font-weight:700; color:#fff; line-height:1.4; }
+  .uda-detail{ font-size:.655rem; color:rgba(255,255,255,.5); line-height:1.45; }
+  .uda-owner{ font-size:.5rem; font-weight:800; letter-spacing:.09em; text-transform:uppercase; padding:2px 7px; border-radius:100px; margin-right:7px; white-space:nowrap; vertical-align:middle; }
+  .uda-owner.novus{ color:var(--cyan); background:rgba(56,189,248,.14); border:1px solid rgba(125,211,252,.4); }
+  .uda-owner.team{ color:#FDBA74; background:rgba(253,186,116,.12); border:1px solid rgba(253,186,116,.38); }
+  .uda-link{ width:2px; height:16px; background:linear-gradient(180deg, rgba(125,211,252,.5), rgba(125,211,252,.12)); position:relative; overflow:hidden; }
+  .uda-link::after{ content:''; position:absolute; left:0; width:2px; height:7px; background:var(--cyan); box-shadow:0 0 6px rgba(125,211,252,.9); animation:uda-travel 2.2s linear infinite; }
+  @keyframes uda-travel{ 0%{ transform:translateY(-8px); opacity:0; } 25%{ opacity:1; } 75%{ opacity:1; } 100%{ transform:translateY(18px); opacity:0; } }
+  .payoff-line{ font-family:var(--serif); font-size:clamp(.96rem,1.9vw,1.15rem); font-weight:600; line-height:1.4; color:#fff; max-width:470px; }
+  .payoff-line .highlight{ color:var(--cyan); }
+
+  /* ═══ BEAT 4 — ACROSS THE BUSINESS ═══
+     The same architectural flow language as the original system map: pills in,
+     converging connectors, the intelligence node, then what it produces. */
+  .flow{ width:100%; max-width:620px; margin:0 auto; display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .flow-cap{ font-size:.5rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:rgba(255,255,255,.3); }
+  .flow-row{ display:flex; align-items:center; justify-content:center; gap:7px; flex-wrap:wrap; width:100%; margin-top:4px; }
+  .flow-pill{ font-size:.62rem; font-weight:600; padding:5px 11px; border-radius:100px; border:1px solid; line-height:1.3; white-space:nowrap; }
+  .flow-pill.in{ color:rgba(255,255,255,.62); border-color:rgba(255,255,255,.16); background:rgba(255,255,255,.04); }
+  .flow-pill.out{ color:#fff; border-color:rgba(125,211,252,.4); background:rgba(56,189,248,.11); }
+
+  /* Two symmetric halves of ONE grid, not two flex items of unequal width —
+     the left column's centre must land on 25% and the right column's on 75%,
+     because that is exactly where the converging connector below starts. An
+     asymmetric row here throws the whole composition off the global axis. */
+  .sources{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); column-gap:20px; row-gap:9px; width:100%; max-width:620px; }
+  .source-col{ display:flex; flex-direction:column; align-items:center; gap:5px; min-width:0; }
+  .source-cap{ font-size:.53rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:rgba(255,255,255,.44); }
+  .source-col .flow-row{ margin-top:0; }
+
+  .flow-connector{ width:70%; max-width:165px; height:25px; display:block; flex-shrink:0; }
+  /* Exactly as wide as .sources, so the curves start on the two column centres. */
+  .flow-connector.inputs{ width:100%; max-width:620px; height:31px; margin-bottom:-8px; }
+  .flow-connector.stem{ width:2px; max-width:2px; height:26px; }
+  .flow-connector.stem .fc-line{ stroke:rgba(125,211,252,.32); }
+  .fc-line{ fill:none; stroke:rgba(125,211,252,.14); stroke-width:1; vector-effect:non-scaling-stroke; }
+  .fc-glow{ fill:none; stroke:rgba(125,211,252,.85); stroke-width:1.5; stroke-linecap:round; stroke-dasharray:9 200; vector-effect:non-scaling-stroke; opacity:.85; animation:flow-travel 2.8s linear infinite; filter:drop-shadow(0 0 2px rgba(125,211,252,.75)); }
+  @keyframes flow-travel{ to{ stroke-dashoffset:-209; } }
+
+  .core-ring{ position:relative; width:96px; height:96px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; flex-shrink:0;
+    background:radial-gradient(circle at 50% 32%, rgba(56,189,248,.4), rgba(13,26,61,.96) 72%);
+    border:1px solid rgba(125,211,252,.6);
+    box-shadow:0 0 0 7px rgba(11,27,63,1), 0 0 0 8px rgba(125,211,252,.16), 0 0 32px rgba(56,189,248,.4); }
+  .core-ring::after{ content:''; position:absolute; inset:-7px; border-radius:50%; border:1px solid rgba(125,211,252,.2); animation:core-breathe 4.5s ease-in-out infinite; }
+  @keyframes core-breathe{ 0%,100%{ transform:scale(1); opacity:.5; } 50%{ transform:scale(1.09); opacity:.12; } }
+  .core-t1{ font-size:.67rem; font-weight:800; letter-spacing:.15em; color:#fff; line-height:1; }
+  .core-t2{ font-size:.49rem; font-weight:700; letter-spacing:.09em; color:rgba(190,227,248,.9); line-height:1; }
+  .core-note{ font-size:.6rem; color:rgba(255,255,255,.46); line-height:1.35; max-width:300px; text-align:center; margin-top:4px; }
+
+  .decide{ display:flex; flex-direction:column; align-items:center; gap:1px; text-align:center; border:1px solid rgba(125,211,252,.32); background:rgba(56,189,248,.09); border-radius:100px; padding:6px 18px; }
+  .dc-title{ font-size:.6rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; color:#fff; }
+
+  .actors{ display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; }
+  .actor{ border-radius:100px; padding:6px 16px; font-size:.63rem; font-weight:800; letter-spacing:.09em; text-transform:uppercase; border:1px solid; }
+  .actor.novus{ color:#fff; border-color:rgba(125,211,252,.5); background:rgba(56,189,248,.14); }
+  .actor.team{ color:#fff; border-color:rgba(253,186,116,.5); background:rgba(253,186,116,.12); }
+  .actor-swap{ color:rgba(255,255,255,.45); font-size:.9rem; line-height:1; }
+
+  .outcome{ font-family:var(--serif); font-size:clamp(.92rem,1.8vw,1.1rem); font-weight:600; line-height:1.4; color:#fff; }
+  .bridge{ font-size:.68rem; line-height:1.5; color:rgba(255,255,255,.44); max-width:440px; border-top:1px solid rgba(255,255,255,.11); padding-top:11px; }
+
+  /* ── CTA ── */
+  .cta-block{ width:100%; display:flex; flex-direction:column; align-items:center; gap:11px; padding-top:4px; }
+  .cta-headline{ font-family:var(--serif); font-size:clamp(1.02rem,2.1vw,1.32rem); font-weight:600; line-height:1.32; color:#fff; max-width:520px; }
+  .cta-actions{ display:flex; align-items:center; gap:13px; flex-wrap:wrap; justify-content:center; }
+  .cta-phone{ font-size:.76rem; color:rgba(255,255,255,.62); }
+  .cta-phone a{ color:#93C5FD; font-weight:700; text-decoration:none; }
+  .cta-phone a:hover{ text-decoration:underline; }
+  .cta-terms{ font-size:.68rem; color:rgba(255,255,255,.38); }
+  .calendly-wrap{ width:100%; max-width:600px; margin-top:3px; display:none; }
+  .calendly-wrap.show{ display:block; }
+  .calendly-inline-widget{ min-width:280px; height:560px; border-radius:13px; overflow:hidden; border:1px solid rgba(255,255,255,.15); background:#fff; }
+  .final-disclaimer{ font-size:.62rem; line-height:1.5; color:rgba(255,255,255,.3); max-width:460px; margin-top:2px; }
+  .final-disclaimer a{ color:rgba(255,255,255,.46); }
+
+  /* ── LOADING / ERROR ── */
+  .boot{ position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:13px; padding:var(--gutter); text-align:center; z-index:60; background:var(--navy); }
+  .boot.hide{ display:none; }
+  .boot-ring{ width:34px; height:34px; border-radius:50%; border:2px solid rgba(125,211,252,.2); border-top-color:var(--cyan); animation:boot-spin .9s linear infinite; }
+  @keyframes boot-spin{ to{ transform:rotate(360deg); } }
+  .boot-msg{ font-size:.78rem; color:rgba(255,255,255,.5); }
+  .boot-title{ font-family:var(--serif); font-size:1.15rem; font-weight:600; color:#fff; }
+
+  .hidden{ display:none !important; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width:1180px){
+    .jstep-label{ display:none; }
+    .jsep{ width:12px; margin:0 5px; }
+  }
+  @media (max-width:860px){
+    .chrome-agency{ display:none; }
+  }
+  @media (max-width:640px){
+    :root{ --gutter:14px; }
+    .chrome{ height:44px; }
+    .scene{ padding:58px var(--gutter) 40px; }
+    .property-price-tag{ font-size:1rem; }
+    .property-visual{ aspect-ratio:16/8.4; }
+    .calendly-inline-widget{ height:520px; }
+    .branches{ flex-direction:column; }
+    .uda-sub{ display:none; }
+    /* Stacked sources: the converging pair would point at nothing, so the
+       connector narrows to a single stem into the node. */
+    .sources{ grid-template-columns:minmax(0,1fr); row-gap:11px; }
+    .flow-connector.inputs{ max-width:2px; }
+    .flow-connector.inputs .fc-line, .flow-connector.inputs .fc-glow{ display:none; }
+    .flow-connector.inputs{ background:linear-gradient(180deg, rgba(125,211,252,.32), rgba(125,211,252,.32)); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .core-ring::after, .fc-glow, .uda-link::after{ animation:none; }
+    .fc-glow{ opacity:0; }
+    .fact, .fstep{ transition:none; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="chrome">
+    <div class="brand"><img src="/novus-icon.png" alt="" /><span class="brand-word">NOVUS</span></div>
+    <nav class="journey" id="journey"></nav>
+    <div class="chrome-agency"><span id="chrome-agency-name"></span><span class="draft-flag hidden" id="draft-flag">Draft</span></div>
+  </div>
+
+  <div class="stage hidden" id="stage">
+
+    <!-- ══ BEAT 1 — THE REAL EVENT ══ -->
+    <section class="scene active" data-scene="1">
+      <div class="scene-inner">
+        <div class="eyebrow" id="b1-eyebrow">One of your enquiries</div>
+        <h1 class="scene-h" id="b1-heading">We sent your team a real enquiry. Here's what happened next.</h1>
+
+        <div class="property-card">
+          <div class="property-visual">
+            <svg class="placeholder" viewBox="0 0 400 140" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+              <g stroke="rgba(255,255,255,.16)" stroke-width="1">
+                <line x1="0" y1="116" x2="400" y2="116"/><line x1="60" y1="116" x2="60" y2="24"/>
+                <line x1="340" y1="116" x2="340" y2="24"/><line x1="60" y1="24" x2="340" y2="24"/>
+                <line x1="60" y1="70" x2="340" y2="70"/><line x1="150" y1="24" x2="150" y2="116"/>
+                <line x1="250" y1="24" x2="250" y2="116"/>
+              </g>
+              <g fill="rgba(255,255,255,.10)">
+                <rect x="72" y="34" width="66" height="24" rx="1"/><rect x="162" y="34" width="76" height="24" rx="1"/>
+                <rect x="262" y="34" width="66" height="24" rx="1"/><rect x="72" y="81" width="66" height="24" rx="1"/>
+                <rect x="162" y="81" width="76" height="24" rx="1"/><rect x="262" y="81" width="66" height="24" rx="1"/>
+              </g>
+            </svg>
+            <img class="property-photo hidden" id="property-photo" alt="" />
+            <div class="grain"></div>
+            <div class="property-status">For Sale</div>
+            <div class="property-price-tag" id="property-price"></div>
+          </div>
+          <div class="property-body">
+            <div class="property-addr" id="property-address"></div>
+            <div class="property-meta hidden" id="property-meta"></div>
+            <div class="property-agency-row">
+              <div class="property-agency">Enquiry sent to <strong id="property-agency-name"></strong> <span id="property-enquiry-when"></span></div>
+              <a class="property-link hidden" id="property-link" href="#" target="_blank" rel="noopener">View the listing ↗</a>
+            </div>
+          </div>
+        </div>
+
+        <p class="hook-line" id="b1-hook"></p>
+
+        <button class="stepper-btn" onclick="nextScene()">Show me what happened <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- ══ BEAT 2 — THE COMMERCIAL OPPORTUNITY ══ -->
+    <section class="scene" data-scene="2">
+      <div class="scene-inner">
+        <div class="eyebrow">What actually happened</div>
+        <h1 class="scene-h" id="b2-heading">What actually happened.</h1>
+
+        <div class="facts" id="observed-events"></div>
+
+        <div class="credit hidden" id="positive-block">
+          <div class="credit-cap">Where you did well</div>
+          <div class="credit-body" id="positive-observation"></div>
+        </div>
+
+        <div class="branches" id="branches">
+          <div class="branch ok">
+            <div class="br-mark">✓</div>
+            <div class="br-who">Buyer</div>
+            <div class="br-name">Viewing</div>
+            <div class="br-state">Handled</div>
+          </div>
+          <div class="branch no">
+            <div class="br-mark">✕</div>
+            <div class="br-who">Seller</div>
+            <div class="br-name">Instruction</div>
+            <div class="br-state">Missed</div>
+          </div>
+        </div>
+
+        <p class="verdict" id="demo-reveal"></p>
+        <p class="consequence hidden" id="commercial-consequence"></p>
+
+        <button class="stepper-btn" onclick="nextScene()">What NOVUS would have done <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- ══ BEAT 3 — THE NOVUS DIFFERENCE ══ -->
+    <section class="scene" data-scene="3">
+      <div class="scene-inner">
+        <div class="eyebrow">The NOVUS difference</div>
+        <h1 class="scene-h">Same enquiry. Intelligence on top of it.</h1>
+
+        <div class="uda">
+          <div class="fstep" data-fs="1" style="width:100%">
+            <div class="uda-stage">
+              <div class="uda-head"><span class="uda-num">1</span><span class="uda-title">Understands</span><span class="uda-sub">What it recognised</span></div>
+              <div class="uda-items" id="novus-detected"></div>
+            </div>
+          </div>
+          <div class="fstep" data-fs="2"><div class="uda-link"></div></div>
+          <div class="fstep" data-fs="3" style="width:100%">
+            <div class="uda-stage">
+              <div class="uda-head"><span class="uda-num">2</span><span class="uda-title">Decides</span><span class="uda-sub">What should happen next</span></div>
+              <div class="uda-items" id="novus-decisions"></div>
+            </div>
+          </div>
+          <div class="fstep" data-fs="4"><div class="uda-link"></div></div>
+          <div class="fstep" data-fs="5" style="width:100%">
+            <div class="uda-stage">
+              <div class="uda-head"><span class="uda-num">3</span><span class="uda-title">Acts</span><span class="uda-sub">NOVUS acts, or routes it to your team</span></div>
+              <div class="uda-items" id="novus-actions"></div>
+            </div>
+          </div>
+        </div>
+
+        <p class="payoff-line fstep" data-fs="6"><span id="payoff-lead"></span><br/><span class="highlight">NOVUS makes sure the opportunity doesn't end there.</span></p>
+
+        <button class="stepper-btn" onclick="nextScene()">And that's one enquiry <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+      </div>
+    </section>
+
+    <!-- ══ BEAT 4 — ACROSS THE BUSINESS + CTA ══ -->
+    <section class="scene" data-scene="4">
+      <div class="scene-inner wide">
+        <div class="eyebrow">Across the business</div>
+        <h1 class="scene-h">This was one enquiry. The same intelligence runs across all of them.</h1>
+
+        <div class="flow">
+          <div class="sources">
+            <div class="source-col">
+              <span class="source-cap">New opportunities</span>
+              <div class="flow-row">
+                <span class="flow-pill in">Portal</span><span class="flow-pill in">Website</span><span class="flow-pill in">Calls</span>
+              </div>
+            </div>
+            <div class="source-col">
+              <span class="source-cap">Existing opportunities</span>
+              <div class="flow-row">
+                <span class="flow-pill in">Applicants</span><span class="flow-pill in">Past vendors</span><span class="flow-pill in">Previous valuations</span><span class="flow-pill in">Database</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Two inputs, converging on the node from the centre of each column. -->
+          <svg class="flow-connector inputs" viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true">
+            <path class="fc-line" d="M25,0 Q25,20 50,30" />
+            <path class="fc-line" d="M75,0 Q75,20 50,30" />
+            <path class="fc-glow" d="M25,0 Q25,20 50,30" style="animation-delay:0s" />
+            <path class="fc-glow" d="M75,0 Q75,20 50,30" style="animation-delay:.7s" />
+            <path class="fc-line" d="M46,25 L50,32 L54,25" />
+          </svg>
+
+          <div class="core-ring">
+            <span class="core-t1">NOVUS</span>
+            <span class="core-t2">INTELLIGENCE</span>
+          </div>
+          <p class="core-note">Finds commercial opportunity being left behind.</p>
+
+          <svg class="flow-connector stem" viewBox="0 0 10 24" preserveAspectRatio="none" aria-hidden="true">
+            <path class="fc-line" d="M5,0 L5,24" />
+            <path class="fc-glow" d="M5,0 L5,24" />
+          </svg>
+
+          <div class="decide"><span class="dc-title">Decides what should happen</span></div>
+
+          <svg class="flow-connector stem" viewBox="0 0 10 24" preserveAspectRatio="none" aria-hidden="true">
+            <path class="fc-line" d="M5,0 L5,24" />
+            <path class="fc-glow" d="M5,0 L5,24" style="animation-delay:.4s" />
+          </svg>
+
+          <div class="actors">
+            <span class="actor novus">NOVUS acts</span>
+            <span class="actor-swap">↔</span>
+            <span class="actor team">Your team acts</span>
+          </div>
+
+          <svg class="flow-connector stem" viewBox="0 0 10 24" preserveAspectRatio="none" aria-hidden="true">
+            <path class="fc-line" d="M5,0 L5,24" />
+            <path class="fc-glow" d="M5,0 L5,24" style="animation-delay:.8s" />
+          </svg>
+
+          <p class="outcome">More opportunities progressed.<br/>More valuations. More instructions.</p>
+        </div>
+
+        <p class="bridge" id="systemic-bridge"></p>
+
+        <div class="cta-block">
+          <p class="cta-headline" id="cta-headline"></p>
+          <div class="cta-actions">
+            <button class="stepper-btn" onclick="revealCalendly()">Book a NOVUS walkthrough</button>
+            <span class="cta-phone">or call direct: <a href="tel:07455506761">07455 506761</a></span>
+          </div>
+          <p class="cta-terms">Ten minutes. No deck — just this, against your own enquiries.</p>
+
+          <div class="calendly-wrap" id="calendly-wrap">
+            <div class="calendly-inline-widget" data-url="https://calendly.com/joe-getnovus/10min?hide_gdpr_banner=1"></div>
+          </div>
+
+          <p class="final-disclaimer" id="final-disclaimer"></p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Boot / failure state. Nothing below renders until one DEMOS row resolves. -->
+  <div class="boot" id="boot">
+    <div class="boot-ring" id="boot-ring"></div>
+    <p class="boot-msg" id="boot-msg">Loading…</p>
+  </div>
+
+<script>
+  /* ═══════════════════════════════════════════════════════════════════════
+     THE RENDERER IS JOURNEY-BLIND.
+     It resolves ONE slug, reads ONE DEMOS row, and renders whatever that row
+     carries. There is no hero_journey branch anywhere in this file — which is
+     what stops "four journeys" becoming four demo pages. Adding a journey is
+     authoring content in lib/demo-journeys.mjs; nothing here changes.
+     Every field is optional: an element with no data is removed, so a thin
+     row degrades to a shorter demo rather than to a broken one.
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const TOTAL = 4;
+  const STAGES = ['The enquiry', 'What happened', 'NOVUS', 'Across the business'];
+  let scene = 1;
+  let furthest = 1;
+  let demoSlug = '';
+
+  // /demo/{demo_slug} is the public route. ?slug= is accepted too so the page
+  // can be opened directly as /demo.html?slug=... while testing.
+  function resolveSlug() {
+    const params = new URLSearchParams(location.search);
+    const fromQuery = (params.get('slug') || '').trim();
+    if (fromQuery) return fromQuery;
+    const segments = location.pathname.split('/').filter(Boolean);
+    if (segments.length >= 2 && segments[0] === 'demo') return decodeURIComponent(segments[1]);
+    return '';
+  }
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  function txt(value) { return String(value == null ? '' : value).trim(); }
+
+  // Sets text, and REMOVES the element when there is nothing to say. Blank
+  // upstream data must never render as an empty heading or a stray bullet.
+  function setField(id, value, { hideWhenEmpty = true } = {}) {
+    const el = document.getElementById(id);
+    if (!el) return false;
+    const v = txt(value);
+    if (!v && hideWhenEmpty) { el.classList.add('hidden'); return false; }
+    el.textContent = v;
+    el.classList.remove('hidden');
+    return true;
+  }
+
+  function show(id, on) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden', !on);
+  }
+
+  // ── JOURNEY RAIL ──
+  const journeyEl = document.getElementById('journey');
+  STAGES.forEach((label, idx) => {
+    const i = idx + 1;
+    if (idx > 0) {
+      const sep = document.createElement('div');
+      sep.className = 'jsep'; sep.dataset.sep = i;
+      journeyEl.appendChild(sep);
+    }
+    const b = document.createElement('button');
+    b.className = 'jstep'; b.dataset.i = i; b.title = label;
+    b.innerHTML = '<span class="jstep-tick"></span><span class="jstep-label">' + esc(label) + '</span>';
+    b.addEventListener('click', () => { if (i <= furthest) goTo(i); });
+    journeyEl.appendChild(b);
+  });
+
+  function renderJourney() {
+    journeyEl.querySelectorAll('.jstep').forEach((b) => {
+      const i = Number(b.dataset.i);
+      b.classList.toggle('on', i === scene);
+      b.classList.toggle('done', i < scene);
+    });
+    journeyEl.querySelectorAll('.jsep').forEach((s) => {
+      s.classList.toggle('filled', Number(s.dataset.sep) <= scene);
+    });
+  }
+
+  function goTo(n) {
+    if (n < 1 || n > TOTAL) return;
+    document.querySelectorAll('.scene').forEach((s) => s.classList.remove('active'));
+    const target = document.querySelector('.scene[data-scene="' + n + '"]');
+    if (target) target.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    scene = n;
+    furthest = Math.max(furthest, n);
+    renderJourney();
+    if (n === 2) animateFacts();
+    if (n === 3) animateFlow();
+  }
+  function nextScene() { goTo(scene + 1); }
+  window.goTo = goTo; window.nextScene = nextScene;
+
+  let factsAnimated = false;
+  function animateFacts() {
+    if (factsAnimated) return;
+    factsAnimated = true;
+    [...document.querySelectorAll('#observed-events .fact')].forEach((el, i) => {
+      setTimeout(() => el.classList.add('on'), 130 * i);
+    });
+  }
+
+  let flowAnimated = false;
+  function animateFlow() {
+    if (flowAnimated) return;
+    flowAnimated = true;
+    [...document.querySelectorAll('.scene[data-scene="3"] .fstep')].forEach((s, i) => {
+      setTimeout(() => s.classList.add('on'), 260 * i);
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.matches('input, textarea')) return;
+    if (e.key === 'ArrowRight') nextScene();
+    if (e.key === 'ArrowLeft') goTo(scene - 1);
+  });
+
+  // ── CTA ──
+  function revealCalendly() {
+    document.getElementById('calendly-wrap').classList.add('show');
+    setTimeout(() => {
+      document.getElementById('calendly-wrap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 60);
+    track('cta_click');
+  }
+  window.revealCalendly = revealCalendly;
+
+  // Telemetry is fire-and-forget: it must never delay or block the CTA. The
+  // route records the FIRST click only, so a reload is not a second signal.
+  function track(action) {
+    if (!demoSlug) return;
+    try {
+      fetch('/api/demo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: action, slug: demoSlug }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch (_) { /* telemetry is never load-bearing */ }
+  }
+
+  // Calendly posts a message when a meeting is actually booked — that is the
+  // outcome this whole demo exists to produce, so it is recorded separately
+  // from the click that opened the calendar.
+  window.addEventListener('message', (e) => {
+    if (!e.data || typeof e.data !== 'object') return;
+    if (e.data.event === 'calendly.event_scheduled') track('meeting_booked');
+  });
+
+  // ── RENDER ──
+
+  function renderList(containerId, items, { withOwner = false } = {}) {
+    const el = document.getElementById(containerId);
+    if (!el) return 0;
+    el.innerHTML = '';
+    const list = Array.isArray(items) ? items : [];
+    let written = 0;
+    for (const item of list) {
+      const label = txt(item && item.label);
+      if (!label) continue;
+      const detail = txt(item && item.detail);
+      const owner = withOwner ? txt(item && item.owner).toLowerCase() : '';
+      const ownerChip = owner === 'novus'
+        ? '<span class="uda-owner novus">NOVUS</span>'
+        : (owner === 'team' ? '<span class="uda-owner team">Your team</span>' : '');
+      const row = document.createElement('div');
+      row.className = 'uda-item';
+      row.innerHTML =
+        '<span class="uda-dot"></span>' +
+        '<span class="uda-item-text">' +
+          '<span class="uda-label">' + ownerChip + esc(label) + '</span>' +
+          (detail ? '<span class="uda-detail">' + esc(detail) + '</span>' : '') +
+        '</span>';
+      el.appendChild(row);
+      written += 1;
+    }
+    return written;
+  }
+
+  const TONE_MARK = { good: '✓', gap: '✕', neutral: '•' };
+
+  function renderObservedEvents(events) {
+    const el = document.getElementById('observed-events');
+    el.innerHTML = '';
+    const list = Array.isArray(events) ? events : [];
+    let written = 0;
+    for (const event of list) {
+      const label = txt(event && event.label);
+      if (!label) continue;
+      const tone = ['good', 'gap', 'neutral'].includes(txt(event && event.tone)) ? txt(event.tone) : 'neutral';
+      const detail = txt(event && event.detail);
+      const row = document.createElement('div');
+      row.className = 'fact ' + tone;
+      row.innerHTML =
+        '<span class="fact-mark">' + TONE_MARK[tone] + '</span>' +
+        '<span class="fact-text">' +
+          '<span class="fact-label">' + esc(label) + '</span>' +
+          (detail ? '<span class="fact-detail">' + esc(detail) + '</span>' : '') +
+        '</span>';
+      el.appendChild(row);
+      written += 1;
+    }
+    el.classList.toggle('hidden', written === 0);
+    return written;
+  }
+
+  function renderProperty(demo) {
+    setField('property-price', demo.property_price);
+    setField('property-address', demo.property_address || 'The property in your enquiry', { hideWhenEmpty: false });
+    setField('property-agency-name', demo.agency_name || 'your team', { hideWhenEmpty: false });
+
+    const when = [demo.enquiry_date, demo.enquiry_time].filter(Boolean).join(' at ');
+    setField('property-enquiry-when', when ? 'on ' + when : '');
+
+    const link = document.getElementById('property-link');
+    if (txt(demo.property_url)) {
+      link.href = demo.property_url;
+      link.classList.remove('hidden');
+    }
+
+    // The stored image is used as-is and NEVER re-derived here — the browser
+    // makes no request to Rightmove. A load error simply leaves the drawn
+    // placeholder in place.
+    const photo = document.getElementById('property-photo');
+    const src = txt(demo.property_image_url);
+    if (src) {
+      photo.addEventListener('load', () => {
+        photo.classList.remove('hidden');
+        photo.classList.add('loaded');
+      });
+      photo.addEventListener('error', () => { photo.remove(); });
+      photo.src = src;
+      photo.alt = txt(demo.property_address) ? 'Photograph of ' + demo.property_address : '';
+    } else {
+      photo.remove();
+    }
+  }
+
+  function render(demo, isDraft) {
+    demoSlug = txt(demo.demo_slug) || demoSlug;
+
+    const agency = txt(demo.agency_name);
+    document.title = agency ? 'NOVUS — ' + agency : 'NOVUS';
+    setField('chrome-agency-name', agency);
+    show('draft-flag', !!isDraft);
+
+    // BEAT 1
+    setField('b1-eyebrow', agency ? agency + ' · one real enquiry' : 'One real enquiry', { hideWhenEmpty: false });
+    if (txt(demo.enquiry_date)) {
+      setField('b1-heading', 'On ' + demo.enquiry_date + ', someone enquired about one of your properties.', { hideWhenEmpty: false });
+    }
+    renderProperty(demo);
+    setField('b1-hook', demo.demo_hook);
+
+    // BEAT 2
+    // Both of these are DERIVED FROM THE ROW'S OWN DATA, not from
+    // hero_journey — "two opportunities" is only true where the enquiry
+    // actually declared a property to sell, and "your team answered" is only
+    // true where a response time was established.
+    const declaredSeller = txt(demo.seller_declared) === 'yes';
+    if (declaredSeller) setField('b2-heading', 'One enquiry. Two opportunities.', { hideWhenEmpty: false });
+    renderObservedEvents(demo.observed_events);
+    const hasPositive = setField('positive-observation', demo.positive_observation);
+    show('positive-block', hasPositive);
+    setField('demo-reveal', demo.demo_reveal);
+    setField('commercial-consequence', demo.commercial_consequence);
+    // The buyer/seller fork only tells the truth when the enquiry actually
+    // declared a property to sell. On every other journey it is removed.
+    show('branches', declaredSeller);
+
+    // BEAT 3
+    setField(
+      'payoff-lead',
+      txt(demo.response_time) ? 'Your team answered the enquiry.' : 'This enquiry never got an answer.',
+      { hideWhenEmpty: false },
+    );
+    const detected = renderList('novus-detected', demo.novus_detected);
+    const decisions = renderList('novus-decisions', demo.novus_decisions);
+    const actions = renderList('novus-actions', demo.novus_actions, { withOwner: true });
+    [['novus-detected', detected], ['novus-decisions', decisions], ['novus-actions', actions]].forEach(([id, count]) => {
+      if (count > 0) return;
+      const stage = document.getElementById(id).closest('.fstep');
+      if (stage) stage.remove();
+    });
+    // Removing a stage would otherwise leave its connector dangling — a short
+    // line into nothing. Drop any link that no longer joins two stages.
+    const steps = [...document.querySelectorAll('.uda > .fstep')];
+    steps.forEach((step, i) => {
+      if (!step.querySelector('.uda-link')) return;
+      const prev = steps[i - 1];
+      const next = steps[i + 1];
+      const joinsTwoStages = prev && next && !prev.querySelector('.uda-link') && !next.querySelector('.uda-link');
+      if (!joinsTwoStages) step.remove();
+    });
+    // Renumber, so a demo whose first stage was dropped doesn't open at "2".
+    [...document.querySelectorAll('.uda .uda-num')].forEach((el, i) => { el.textContent = String(i + 1); });
+
+    // BEAT 4
+    setField('systemic-bridge', demo.systemic_bridge);
+    setField('cta-headline', demo.cta_headline || 'See what NOVUS could uncover across your business.', { hideWhenEmpty: false });
+
+    const address = txt(demo.property_address);
+    const disclaimerParts = ['We sent this enquiry ourselves, as a test'];
+    if (txt(demo.enquiry_date)) disclaimerParts.push('on ' + demo.enquiry_date);
+    if (address) disclaimerParts.push('about ' + address);
+    setField(
+      'final-disclaimer',
+      disclaimerParts.join(' ') + '. Everything shown after it is what actually happened.',
+      { hideWhenEmpty: false },
+    );
+
+    document.getElementById('boot').classList.add('hide');
+    document.getElementById('stage').classList.remove('hidden');
+    renderJourney();
+  }
+
+  function fail(message) {
+    document.getElementById('boot-ring').classList.add('hidden');
+    document.getElementById('boot-msg').innerHTML =
+      '<span class="boot-title">This demo link isn\'t available.</span><br/><br/>' + esc(message) +
+      '<br/><br/><a href="https://getnovus.co.uk" style="color:#93C5FD;font-weight:700;text-decoration:none">getnovus.co.uk ↗</a>';
+  }
+
+  (async function boot() {
+    demoSlug = resolveSlug();
+    if (!demoSlug) { fail('No demo was named in the link.'); return; }
+    const preview = new URLSearchParams(location.search).get('preview') === '1' ? '&preview=1' : '';
+    try {
+      const res = await fetch('/api/demo?slug=' + encodeURIComponent(demoSlug) + preview, {
+        headers: { Accept: 'application/json' },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data || !data.demo) {
+        fail((data && data.error) || 'We could not load this demo.');
+        return;
+      }
+      render(data.demo, !!data.draft);
+    } catch (err) {
+      fail('We could not reach the demo service. Please try again in a moment.');
+    }
+  })();
+</script>
+</body>
+</html>

@@ -483,6 +483,78 @@ reworded so the offer makes sense when there was nothing to discuss.
 
 ---
 
+## 4d. `DEMOS` — 43 fields, one row per published personalised demo
+
+One step past the email. `PERSONALISATION` decides *what the story is*;
+`DEMOS` is that story **frozen as render-ready copy** for the page the
+prospect actually opens at `/demo/{demo_slug}`.
+
+**Why the tab exists.** The demo must not query `PROBES` + `AGENCIES` +
+`INTELLIGENCE` + `DIAGNOSIS_FINDINGS` + `PERSONALISATION` from a browser on
+every open. It resolves one slug, reads one row, renders it. `DEMOS` is a
+projection of the five tabs above, written once at build time by
+`lib/demos.mjs`'s `buildDemoRow()` (via `POST /api/demo {action:'build'}`).
+
+**It is strictly downstream.** Nothing in the demo path writes back into the
+pipeline. A demo can be rebuilt, republished or deleted without touching a
+single upstream row.
+
+**The demo shows the probe as at build time.** Rebuilding is an explicit
+action; a page view never re-derives anything.
+
+| Group | Fields |
+|---|---|
+| Identity | `demo_id` (`dmo_*`), `demo_slug`, `demo_status` (`draft`/`published`/`archived`), `demo_version` |
+| Links back | `agency_id`, `probe_id`, `personalisation_id`, `hero_journey` |
+| Beat 1 — the real event | `agency_name`, `property_address`, `property_price`, `property_url`, `property_image_url`, `enquiry_at`, `enquiry_date`, `enquiry_time` |
+| Beat 2 — the observed facts | `seller_declared`, `response_time`, `response_hours`, `contact_attempts`, `follow_ups`, `channels_used`, `viewing_progression`, `seller_recognition` |
+| The copy read by the prospect | `demo_hook`, `positive_observation`, `demo_reveal`, `main_finding`, `commercial_consequence`, `systemic_bridge`, `cta_headline` |
+| Collections (JSON, short by design) | `observed_events_json`, `novus_detected_json`, `novus_decisions_json`, `novus_actions_json` |
+| Plumbing | `created_at`, `updated_at`, `published_at` |
+| Telemetry | `first_viewed_at`, `last_viewed_at`, `view_count`, `cta_clicked_at`, `meeting_booked_at` |
+
+### Where each field comes from
+
+Nothing here is invented. Prospect-facing prose is `PERSONALISATION`'s own
+copy, raised to a standalone sentence and never rewritten:
+
+| Field | Source |
+|---|---|
+| `positive_observation` | `PERSONALISATION.fair_observation`, sentence-cased |
+| `main_finding` | `PERSONALISATION.main_finding`, sentence-cased |
+| `commercial_consequence` | `PERSONALISATION.commercial_consequence`, sentence-cased |
+| `property_address` | `PROBES.property_address` through the same `cleanAddressForEmail()` the email uses |
+| `enquiry_date` / `enquiry_time` | `PROBES.probe_timestamp`, Europe/London |
+| `seller_declared` | `hasVendorDeclaration(probe)` — the deterministic marker, not an AI read |
+| `response_time` … `seller_recognition` | the `INTELLIGENCE` row verbatim (`response_time` is `response_hours` formatted) |
+| `observed_events_json` | derived from those `INTELLIGENCE` fields — no prose, no findings text |
+| `novus_detected_json` | this probe's `DIAGNOSIS_FINDINGS` plus the facts that make them real |
+| `novus_decisions_json` | leads with `PERSONALISATION.novus_counterfactual`, then the journey's product decisions |
+| `demo_hook` / `demo_reveal` / `novus_actions_json` / `systemic_bridge` / `cta_headline` | authored per journey in `lib/demo-journeys.mjs` — product copy, identical for every agency on a journey |
+
+### `hero_journey` support
+
+`lib/demo-journeys.mjs` carries a **shell of four** — `complete_miss`,
+`slow_response_gap`, `fast_response_stalled_follow_up`,
+`weak_seller_qualification` — of which only `weak_seller_qualification` is
+authored and publishable. The other three build, warn, and stay `draft`.
+
+The three journeys `pickHeroJourney()` can still emit and the demo has no
+design for — `automated_ack_only`,
+`strong_handling_database_opportunity`, `strong_handling_no_opportunity` —
+are **refused by name** (HTTP 422) rather than fudged into the nearest shape.
+
+### The renderer is journey-blind
+
+`demo.html` contains no `hero_journey` branch. It renders whatever the row
+carries and hides whatever is blank, which is what stops four journeys
+becoming four demo pages. Adding a journey is authoring content in
+`lib/demo-journeys.mjs`; the page does not change.
+
+Regression suite: `npm run novus:demo-selftest`.
+
+---
+
 ## 5. The three rules that stop it going canned
 
 1. **Grade never selects a paragraph.** Today `primary_problem` and `sales_angle` are each one of 8 strings keyed off the grade letter. In V2 the grade is not an input to `DIAGNOSIS` at all. Two probes graded `F` produce different diagnoses because their evidence is different — demonstrated in §7.

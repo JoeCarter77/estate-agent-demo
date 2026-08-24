@@ -1,0 +1,193 @@
+// scripts/novus-demo.mjs — the operator CLI for personalised demos.
+//
+// WHY IT TALKS HTTP, NOT SHEETS. lib/sheets.mjs authenticates with a Vercel
+// OIDC token federated through Workload Identity Federation — there is no
+// service-account key, by GCP org policy, and no such token exists on a
+// laptop. So this CLI drives the DEPLOYED /api/demo route with the same NOVUS
+// Basic Auth credential a human uses, rather than trying to reach the
+// workbook itself.
+//
+// THE DIVISION OF LABOUR ON IMAGES. The serverless build does one short fetch
+// of the listing, which Rightmove often blocks. This CLI can do what a
+// serverless function cannot: run a real Chromium, on a real residential-ish
+// IP, and extract the hero photo from the rendered page — then hand the URL
+// back to the build as `property_image_url`. That is the whole backfill
+// mechanism; `backfill-images` is just this loop over several probes.
+//
+// Usage
+//   node scripts/novus-demo.mjs image <listing-url> [--browser]
+//   node scripts/novus-demo.mjs build <probe_id> [--publish] [--slug s]
+//                                     [--browser] [--image <url>] [--refresh-image]
+//   node scripts/novus-demo.mjs backfill-images <probe_id> [probe_id ...]
+//   node scripts/novus-demo.mjs publish <probe_id> | unpublish <probe_id>
+//
+// Env (or flags):
+//   NOVUS_DEMO_BASE_URL   https://your-deployment            (--base)
+//   NOVUS_BASIC_AUTH_USER / NOVUS_BASIC_AUTH_PASS            (--user / --pass)
+
+import { fetchPropertyImageUrl, fetchPropertyImageUrlViaBrowser } from '../lib/property-image.mjs';
+
+function parseArgs(argv) {
+  const args = { _: [], flags: {} };
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i];
+    if (!token.startsWith('--')) { args._.push(token); continue; }
+    const key = token.slice(2);
+    const next = argv[i + 1];
+    if (next === undefined || next.startsWith('--')) { args.flags[key] = true; continue; }
+    args.flags[key] = next;
+    i += 1;
+  }
+  return args;
+}
+
+function config(flags) {
+  const base = String(flags.base || process.env.NOVUS_DEMO_BASE_URL || '').replace(/\/+$/, '');
+  const user = String(flags.user || process.env.NOVUS_BASIC_AUTH_USER || '');
+  const pass = String(flags.pass || process.env.NOVUS_BASIC_AUTH_PASS || '');
+  if (!base) die('Set --base or NOVUS_DEMO_BASE_URL to the deployment URL (e.g. https://novus.vercel.app)');
+  if (!user || !pass) die('Set --user/--pass or NOVUS_BASIC_AUTH_USER/NOVUS_BASIC_AUTH_PASS');
+  return { base, auth: 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64') };
+}
+
+function die(message) {
+  console.error(`\n✗ ${message}\n`);
+  process.exit(1);
+}
+
+async function post(cfg, body) {
+  const res = await fetch(`${cfg.base}/api/demo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: cfg.auth },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) die(`${res.status} ${data.error || 'request failed'}`);
+  return data;
+}
+
+// Extract once, cheaply, then escalate to a real browser only if asked.
+async function extractImage(listingUrl, useBrowser) {
+  if (!listingUrl) return '';
+  process.stdout.write('  fetching listing…');
+  let image = await fetchPropertyImageUrl(listingUrl);
+  if (image) { console.log(` found\n  ${image}`); return image; }
+  if (!useBrowser) { console.log(' blocked (pass --browser to retry with a real browser)'); return ''; }
+  console.log(' blocked');
+  process.stdout.write('  retrying with a real browser…');
+  image = await fetchPropertyImageUrlViaBrowser(listingUrl);
+  console.log(image ? ` found\n  ${image}` : ' nothing (leaving the image blank)');
+  return image;
+}
+
+// ── commands ─────────────────────────────────────────────────────────────────
+
+async function cmdImage(args) {
+  const url = args._[1];
+  if (!url) die('Usage: novus-demo.mjs image <listing-url> [--browser]');
+  const image = await extractImage(url, args.flags.browser === true);
+  if (!image) process.exit(2);            // non-zero so a script can branch on it
+}
+
+async function cmdBuild(args) {
+  const probeId = args._[1];
+  if (!probeId) die('Usage: novus-demo.mjs build <probe_id> [--publish] [--browser]');
+  const cfg = config(args.flags);
+
+  const body = { action: 'build', probe_id: probeId };
+  if (args.flags.publish === true) body.publish = true;
+  if (typeof args.flags.slug === 'string') body.slug = args.flags.slug;
+  if (typeof args.flags.image === 'string') body.property_image_url = args.flags.image;
+  if (args.flags['refresh-image'] === true) body.refresh_image = true;
+
+  console.log(`\nBuilding demo for ${probeId}…`);
+  let result = await post(cfg, body);
+  report(cfg, result);
+
+  // Second pass: the server's cheap fetch came back blank and we CAN do
+  // better locally. This is the same code path backfill-images uses.
+  if (!result.property_image_url && args.flags.browser === true && result.property_url) {
+    console.log('\nNo image from the serverless fetch — escalating locally.');
+    const image = await extractImage(result.property_url, true);
+    if (image) {
+      result = await post(cfg, { ...body, property_image_url: image });
+      console.log('\nRebuilt with the extracted image:');
+      report(cfg, result);
+    }
+  }
+  return result;
+}
+
+async function cmdBackfillImages(args) {
+  const probeIds = args._.slice(1);
+  if (probeIds.length === 0) die('Usage: novus-demo.mjs backfill-images <probe_id> [probe_id ...]');
+  const cfg = config(args.flags);
+
+  let filled = 0;
+  for (const probeId of probeIds) {
+    console.log(`\n── ${probeId}`);
+    // A build with no image flags keeps any image the row already has, so a
+    // backfill never overwrites a good image with a blocked fetch.
+    let result;
+    try {
+      result = await post(cfg, { action: 'build', probe_id: probeId });
+    } catch {
+      continue; // post() already reported and exited on hard failures
+    }
+    if (result.property_image_url) { console.log('  already has an image — skipped'); continue; }
+    if (!result.property_url) { console.log('  no property_url on the probe — skipped'); continue; }
+    const image = await extractImage(result.property_url, true);
+    if (!image) { console.log('  could not extract — left blank (the demo still renders)'); continue; }
+    await post(cfg, { action: 'build', probe_id: probeId, property_image_url: image });
+    filled += 1;
+    console.log('  ✓ stored');
+  }
+  console.log(`\nBackfilled ${filled} of ${probeIds.length} probe(s).\n`);
+}
+
+async function cmdPublish(args, publish) {
+  const probeId = args._[1];
+  if (!probeId) die(`Usage: novus-demo.mjs ${publish ? 'publish' : 'unpublish'} <probe_id>`);
+  const cfg = config(args.flags);
+  const result = await post(cfg, { action: publish ? 'publish' : 'unpublish', probe_id: probeId });
+  console.log(`\n${result.demo_slug} → ${result.demo_status}`);
+  console.log(`${cfg.base}/demo/${result.demo_slug}\n`);
+}
+
+function report(cfg, result) {
+  console.log(`  slug     ${result.demo_slug}`);
+  console.log(`  status   ${result.demo_status}`);
+  console.log(`  journey  ${result.hero_journey}`);
+  console.log(`  image    ${result.property_image_url || '(none — the drawn placeholder is used)'}`);
+  console.log(`  url      ${cfg.base}/demo/${result.demo_slug}`);
+  for (const warning of result.warnings || []) console.log(`  ⚠  ${warning}`);
+}
+
+const COMMANDS = {
+  image: cmdImage,
+  build: cmdBuild,
+  'backfill-images': cmdBackfillImages,
+  publish: (args) => cmdPublish(args, true),
+  unpublish: (args) => cmdPublish(args, false),
+};
+
+const args = parseArgs(process.argv.slice(2));
+const command = COMMANDS[args._[0]];
+if (!command) {
+  console.log(`
+NOVUS personalised demos
+
+  image <listing-url> [--browser]            extract a hero photo and print it
+  build <probe_id> [--publish] [--browser]   build/rebuild that probe's DEMOS row
+  backfill-images <probe_id> [probe_id ...]  fill in missing property images
+  publish <probe_id> / unpublish <probe_id>  flip a demo's status
+
+  --base   deployment URL      (or NOVUS_DEMO_BASE_URL)
+  --user   / --pass            (or NOVUS_BASIC_AUTH_USER / NOVUS_BASIC_AUTH_PASS)
+  --slug   override the generated slug
+  --image  supply a property image URL by hand
+  --refresh-image  re-resolve an image the row already has
+`);
+  process.exit(args._[0] ? 1 : 0);
+}
+command(args).catch((err) => die(err?.message || String(err)));
