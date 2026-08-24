@@ -31,38 +31,49 @@
 
 import assert from 'node:assert';
 import { personaliseProbe, _internal } from '../lib/probe-personalisation.mjs';
-import { emailContractViolations, isSendable } from '../lib/email-assembly.mjs';
+import { emailContractViolations, isSendable, ADDITIONAL_FINDINGS_HOOK_LINE } from '../lib/email-assembly.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 
 let passed = 0;
 function ok(msg) { passed++; console.log('  ✓ ' + msg); }
 
-// ── The three probes ─────────────────────────────────────────────────────────
-// Shaped like the live test probes: one that was never replied to, one that
-// got a thin same-day reply, and one that was handled well on the buying side
-// with a declared seller opportunity that was never picked up.
+// ── The three test probes ────────────────────────────────────────────────────
+// Shaped like the live test probes prb_hist_0003 / 0004 / 0009: one that was
+// never replied to, one that got a late call that asked nothing, and one that
+// was followed up hard on the buying side with a declared seller opportunity
+// that never came up. Addresses are in the live PROBES shape, analyst note and
+// all — the note is stripped for display, never sent.
 
 const PROBES = {
+  // prb_hist_0003 — no response at all. Road-only address, so the email must
+  // say "a house on Perry Street" and must never invent a house number.
   silent: {
-    probe_id: 'prb_test_silent',
-    property_address: 'Rayleigh Road, Basildon, SS14',
-    property_price: '£285,000',
-    probe_timestamp: '2026-08-11T21:21:04Z',
-    enquiry_text: 'Interested in a viewing. Declared: has a property of their own to sell, not yet on the market.',
+    probe_id: 'prb_hist_0003',
+    property_address: 'Perry Street (exact property not evidenced)',
+    property_price: '£425,000',
+    probe_timestamp: '2026-08-10T09:12:00Z',
+    enquiry_text: 'Interested in viewing. Declared: has a property of their own to sell, not yet on the market.',
   },
+  // prb_hist_0004 — one call, ~19 hours later, that answered nothing and
+  // asked nothing.
   weak: {
-    probe_id: 'prb_test_weak',
-    property_address: 'Church Road, Hadleigh',
-    property_price: '£340,000',
-    probe_timestamp: '2026-08-12T08:04:11Z',
-    enquiry_text: 'Interested in a viewing. Asked what the position is on the property.',
+    probe_id: 'prb_hist_0004',
+    property_address: 'Southend Road',
+    property_price: '£225,000',
+    probe_timestamp: '2026-08-10T14:03:00Z',
+    enquiry_text: 'Asked whether the property is still available and whether there is a chain. Declared: has a property of their own to sell.',
   },
+  // prb_hist_0009 — three attempts inside a day, all pushing the viewing.
+  // NOTE THE ADDRESS. The live row records Fox Cottage and flags the Church
+  // Road relationship as UNCONFIRMED, so the email opens on Fox Cottage: the
+  // unconfirmed road never reaches the intro, because we do not assume a
+  // relationship the data says is unverified.
   seller: {
-    probe_id: 'prb_test_seller',
-    property_address: 'Fox Cottage',
-    property_price: '£475,000',
-    probe_timestamp: '2026-08-13T19:47:00Z',
-    enquiry_text: 'Interested in a viewing. Declared: has a property of their own to sell.',
+    probe_id: 'prb_hist_0009',
+    property_address: "Fox Cottage (relationship to 'Church Road' UNCONFIRMED)",
+    property_price: '£650,000',
+    probe_timestamp: '2026-08-10T18:40:00Z',
+    enquiry_text: 'Interested in viewing Fox Cottage. Declared: has a property of their own to sell, not yet on the market.',
   },
 };
 
@@ -71,27 +82,52 @@ const COMMS = {
   weak: [
     {
       communication_id: 'com_w1',
-      channel: 'email',
-      occurred_at: '2026-08-12T14:31:00Z',
-      subject: 'RE: Church Road',
-      body_text: 'Thanks for getting in touch about Church Road. What sort of thing are you looking for?',
+      channel: 'voice',
+      occurred_at: '2026-08-11T08:57:00Z',
+      transcript: 'Hi, calling about your enquiry. Give us a ring back when you get a minute and we can have a chat.',
     },
   ],
   seller: [
     {
       communication_id: 'com_s1',
       channel: 'voice',
-      occurred_at: '2026-08-13T20:02:00Z',
-      transcript: 'Hi, calling about Fox Cottage. I can get you in on Thursday if that suits.',
+      occurred_at: '2026-08-10T19:20:00Z',
+      transcript: 'Hi, this is about your enquiry on Fox Cottage. I can get you booked in for a viewing whenever suits.',
     },
     {
       communication_id: 'com_s2',
       channel: 'email',
-      occurred_at: '2026-08-14T09:15:00Z',
+      occurred_at: '2026-08-11T08:15:00Z',
       subject: 'Fox Cottage viewing',
-      body_text: 'Confirming Thursday 2pm at Fox Cottage. Could you let me know your budget and how you are funding it?',
+      body_text: 'Just following up on Fox Cottage — happy to get a viewing in the diary this week if you let me know a time.',
+    },
+    {
+      communication_id: 'com_s3',
+      channel: 'voice',
+      occurred_at: '2026-08-11T16:44:00Z',
+      transcript: 'Trying you again about Fox Cottage. Let me know when you would like to view.',
     },
   ],
+};
+
+// The INTELLIGENCE each probe actually carries, so the layer sees the shape it
+// is writing about rather than one generic probe three times.
+const INTELLIGENCE = {
+  silent: {
+    human_contact: 'none', response_hours: '', contact_attempts: 0, follow_ups: 0, channels_used: '',
+    grade: 'H', communication_quality: 'none', did_well: '', missed: 'Nothing was ever sent.',
+  },
+  weak: {
+    human_contact: 'yes', response_hours: 18.9, contact_attempts: 1, follow_ups: 0, channels_used: 'voice',
+    grade: 'F', buyer_qualification: 'none', communication_quality: 'generic',
+    did_well: 'Called rather than leaving it unanswered.', missed: 'The call answered nothing and asked nothing.',
+  },
+  seller: {
+    human_contact: 'yes', response_hours: 0.67, contact_attempts: 3, follow_ups: 2, channels_used: 'voice,email',
+    grade: 'D', viewing_progression: 'availability_requested', buyer_qualification: 'none',
+    did_well: 'Three attempts across two channels inside a day, property referenced correctly.',
+    missed: 'Nothing was asked about the buyer, and the declared property to sell never came up.',
+  },
 };
 
 function intelligence(overrides = {}) {
@@ -126,49 +162,51 @@ function diagnosis(overrides = {}) {
   };
 }
 
-// ── The three real Personalisation outputs, in the shape the model returns ───
-// These are what the AI is expected to produce for each shape under the
-// rebuilt contract: reasoning first, then the variables.
+// ── The three Personalisation outputs, at target quality ─────────────────────
+// This is what the AI is expected to produce for each shape under the rebuilt
+// contract: reasoning first, then the variables — tight, one job per sentence,
+// the property value used to make the scale obvious without ever costing it
+// out, and the seller side kept to two short sentences in the wider beat.
 
 const STORIES = {
   silent: {
-    story_reasoning: '1. Nothing at all came back, so there is nothing to acknowledge. 2. The enquiry was never picked up by anyone. 3. Nobody established that there was a buyer here at all, let alone what they were looking for. 4. Yes — I said I had a property of my own to sell. 5. That valuation was never identified either.',
-    primary_narrative: 'Nothing came back across the whole window — no acknowledgement, no call, nothing.',
+    story_reasoning: '1. Nothing came back at all, so there is nothing to acknowledge. 2. The enquiry was never picked up by anyone. 3. Nobody established whether I was ready to view, what my timescale was, or what would have got me through the door. 4. Yes — I said I had a property of my own to sell, not yet on the market. 5. That instruction opportunity was never explored either.',
+    primary_narrative: 'Nothing came back across four days — no acknowledgement, no call, nothing — on an enquiry that carried both a buyer and a seller.',
     narrative_finding_indexes: [1],
     supporting_findings: '',
     evidence_quotes: [],
     fair_observation: '',
     main_finding: '',
-    commercial_consequence: 'a buyer who was ready to book a viewing never got as far as a conversation, so nobody ever found out how serious I was or what I could actually afford.',
-    wider_observation: "I'd also mentioned that I had a property of my own that I was considering selling.",
-    wider_consequence: 'a valuation sitting inside the same enquiry was never identified.',
-    novus_counterfactual: 'NOVUS would have answered the enquiry the moment it landed, at 21:21, and qualified both sides of it.',
+    commercial_consequence: 'a £425,000 buyer enquiry sat for four days without anyone finding out whether I was ready to view, what my timescale was, or what it would have taken to get me through the door.',
+    wider_observation: "I'd also said in the enquiry that I had a property of my own to sell that wasn't yet on the market.",
+    wider_consequence: 'a potential seller instruction sitting inside the same enquiry was never explored.',
+    novus_counterfactual: 'NOVUS would have answered the enquiry the moment it landed and qualified both sides of it.',
   },
   weak: {
-    story_reasoning: '1. You did reply, the same day, and asked me a question. 2. The reply never established anything about my position. 3. Nobody found out whether I was a serious buyer, whether I was ready to move, or what the next step was. 4. Nothing genuinely separate. 5. n/a',
-    primary_narrative: 'The reply arrived the same day and asked an open question, and then nothing about the enquiry was established.',
+    story_reasoning: '1. You did phone me back about the enquiry rather than ignoring it. 2. The call came almost 19 hours later, answered nothing I had asked, and asked nothing about me. 3. Nobody established whether I was ready to move, what I needed, or what should happen next. 4. Yes — I said I had a property of my own to sell. 5. That valuation and instruction were never explored.',
+    primary_narrative: 'The call came the next morning and went nowhere: it answered none of the questions in the enquiry and asked none of its own.',
     narrative_finding_indexes: [1],
     supporting_findings: '',
-    evidence_quotes: [{ quote: 'What sort of thing are you looking for?', communication_id: 'com_w1' }],
-    fair_observation: 'you did get back to me, with an email asking what I was looking for.',
-    main_finding: 'that the conversation never really established my position, my timescale or what I could afford.',
-    commercial_consequence: 'you had a live buyer enquiry in front of you, but nobody ever found out whether I was ready to move or what the next step should have been.',
-    wider_observation: '',
-    wider_consequence: '',
-    novus_counterfactual: 'NOVUS would have asked the position, the timescale and the funding in that same first reply.',
+    evidence_quotes: [{ quote: 'Give us a ring back when you get a minute', communication_id: 'com_w1' }],
+    fair_observation: 'you did get back to me with a phone call about my enquiry, rather than leaving it unanswered altogether.',
+    main_finding: "that the call came almost 19 hours later, didn't answer what I'd asked about the property, and didn't ask me anything about my own situation.",
+    commercial_consequence: 'you had a £225,000 buyer enquiry in front of you without establishing whether I was ready to move, what I needed from the property, or what should happen next.',
+    wider_observation: "I'd also said in my enquiry that I had a property of my own that I was looking to sell, but that never came up.",
+    wider_consequence: 'a potential valuation and seller instruction sitting inside the same enquiry was never explored.',
+    novus_counterfactual: 'NOVUS would have answered inside the hour and asked the position, the timescale and the funding on that first call.',
   },
   seller: {
-    story_reasoning: '1. You called back inside the evening and had a viewing booked by the next morning. 2. The property I said I had to sell never came up. 3. A valuation and a potential instruction inside the same enquiry were never explored. 4. Yes, the seller side. 5. It was never identified as an instruction opportunity.',
-    primary_narrative: 'The buying side was handled well and the selling side, which the enquiry declared, was never touched.',
+    story_reasoning: '1. You followed up quickly and persistently — three attempts across phone and email inside a day, with my name and Fox Cottage referenced correctly. 2. Every attempt pushed the viewing and asked nothing about me. 3. Nobody established whether I was in a position to move forward at all. 4. Yes — I said I had a property of my own to sell, not yet on the market. 5. That instruction opportunity was never explored.',
+    primary_narrative: 'The persistence went entirely into pushing a viewing, while the two things that would have told them who they were dealing with — buying readiness and selling potential — were left completely unexplored.',
     narrative_finding_indexes: [1],
     supporting_findings: '',
-    evidence_quotes: [{ quote: 'I can get you in on Thursday if that suits.', communication_id: 'com_s1' }],
-    fair_observation: 'you did follow up with me and tried to get me on the phone the same evening.',
-    main_finding: 'that I had told you I was considering selling my own property, but the conversation stayed entirely around the purchase.',
-    commercial_consequence: 'the £475,000 enquiry was treated as a viewing to book rather than as a household that was about to move twice.',
-    wider_observation: "I'd also mentioned that I had a property of my own that I was considering selling, but that never really came into the conversation.",
+    evidence_quotes: [{ quote: 'I can get you booked in for a viewing whenever suits.', communication_id: 'com_s1' }],
+    fair_observation: 'you did follow up with me quickly and persistently — three attempts by phone and email within a day, with my name and Fox Cottage referenced correctly and a clear invitation to book a viewing.',
+    main_finding: 'that all three attempts focused on getting me to a viewing without asking anything about my budget, timescale, requirements or position as a buyer.',
+    commercial_consequence: 'you had a £650,000 buyer enquiry in front of you without establishing whether I was actually in a position to move forward.',
+    wider_observation: "I'd also said in my enquiry that I had a property of my own to sell that wasn't yet on the market, but that never came into the conversation.",
     wider_consequence: 'a potential seller instruction sitting inside the same enquiry was never explored.',
-    novus_counterfactual: 'NOVUS would have booked the same Thursday viewing and offered the valuation on the same call.',
+    novus_counterfactual: 'NOVUS would have made the same three attempts and qualified the buyer and the seller side on the first one.',
   },
 };
 
@@ -184,7 +222,7 @@ async function personaliseWithCaller(shape, caller, { probe: probeOverrides = {}
   const findings = [{ finding_index: 1, finding: 'The enquiry was not progressed.', evidence: 'From the communications above.', significance_note: 'A live enquiry that stopped.' }];
   const row = await personaliseProbe(
     { ...PROBES[shape], ...probeOverrides },
-    intelligence(shape === 'silent' ? { human_contact: 'none', response_hours: '', contact_attempts: 0, channels_used: '', ...intelligenceOverrides } : intelligenceOverrides),
+    intelligence({ ...INTELLIGENCE[shape], ...intelligenceOverrides }),
     diagnosis(),
     findings,
     COMMS[shape],
@@ -198,7 +236,7 @@ async function personalise(shape, storyOverrides = {}, intelligenceOverrides = {
   const findings = [{ finding_index: 1, finding: 'The enquiry was not progressed.', evidence: 'From the communications above.', significance_note: 'A live enquiry that stopped.' }];
   return personaliseProbe(
     PROBES[shape],
-    intelligence(shape === 'silent' ? { human_contact: 'none', response_hours: '', contact_attempts: 0, channels_used: '', ...intelligenceOverrides } : intelligenceOverrides),
+    intelligence({ ...INTELLIGENCE[shape], ...intelligenceOverrides }),
     diagnosis(diagnosisOverrides),
     findings,
     COMMS[shape],
@@ -209,57 +247,119 @@ async function personalise(shape, storyOverrides = {}, intelligenceOverrides = {
 async function run() {
   console.log('the locked email contract — end-to-end regression over the three test probes\n');
 
-  // ── VARIANT 1, exactly ──
+  // ── prb_hist_0003 — VARIANT 1 (no response), word for word ──
   {
     const result = await personalise('silent');
     assert.strictEqual(result.email_variant, 'no_response');
     assert.strictEqual(result.email_body, [
       'Hi {{first_name}},',
-      'We sent your team an enquiry on 11 August about Rayleigh Road, Basildon, SS14.',
+      'We sent your team an enquiry on 10 August about a house on Perry Street.',
       'We never received a reply.',
-      'That meant a buyer who was ready to book a viewing never got as far as a conversation, so nobody ever found out how serious I was or what I could actually afford.',
-      "I'd also mentioned that I had a property of my own that I was considering selling.",
-      'That also meant a valuation sitting inside the same enquiry was never identified.',
-      'There were a couple of other things from the enquiry that caught our attention too.',
-      "I've put together a personalised breakdown of what we found. Happy to send it over if you'd like to see it.",
+      'That meant a £425,000 buyer enquiry sat for four days without anyone finding out whether I was ready to view, what my timescale was, or what it would have taken to get me through the door.',
+      "I'd also said in the enquiry that I had a property of my own to sell that wasn't yet on the market.",
+      'That also meant a potential seller instruction sitting inside the same enquiry was never explored.',
+      "We found a couple of things that may explain it, so we've put together a short breakdown that might be useful.",
+      "Happy to send it over if you'd like to see it.",
       'Joe',
     ].join('\n\n'));
-    ok('VARIANT 1 (no response) assembles exactly as the contract specifies, ending in the same locked two paragraphs as every other email');
+    ok('prb_hist_0003 (no response) assembles exactly as specified — "a house on Perry Street", the silence, its consequence at £425,000, the seller beat, and the no-response closing');
   }
 
-  // ── VARIANT 2 with no wider beat, exactly ──
+  // ── prb_hist_0004 — VARIANT 2, word for word ──
   {
     const result = await personalise('weak');
     assert.strictEqual(result.email_variant, 'normal');
     assert.strictEqual(result.email_body, [
       'Hi {{first_name}},',
-      'We sent your team an enquiry on 12 August about Church Road, Hadleigh.',
-      'I want to say upfront that you did get back to me, with an email asking what I was looking for.',
-      'What stood out, though, was that the conversation never really established my position, my timescale or what I could afford.',
-      'That meant you had a live buyer enquiry in front of you, but nobody ever found out whether I was ready to move or what the next step should have been.',
+      'We sent your team an enquiry on 10 August about a house on Southend Road.',
+      'I want to say upfront that you did get back to me with a phone call about my enquiry, rather than leaving it unanswered altogether.',
+      "What stood out, though, was that the call came almost 19 hours later, didn't answer what I'd asked about the property, and didn't ask me anything about my own situation.",
+      'That meant you had a £225,000 buyer enquiry in front of you without establishing whether I was ready to move, what I needed from the property, or what should happen next.',
+      "I'd also said in my enquiry that I had a property of my own that I was looking to sell, but that never came up.",
+      'That also meant a potential valuation and seller instruction sitting inside the same enquiry was never explored.',
       'There were a couple of other things from the enquiry that caught our attention too.',
       "I've put together a personalised breakdown of what we found. Happy to send it over if you'd like to see it.",
       'Joe',
     ].join('\n\n'));
-    ok('VARIANT 2 with a weak-but-real interaction assembles exactly as the contract specifies — the fair observation is small, factual and genuinely positive, and the locked closing still runs with no wider beat');
+    ok('prb_hist_0004 (a late call that asked nothing) assembles exactly as specified — a genuine positive for a weak interaction, the finding, the £225,000 consequence, the seller beat, and the normal closing');
   }
 
-  // ── VARIANT 2 with the full wider beat, exactly ──
+  // ── prb_hist_0009 — VARIANT 2 with strong follow-up, word for word ──
   {
-    const result = await personalise('seller', {}, { human_contact: 'yes', response_hours: 0.25, contact_attempts: 2, follow_ups: 1, channels_used: 'voice,email', viewing_progression: 'booked', buyer_qualification: 'thorough' });
+    const result = await personalise('seller');
     assert.strictEqual(result.email_body, [
       'Hi {{first_name}},',
-      'We sent your team an enquiry on 13 August about Fox Cottage.',
-      'I want to say upfront that you did follow up with me and tried to get me on the phone the same evening.',
-      'What stood out, though, was that I had told you I was considering selling my own property, but the conversation stayed entirely around the purchase.',
-      'That meant the £475,000 enquiry was treated as a viewing to book rather than as a household that was about to move twice.',
-      "I'd also mentioned that I had a property of my own that I was considering selling, but that never really came into the conversation.",
+      'We sent your team an enquiry on 10 August about Fox Cottage.',
+      'I want to say upfront that you did follow up with me quickly and persistently — three attempts by phone and email within a day, with my name and Fox Cottage referenced correctly and a clear invitation to book a viewing.',
+      'What stood out, though, was that all three attempts focused on getting me to a viewing without asking anything about my budget, timescale, requirements or position as a buyer.',
+      'That meant you had a £650,000 buyer enquiry in front of you without establishing whether I was actually in a position to move forward.',
+      "I'd also said in my enquiry that I had a property of my own to sell that wasn't yet on the market, but that never came into the conversation.",
       'That also meant a potential seller instruction sitting inside the same enquiry was never explored.',
       'There were a couple of other things from the enquiry that caught our attention too.',
       "I've put together a personalised breakdown of what we found. Happy to send it over if you'd like to see it.",
       'Joe',
     ].join('\n\n'));
-    ok('VARIANT 2 with a genuine wider opportunity assembles exactly as the contract specifies — observation, its own separate consequence, then the locked closing');
+
+    // THE ADDRESS CHECK the brief asks for. The live row records Fox Cottage
+    // and marks the Church Road relationship UNCONFIRMED, so the intro opens
+    // on Fox Cottage — the road is never assumed into the email. Fox Cottage
+    // itself IS evidenced in the communications, so quoting it back in the
+    // fair observation is honest.
+    assert.ok(!/Church Road/.test(result.email_body), 'an UNCONFIRMED road relationship never reaches the email');
+    assert.ok(!/UNCONFIRMED|relationship/i.test(result.email_body), "and neither does the analyst's own note");
+    assert.ok(result.email_body.includes('about Fox Cottage.'), 'the intro opens on the property the data actually establishes');
+    ok('prb_hist_0009 (three attempts, all pushing the viewing) assembles exactly as specified — and the intro names Fox Cottage, never the road the data flags as an unconfirmed relationship');
+  }
+
+  // ── THE PROPERTY VALUE MAKES THE SCALE OBVIOUS; WE NEVER COST IT OUT ──
+  {
+    // Used where it strengthens the consequence...
+    for (const shape of ['silent', 'weak', 'seller']) {
+      const body = (await personalise(shape)).email_body;
+      const price = PROBES[shape].property_price;
+      assert.ok(body.includes(price), `${shape}: the confirmed property value is used to make the scale obvious`);
+      assert.strictEqual((body.match(/£/g) || []).length, 1, `${shape}: exactly one figure appears, and it is that one`);
+      assert.ok(!/\bfees?\b|\bcommission\b|\bper cent\b|%/i.test(body), `${shape}: no fee, commission or percentage is ever stated`);
+      assert.ok(!/cost you|lost you|could have (?:earned|made)/i.test(body), `${shape}: and the loss is never costed out for them`);
+    }
+
+    // ...and omitted entirely when it adds nothing. A consequence written
+    // without the value is stored exactly as written — nothing forces a price
+    // into an email that does not need one.
+    const noPrice = await personalise('weak', {
+      commercial_consequence: 'nobody ever established whether I was ready to move or what should happen next.',
+    });
+    assert.ok(!noPrice.email_body.includes('£'), 'no figure is forced into an email whose consequence does not use one');
+    assert.ok(noPrice.email_body.includes('That meant nobody ever established whether I was ready to move'), 'and the consequence is printed exactly as written');
+
+    // An invented cost is stripped even when it uses the ALLOWED figure.
+    const costed = await personalise('weak', {
+      commercial_consequence: 'you had a £225,000 buyer enquiry in front of you without establishing whether I was ready to move. On a typical fee that is around £4,500 you never billed.',
+    });
+    assert.ok(costed.email_body.includes('£225,000 buyer enquiry'), 'the property value survives');
+    assert.ok(!/4,500|fee/i.test(costed.email_body), 'and the invented fee sentence beside it does not');
+    ok('the property value is used to make the scale obvious and never turned into what it cost them — no fees, no commission, no percentages — and it is never forced into an email that does not need it');
+  }
+
+  // ── THE SELLER SIDE IS A SEPARATE BEAT, AND NEVER INVENTED ──
+  {
+    // Where the enquiry declared it, it is two short sentences: the
+    // observation, then what missing it meant.
+    for (const shape of ['silent', 'weak', 'seller']) {
+      const body = (await personalise(shape)).email_body;
+      assert.ok(/property of my own/.test(body), `${shape}: the declared seller side is named in its own paragraph`);
+      assert.ok(/That also meant a potential (?:valuation and )?seller instruction sitting inside the same enquiry was never explored\./.test(body),
+        `${shape}: and its consequence is the separate wider beat`);
+      assert.ok(!/would have (?:won|got|secured|listed)|definitely|certainly/i.test(body),
+        `${shape}: it is never claimed the instruction would definitely have followed`);
+    }
+
+    // Where the enquiry did NOT declare one, nothing is manufactured.
+    const noSeller = await personalise('weak', { wider_observation: '', wider_consequence: '' });
+    assert.ok(!/property of my own|seller instruction|valuation/i.test(noSeller.email_body),
+      'an enquiry with no declared seller side gets no seller paragraph at all');
+    assert.ok(noSeller.email_body.includes(ADDITIONAL_FINDINGS_HOOK_LINE), 'and the email simply closes');
+    ok('the seller opportunity is handled as its own two-sentence wider beat when the enquiry declared it, is never claimed to be a certain instruction, and is never invented when it was not declared');
   }
 
   // ── The story reads as a story, not a list of problems ──
@@ -270,8 +370,9 @@ async function run() {
       assert.ok(!/^\s*[-*\d]+[.)]\s/m.test(body), `${shape}: no bullet or numbered list anywhere in the email`);
       assert.ok(!/audit|grade|score|report/i.test(body), `${shape}: it never reads as an audit, a grading or a report`);
       assert.ok(!/NOVUS/i.test(body), `${shape}: the email does not sell NOVUS`);
-      assert.strictEqual((body.match(/personalised breakdown/g) || []).length, 1, `${shape}: the offer is made exactly once`);
-      assert.ok(body.endsWith('Happy to send it over if you\'d like to see it.\n\nJoe'), `${shape}: and the locked CTA is the last thing before the sign-off`);
+      assert.strictEqual((body.match(/breakdown/g) || []).length, 1, `${shape}: the breakdown is offered exactly once`);
+      assert.strictEqual((body.match(/couple of/g) || []).length, 1, `${shape}: and "a couple of things" is said exactly once`);
+      assert.ok(body.endsWith('Happy to send it over if you\'d like to see it.\n\nJoe'), `${shape}: the offer is the last thing before the sign-off`);
     }
     ok('all three shapes read as one story ending in one offer — never a list of problems, never an audit, and never a pitch');
   }
@@ -284,8 +385,10 @@ async function run() {
     assert.ok(emailContractViolations(blank).includes('missing_commercial_consequence'));
 
     // A consequence that merely repeats the finding.
+    // Derived from the story itself, so this stays a restatement however the
+    // fixture's wording changes.
     const repeated = await personalise('weak', {
-      commercial_consequence: 'the conversation never really established my position, my timescale or what I could afford.',
+      commercial_consequence: STORIES.weak.main_finding.replace(/^that /, ''),
     });
     assert.strictEqual(repeated.commercial_consequence, '', 'a consequence that restates the finding is dropped');
     assert.strictEqual(repeated.email_body, '', 'so the row is not sendable rather than sending a hollow email');
@@ -314,8 +417,8 @@ async function run() {
 
     // A seller observation repeated back as its own consequence.
     const echoed = await personalise('seller', {
-      wider_consequence: 'a property of my own that I was considering selling never really came into the conversation.',
-      commercial_consequence: 'a property of my own that I was considering selling never really came into the conversation.',
+      wider_consequence: 'a property of my own that I was looking to sell never came into the conversation.',
+      commercial_consequence: 'a property of my own that I was looking to sell never came into the conversation.',
     });
     assert.strictEqual(echoed.wider_consequence, '', 'the seller observation restated as its own consequence is dropped');
     assert.ok(!echoed.email_body.includes('That also meant'), 'so it is never printed twice, one paragraph apart');

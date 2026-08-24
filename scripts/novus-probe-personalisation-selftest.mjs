@@ -41,11 +41,12 @@ import {
   personaliseProbe, pickHeroJourney, stripUnbackedCurrency,
   normalizeCurrencyFigure, formatEnquiryDate, cleanAddressForEmail,
   stripThatMeantPrefix, readsAsInternalReasoning, readsAsDetachedThirdPerson,
-  distinctWiderConsequence, emailPropertyAddress, readsAsSnuckCriticism,
+  distinctWiderConsequence, emailPropertyAddress, readsAsSnuckCriticism, stripInventedLoss,
   consequenceGoesBeyondFinding, extractProtectedWords,
 } from '../lib/probe-personalisation.mjs';
 import {
   ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE, THAT_MEANT_PREFIX, emailContractViolations,
+  NO_RESPONSE_BREAKDOWN_LINE, NO_RESPONSE_CTA_LINE,
   THAT_ALSO_MEANT_PREFIX, FAIR_OBSERVATION_PREFIX, MAIN_FINDING_PREFIX, assembleEmail,
 } from '../lib/email-assembly.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
@@ -359,8 +360,8 @@ async function run() {
     assert.strictEqual(result.email_variant, 'no_response', 'the email switches to its own structure');
     assert.strictEqual(result.fair_observation, '', 'there was no handling to be fair about, so nothing is invented');
     assert.strictEqual(result.main_finding, '', 'and the model\'s invented conversation is discarded outright — the failure is the silence');
-    assert.strictEqual(result.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE,
-      'the locked closing transition is used here too — both variants end the same way');
+    assert.strictEqual(result.additional_findings_hook, '',
+      'the no-response variant has its own closing, so the normal tease is not stored on top of it');
     assert.strictEqual(result.hero_journey, 'complete_miss', 'the journey is the complete-miss one');
     assert.strictEqual(result.evidence, '', 'nothing was ever said, so there is no evidence to quote');
 
@@ -369,8 +370,9 @@ async function run() {
     assert.ok(!result.email_body.includes('called back'), 'no invented conversation reaches the email');
     assert.ok(result.email_body.includes('That meant a buyer who was ready to view never got as far as a conversation.'), 'the consequence of the silence still lands');
     assert.ok(result.email_body.includes('never picked up as a valuation'), 'and a seller opportunity our own enquiry declared still carries a wider consequence');
-    assert.ok(result.email_body.endsWith(`${ADDITIONAL_FINDINGS_HOOK_LINE}\n\n${CTA_LINE}\n\nJoe`),
-      'and it closes with exactly the same locked two paragraphs as every other email');
+    assert.ok(result.email_body.endsWith(`${NO_RESPONSE_BREAKDOWN_LINE}\n\n${NO_RESPONSE_CTA_LINE}\n\nJoe`),
+      'and it closes with the no-response variant\'s own locked two paragraphs');
+    assert.ok(!result.email_body.includes(ADDITIONAL_FINDINGS_HOOK_LINE), 'never the normal tease');
     ok('a probe that was never replied to switches to the no-response email structure — no fair observation, no invented conversation, just the silence, its consequence and an offer that makes sense');
   }
 
@@ -452,7 +454,7 @@ async function run() {
     assert.strictEqual(result.email_body, assembleEmail(result), 'email_body is the deterministic assembly of the fields beside it');
     assert.strictEqual(result.email_body, [
       'Hi {{first_name}},',
-      'We sent your team an enquiry on 17 August about Barn Field, Chevington, IP29.',
+      'We sent your team an enquiry on 17 August about a house on Barn Field.',
       `${FAIR_OBSERVATION_PREFIX}${result.fair_observation}`,
       `${MAIN_FINDING_PREFIX}${result.main_finding}`,
       `${THAT_MEANT_PREFIX}${result.commercial_consequence}`,
@@ -757,6 +759,81 @@ async function run() {
     ok('a main_finding/commercial_consequence phrased as an honest "there is no ..." absence is never blanked, and still produces a sendable email');
   }
 
+  // ── REGRESSION: "finding out" is ordinary English, not our own jargon ──
+  //    An earlier blanket /findings?/ pattern blanked a real commercial
+  //    consequence — "without anyone finding out whether I was ready to view"
+  //    — and took the whole email with it. The singular only counts as our
+  //    concept when it is a noun with a determiner in front of it.
+  {
+    assert.strictEqual(readsAsInternalReasoning('without anyone finding out whether I was ready to view'), false);
+    assert.strictEqual(readsAsInternalReasoning('you never got round to finding a time that suited'), false);
+    assert.strictEqual(readsAsInternalReasoning('no findings were recorded'), true);
+    assert.strictEqual(readsAsInternalReasoning('the finding here is that nobody asked'), true);
+
+    __setAiCallerForTests(async () => stubResult({
+      commercial_consequence: 'a £375,000 buyer enquiry sat overnight without anyone finding out whether I was ready to view.',
+    }));
+    const result = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    assert.ok(result.commercial_consequence.includes('finding out whether I was ready to view'),
+      'the sentence survives intact');
+    assert.ok(result.email_body.includes('That meant a £375,000 buyer enquiry sat overnight'), 'and reaches the email');
+    ok('"finding out" and "finding a time" are ordinary English and survive; "no findings", "our findings" and "the finding" are still caught as notes to ourselves');
+  }
+
+  // ── The property value speaks; we never cost the loss out for them ──
+  {
+    // The allowed figure is kept where it makes the scale obvious...
+    assert.strictEqual(
+      stripInventedLoss('you had a £225,000 buyer enquiry in front of you without establishing whether I was ready to move.'),
+      'you had a £225,000 buyer enquiry in front of you without establishing whether I was ready to move.',
+    );
+    // ...and any sentence that turns it into their loss goes, even though the
+    // figure itself was allowed.
+    for (const costed of [
+      'on a typical fee that is £4,500 you never billed.',
+      'that is a commission you never earned.',
+      'at 1.5% that is real money.',
+      'this could have cost you a £425,000 sale.',
+      'you may have lost your £12,000.',
+      'it is worth £8,000 in revenue to you.',
+    ]) {
+      assert.strictEqual(stripInventedLoss(costed), '', `"${costed}" is never sent`);
+    }
+
+    // Sentence-level, so the honest half of a mixed answer survives.
+    __setAiCallerForTests(async () => stubResult({
+      commercial_consequence: 'you had a £375,000 buyer enquiry in front of you and never established my position. On a typical fee that is around £5,600 you never billed.',
+    }));
+    const mixed = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), COMMS, {});
+    assert.ok(mixed.commercial_consequence.includes('£375,000 buyer enquiry'), 'the property value survives');
+    assert.ok(!/5,600|fee/i.test(mixed.commercial_consequence), 'the invented fee sentence does not');
+    assert.ok(mixed.email_body, 'and the email is still sendable on the honest half');
+    ok('the property value is allowed to make the scale obvious, while any sentence that turns it into a fee, a commission, a percentage or "what this cost you" is stripped');
+  }
+
+  // ── A weak interaction still yields a genuine, unhedged positive ──
+  {
+    // One late call that asked nothing — the worst case that still counts as
+    // human contact. The acknowledgement is small and factual, and it is not
+    // rewritten, shortened or hedged by the code.
+    __setAiCallerForTests(async () => stubResult({
+      fair_observation: 'you did get back to me with a phone call about my enquiry, rather than leaving it unanswered altogether.',
+    }));
+    const result = await personaliseProbe(
+      PROBE,
+      baseIntelligence({ response_hours: 18.9, contact_attempts: 1, follow_ups: 0, communication_quality: 'generic' }),
+      baseDiagnosis({ strengths: '' }),
+      baseFindings(), COMMS, {},
+    );
+    assert.strictEqual(result.fair_observation, 'you did get back to me with a phone call about my enquiry, rather than leaving it unanswered altogether.',
+      'the small factual positive is stored exactly as written');
+    assert.ok(!readsAsSnuckCriticism(result.fair_observation), 'and carries no hedge word');
+    assert.ok(result.email_body.startsWith('Hi {{first_name}},'), 'so the email is sendable');
+    assert.ok(result.email_body.includes('I want to say upfront that you did get back to me with a phone call'),
+      'and opens on it, after the fixed opener');
+    ok('a weak interaction still opens the email with a genuine, unhedged positive — the acknowledgement is small and factual, and the code never rewrites it');
+  }
+
   // ── Only the wider beat is optional — the rest of the normal email is not ──
   {
     __setAiCallerForTests(async () => stubResult({
@@ -774,7 +851,7 @@ async function run() {
     // The email drops the wider paragraphs — and nothing else.
     assert.strictEqual(result.email_body, [
       'Hi {{first_name}},',
-      'We sent your team an enquiry on 17 August about Barn Field, Chevington, IP29.',
+      'We sent your team an enquiry on 17 August about a house on Barn Field.',
       `${FAIR_OBSERVATION_PREFIX}${result.fair_observation}`,
       `${MAIN_FINDING_PREFIX}${result.main_finding}`,
       `${THAT_MEANT_PREFIX}${result.commercial_consequence}`,

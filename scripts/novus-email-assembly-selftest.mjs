@@ -28,7 +28,8 @@ import {
   assembleEmail, isSendable, normaliseVariant, openingLine,
   ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, FIRST_NAME_MERGE_FIELD, NO_REPLY_LINE,
   SIGN_OFF, THAT_MEANT_PREFIX, THAT_ALSO_MEANT_PREFIX, FAIR_OBSERVATION_PREFIX,
-  MAIN_FINDING_PREFIX, withPrefix, emailContractViolations,
+  MAIN_FINDING_PREFIX, withPrefix, emailContractViolations, propertyReference,
+  NO_RESPONSE_BREAKDOWN_LINE, NO_RESPONSE_CTA_LINE,
 } from '../lib/email-assembly.mjs';
 
 let passed = 0;
@@ -99,20 +100,28 @@ function run() {
     ok('the call to action is the locked breakdown line — never an audit, never a sales offer');
   }
 
-  // ── The locked final two paragraphs are ALWAYS both there ──
+  // ── Each variant's locked final two paragraphs are ALWAYS both there ──
   {
     for (const [why, row] of [
       ['nothing beyond the primary narrative', fullRow({ additional_findings_hook: '' })],
       ['a stored hook someone blanked', fullRow({ additional_findings_hook: '' })],
       ['a stored hook someone rewrote', fullRow({ additional_findings_hook: 'We noticed four other problems with your process.' })],
-      ['the no-response variant', noResponseRow()],
     ]) {
       const body = assembleEmail(row);
       assert.ok(body.includes(`\n\n${ADDITIONAL_FINDINGS_HOOK_LINE}\n\n${CTA_LINE}\n\n${SIGN_OFF}`),
         `${why}: the locked transition and the locked CTA both close the email, in that order`);
       assert.ok(!body.includes('four other problems'), `${why}: a stored hook is never printed as copy`);
     }
-    ok('the final two paragraphs are locked and appear in every sendable email, in both variants — the transition is not conditional on a leftover finding, and the stored additional_findings_hook is never used as copy');
+
+    // The no-response variant closes with its own two lines: there was no
+    // conversation, so "a couple of OTHER things" has nothing to be other than.
+    const silent = assembleEmail(noResponseRow({ additional_findings_hook: ADDITIONAL_FINDINGS_HOOK_LINE }));
+    assert.ok(silent.includes(`\n\n${NO_RESPONSE_BREAKDOWN_LINE}\n\n${NO_RESPONSE_CTA_LINE}\n\n${SIGN_OFF}`),
+      'the no-response variant closes with its own locked two lines');
+    assert.ok(!silent.includes(ADDITIONAL_FINDINGS_HOOK_LINE), 'and never stacks the normal tease on top of them');
+    assert.ok(!silent.includes(CTA_LINE), 'nor the normal CTA');
+    assert.strictEqual((silent.match(/couple of/g) || []).length, 1, 'so "a couple of things" is offered exactly once');
+    ok('each variant has its own locked final two paragraphs, and they are not conditional on a leftover finding — the stored additional_findings_hook is never used as copy');
   }
 
   // ── Only the truly optional paragraphs are optional ──
@@ -205,7 +214,7 @@ function run() {
     ok('the assembler adds the fixed opener and nothing else — it never repairs, capitalises or punctuates a sentence, because sentence-ready copy is Personalisation\'s contract');
   }
 
-  // ── VARIANT 1: the no-response structure ──
+  // ── VARIANT 1: the no-response structure, exactly ──
   {
     const body = assembleEmail(noResponseRow());
     const row = noResponseRow();
@@ -216,11 +225,11 @@ function run() {
       `That meant ${row.commercial_consequence}`,
       row.wider_observation,
       `That also meant ${row.wider_consequence}`,
-      ADDITIONAL_FINDINGS_HOOK_LINE,
-      CTA_LINE,
+      "We found a couple of things that may explain it, so we've put together a short breakdown that might be useful.",
+      "Happy to send it over if you'd like to see it.",
       'Joe',
     ].join('\n\n'));
-    ok('the no-response structure assembles as its own fixed shape: the plain no-reply line, the consequence, the optional wider beat, and then the same locked closing two paragraphs as every other email');
+    ok('the no-response structure assembles as its own fixed shape: the plain no-reply line, the consequence, the optional wider beat, and a closing that makes sense when there was nothing to discuss');
   }
 
   // ── The no-response case never describes a conversation ──
@@ -234,9 +243,44 @@ function run() {
     assert.ok(!body.includes(FAIR_OBSERVATION_PREFIX), 'and neither is its fixed opener — there was no interaction to praise');
     assert.ok(!body.includes('The reply did not mention the property.'), 'nor a stray main finding — there was no reply to describe');
     assert.ok(body.includes(NO_REPLY_LINE), 'the fixed no-reply line stands in their place');
-    assert.ok(body.includes(ADDITIONAL_FINDINGS_HOOK_LINE) && body.includes(CTA_LINE), 'and the same locked closing is used as in a normal email');
-    assert.strictEqual((body.match(/couple of/g) || []).length, 1, 'so "a couple of other things" is offered exactly once');
-    ok('the no-response structure prints only what is true of silence — no conversation, no invented praise — and closes with exactly the same locked two paragraphs');
+    assert.ok(body.includes(NO_RESPONSE_BREAKDOWN_LINE) && body.includes(NO_RESPONSE_CTA_LINE), 'and its own locked closing is used');
+    assert.strictEqual((body.match(/couple of/g) || []).length, 1, 'so "a couple of things" is offered exactly once');
+    ok('the no-response structure prints only what is true of silence — no conversation, no invented praise — and closes with its own locked two paragraphs');
+  }
+
+  // ── THE PROPERTY WORDING: we enquired about a house, not about a street ──
+  {
+    // A road name on its own gets "a house on" in front of it...
+    for (const [address, expected] of [
+      ['Perry Street', 'a house on Perry Street'],
+      ['Church Road, Hadleigh', 'a house on Church Road'],
+      ['Rayleigh Road', 'a house on Rayleigh Road'],
+      ['Whitmore Way, Basildon, SS14', 'a house on Whitmore Way'],
+    ]) {
+      assert.strictEqual(propertyReference(address), expected, `"${address}" is a road, not a property`);
+    }
+
+    // ...and an address that actually identifies a property never does.
+    for (const [address, expected] of [
+      ['14 Perry Street', '14 Perry Street'],
+      ['1a Oak Road', '1a Oak Road'],
+      ['Fox Cottage', 'Fox Cottage'],
+      ['The Old Barn, Church Lane', 'The Old Barn'],
+      ['Apt 16, Southwood Court, Southend Road, Billericay', 'Apt 16, Southwood Court'],
+    ]) {
+      assert.strictEqual(propertyReference(address), expected, `"${address}" already names the property`);
+    }
+
+    // No number is ever invented for an address that does not carry one.
+    for (const roadOnly of ['Perry Street', 'Church Road, Hadleigh', 'Rayleigh Road']) {
+      assert.ok(!/\d/.test(propertyReference(roadOnly)), `"${roadOnly}" never gains a house number`);
+    }
+
+    assert.strictEqual(openingLine('10 August', 'Perry Street'), 'We sent your team an enquiry on 10 August about a house on Perry Street.');
+    assert.strictEqual(openingLine('10 August', '14 Perry Street'), 'We sent your team an enquiry on 10 August about 14 Perry Street.');
+    assert.ok(assembleEmail(fullRow({ property_address: 'Perry Street' })).includes('about a house on Perry Street.'),
+      'and the assembled email opens on it');
+    ok('the property wording is deterministic: a road-only address reads as "a house on Perry Street", an address that names the property is printed as it stands, and no house number is ever invented');
   }
 
   // ── Merge fields ──
@@ -246,7 +290,7 @@ function run() {
     assert.strictEqual((body.match(/\{\{/g) || []).length, 1, 'and it is the ONLY unresolved merge field in the email');
     assert.ok(body.includes('We sent your team an enquiry on 18 August about 14 Oak Road.'),
       'the date and address are resolved here, from the probe\'s own facts');
-    assert.strictEqual(openingLine('1 January', 'Silence Road'), 'We sent your team an enquiry on 1 January about Silence Road.');
+    assert.strictEqual(openingLine('1 January', 'Silence Road'), 'We sent your team an enquiry on 1 January about a house on Silence Road.');
     ok('the assembler resolves enquiry_date and property_address itself and leaves exactly one merge field, {{first_name}}, for the sending tool');
   }
 
