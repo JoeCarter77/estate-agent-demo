@@ -20,10 +20,18 @@
 //   H. the CTA records once — a reload is not a second signal
 //   I. a recompile preserves identity, created_at and EVERY analytics field
 //   J. the demo write path is authed; the read path is not
+//   K. …and the recovery-build/archive/restore edge cases, including that a
+//      needs_review demo 404s exactly like an unknown slug for a normal
+//      request, resolves only under ?preview=1, and stays gone under preview
+//      when archived
 //   L. AUTOMATIC COMPILATION: a probe that finishes PERSONALISATION comes out
 //      of the same pass with a live demo, and the pass self-heals a probe that
 //      was personalised before the DEMOS tab existed
 //   M. THE PROSPECT PATH READS ONE TAB. GET touches DEMOS and nothing else.
+//   N. OBSERVED-EVENTS EVIDENCE: the events shown are drawn from the probe's
+//      matched COMMUNICATIONS rows by fixed rules — never an AI call — and
+//      fall back to the old INTELLIGENCE-only summary when none are matched
+//   O. display formatting
 //
 // Run: npm run novus:demo-selftest
 
@@ -31,8 +39,9 @@ import assert from 'node:assert';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import demoHandler from '../api/demo.js';
 import {
-  ANALYTICS_COLUMNS, DEMOS_HEADER, buildDemoRow, buildDemoSlug, formatResponseTime,
-  formatChannels, reviewReasonsFor, sentenceCase, statusFromReasons, toRenderReady,
+  ANALYTICS_COLUMNS, DEMOS_HEADER, buildDemoRow, buildDemoSlug, buildObservedEvents,
+  formatResponseTime, formatChannels, reviewReasonsFor, selectCommunicationEvidence,
+  sentenceCase, statusFromReasons, toRenderReady,
 } from '../lib/demos.mjs';
 import { compileDemos, compileDecision } from '../lib/demo-compile.mjs';
 import { runRebuildPass } from '../lib/rebuild-pass.mjs';
@@ -85,6 +94,11 @@ function makeWorkbook(seed = {}) {
   const store = {
     PROBES: [PROBES_HEADER.slice(), row(PROBES_HEADER, { probe_id: 'SCHEMA NOTE' })],
     AGENCIES: [AGENCIES_HEADER.slice()],
+    // Always present, like every other required tab here — COMMUNICATIONS is
+    // one of the pipeline's original five tabs and is never optional in the
+    // live workbook. compileDemos() now reads it (§ evidence selection), so
+    // it has to exist by default the same way PROBES/AGENCIES/INTELLIGENCE do.
+    COMMUNICATIONS: [COMMUNICATIONS_HEADER.slice()],
     INTELLIGENCE: [INTELLIGENCE_HEADER.slice()],
     DIAGNOSIS_FINDINGS: [DIAGNOSIS_FINDINGS_HEADER.slice()],
     PERSONALISATION: [PERSONALISATION_HEADER.slice()],
@@ -193,6 +207,34 @@ function seedWeakSeller(store, {
     communication_quality: 'strong',
     grade: 'B',
   }));
+  // Three real contact attempts (30-minute grouping), matching the
+  // INTELLIGENCE row above: a voicemail + email inside 23 minutes of the
+  // enquiry, then two later follow-ups — the real evidence
+  // selectCommunicationEvidence() now reads instead of the old generic counts.
+  store.COMMUNICATIONS.push(row(COMMUNICATIONS_HEADER, {
+    communication_id: 'com_demo_001', agency_id: agencyId, probe_id: probeId,
+    occurred_at: '2026-08-17T22:57:41.000Z', channel: 'voice', direction: 'outbound',
+    voicemail_present: 'TRUE', automated_or_human: 'human',
+    transcript: "Hi, it's Rosa from Ensum Brown, calling about Barn Field. Give us a call back.",
+  }));
+  store.COMMUNICATIONS.push(row(COMMUNICATIONS_HEADER, {
+    communication_id: 'com_demo_002', agency_id: agencyId, probe_id: probeId,
+    occurred_at: '2026-08-17T22:58:56.000Z', channel: 'email', direction: 'outbound',
+    automated_or_human: 'human', subject: 'Barn Field, Chevington',
+    body_text: 'Hi Priya, thanks for your enquiry about Barn Field. Are you on the market or renting for example?',
+  }));
+  store.COMMUNICATIONS.push(row(COMMUNICATIONS_HEADER, {
+    communication_id: 'com_demo_003', agency_id: agencyId, probe_id: probeId,
+    occurred_at: '2026-08-18T09:15:00.000Z', channel: 'email', direction: 'outbound',
+    automated_or_human: 'human',
+    body_text: "Just checking back in — are Saturday or Sunday still good for the viewing?",
+  }));
+  store.COMMUNICATIONS.push(row(COMMUNICATIONS_HEADER, {
+    communication_id: 'com_demo_004', agency_id: agencyId, probe_id: probeId,
+    occurred_at: '2026-08-18T09:50:00.000Z', channel: 'voice', direction: 'outbound',
+    automated_or_human: 'human',
+    transcript: "Hi it's Rosa again — wanted to see if Saturday or Sunday still works for the viewing.",
+  }));
   store.DIAGNOSIS_FINDINGS.push(row(DIAGNOSIS_FINDINGS_HEADER, {
     probe_id: probeId,
     finding_index: '1',
@@ -295,6 +337,15 @@ function seedPipelineReadyProbe(store, { probeId = 'prb_auto_001' } = {}) {
     evidence: 'First human reply 30 minutes after the enquiry.',
     significance_note: 'Genuinely fast on the buying side.',
   }));
+  // Matches first_human_response_at above — so the demo this pass compiles
+  // also exercises the real evidence path (selectCommunicationEvidence),
+  // not just the AI-derived personalisation copy.
+  store.COMMUNICATIONS.push(row(COMMUNICATIONS_HEADER, {
+    communication_id: 'com_auto_001', agency_id: 'agc_auto', probe_id: probeId,
+    occurred_at: '2026-08-10T19:22:00.000Z', channel: 'email', direction: 'outbound',
+    automated_or_human: 'human', subject: 'Willow Lane, Hartwell',
+    body_text: 'Hi, thanks for your enquiry about Willow Lane — Saturday or Sunday for a viewing?',
+  }));
 }
 
 // HERMETIC BY CONSTRUCTION. Nothing in this suite may reach a portal, so every
@@ -304,8 +355,13 @@ const noImage = async () => '';
 const anImage = async () => 'https://media.rightmove.co.uk/dir/1/IMG_01_0000_max_656x437.jpeg';
 
 // The one AI call Part L's pass makes. Everything else on that probe is
-// already seeded, so this fake only has to answer the personalisation tool.
+// already seeded, so this fake only has to answer the personalisation tool —
+// and it THROWS for any other tool name, which is what proves the DEMOS
+// compile step that runs immediately afterwards makes no AI call of its own:
+// if it did, this fake would blow up the pass rather than silently pass.
+let personalisationAiCalls = 0;
 async function fakePersonalisationAi({ tool }) {
+  personalisationAiCalls += 1;
   if (tool?.name !== 'record_probe_personalisation') {
     throw new Error(`Part L should only need the personalisation call, got "${tool?.name}"`);
   }
@@ -389,13 +445,15 @@ async function run() {
     const agency = Object.fromEntries(AGENCIES_HEADER.map((k, i) => [k, store.AGENCIES[1][i] ?? '']));
     const intelligence = Object.fromEntries(INTELLIGENCE_HEADER.map((k, i) => [k, store.INTELLIGENCE[1][i] ?? '']));
     const personalisation = Object.fromEntries(PERSONALISATION_HEADER.map((k, i) => [k, store.PERSONALISATION[1][i] ?? '']));
+    const communications = store.COMMUNICATIONS.slice(1)
+      .map((r) => Object.fromEntries(COMMUNICATIONS_HEADER.map((k, i) => [k, r[i] ?? ''])));
     const findings = [
       { finding_index: 1, finding_type: 'opportunity', finding: 'The declared property to sell was asked about once and never converted into a valuation.', evidence: 'no valuation offered in any message', significance_note: 'An instruction lead was recognised in words and left on the table.' },
       { finding_index: 2, finding_type: 'positive', finding: 'The team followed up quickly across two channels.', evidence: 'Voicemail and email inside 23 minutes', significance_note: 'Shows genuine persistence.' },
     ];
 
     const { row: built, reasons, status } = buildDemoRow({
-      probe, agency, intelligence, findings, personalisation,
+      probe, agency, intelligence, findings, personalisation, communications,
       propertyImageUrl: 'https://media.rightmove.co.uk/dir/123/IMG_01_0000_max_656x437.jpeg',
       propertyImageStatus: 'ok',
       now: '2026-08-24T10:00:00.000Z',
@@ -427,10 +485,24 @@ async function run() {
     ok('positive observation and consequence are PERSONALISATION copy, sentence-cased only');
 
     const events = JSON.parse(built.observed_events_json);
-    assert.ok(events.length >= 5 && events.length <= 7, `expected a SHORT event list, got ${events.length}`);
+    assert.ok(events.length >= 4 && events.length <= 7, `expected a SHORT event list, got ${events.length}`);
     assert.deepStrictEqual(events[0], { label: 'Enquiry submitted', detail: '17 August, 23:34', tone: 'neutral' });
     assert.ok(events.some((e) => e.label === 'Property to sell declared'));
-    assert.ok(events.some((e) => e.label === '3 contact attempts' && e.detail === 'Across phone and email'));
+
+    // REAL EVIDENCE, not aggregate counts: the response and follow-up events
+    // now quote the actual COMMUNICATIONS rows (via selectCommunicationEvidence,
+    // zero AI — see Part N), so the old "3 contact attempts / Across phone and
+    // email" line is gone in favour of the specific messages it was standing in for.
+    const firstResponse = events.find((e) => e.label === 'First response — phone');
+    assert.ok(firstResponse, 'the first human touch (the voicemail) is shown as evidence');
+    assert.strictEqual(firstResponse.detail, "\"Hi, it's Rosa from Ensum Brown, calling about Barn Field. Give us a call back.\"");
+    assert.strictEqual(firstResponse.tone, 'good');
+    const followUp = events.find((e) => e.label === 'Follow-up — phone');
+    assert.ok(followUp, 'the strongest follow-up (the second call) is shown as evidence');
+    assert.ok(followUp.detail.includes('Saturday or Sunday'), 'the follow-up detail is a real excerpt, not a generic count');
+    assert.ok(!events.some((e) => e.label === '3 contact attempts'), 'the old generic count line is gone once real evidence exists');
+    ok('the response and follow-up events are real COMMUNICATIONS excerpts, not generic counts');
+
     assert.ok(events.some((e) => e.label === 'Viewing slot offered' && e.tone === 'good'));
     const sellerEvent = events.find((e) => e.label.startsWith('Seller position asked about'));
     assert.ok(sellerEvent && sellerEvent.tone === 'gap', 'the unconverted seller position is the gap');
@@ -743,6 +815,13 @@ async function run() {
     assert.strictEqual(res.statusCode, 404);
     ok('an archived demo is a 404');
 
+    // Preserved exactly: archived stays gone even under the internal preview
+    // mechanism — preview reveals an unfinished demo, never a retired one.
+    const previewRes = mockRes();
+    await demoHandler(mockReq({ method: 'GET', query: { slug: 'ensum-brown-rm-0042', preview: '1' }, auth: false }), previewRes);
+    assert.strictEqual(previewRes.statusCode, 404);
+    ok('?preview=1 does not resurrect an archived demo either');
+
     // ARCHIVING IS STICKY: a later recompile refreshes the snapshot but must
     // not quietly bring a retired link back to life.
     await compileDemos(repo, { probeIds: ['prb_demo_001'], force: true, resolveImageUrl: noImage });
@@ -786,12 +865,27 @@ async function run() {
     assert.strictEqual(demoRowsOf(store)[0].ready_at, '', 'a demo that was never ready has no ready_at');
     ok('an unreviewed journey compiles to needs_review with the reason on the row');
 
-    // It still resolves, flagged — so the URL can be checked before sending.
+    // A NORMAL request must not expose it — same 404 an unknown slug gets,
+    // so the outside world cannot tell "not ready" from "never existed".
+    const normalRes = mockRes();
+    await demoHandler(mockReq({ method: 'GET', query: { slug: demoRowsOf(store)[0].demo_slug }, auth: false }), normalRes);
+    assert.strictEqual(normalRes.statusCode, 404);
+    assert.strictEqual(normalRes.body.error, 'No demo found for this link');
+    const unknownRes = mockRes();
+    await demoHandler(mockReq({ method: 'GET', query: { slug: 'genuinely-unknown-slug' }, auth: false }), unknownRes);
+    assert.strictEqual(unknownRes.body.error, normalRes.body.error, 'the two 404s must read identically');
+    ok('a normal request to a needs_review demo 404s exactly like an unknown slug');
+
+    // Only ?preview=1 — the internal viewing mechanism — is allowed to see it.
     const res = mockRes();
     await demoHandler(mockReq({ method: 'GET', query: { slug: demoRowsOf(store)[0].demo_slug, preview: '1' }, auth: false }), res);
     assert.strictEqual(res.statusCode, 200);
     assert.strictEqual(res.body.needs_review, true);
-    ok('a needs_review demo still resolves, flagged, rather than 404ing');
+    ok('?preview=1 still resolves it, flagged, so it can be checked before sending');
+
+    // Telemetry must never fire off a request that never rendered the page.
+    assert.strictEqual(demoRowsOf(store)[0].view_count, '', 'the blocked normal request must not have counted as a view');
+    ok('the blocked normal request left no view recorded');
   }
   {
     // A probe with no PERSONALISATION row has no story to tell yet.
@@ -845,12 +939,10 @@ async function run() {
   // PERSONALISATION comes out of the SAME pass with a live demo.
   console.log('\nPart L — the demo compiles itself when PERSONALISATION completes');
   {
-    const { store, repo } = makeWorkbook({
-      DIAGNOSIS: [DIAGNOSIS_HEADER.slice()],
-      COMMUNICATIONS: [COMMUNICATIONS_HEADER.slice()],
-    });
+    const { store, repo } = makeWorkbook({ DIAGNOSIS: [DIAGNOSIS_HEADER.slice()] });
     seedPipelineReadyProbe(store);
     __setRepoForTests(repo);
+    personalisationAiCalls = 0;
     __setAiCallerForTests(fakePersonalisationAi);
 
     // Exactly what api/novus/intelligence/finalize.js (the cron) and the
@@ -866,6 +958,14 @@ async function run() {
     assert.strictEqual(summary.demos.results[0].reason, 'personalisation_completed');
     ok('ONE pass: PERSONALISATION completes and the DEMOS row is compiled in the same invocation');
 
+    // ZERO AI IN DEMOS COMPILATION: exactly one AI call happened in the whole
+    // pass — the personalisation call. If compileDemos() had called AI to
+    // select/rank/summarise evidence, fakePersonalisationAi would have thrown
+    // on the unexpected tool name and this pass would already have failed;
+    // this count makes the "zero" explicit rather than merely implied.
+    assert.strictEqual(personalisationAiCalls, 1, 'DEMOS compilation must add no AI calls beyond personalisation');
+    ok('exactly one AI call for the whole pass — DEMOS compilation made none');
+
     const demo = demoRowsOf(store)[0];
     assert.strictEqual(demo.probe_id, 'prb_auto_001');
     assert.strictEqual(demo.hero_journey, 'weak_seller_qualification');
@@ -874,13 +974,18 @@ async function run() {
     assert.ok(demo.compiled_at);
     ok(`the compiled demo is live at /demo/${demo.demo_slug} with no human step`);
 
+    // The observed events are real evidence from the seeded COMMUNICATIONS
+    // row, not just AI-derived personalisation copy.
+    const autoEvents = JSON.parse(demo.observed_events_json);
+    assert.ok(autoEvents.some((e) => e.label.startsWith('First response')), 'the compiled demo carries real evidence too');
+
     // And it renders — the same GET a prospect makes.
     const getRes = mockRes();
     await demoHandler(mockReq({ method: 'GET', query: { slug: demo.demo_slug }, auth: false }), getRes);
     assert.strictEqual(getRes.statusCode, 200, JSON.stringify(getRes.body));
     assert.strictEqual(getRes.body.demo.agency_name, 'Auto Agency');
     assert.ok(getRes.body.demo.observed_events.length >= 2);
-    ok('the automatically compiled demo serves render-ready JSON straight away');
+    ok('the automatically compiled demo serves render-ready JSON straight away, with real evidence in it');
 
     // A second pass must be a no-op: PERSONALISATION is frozen, the demo is
     // up to date, nothing is rewritten and no second row appears.
@@ -896,10 +1001,7 @@ async function run() {
     // SELF-HEALING: the probe was personalised before the DEMOS tab existed.
     // This is the case that makes "never run a build command" true for the
     // demos that already exist, not just the ones from now on.
-    const { store, repo } = makeWorkbook({
-      DIAGNOSIS: [DIAGNOSIS_HEADER.slice()],
-      COMMUNICATIONS: [COMMUNICATIONS_HEADER.slice()],
-    });
+    const { store, repo } = makeWorkbook({ DIAGNOSIS: [DIAGNOSIS_HEADER.slice()] });
     seedWeakSeller(store, { propertyUrl: '' });      // already personalised
     __setRepoForTests(repo);
     __setAiCallerForTests(async () => { throw new Error('no AI call should be needed'); });
@@ -992,8 +1094,113 @@ async function run() {
     ok('CTA telemetry also touches DEMOS only');
   }
 
-  // ══ Part N — display formatting ═══════════════════════════════════════════
-  console.log('\nPart N — display formatting');
+  // ══ Part N — COMMUNICATIONS evidence, zero AI ════════════════════════════
+  console.log('\nPart N — observed-events evidence, drawn from COMMUNICATIONS, zero AI');
+  {
+    assert.deepStrictEqual(selectCommunicationEvidence({ communications: [] }), []);
+    assert.deepStrictEqual(selectCommunicationEvidence({}), []);
+    ok('no COMMUNICATIONS rows -> no evidence events (never a throw, never a guess)');
+  }
+  {
+    // An auto-acknowledgement is never evidence of the team doing something —
+    // isHumanCommunication() (the same classifier lib/observation.mjs's own
+    // rollup uses) must exclude it, exactly as it does for the grade.
+    const autoAckOnly = [row(COMMUNICATIONS_HEADER, {
+      communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:00:00.000Z',
+      channel: 'email', automated_or_human: 'automated', communication_classification: 'auto_acknowledgement',
+      body_text: 'Thanks for your enquiry, a member of the team will be in touch.',
+    })].map((r) => Object.fromEntries(COMMUNICATIONS_HEADER.map((k, i) => [k, r[i] ?? ''])));
+    assert.deepStrictEqual(selectCommunicationEvidence({ communications: autoAckOnly }), []);
+    ok('an automated acknowledgement alone produces no evidence event');
+  }
+  {
+    // Exactly one human touch, no follow-up: the "absence" case the brief
+    // names explicitly.
+    const oneTouch = [{
+      communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:05:00.000Z',
+      channel: 'email', automated_or_human: 'human', body_text: 'Hi, yes it is still available for a viewing.',
+    }];
+    const events = selectCommunicationEvidence({ communications: oneTouch });
+    assert.strictEqual(events.length, 2);
+    assert.deepStrictEqual(events[0], {
+      label: 'First response — email', detail: '"Hi, yes it is still available for a viewing."', tone: 'good',
+    });
+    assert.strictEqual(events[1].label, 'No follow-up after the first reply');
+    assert.strictEqual(events[1].tone, 'gap');
+    // 09:05 UTC is 10:05 in Europe/London during BST (August).
+    assert.ok(events[1].detail.includes('email') && events[1].detail.includes('10:05'));
+    ok('a single touch with nothing after it yields First response + the explicit no-follow-up gap');
+  }
+  {
+    // First contact (email) + a DISTINCT later voicemail + a follow-up attempt
+    // (>30 minutes after the follow-up attempt's own start) -> all three
+    // example events from the brief, capped at 3.
+    const touches = [
+      { communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:00:00.000Z', channel: 'email', automated_or_human: 'human', subject: 'Re: enquiry', body_text: 'Thanks for your enquiry — happy to arrange a viewing.' },
+      { communication_id: 'c2', probe_id: 'p', occurred_at: '2026-08-01T09:10:00.000Z', channel: 'voice', automated_or_human: 'human', voicemail_present: 'TRUE', transcript: 'Hi, just calling about the property, give me a ring back.' },
+      { communication_id: 'c3', probe_id: 'p', occurred_at: '2026-08-02T10:00:00.000Z', channel: 'sms', automated_or_human: 'human', body_text: 'Following up — are you still interested in viewing this weekend?' },
+    ];
+    const events = selectCommunicationEvidence({ communications: touches });
+    assert.strictEqual(events.length, 3);
+    assert.strictEqual(events[0].label, 'First response — email');
+    assert.strictEqual(events[1].label, 'Voicemail left — 10:10'); // 09:10 UTC = 10:10 BST
+    assert.strictEqual(events[1].detail, '"Hi, just calling about the property, give me a ring back."');
+    assert.strictEqual(events[2].label, 'Follow-up — SMS');
+    assert.ok(events[2].detail.includes('Following up'));
+    ok('first contact, a distinct voicemail and the follow-up all appear — capped at 3');
+
+    // The voicemail branch must be SKIPPED, not duplicated, when the first
+    // contact IS the voicemail (this is exactly seedWeakSeller's own fixture
+    // — see Part B).
+    const firstIsVoicemail = [
+      { communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:00:00.000Z', channel: 'voice', automated_or_human: 'human', voicemail_present: 'TRUE', transcript: 'Hi, calling about the enquiry.' },
+      { communication_id: 'c2', probe_id: 'p', occurred_at: '2026-08-01T09:05:00.000Z', channel: 'email', automated_or_human: 'human', body_text: 'Following up my call by email.' },
+    ];
+    const events2 = selectCommunicationEvidence({ communications: firstIsVoicemail });
+    assert.strictEqual(events2.length, 2, 'no separate voicemail event when the FIRST contact is itself the voicemail');
+    assert.ok(!events2.some((e) => e.label.startsWith('Voicemail left')));
+    ok('a voicemail that IS the first contact is not shown twice');
+  }
+  {
+    // Deterministic truncation, never a rewrite: long text is cut at a fixed
+    // length with an ellipsis; short text is shown verbatim, in full.
+    const longTranscript = 'A'.repeat(50) + ' this part must be cut off because the whole thing is much too long to show in full on the demo';
+    const long = selectCommunicationEvidence({
+      communications: [{ communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:00:00.000Z', channel: 'voice', automated_or_human: 'human', transcript: longTranscript }],
+    });
+    const longDetail = long[0].detail.replace(/^"|"$/g, '');
+    assert.ok(longDetail.endsWith('…'), 'a long excerpt is marked as truncated');
+    assert.ok(longDetail.length <= 91, `truncated excerpt must be short, got ${longDetail.length} chars`);
+    assert.ok(longTranscript.startsWith(longDetail.slice(0, -1)), 'the excerpt is a literal prefix of the original text — never reworded');
+
+    const shortTranscript = 'Hi, still interested in the viewing this weekend?';
+    const short = selectCommunicationEvidence({
+      communications: [{ communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:00:00.000Z', channel: 'voice', automated_or_human: 'human', transcript: shortTranscript }],
+    });
+    assert.strictEqual(short[0].detail, `"${shortTranscript}"`, 'short text is shown whole, verbatim — no rewriting');
+    ok('long text is mechanically truncated with an ellipsis; short text is shown verbatim in full');
+  }
+  {
+    // buildObservedEvents(): when COMMUNICATIONS produce evidence, it REPLACES
+    // the old generic response/attempts lines (Part B proves this end-to-end);
+    // when there is nothing to draw from, the old generic summary still runs —
+    // this is the regression guard for every existing caller.
+    const events = buildObservedEvents({
+      intelligence: { contact_attempts: '2', channels_used: 'voice,email' },
+      sellerDeclared: false,
+      enquiryDate: '1 August',
+      enquiryTime: '09:00',
+      responseTime: '10 minutes',
+      communications: [],
+    });
+    assert.ok(events.some((e) => e.label === 'Your team responded' && e.detail === '10 minutes later'));
+    assert.ok(events.some((e) => e.label === '2 contact attempts'));
+    assert.ok(!events.some((e) => e.label.startsWith('First response')));
+    ok('with no matched COMMUNICATIONS, the old INTELLIGENCE-only summary still renders unchanged');
+  }
+
+  // ══ Part O — display formatting ═══════════════════════════════════════════
+  console.log('\nPart O — display formatting');
   {
     assert.strictEqual(formatResponseTime('0.38'), '23 minutes');
     assert.strictEqual(formatResponseTime('1'), '1 hour');

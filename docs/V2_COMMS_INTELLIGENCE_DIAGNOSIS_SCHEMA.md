@@ -510,8 +510,10 @@ already-personalised probe with no demo row yet — so a tab created after the
 fact, a budget-capped earlier pass, or a row deleted by hand all self-heal on
 the next pass rather than needing a human.
 
-The step makes **no AI calls** and takes no share of the AI budget. It has its
-own budgets (`maxDemoCompiles`, default 25; `maxDemoImageFetches`, default 6)
+The step makes **no AI calls** and takes no share of the AI budget — it only
+packages and displays intelligence the pipeline already produced upstream, in
+`COMMUNICATIONS`/`INTELLIGENCE`/`DIAGNOSIS`/`PERSONALISATION`. It has its own
+budgets (`maxDemoCompiles`, default 25; `maxDemoImageFetches`, default 6)
 because a serverless invocation has a wall clock, and whatever it cannot reach
 is picked up next pass. It is wrapped so it can never fail the pipeline: a
 missing `DEMOS` tab is a flagged no-op, and a per-probe failure is reported,
@@ -522,6 +524,14 @@ not thrown.
 `GET /api/demo?slug=…` resolves the slug in `DEMOS`, loads that row, returns
 it. No join, no AI, no Rightmove request. `npm run novus:demo-selftest`
 asserts this directly by recording every tab the request reads.
+
+**Only `ready` resolves to a normal request.** A `needs_review` row is an
+unfinished prospect experience, so a plain request to it gets the exact same
+404 an unknown slug gets — nothing distinguishes "not ready yet" from "never
+existed" from the outside. The only way to see one is `?preview=1`, the
+internal viewing mechanism (also how a demo is opened without inflating its
+own view count). `archived` stays gone under `?preview=1` too — preview
+reveals an unfinished demo, never a retired one.
 
 ### Duplication here is the point
 
@@ -555,10 +565,50 @@ raised to a standalone sentence and never rewritten.
 | `seller_declared` | `hasVendorDeclaration(probe)` — the deterministic marker, not an AI read |
 | `agency_name` | the `AGENCIES` row |
 | `human_contact` … `grade` | the `INTELLIGENCE` row verbatim (`response_time` is `response_hours` formatted) |
-| `observed_events_json` | derived from those `INTELLIGENCE` fields — no prose, no findings text |
+| `observed_events_json` | the probe's matched `COMMUNICATIONS` rows, by fixed rules — see below — falling back to an `INTELLIGENCE`-only summary when none are matched |
 | `novus_detected_json` | this probe's `DIAGNOSIS_FINDINGS` plus the facts that make them real |
 | `novus_decisions_json` | leads with `PERSONALISATION.novus_counterfactual`, then the journey's product decisions |
 | `demo_hook`, `demo_reveal`, `novus_actions_json`, `systemic_bridge`, `cta_headline` | authored per journey in `lib/demo-journeys.mjs` — product copy, identical for every agency on a journey |
+
+### `observed_events_json` — real evidence, zero AI
+
+`lib/demos.mjs`'s `selectCommunicationEvidence()` reads the probe's matched
+`COMMUNICATIONS` rows ("matched" = `probe_id === probeId`, the same rule
+`lib/observation-recompute.mjs` already uses) and picks up to three events by
+**fixed rules over fields the pipeline already wrote when each message
+arrived** — `occurred_at`, `channel`, `automated_or_human` (read through
+`isHumanCommunication()`, the same deterministic classifier
+`lib/observation.mjs`'s own `INTELLIGENCE` rollup uses), `voicemail_present`,
+and the message's own stored `transcript`/`body_text`/`subject`. It never
+calls `lib/ai-client.mjs` — nothing here selects, ranks, summarises or
+rewrites with a model.
+
+Selection, in fixed priority order:
+
+1. **First human contact** — the first real person to touch the enquiry, any
+   channel.
+2. **Voicemail** — only when a *different* touch left one (skipped when the
+   first contact already was the voicemail, so it is never shown twice).
+3. **The strongest follow-up, or its absence** — the first touch of the LAST
+   contact attempt (`lib/observation.mjs`'s own 30-minute grouping), or, when
+   there was only ever one attempt, the explicit gap: *"No follow-up after the
+   first reply"*.
+
+Where a message's own text is shown, it is a **mechanical truncation** of what
+is already stored (whitespace-collapsed, cut to 90 characters with an
+ellipsis) — never a summary, never reworded. A probe with no matched
+`COMMUNICATIONS` (thin data, or none matched yet) falls back to the old
+`INTELLIGENCE`-only summary (*"Your team responded — N minutes later"*, *"N
+contact attempts"*) so this section is never blank.
+
+"Relevant to the stored `hero_journey`" is satisfied by the **data**, not a
+branch on it: a `complete_miss` probe has no human touches so this returns
+nothing (the fallback carries the demo); a `fast_response_stalled_follow_up`
+probe has exactly one attempt, so rule 3 is exactly the story that journey
+tells. `selectCommunicationEvidence()` stays journey-blind, same as the
+renderer and same as `lib/demo-journeys.mjs`'s own architecture.
+
+Regression suite: Part N of `npm run novus:demo-selftest`.
 
 ### `ready` vs `needs_review`
 
@@ -583,9 +633,12 @@ in `property_image_status` (`ok` / `manual` / `unavailable` / `pending` /
 `none`) instead. `pending` (the pass's image budget ran out) is retried next
 pass; `unavailable` is not, so a dead listing is not re-fetched forever.
 
-`needs_review` demos still resolve, flagged in the page chrome, so the URL can
-be checked. `archived` 404s and is **sticky** — a recompile refreshes an
-archived demo's snapshot but never brings its link back.
+`needs_review` demos are **internal-only** — see "Opening a demo reads one
+tab" above: a normal request 404s exactly like an unknown slug, and only
+`?preview=1` can see one, flagged in the page chrome, so it can be checked
+before the link is ever sent. `archived` 404s under every request, preview
+included, and is **sticky** — a recompile refreshes an archived demo's
+snapshot but never brings its link back.
 
 ### A recompile updates the snapshot, never the identity or the history
 

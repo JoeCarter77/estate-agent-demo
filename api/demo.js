@@ -11,6 +11,14 @@
 // completed (lib/demo-compile.mjs, from lib/rebuild-pass.mjs) — opening a
 // demo only reads that snapshot.
 //
+// ONLY `ready` RESOLVES NORMALLY. A `needs_review` row is an unfinished
+// prospect experience (something in review_reasons is missing or unreviewed)
+// and a plain request to it gets the SAME 404 as an unknown slug — nothing
+// distinguishes "not ready yet" from "never existed" from the outside. The
+// only way to see one is `?preview=1`, the internal viewing mechanism (also
+// how we open our own demos without inflating view telemetry). `archived` is
+// always gone, preview or not.
+//
 // `build` IS NOT PART OF THE ACQUISITION WORKFLOW. Demos are compiled
 // automatically by the pipeline; this action exists so a human can force a
 // recompile when debugging or recovering one row, and it calls straight into
@@ -75,13 +83,28 @@ async function handleGet(req, res) {
   if (!record) return res.status(404).json({ error: 'No demo found for this link' });
 
   const status = text(record.obj.demo_status) || 'needs_review';
-  // An archived demo is deliberately retired. A needs_review one still
-  // resolves — flagged, so it can be looked at rather than silently sent.
+
+  // ?preview=1 is the INTERNAL viewing mechanism — how a demo is checked
+  // before it is sent, and how we open our own demo without inflating the
+  // prospect's view history. It is not a credential (no auth behind it,
+  // same as every other value in the query string), so it must never be
+  // required to see a demo that is genuinely ready to send — only to see
+  // one that isn't.
+  const preview = text(req.query?.preview) === '1';
+
+  // An archived demo is deliberately retired — gone, preview or not.
   if (status === 'archived') return res.status(404).json({ error: 'This demo is no longer available' });
 
-  // ?preview=1 is how we open our own demo without inflating the prospect's
-  // view history. It is a courtesy flag, not a security boundary.
-  const preview = text(req.query?.preview) === '1';
+  // A needs_review demo is an unfinished prospect experience: something on
+  // it is missing or unreviewed (see review_reasons). A normal request must
+  // see exactly what an unknown slug sees — the same status, the same
+  // message — so the outside world cannot tell "not ready yet" apart from
+  // "never existed". Only ?preview=1 is allowed to look at it, so it can be
+  // checked before the link is ever sent.
+  if (status !== 'ready' && !preview) {
+    return res.status(404).json({ error: 'No demo found for this link' });
+  }
+
   if (!preview) {
     await recordView(repo, table, record).catch((err) => {
       console.error('demo view telemetry failed (serving the demo anyway):', err?.message || err);
