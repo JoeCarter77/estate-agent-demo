@@ -43,11 +43,13 @@ import {
   stripThatMeantPrefix, readsAsInternalReasoning, readsAsDetachedThirdPerson,
   distinctWiderConsequence, emailPropertyAddress, readsAsSnuckCriticism, stripInventedLoss,
   consequenceGoesBeyondFinding, extractProtectedWords,
+  readsAsSpeculativeProspectBehaviour,
 } from '../lib/probe-personalisation.mjs';
 import {
   ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE, THAT_MEANT_PREFIX, emailContractViolations,
   NO_RESPONSE_BREAKDOWN_LINE, NO_RESPONSE_CTA_LINE,
   THAT_ALSO_MEANT_PREFIX, FAIR_OBSERVATION_PREFIX, MAIN_FINDING_PREFIX, assembleEmail,
+  withMainFindingPrefix,
 } from '../lib/email-assembly.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 
@@ -610,7 +612,7 @@ async function run() {
       'Hi {{first_name}},',
       'We sent your team an enquiry on 17 August about a house on Barn Field.',
       `${FAIR_OBSERVATION_PREFIX}${result.fair_observation}`,
-      `${MAIN_FINDING_PREFIX}${result.main_finding}`,
+      withMainFindingPrefix(result.main_finding),
       `${THAT_MEANT_PREFIX}${result.commercial_consequence}`,
       ADDITIONAL_FINDINGS_HOOK_LINE,
       CTA_LINE,
@@ -799,6 +801,27 @@ async function run() {
     ok('a commercial consequence that only rephrases the finding is refused — the email says what the failure cost, or it is not sent at all');
   }
 
+  // ── Consequences describe established commercial state, never invented
+  //    prospect behaviour ──────────────────────────────────────────────────
+  {
+    const speculative = 'leaving it open for me to lose interest or go and view something similar elsewhere.';
+    assert.strictEqual(readsAsSpeculativeProspectBehaviour(speculative), true);
+    assert.strictEqual(readsAsSpeculativeProspectBehaviour('the enquiry remained unqualified and no next step was established.'), false);
+
+    __setAiCallerForTests(async () => stubResult({ commercial_consequence: speculative }));
+    const rejected = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+    assert.strictEqual(rejected.commercial_consequence, '', 'hypothetical loss of interest or viewing elsewhere is rejected');
+    assert.strictEqual(rejected.email_body, '', 'an invented prospect action never reaches an assembled email');
+
+    __setAiCallerForTests(async () => stubResult({
+      commercial_consequence: 'the enquiry remained unqualified, the viewing remained unbooked, and no next step was established.',
+    }));
+    const grounded = await personaliseProbe(PROBE, baseIntelligence(), baseDiagnosis(), baseFindings(), {});
+    assert.ok(grounded.commercial_consequence.includes('viewing remained unbooked'), 'a strong consequence grounded in established state survives');
+    assert.ok(grounded.email_body.includes('That meant the enquiry remained unqualified'), 'and is assembled into the email');
+    ok('speculative prospect behaviour is rejected while grounded, commercially strong consequences remain sendable');
+  }
+
   // ── PROPER NOUNS from this probe's own address/agency survive a
   //    continuation unchanged — never forced to lower case ──────────────────
   {
@@ -817,8 +840,8 @@ async function run() {
     assert.strictEqual(result.main_finding, 'Barn Field was mentioned twice but never actually offered as a viewing.',
       'a continuation opening with this probe\'s own proper noun keeps its capital, unlike an ordinary opening word');
     assert.strictEqual(result.commercial_consequence, 'Chevington itself was never confirmed as the area I was searching in.');
-    assert.ok(result.email_body.includes('What stood out, though, was Barn Field was mentioned'),
-      'and it reads correctly in the assembled email — the fixed opener followed by a genuine proper noun, not a lower-cased one');
+    assert.ok(result.email_body.includes('What stood out, though, was that Barn Field was mentioned'),
+      'and the assembler adds the complementiser while preserving the genuine proper noun');
 
     // An ordinary word that merely LOOKS like it could be a name, but isn't
     // established by this probe's own address or agency, is still lower-cased.
@@ -925,7 +948,7 @@ async function run() {
     assert.ok(result.main_finding, 'main_finding is populated, not blanked by the absence phrasing');
     assert.ok(result.commercial_consequence, 'commercial_consequence is populated too');
     assert.ok(result.email_body, 'and a real email is assembled from them');
-    assert.ok(result.email_body.includes('What stood out, though, was there is no qualifying question'), 'the actual sentence reaches the email, after the fixed opener');
+    assert.ok(result.email_body.includes('What stood out, though, was that there is no qualifying question'), 'the actual sentence reaches the email, after the grammatical fixed opener');
     ok('a main_finding/commercial_consequence phrased as an honest "there is no ..." absence is never blanked, and still produces a sendable email');
   }
 
@@ -1023,7 +1046,7 @@ async function run() {
       'Hi {{first_name}},',
       'We sent your team an enquiry on 17 August about a house on Barn Field.',
       `${FAIR_OBSERVATION_PREFIX}${result.fair_observation}`,
-      `${MAIN_FINDING_PREFIX}${result.main_finding}`,
+      withMainFindingPrefix(result.main_finding),
       `${THAT_MEANT_PREFIX}${result.commercial_consequence}`,
       ADDITIONAL_FINDINGS_HOOK_LINE,
       CTA_LINE,

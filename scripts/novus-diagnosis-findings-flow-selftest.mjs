@@ -39,7 +39,7 @@ import {
   ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, NO_REPLY_LINE,
   NO_RESPONSE_BREAKDOWN_LINE, NO_RESPONSE_CTA_LINE, propertyReference,
   THAT_MEANT_PREFIX, THAT_ALSO_MEANT_PREFIX,
-  FAIR_OBSERVATION_PREFIX, MAIN_FINDING_PREFIX, assembleEmail,
+  FAIR_OBSERVATION_PREFIX, MAIN_FINDING_PREFIX, assembleEmail, withMainFindingPrefix,
 } from '../lib/email-assembly.mjs';
 
 // ── The live workbook's actual headers ───────────────────────────────────────
@@ -598,7 +598,7 @@ async function run() {
       if (p.email_variant !== 'no_response') {
         // The locked paragraph order from the brief: fair observation (when
         // there is one), then the finding, then the consequence.
-        assert.ok(p.email_body.includes(`${MAIN_FINDING_PREFIX}${p.main_finding}`), `${s.key}: the finding opens with the fixed "What stood out, though, was"`);
+        assert.ok(p.email_body.includes(withMainFindingPrefix(p.main_finding)), `${s.key}: the finding opens with the grammatical fixed "What stood out, though, was" join`);
         assert.ok(p.email_body.indexOf(MAIN_FINDING_PREFIX) < p.email_body.indexOf(THAT_MEANT_PREFIX), `${s.key}: the finding comes before its consequence`);
         if (p.fair_observation) {
           assert.ok(p.email_body.includes(`${FAIR_OBSERVATION_PREFIX}${p.fair_observation}`), `${s.key}: the fair observation opens with the fixed "I want to say upfront that"`);

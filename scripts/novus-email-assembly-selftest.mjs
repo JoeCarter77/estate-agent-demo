@@ -29,6 +29,7 @@ import {
   ADDITIONAL_FINDINGS_HOOK_LINE, CTA_LINE, FIRST_NAME_MERGE_FIELD, NO_REPLY_LINE,
   SIGN_OFF, THAT_MEANT_PREFIX, THAT_ALSO_MEANT_PREFIX, FAIR_OBSERVATION_PREFIX,
   MAIN_FINDING_PREFIX, withPrefix, emailContractViolations, propertyReference,
+  withMainFindingPrefix,
   NO_RESPONSE_BREAKDOWN_LINE, NO_RESPONSE_CTA_LINE,
 } from '../lib/email-assembly.mjs';
 
@@ -72,6 +73,20 @@ function noResponseRow(overrides = {}) {
 
 function run() {
   console.log('lib/email-assembly.mjs — hermetic selftest\n');
+
+  // ── "What stood out ... was" takes a grammatical complement ──
+  {
+    for (const [finding, expected] of [
+      ['across all three emails, nobody established what I needed.', 'What stood out, though, was that across all three emails, nobody established what I needed.'],
+      ["I'd also told you I had a property to sell.", "What stood out, though, was that I'd also told you I had a property to sell."],
+      ['it took over 63 hours to receive a reply.', 'What stood out, though, was that it took over 63 hours to receive a reply.'],
+      ['that nobody established a next step.', 'What stood out, though, was that nobody established a next step.'],
+    ]) assert.strictEqual(withMainFindingPrefix(finding), expected);
+    assert.strictEqual(withMainFindingPrefix('the lack of any qualifying question.'),
+      'What stood out, though, was the lack of any qualifying question.',
+      'a noun-phrase complement is not blindly given "that"');
+    ok('the main-finding join adds "that" for clear clauses, never doubles an existing "that", and leaves noun-phrase complements alone');
+  }
 
   // ── The locked normal structure, exactly ──
   {
@@ -202,7 +217,7 @@ function run() {
     ok('"That meant " is hard-coded here and nowhere else, joining onto the continuation Personalisation returns');
   }
 
-  // ── Nothing here rewrites a sentence Personalisation wrote ──
+  // ── Apart from the narrow "that" join, copy stays untouched ──
   {
     const row = fullRow({
       fair_observation: 'you came back fast',           // no capital, no full stop
@@ -210,8 +225,8 @@ function run() {
     });
     const body = assembleEmail(row);
     assert.ok(body.includes('\n\nI want to say upfront that you came back fast\n\n'), 'the fair observation is passed through byte-for-byte after the fixed opener');
-    assert.ok(body.includes('\n\nWhat stood out, though, was each follow-up asked me to chase\n\n'), 'and so is the main finding');
-    ok('the assembler adds the fixed opener and nothing else — it never repairs, capitalises or punctuates a sentence, because sentence-ready copy is Personalisation\'s contract');
+    assert.ok(body.includes('\n\nWhat stood out, though, was that each follow-up asked me to chase\n\n'), 'the main finding gets only the complementiser its clause needs');
+    ok('apart from the narrow grammatical "that" join, the assembler never repairs, capitalises or punctuates Personalisation copy');
   }
 
   // ── VARIANT 1: the no-response structure, exactly ──
