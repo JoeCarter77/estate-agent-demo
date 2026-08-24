@@ -1,24 +1,29 @@
 // scripts/novus-demo-selftest.mjs — hermetic end-to-end test (no network, no
-// creds, no AI) for the personalised demo:
+// creds, no AI) for the personalised demo, the LAST STEP of the pipeline:
 //
-//   PROBES + AGENCIES + INTELLIGENCE + DIAGNOSIS_FINDINGS + PERSONALISATION
-//     -> DEMOS row  ->  GET /api/demo?slug=...  ->  render-ready payload
+//   PROBE -> COMMUNICATIONS -> INTELLIGENCE -> DIAGNOSIS ->
+//   DIAGNOSIS_FINDINGS -> PERSONALISATION -> DEMOS
+//     -> GET /api/demo?slug=...  ->  render-ready payload
 //
-// It runs the REAL api/demo.js handler over an in-memory workbook seeded with
-// live-shaped headers, and proves the things that would otherwise only fail in
-// front of a prospect:
+// It runs the REAL api/demo.js handler and the REAL lib/demo-compile.mjs step
+// over an in-memory workbook seeded with live-shaped headers, and proves the
+// things that would otherwise only fail in front of a prospect:
 //
 //   A. property-image extraction is pure, picks the LARGEST listing photo,
 //      rejects logos/floorplans/EPCs, and returns '' for a blocked page
-//   B. one weak_seller_qualification probe builds a complete DEMOS row
+//   B. one weak_seller_qualification probe compiles a complete DEMOS row
 //   C. an unsupported hero_journey is REFUSED, not fudged into another shape
-//   D. the three draft journeys build, but warn and stay `draft`
+//   D. ready vs needs_review, and exactly what tips it either way
 //   E. the slug is deterministic, and a second probe never steals another's
 //   F. GET by slug returns render-ready JSON with no pipeline keys in it
 //   G. a view increments telemetry; ?preview=1 does not; archived is gone
 //   H. the CTA records once — a reload is not a second signal
-//   I. a rebuild is idempotent: same slug, same created_at, telemetry intact
+//   I. a recompile preserves identity, created_at and EVERY analytics field
 //   J. the demo write path is authed; the read path is not
+//   L. AUTOMATIC COMPILATION: a probe that finishes PERSONALISATION comes out
+//      of the same pass with a live demo, and the pass self-heals a probe that
+//      was personalised before the DEMOS tab existed
+//   M. THE PROSPECT PATH READS ONE TAB. GET touches DEMOS and nothing else.
 //
 // Run: npm run novus:demo-selftest
 
@@ -26,9 +31,12 @@ import assert from 'node:assert';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import demoHandler from '../api/demo.js';
 import {
-  DEMOS_HEADER, buildDemoRow, buildDemoSlug, formatResponseTime, formatChannels,
-  sentenceCase, toRenderReady,
+  ANALYTICS_COLUMNS, DEMOS_HEADER, buildDemoRow, buildDemoSlug, formatResponseTime,
+  formatChannels, reviewReasonsFor, sentenceCase, statusFromReasons, toRenderReady,
 } from '../lib/demos.mjs';
+import { compileDemos, compileDecision } from '../lib/demo-compile.mjs';
+import { runRebuildPass } from '../lib/rebuild-pass.mjs';
+import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import { extractPropertyImageUrl, fetchPropertyImageUrl, isUsablePropertyImage } from '../lib/property-image.mjs';
 import { journeySupport, SUPPORTED_HERO_JOURNEYS } from '../lib/demo-journeys.mjs';
 
@@ -45,6 +53,17 @@ const INTELLIGENCE_HEADER = [
   'channels_used', 'viewing_progression', 'buyer_qualification', 'buyer_questions_asked',
   'seller_recognition', 'communication_quality', 'did_well', 'missed', 'evidence',
   'grade', 'grade_reason',
+];
+// runRebuildPass reads COMMUNICATIONS too — Part L needs the tab to exist even
+// though this probe's INTELLIGENCE is already seeded and nothing re-derives it.
+const COMMUNICATIONS_HEADER = [
+  'communication_id', 'agency_id', 'probe_id', 'occurred_at', 'channel', 'direction',
+  'source_identifier_normalized', 'subject', 'body_text', 'transcript', 'raw_content',
+  'match_status', 'automated_or_human', 'manual_override', 'created_at', 'updated_at',
+];
+const DIAGNOSIS_HEADER = [
+  'diagnosis_id', 'probe_id', 'agency_id', 'strengths', 'missed_opportunities',
+  'commercial_implication', 'novus_opportunity', 'diagnosis_summary', 'created_at', 'updated_at',
 ];
 const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding_type', 'finding', 'evidence', 'significance_note'];
 const PERSONALISATION_HEADER = [
@@ -77,9 +96,13 @@ function makeWorkbook(seed = {}) {
     const m = String(range).match(/!\D+(\d+)/);
     return m ? parseInt(m[1], 10) : null;
   };
+  // Every tab this workbook is asked for, in order. Part M reads it to prove
+  // the prospect's request touches DEMOS and nothing else.
+  const reads = [];
   const valuesApi = {
     async get(range) {
       const tab = tabOf(range);
+      reads.push(tab);
       if (!(tab in store)) throw new Error(`Sheets API GET ${tab} failed (400): Unable to parse range`);
       return store[tab].map((r) => r.slice());
     },
@@ -103,7 +126,7 @@ function makeWorkbook(seed = {}) {
       }
     },
   };
-  return { store, repo: createRepo(valuesApi) };
+  return { store, reads, repo: createRepo(valuesApi) };
 }
 
 function demoRowsOf(store) {
@@ -134,6 +157,10 @@ function seedWeakSeller(store, {
   agencyId = 'agc_demo',
   agencyName = 'Ensum Brown',
   heroJourney = 'weak_seller_qualification',
+  // Blank it where a test runs the FULL pass: runRebuildPass compiles demos
+  // itself, and a probe with no listing URL is the only way to keep that path
+  // hermetic without threading a test seam through the whole pipeline.
+  propertyUrl = 'https://www.rightmove.co.uk/properties/123456789',
 } = {}) {
   store.PROBES.push(row(PROBES_HEADER, {
     probe_id: probeId,
@@ -141,7 +168,7 @@ function seedWeakSeller(store, {
     agency_id: agencyId,
     portal: 'rightmove',
     property_address: 'Barn Field, Chevington (2 bed semi, £375,000)',
-    property_url: 'https://www.rightmove.co.uk/properties/123456789',
+    property_url: propertyUrl,
     property_price: '£375,000',
     property_status: 'for_sale',
     enquiry_text: SELLER_DECLARATION,
@@ -199,6 +226,105 @@ function seedWeakSeller(store, {
   }));
 }
 
+// A probe that is closed, interpreted and DIAGNOSED but not yet personalised
+// — the exact state lib/rebuild-pass.mjs hands to the personalisation step, so
+// Part L exercises the real "PERSONALISATION completes -> demo appears" edge
+// rather than a shortcut.
+function seedPipelineReadyProbe(store, { probeId = 'prb_auto_001' } = {}) {
+  store.PROBES.push(row(PROBES_HEADER, {
+    probe_id: probeId,
+    probe_reference: 'RM-0099',
+    agency_id: 'agc_auto',
+    portal: 'rightmove',
+    property_address: 'Willow Lane, Hartwell',
+    property_url: '',                                  // no listing: no image fetch, no network
+    property_price: '£420,000',
+    property_status: 'for_sale',
+    enquiry_text: SELLER_DECLARATION,
+    probe_timestamp: '2026-08-10T18:52:00.000Z',
+    probe_status: 'sent',
+  }));
+  store.AGENCIES.push(row(AGENCIES_HEADER, { agency_id: 'agc_auto', agency_name: 'Auto Agency' }));
+  store.INTELLIGENCE.push(row(INTELLIGENCE_HEADER, {
+    intelligence_id: 'itl_auto_001',
+    agency_id: 'agc_auto',
+    probe_id: probeId,
+    observation_status: 'closed',
+    human_contact: 'yes',
+    response_hours: '0.5',
+    first_human_response_at: '2026-08-10T19:22:00.000Z',
+    contact_attempts: '2',
+    follow_ups: '1',
+    channels_used: 'email',
+    viewing_progression: 'slot_offered',
+    buyer_qualification: 'standard',
+    buyer_questions_asked: 'viewing availability',
+    seller_recognition: 'asked_position',
+    communication_quality: 'competent',
+    did_well: 'Answered quickly and offered a slot.',
+    missed: 'Never offered a valuation.',
+    evidence: '"Are you on the market?"',
+    grade: 'B',
+    grade_reason: 'Fast first response with follow-up.',
+  }));
+  // DIAGNOSIS finalised (non-blank diagnosis_summary) is the gate the
+  // personalisation step opens on.
+  store.DIAGNOSIS.push(row(DIAGNOSIS_HEADER, {
+    diagnosis_id: 'dgn_auto_001',
+    probe_id: probeId,
+    agency_id: 'agc_auto',
+    strengths: 'Quick, clear reply that offered a viewing slot.',
+    missed_opportunities: 'The declared property to sell never became a valuation.',
+    commercial_implication: 'An instruction inside a £420,000 enquiry was left on the table.',
+    novus_opportunity: 'Growth (valuation list / seller conversion)',
+    diagnosis_summary: 'Fast on the buyer, silent on the seller.',
+  }));
+  store.DIAGNOSIS_FINDINGS.push(row(DIAGNOSIS_FINDINGS_HEADER, {
+    probe_id: probeId,
+    finding_index: '1',
+    finding_type: 'opportunity',
+    finding: 'The declared property to sell was asked about and never converted into a valuation.',
+    evidence: '"Are you on the market?" — no valuation offered in any message.',
+    significance_note: 'An instruction lead was recognised and left on the table.',
+  }));
+  store.DIAGNOSIS_FINDINGS.push(row(DIAGNOSIS_FINDINGS_HEADER, {
+    probe_id: probeId,
+    finding_index: '2',
+    finding_type: 'positive',
+    finding: 'The team replied within half an hour and offered a slot.',
+    evidence: 'First human reply 30 minutes after the enquiry.',
+    significance_note: 'Genuinely fast on the buying side.',
+  }));
+}
+
+// HERMETIC BY CONSTRUCTION. Nothing in this suite may reach a portal, so every
+// compile goes through a stub in place of the one listing fetch. `never` is
+// the "Rightmove blocked us" answer, which is the interesting case anyway.
+const noImage = async () => '';
+const anImage = async () => 'https://media.rightmove.co.uk/dir/1/IMG_01_0000_max_656x437.jpeg';
+
+// The one AI call Part L's pass makes. Everything else on that probe is
+// already seeded, so this fake only has to answer the personalisation tool.
+async function fakePersonalisationAi({ tool }) {
+  if (tool?.name !== 'record_probe_personalisation') {
+    throw new Error(`Part L should only need the personalisation call, got "${tool?.name}"`);
+  }
+  return {
+    story_reasoning: 'The viewing moved; the declared sale did not.',
+    primary_narrative: 'A fast, capable reply on the buying side, with the declared sale never taken further.',
+    positive_finding_index: 2,
+    main_finding_index: 1,
+    wider_finding_index: null,
+    supporting_findings: '',
+    fair_observation: 'you replied within half an hour and put a viewing slot on the table.',
+    main_finding: 'the property I said I had to sell was asked about once and never taken any further.',
+    commercial_consequence: 'a valuation that was already inside the enquiry was never booked, and the instruction behind it never reached your pipeline.',
+    wider_observation: '',
+    wider_consequence: '',
+    novus_counterfactual: 'NOVUS would have answered the viewing and offered a market appraisal in the same reply.',
+  };
+}
+
 async function run() {
   process.env.NOVUS_BASIC_AUTH_USER = 'novus';
   process.env.NOVUS_BASIC_AUTH_PASS = 'testpass';
@@ -254,7 +380,7 @@ async function run() {
   }
 
   // ══ Part B — the row builder ══════════════════════════════════════════════
-  console.log('\nPart B — building a weak_seller_qualification DEMOS row');
+  console.log('\nPart B — compiling a weak_seller_qualification DEMOS row');
   let builtRow;
   {
     const { store } = makeWorkbook();
@@ -268,9 +394,10 @@ async function run() {
       { finding_index: 2, finding_type: 'positive', finding: 'The team followed up quickly across two channels.', evidence: 'Voicemail and email inside 23 minutes', significance_note: 'Shows genuine persistence.' },
     ];
 
-    const { row: built, warnings } = buildDemoRow({
+    const { row: built, reasons, status } = buildDemoRow({
       probe, agency, intelligence, findings, personalisation,
       propertyImageUrl: 'https://media.rightmove.co.uk/dir/123/IMG_01_0000_max_656x437.jpeg',
+      propertyImageStatus: 'ok',
       now: '2026-08-24T10:00:00.000Z',
     });
     builtRow = built;
@@ -328,8 +455,23 @@ async function run() {
     assert.ok(built.systemic_bridge.includes('not replace them'));
     ok('the CTA names the agency and the bridge line is the locked copy');
 
-    assert.strictEqual(warnings.length, 0, `unexpected warnings: ${warnings.join(' | ')}`);
-    ok('a complete probe builds with no warnings');
+    assert.deepStrictEqual(reasons, [], `unexpected review reasons: ${reasons.join(' | ')}`);
+    assert.strictEqual(status, 'ready');
+    assert.strictEqual(built.demo_status, 'ready');
+    assert.strictEqual(built.review_reasons, '');
+    assert.strictEqual(built.ready_at, '2026-08-24T10:00:00.000Z');
+    ok('a complete probe compiles straight to ready, with ready_at stamped');
+
+    // The snapshot has to carry the upstream context a human needs to debug it
+    // without opening five other tabs.
+    assert.strictEqual(built.probe_reference, 'RM-0042');
+    assert.strictEqual(built.portal, 'rightmove');
+    assert.strictEqual(built.human_contact, 'yes');
+    assert.strictEqual(built.grade, 'B');
+    assert.strictEqual(built.property_image_status, 'ok');
+    assert.strictEqual(built.compiled_at, '2026-08-24T10:00:00.000Z');
+    assert.strictEqual(built.compiled_by, 'auto');
+    ok('the snapshot carries probe_reference, portal, human_contact, grade and provenance');
   }
   {
     // A missing image is a warning, never a failure.
@@ -337,13 +479,15 @@ async function run() {
     seedWeakSeller(store);
     const probe = Object.fromEntries(PROBES_HEADER.map((k, i) => [k, store.PROBES[2][i] ?? '']));
     const personalisation = Object.fromEntries(PERSONALISATION_HEADER.map((k, i) => [k, store.PERSONALISATION[1][i] ?? '']));
-    const { row: built, warnings } = buildDemoRow({
+    const { row: built, reasons } = buildDemoRow({
       probe, agency: { agency_name: 'Ensum Brown' }, intelligence: {}, findings: [], personalisation,
-      propertyImageUrl: '',
+      propertyImageUrl: '', propertyImageStatus: 'unavailable',
     });
     assert.strictEqual(built.property_image_url, '');
-    assert.ok(warnings.some((w) => w.includes('property_image_url')));
-    ok('a blank property image warns and still produces a complete row');
+    // A MISSING IMAGE IS NOT A REVIEW REASON — the placeholder card carries it.
+    assert.ok(!reasons.some((r) => r.toLowerCase().includes('image')));
+    assert.strictEqual(built.property_image_status, 'unavailable');
+    ok('a blank property image is recorded in property_image_status, never as a review reason');
     assert.strictEqual(built.response_time, '', 'no INTELLIGENCE row means no invented response time');
     ok('missing INTELLIGENCE renders as absent, never as a guess');
   }
@@ -370,7 +514,7 @@ async function run() {
     for (const journey of ['complete_miss', 'slow_response_gap', 'fast_response_stalled_follow_up']) {
       assert.ok(journeySupport(journey).warning.includes('draft copy'));
     }
-    ok('only weak_seller_qualification is authored; the other three warn as draft');
+    ok('only weak_seller_qualification is authored; the other three flag for review');
   }
   {
     // The refusal has to happen BEFORE anything is written.
@@ -385,8 +529,52 @@ async function run() {
     ok('an unsupported journey throws before a row is built');
   }
 
-  // ══ Part D — slugs ════════════════════════════════════════════════════════
-  console.log('\nPart D — demo slugs');
+  // ══ Part D — ready vs needs_review ════════════════════════════════════════
+  console.log('\nPart D — ready vs needs_review');
+  {
+    const complete = {
+      agency_name: 'Ensum Brown',
+      property_address: 'Barn Field, Chevington',
+      commercial_consequence: 'A valuation was never booked.',
+      positive_observation: 'You came back inside 23 minutes.',
+      human_contact: 'yes',
+      novus_detected_json: JSON.stringify([{ label: 'Something real' }]),
+      observed_events_json: JSON.stringify([{ label: 'a' }, { label: 'b' }]),
+    };
+    assert.deepStrictEqual(reviewReasonsFor(complete), []);
+    assert.strictEqual(statusFromReasons([]), 'ready');
+    ok('a complete snapshot is ready');
+
+    const cases = [
+      ['agency_name', { agency_name: '' }, 'agency_name'],
+      ['property_address', { property_address: '' }, 'property_address'],
+      ['commercial_consequence', { commercial_consequence: '' }, 'commercial_consequence'],
+      ['positive_observation (with human contact)', { positive_observation: '' }, 'positive_observation'],
+      ['novus_detected', { novus_detected_json: '[]' }, 'novus_detected'],
+      ['observed_events', { observed_events_json: JSON.stringify([{ label: 'a' }]) }, 'observed events'],
+    ];
+    for (const [name, patch, needle] of cases) {
+      const reasons = reviewReasonsFor({ ...complete, ...patch });
+      assert.ok(reasons.some((r) => r.includes(needle)), `${name} should be a review reason`);
+      assert.strictEqual(statusFromReasons(reasons), 'needs_review');
+    }
+    ok('each missing critical field is named as a review reason and forces needs_review');
+
+    // The one exception that stops every complete_miss demo being flagged for
+    // a positive that genuinely does not exist.
+    const noContact = { ...complete, positive_observation: '', human_contact: 'none' };
+    assert.deepStrictEqual(reviewReasonsFor(noContact), []);
+    ok('a blank positive observation is fine where nobody responded (human_contact=none)');
+
+    // An unreviewed journey is a review reason on its own.
+    const draftJourney = reviewReasonsFor(complete, { journeyWarning: journeySupport('slow_response_gap').warning });
+    assert.strictEqual(draftJourney.length, 1);
+    assert.strictEqual(statusFromReasons(draftJourney), 'needs_review');
+    ok('an unreviewed journey alone is enough to hold a demo at needs_review');
+  }
+
+  // ══ Part E — slugs ════════════════════════════════════════════════════════
+  console.log('\nPart E — demo slugs');
   {
     const slug = buildDemoSlug({ agencyName: 'Ensum Brown', probeReference: 'RM-0042', probeId: 'prb_a' });
     assert.strictEqual(slug, 'ensum-brown-rm-0042');
@@ -410,8 +598,8 @@ async function run() {
     ok('punctuation and ampersands slugify cleanly');
   }
 
-  // ══ Part E — render-ready projection ══════════════════════════════════════
-  console.log('\nPart E — what the browser receives');
+  // ══ Part F — render-ready projection ══════════════════════════════════════
+  console.log('\nPart F — what the browser receives');
   {
     const rendered = toRenderReady(builtRow);
     for (const internal of ['agency_id', 'probe_id', 'personalisation_id', 'demo_id']) {
@@ -428,49 +616,44 @@ async function run() {
     ok('a hand-mangled JSON cell renders as an absent section, never a broken page');
   }
 
-  // ══ Part F/G/H/I/J — the route, end to end ════════════════════════════════
-  console.log('\nPart F — build, publish and serve one demo through /api/demo');
+  // ══ Part G/H/I/J — the route, end to end ══════════════════════════════════
+  console.log('\nPart G — serving one demo through /api/demo');
   {
     const { store, repo } = makeWorkbook();
     seedWeakSeller(store);
     __setRepoForTests(repo);
 
-    // BUILD (authed) — no network: the image is supplied rather than fetched.
-    const buildRes = mockRes();
-    await demoHandler(mockReq({
-      body: {
-        action: 'build',
-        probe_id: 'prb_demo_001',
-        publish: true,
-        property_image_url: 'https://media.rightmove.co.uk/dir/123/IMG_01_0000_max_656x437.jpeg',
-      },
-    }), buildRes);
-    assert.strictEqual(buildRes.statusCode, 200, JSON.stringify(buildRes.body));
-    assert.strictEqual(buildRes.body.demo_slug, 'ensum-brown-rm-0042');
-    assert.strictEqual(buildRes.body.demo_url, '/demo/ensum-brown-rm-0042');
-    assert.strictEqual(buildRes.body.demo_status, 'published');
-    assert.deepStrictEqual(buildRes.body.warnings, []);
+    // The demo is compiled by the pipeline step, not by a human — exactly as
+    // lib/rebuild-pass.mjs calls it. No network: the image is supplied.
+    const compiled = await compileDemos(repo, {
+      justPersonalised: ['prb_demo_001'],
+      suppliedImageUrl: 'https://media.rightmove.co.uk/dir/123/IMG_01_0000_max_656x437.jpeg',
+    });
+    assert.strictEqual(compiled.demos_created, 1);
+    assert.strictEqual(compiled.demos_ready, 1);
+    assert.strictEqual(compiled.results[0].demo_slug, 'ensum-brown-rm-0042');
+    assert.strictEqual(compiled.results[0].demo_url, '/demo/ensum-brown-rm-0042');
     assert.strictEqual(demoRowsOf(store).length, 1);
-    ok('build writes exactly one DEMOS row and returns /demo/{slug}');
+    ok('the pipeline step writes exactly one DEMOS row and returns /demo/{slug}');
 
-    // Nothing upstream may be touched by a demo build.
+    // Nothing upstream may be touched by a demo compile.
     assert.strictEqual(store.PROBES.length, 3);
     assert.strictEqual(store.PERSONALISATION.length, 2);
     assert.strictEqual(store.INTELLIGENCE.length, 2);
     assert.strictEqual(store.DIAGNOSIS_FINDINGS.length, 3);
-    ok('building a demo writes nothing back into PROBES/INTELLIGENCE/FINDINGS/PERSONALISATION');
+    ok('compiling a demo writes nothing back into PROBES/INTELLIGENCE/FINDINGS/PERSONALISATION');
 
     // GET — the prospect's request.
     const getRes = mockRes();
     await demoHandler(mockReq({ method: 'GET', query: { slug: 'ensum-brown-rm-0042' }, auth: false }), getRes);
     assert.strictEqual(getRes.statusCode, 200);
-    assert.strictEqual(getRes.body.draft, false);
+    assert.strictEqual(getRes.body.needs_review, false);
     assert.strictEqual(getRes.body.demo.agency_name, 'Ensum Brown');
     assert.ok(!('probe_id' in getRes.body.demo));
     assert.strictEqual(getRes.headers['Cache-Control'], 'no-store');
-    ok('GET /api/demo?slug=… serves the published demo WITHOUT auth');
+    ok('GET /api/demo?slug=… serves a ready demo WITHOUT auth');
 
-    console.log('\nPart G — view telemetry');
+    console.log('\nPart H — view telemetry');
     assert.strictEqual(demoRowsOf(store)[0].view_count, '1');
     const firstViewedAt = demoRowsOf(store)[0].first_viewed_at;
     assert.ok(firstViewedAt, 'first_viewed_at is stamped on the first view');
@@ -494,7 +677,7 @@ async function run() {
     assert.strictEqual(missingRes.statusCode, 404);
     ok('an unknown slug is a clean 404');
 
-    console.log('\nPart H — CTA telemetry');
+    console.log('\nPart I — CTA telemetry');
     await demoHandler(mockReq({ body: { action: 'cta_click', slug: 'ensum-brown-rm-0042' }, auth: false }), mockRes());
     const clickedAt = demoRowsOf(store)[0].cta_clicked_at;
     assert.ok(clickedAt, 'the CTA click is recorded');
@@ -506,50 +689,69 @@ async function run() {
     assert.ok(demoRowsOf(store)[0].meeting_booked_at);
     ok('a booked meeting is recorded separately from the click that opened the calendar');
 
-    console.log('\nPart I — rebuild is idempotent');
+    console.log('\nPart J — a recompile updates the snapshot and nothing else');
+    // THE CASE THIS EXISTS FOR: a Personalisation rebuild before outreach
+    // recompiles the demo. Identity, history and analytics must all survive it.
     const before = demoRowsOf(store)[0];
-    const rebuildRes = mockRes();
-    await demoHandler(mockReq({ body: { action: 'build', probe_id: 'prb_demo_001' } }), rebuildRes);
-    assert.strictEqual(rebuildRes.statusCode, 200);
-    assert.strictEqual(demoRowsOf(store).length, 1, 'a rebuild must never append a second row');
+    assert.ok(before.view_count && before.cta_clicked_at && before.meeting_booked_at,
+      'the fixture must have accumulated analytics before this check means anything');
+
+    const recompiled = await compileDemos(repo, { probeIds: ['prb_demo_001'], force: true, compiledBy: 'manual', resolveImageUrl: noImage });
+    assert.strictEqual(recompiled.demos_updated, 1);
+    assert.strictEqual(demoRowsOf(store).length, 1, 'a recompile must never append a second row');
+
     const after = demoRowsOf(store)[0];
-    assert.strictEqual(after.demo_slug, before.demo_slug);
+    assert.strictEqual(after.demo_slug, before.demo_slug, 'the URL must survive a recompile');
     assert.strictEqual(after.demo_id, before.demo_id);
     assert.strictEqual(after.created_at, before.created_at);
-    assert.strictEqual(after.demo_status, 'published', 'a rebuild must not silently unpublish');
-    assert.strictEqual(after.view_count, before.view_count);
-    assert.strictEqual(after.first_viewed_at, before.first_viewed_at);
-    assert.strictEqual(after.cta_clicked_at, before.cta_clicked_at);
-    assert.strictEqual(after.property_image_url, before.property_image_url, 'a rebuild keeps the image it already has');
-    ok('rebuild keeps the URL, the id, created_at, the status, the image and all telemetry');
+    assert.strictEqual(after.ready_at, before.ready_at, 'ready_at is stamped once, never moved');
+    assert.strictEqual(after.demo_status, 'ready');
+    assert.strictEqual(after.property_image_url, before.property_image_url, 'a recompile keeps the image it already has');
+    assert.strictEqual(after.compiled_by, 'manual', 'provenance records who recompiled it');
+    for (const column of ANALYTICS_COLUMNS) {
+      assert.strictEqual(after[column], before[column], `${column} must survive a recompile`);
+    }
+    ok(`recompile preserves the URL, demo_id, created_at, ready_at, the image and all ${ANALYTICS_COLUMNS.length} analytics fields`);
 
-    console.log('\nPart J — the write path is authed, the read path is not');
+    console.log('\nPart K — the write path is authed, the read path is not');
     const noAuth = mockRes();
     await demoHandler(mockReq({ body: { action: 'build', probe_id: 'prb_demo_001' }, auth: false }), noAuth);
     assert.strictEqual(noAuth.statusCode, 401);
-    ok('build without the NOVUS credential is a 401');
+    ok('the recovery build without the NOVUS credential is a 401');
 
-    const unpublishRes = mockRes();
-    await demoHandler(mockReq({ body: { action: 'unpublish', slug: 'ensum-brown-rm-0042' } }), unpublishRes);
-    assert.strictEqual(demoRowsOf(store)[0].demo_status, 'draft');
-    const draftRes = mockRes();
-    await demoHandler(mockReq({ method: 'GET', query: { slug: 'ensum-brown-rm-0042', preview: '1' }, auth: false }), draftRes);
-    assert.strictEqual(draftRes.statusCode, 200);
-    assert.strictEqual(draftRes.body.draft, true);
-    ok('a draft demo still resolves, flagged as draft, so the URL can be checked before sending');
+    // The recovery action goes through the SAME compiler.
+    const recoveryRes = mockRes();
+    await demoHandler(mockReq({ body: { action: 'build', probe_id: 'prb_demo_001' } }), recoveryRes);
+    assert.strictEqual(recoveryRes.statusCode, 200, JSON.stringify(recoveryRes.body));
+    assert.strictEqual(recoveryRes.body.demo_slug, 'ensum-brown-rm-0042');
+    assert.strictEqual(recoveryRes.body.demo_status, 'ready');
+    assert.strictEqual(demoRowsOf(store).length, 1);
+    assert.strictEqual(demoRowsOf(store)[0].view_count, before.view_count);
+    ok('the authed recovery build reuses the pipeline compiler and preserves analytics too');
   }
   {
     // An archived demo is deliberately gone.
     const { store, repo } = makeWorkbook();
     seedWeakSeller(store);
     __setRepoForTests(repo);
-    await demoHandler(mockReq({ body: { action: 'build', probe_id: 'prb_demo_001', publish: true } }), mockRes());
-    const idx = store.DEMOS.findIndex((r) => r[1] === 'ensum-brown-rm-0042');
-    store.DEMOS[idx][DEMOS_HEADER.indexOf('demo_status')] = 'archived';
+    await compileDemos(repo, { justPersonalised: ['prb_demo_001'], suppliedImageUrl: 'https://media.rightmove.co.uk/x/IMG_01.jpeg' });
+
+    await demoHandler(mockReq({ body: { action: 'archive', probe_id: 'prb_demo_001' } }), mockRes());
+    assert.strictEqual(demoRowsOf(store)[0].demo_status, 'archived');
     const res = mockRes();
     await demoHandler(mockReq({ method: 'GET', query: { slug: 'ensum-brown-rm-0042' }, auth: false }), res);
     assert.strictEqual(res.statusCode, 404);
     ok('an archived demo is a 404');
+
+    // ARCHIVING IS STICKY: a later recompile refreshes the snapshot but must
+    // not quietly bring a retired link back to life.
+    await compileDemos(repo, { probeIds: ['prb_demo_001'], force: true, resolveImageUrl: noImage });
+    assert.strictEqual(demoRowsOf(store)[0].demo_status, 'archived');
+    ok('a recompile does not un-archive a retired demo');
+
+    await demoHandler(mockReq({ body: { action: 'restore', probe_id: 'prb_demo_001' } }), mockRes());
+    assert.strictEqual(demoRowsOf(store)[0].demo_status, 'ready');
+    ok('restore brings it back to the status its content actually earns');
   }
   {
     // The 422 an unsupported journey produces at the route boundary.
@@ -562,18 +764,34 @@ async function run() {
     assert.strictEqual(res.body.hero_journey, 'automated_ack_only');
     assert.strictEqual(demoRowsOf(store).length, 0);
     ok('an unsupported journey is a 422 and writes no row');
+
+    // The automatic pass reports it rather than failing — a journey with no
+    // demo behind it must not take the pipeline down.
+    const summary = await compileDemos(repo, { justPersonalised: ['prb_demo_001'], resolveImageUrl: noImage });
+    assert.strictEqual(summary.skipped_unsupported_journey, 1);
+    assert.strictEqual(summary.demos_compiled, 0);
+    assert.strictEqual(demoRowsOf(store).length, 0);
+    ok('the automatic pass counts an unsupported journey and carries on');
   }
   {
-    // A draft journey builds, warns, and cannot reach `published` by accident.
+    // An unreviewed journey compiles, but is held at needs_review.
     const { store, repo } = makeWorkbook();
     seedWeakSeller(store, { heroJourney: 'slow_response_gap' });
     __setRepoForTests(repo);
+    const summary = await compileDemos(repo, { justPersonalised: ['prb_demo_001'], resolveImageUrl: noImage });
+    assert.strictEqual(summary.demos_compiled, 1);
+    assert.strictEqual(summary.demos_needs_review, 1);
+    assert.strictEqual(demoRowsOf(store)[0].demo_status, 'needs_review');
+    assert.ok(demoRowsOf(store)[0].review_reasons.includes('draft copy'));
+    assert.strictEqual(demoRowsOf(store)[0].ready_at, '', 'a demo that was never ready has no ready_at');
+    ok('an unreviewed journey compiles to needs_review with the reason on the row');
+
+    // It still resolves, flagged — so the URL can be checked before sending.
     const res = mockRes();
-    await demoHandler(mockReq({ body: { action: 'build', probe_id: 'prb_demo_001' } }), res);
+    await demoHandler(mockReq({ method: 'GET', query: { slug: demoRowsOf(store)[0].demo_slug, preview: '1' }, auth: false }), res);
     assert.strictEqual(res.statusCode, 200);
-    assert.ok(res.body.warnings.some((w) => w.includes('draft copy')));
-    assert.strictEqual(demoRowsOf(store)[0].demo_status, 'draft');
-    ok('a draft journey builds with a warning and stays draft');
+    assert.strictEqual(res.body.needs_review, true);
+    ok('a needs_review demo still resolves, flagged, rather than 404ing');
   }
   {
     // A probe with no PERSONALISATION row has no story to tell yet.
@@ -585,6 +803,19 @@ async function run() {
     await demoHandler(mockReq({ body: { action: 'build', probe_id: 'prb_demo_001' } }), res);
     assert.strictEqual(res.statusCode, 409);
     ok('a probe with no PERSONALISATION row is refused with a 409, not a half-demo');
+  }
+  {
+    // A PERSONALISATION row that exists but was never finalised (no
+    // primary_narrative) is NOT a story — compiling from it would put a demo
+    // in front of a prospect built on half an answer.
+    const { store, repo } = makeWorkbook();
+    seedWeakSeller(store);
+    store.PERSONALISATION[1][PERSONALISATION_HEADER.indexOf('primary_narrative')] = '';
+    __setRepoForTests(repo);
+    const summary = await compileDemos(repo, { resolveImageUrl: noImage });
+    assert.strictEqual(summary.demos_compiled, 0);
+    assert.strictEqual(demoRowsOf(store).length, 0);
+    ok('an unfinalised PERSONALISATION row compiles no demo');
   }
   {
     // A workbook without the tab must say so, not 500.
@@ -600,10 +831,169 @@ async function run() {
     assert.strictEqual(buildRes.statusCode, 409);
     assert.ok(buildRes.body.error.includes('DEMOS'));
     ok('a workbook with no DEMOS tab yet returns a clear 404/409, never a 500');
+
+    // And the automatic pass is a flagged no-op rather than a pipeline failure.
+    const summary = await compileDemos(repo, { justPersonalised: ['prb_demo_001'], resolveImageUrl: noImage });
+    assert.strictEqual(summary.demos_tab_missing, true);
+    assert.strictEqual(summary.demos_compiled, 0);
+    assert.deepStrictEqual(summary.problems, []);
+    ok('a missing DEMOS tab makes the pipeline step a flagged no-op, never a throw');
   }
 
-  // ══ Part K — display formatting ═══════════════════════════════════════════
-  console.log('\nPart K — display formatting');
+  // ══ Part L — AUTOMATIC COMPILATION ════════════════════════════════════════
+  // The headline behaviour: nobody runs a build command. A probe that finishes
+  // PERSONALISATION comes out of the SAME pass with a live demo.
+  console.log('\nPart L — the demo compiles itself when PERSONALISATION completes');
+  {
+    const { store, repo } = makeWorkbook({
+      DIAGNOSIS: [DIAGNOSIS_HEADER.slice()],
+      COMMUNICATIONS: [COMMUNICATIONS_HEADER.slice()],
+    });
+    seedPipelineReadyProbe(store);
+    __setRepoForTests(repo);
+    __setAiCallerForTests(fakePersonalisationAi);
+
+    // Exactly what api/novus/intelligence/finalize.js (the cron) and the
+    // "Rebuild Intelligence" button run.
+    const summary = await runRebuildPass(repo, { maxAiCalls: 10 });
+
+    assert.strictEqual(summary.personalisation.personalisation_created, 1, JSON.stringify(summary.personalisation.problems));
+    assert.deepStrictEqual(summary.personalisation.personalised_probe_ids, ['prb_auto_001']);
+    ok('PERSONALISATION reports which probes it wrote, so the demo step knows what is new');
+
+    assert.ok(summary.demos, 'the pass reports a demos summary');
+    assert.strictEqual(summary.demos.demos_created, 1, JSON.stringify(summary.demos.problems));
+    assert.strictEqual(summary.demos.results[0].reason, 'personalisation_completed');
+    ok('ONE pass: PERSONALISATION completes and the DEMOS row is compiled in the same invocation');
+
+    const demo = demoRowsOf(store)[0];
+    assert.strictEqual(demo.probe_id, 'prb_auto_001');
+    assert.strictEqual(demo.hero_journey, 'weak_seller_qualification');
+    assert.strictEqual(demo.demo_slug, 'auto-agency-rm-0099');
+    assert.strictEqual(demo.compiled_by, 'auto');
+    assert.ok(demo.compiled_at);
+    ok(`the compiled demo is live at /demo/${demo.demo_slug} with no human step`);
+
+    // And it renders — the same GET a prospect makes.
+    const getRes = mockRes();
+    await demoHandler(mockReq({ method: 'GET', query: { slug: demo.demo_slug }, auth: false }), getRes);
+    assert.strictEqual(getRes.statusCode, 200, JSON.stringify(getRes.body));
+    assert.strictEqual(getRes.body.demo.agency_name, 'Auto Agency');
+    assert.ok(getRes.body.demo.observed_events.length >= 2);
+    ok('the automatically compiled demo serves render-ready JSON straight away');
+
+    // A second pass must be a no-op: PERSONALISATION is frozen, the demo is
+    // up to date, nothing is rewritten and no second row appears.
+    const second = await runRebuildPass(repo, { maxAiCalls: 10 });
+    assert.strictEqual(second.personalisation.personalisation_created, 0);
+    assert.strictEqual(second.demos.demos_compiled, 0);
+    assert.strictEqual(demoRowsOf(store).length, 1);
+    ok('a second pass compiles nothing — an up-to-date demo is left alone');
+
+    __setAiCallerForTests(null);
+  }
+  {
+    // SELF-HEALING: the probe was personalised before the DEMOS tab existed.
+    // This is the case that makes "never run a build command" true for the
+    // demos that already exist, not just the ones from now on.
+    const { store, repo } = makeWorkbook({
+      DIAGNOSIS: [DIAGNOSIS_HEADER.slice()],
+      COMMUNICATIONS: [COMMUNICATIONS_HEADER.slice()],
+    });
+    seedWeakSeller(store, { propertyUrl: '' });      // already personalised
+    __setRepoForTests(repo);
+    __setAiCallerForTests(async () => { throw new Error('no AI call should be needed'); });
+
+    const summary = await runRebuildPass(repo, { maxAiCalls: 10 });
+    assert.strictEqual(summary.personalisation.personalisation_created, 0, 'nothing left to personalise');
+    assert.strictEqual(summary.demos.demos_created, 1);
+    assert.strictEqual(summary.demos.results[0].reason, 'missing_demo_row');
+    assert.strictEqual(demoRowsOf(store).length, 1);
+    ok('an already-personalised probe with no demo row is picked up by the next pass, with no AI call');
+
+    __setAiCallerForTests(null);
+  }
+  {
+    // Budgets: a pass compiles what it can and reports the rest, rather than
+    // running past a serverless time limit.
+    const { store, repo } = makeWorkbook();
+    seedWeakSeller(store, { probeId: 'prb_a', probeReference: 'RM-1', agencyId: 'ag_a', agencyName: 'Agency A' });
+    seedWeakSeller(store, { probeId: 'prb_b', probeReference: 'RM-2', agencyId: 'ag_b', agencyName: 'Agency B' });
+    __setRepoForTests(repo);
+
+    const first = await compileDemos(repo, { maxCompiles: 1, maxImageFetches: 0, resolveImageUrl: noImage });
+    assert.strictEqual(first.demos_compiled, 1);
+    assert.strictEqual(first.remaining_demos, 1);
+    assert.strictEqual(first.images_pending, 1, 'no image budget leaves the image pending, not failed');
+    assert.strictEqual(demoRowsOf(store)[0].property_image_status, 'pending');
+    ok('a capped pass compiles what it can and reports the remainder');
+
+    // The next pass finishes the job AND retries the pending image.
+    const second = await compileDemos(repo, { maxImageFetches: 5, resolveImageUrl: noImage });
+    assert.strictEqual(second.demos_compiled, 2, 'the second demo, plus the pending-image retry');
+    assert.strictEqual(demoRowsOf(store).length, 2);
+    assert.ok(demoRowsOf(store).every((d) => d.property_image_status !== 'pending'));
+    ok('the next pass finishes the remainder and retries every pending image');
+
+    // A settled failure is NOT retried — a dead listing must not be re-fetched
+    // on every pass forever.
+    assert.ok(demoRowsOf(store).some((d) => d.property_image_status === 'unavailable'));
+    const third = await compileDemos(repo, { maxImageFetches: 5, resolveImageUrl: anImage });
+    assert.strictEqual(third.demos_compiled, 0);
+    assert.strictEqual(third.images_fetched, 0);
+    ok('an image marked unavailable is never re-fetched automatically');
+
+    assert.strictEqual(
+      new Set(demoRowsOf(store).map((d) => d.demo_slug)).size, 2,
+      'two probes compiled in one pass must not share a URL',
+    );
+    ok('two probes compiled in the same pass get distinct slugs');
+  }
+
+  // ══ Part M — THE PROSPECT PATH READS ONE TAB ══════════════════════════════
+  console.log('\nPart M — opening a demo reads the DEMOS snapshot and nothing else');
+  {
+    const { store, reads, repo } = makeWorkbook();
+    seedWeakSeller(store);
+    __setRepoForTests(repo);
+    await compileDemos(repo, { justPersonalised: ['prb_demo_001'], suppliedImageUrl: 'https://media.rightmove.co.uk/x/IMG_01.jpeg' });
+
+    // Everything up to here was compilation. From this point, only the
+    // prospect's own request.
+    reads.length = 0;
+    const getRes = mockRes();
+    await demoHandler(mockReq({ method: 'GET', query: { slug: 'ensum-brown-rm-0042' }, auth: false }), getRes);
+    assert.strictEqual(getRes.statusCode, 200);
+
+    assert.deepStrictEqual([...new Set(reads)], ['DEMOS'],
+      `opening a demo must read DEMOS only — it read: ${[...new Set(reads)].join(', ')}`);
+    ok('GET /api/demo touches DEMOS and NOTHING else — no PROBES, INTELLIGENCE, FINDINGS or PERSONALISATION join');
+
+    // The payload is complete on its own: every field the four beats need is
+    // already on the row, so the page has nothing left to look up.
+    const demo = getRes.body.demo;
+    for (const field of [
+      'agency_name', 'property_address', 'property_price', 'property_url', 'property_image_url',
+      'enquiry_date', 'enquiry_time', 'seller_declared', 'response_time',
+      'demo_hook', 'positive_observation', 'demo_reveal', 'main_finding',
+      'commercial_consequence', 'systemic_bridge', 'cta_headline',
+    ]) {
+      assert.ok(field in demo, `${field} must be on the render-ready payload`);
+    }
+    for (const collection of ['observed_events', 'novus_detected', 'novus_decisions', 'novus_actions']) {
+      assert.ok(Array.isArray(demo[collection]) && demo[collection].length > 0, `${collection} must be populated`);
+    }
+    ok('the snapshot alone carries every field all four beats render');
+
+    // Telemetry is one write on the same row — never a read of another tab.
+    reads.length = 0;
+    await demoHandler(mockReq({ body: { action: 'cta_click', slug: 'ensum-brown-rm-0042' }, auth: false }), mockRes());
+    assert.deepStrictEqual([...new Set(reads)], ['DEMOS']);
+    ok('CTA telemetry also touches DEMOS only');
+  }
+
+  // ══ Part N — display formatting ═══════════════════════════════════════════
+  console.log('\nPart N — display formatting');
   {
     assert.strictEqual(formatResponseTime('0.38'), '23 minutes');
     assert.strictEqual(formatResponseTime('1'), '1 hour');

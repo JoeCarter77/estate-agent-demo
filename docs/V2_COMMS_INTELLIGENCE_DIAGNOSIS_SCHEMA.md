@@ -483,72 +483,136 @@ reworded so the offer makes sense when there was nothing to discuss.
 
 ---
 
-## 4d. `DEMOS` — 43 fields, one row per published personalised demo
+## 4d. `DEMOS` — 51 fields, one row per personalised demo
 
-One step past the email. `PERSONALISATION` decides *what the story is*;
-`DEMOS` is that story **frozen as render-ready copy** for the page the
-prospect actually opens at `/demo/{demo_slug}`.
+The last step of the pipeline:
 
-**Why the tab exists.** The demo must not query `PROBES` + `AGENCIES` +
-`INTELLIGENCE` + `DIAGNOSIS_FINDINGS` + `PERSONALISATION` from a browser on
-every open. It resolves one slug, reads one row, renders it. `DEMOS` is a
-projection of the five tabs above, written once at build time by
-`lib/demos.mjs`'s `buildDemoRow()` (via `POST /api/demo {action:'build'}`).
+```
+PROBE -> COMMUNICATIONS -> INTELLIGENCE -> DIAGNOSIS ->
+DIAGNOSIS_FINDINGS -> PERSONALISATION -> DEMOS
+```
 
-**It is strictly downstream.** Nothing in the demo path writes back into the
-pipeline. A demo can be rebuilt, republished or deleted without touching a
-single upstream row.
+`PERSONALISATION` decides *what the story is*; `DEMOS` is that story frozen as
+a **self-contained, render-ready snapshot** for the page the prospect opens at
+`/demo/{demo_slug}`.
 
-**The demo shows the probe as at build time.** Rebuilding is an explicit
-action; a page view never re-derives anything.
+### Compiled automatically, never by hand
+
+`lib/demo-compile.mjs` runs as the **last step of `lib/rebuild-pass.mjs`**,
+immediately after `rebuildAllPersonalisation`. A probe that finishes
+Personalisation comes out of that same invocation with a live demo. There is no
+manual build step in the acquisition workflow, and no compilation of any kind
+at prospect page-load time.
+
+`rebuildAllPersonalisation` now returns `personalised_probe_ids`; the compile
+step takes that list and compiles exactly those probes, **plus** any
+already-personalised probe with no demo row yet — so a tab created after the
+fact, a budget-capped earlier pass, or a row deleted by hand all self-heal on
+the next pass rather than needing a human.
+
+The step makes **no AI calls** and takes no share of the AI budget. It has its
+own budgets (`maxDemoCompiles`, default 25; `maxDemoImageFetches`, default 6)
+because a serverless invocation has a wall clock, and whatever it cannot reach
+is picked up next pass. It is wrapped so it can never fail the pipeline: a
+missing `DEMOS` tab is a flagged no-op, and a per-probe failure is reported,
+not thrown.
+
+### Opening a demo reads one tab
+
+`GET /api/demo?slug=…` resolves the slug in `DEMOS`, loads that row, returns
+it. No join, no AI, no Rightmove request. `npm run novus:demo-selftest`
+asserts this directly by recording every tab the request reads.
+
+### Duplication here is the point
+
+Fields are copied down from five tabs so one row answers everything the page
+needs to *render* and everything a human needs to *debug why a demo says what
+it says*. Only genuinely derivable fields are left out.
 
 | Group | Fields |
 |---|---|
-| Identity | `demo_id` (`dmo_*`), `demo_slug`, `demo_status` (`draft`/`published`/`archived`), `demo_version` |
-| Links back | `agency_id`, `probe_id`, `personalisation_id`, `hero_journey` |
-| Beat 1 — the real event | `agency_name`, `property_address`, `property_price`, `property_url`, `property_image_url`, `enquiry_at`, `enquiry_date`, `enquiry_time` |
-| Beat 2 — the observed facts | `seller_declared`, `response_time`, `response_hours`, `contact_attempts`, `follow_ups`, `channels_used`, `viewing_progression`, `seller_recognition` |
-| The copy read by the prospect | `demo_hook`, `positive_observation`, `demo_reveal`, `main_finding`, `commercial_consequence`, `systemic_bridge`, `cta_headline` |
+| Identity | `demo_id` (`dmo_*`), `demo_slug`, `demo_status`, `demo_version`, `review_reasons` |
+| Pipeline links | `agency_id`, `probe_id`, `probe_reference`, `personalisation_id`, `hero_journey` |
+| Beat 1 — the real event | `agency_name`, `property_address`, `property_price`, `property_url`, `property_image_url`, `property_image_status`, `portal`, `enquiry_at`, `enquiry_date`, `enquiry_time` |
+| Beat 2 — the observed facts | `seller_declared`, `human_contact`, `response_time`, `response_hours`, `contact_attempts`, `follow_ups`, `channels_used`, `viewing_progression`, `seller_recognition`, `grade` |
+| The copy the prospect reads | `demo_hook`, `positive_observation`, `demo_reveal`, `main_finding`, `commercial_consequence`, `systemic_bridge`, `cta_headline` |
 | Collections (JSON, short by design) | `observed_events_json`, `novus_detected_json`, `novus_decisions_json`, `novus_actions_json` |
-| Plumbing | `created_at`, `updated_at`, `published_at` |
-| Telemetry | `first_viewed_at`, `last_viewed_at`, `view_count`, `cta_clicked_at`, `meeting_booked_at` |
+| Provenance | `created_at`, `updated_at`, `compiled_at`, `compiled_by`, `ready_at` |
+| Analytics — never reset | `first_viewed_at`, `last_viewed_at`, `view_count`, `cta_clicked_at`, `meeting_booked_at` |
 
 ### Where each field comes from
 
-Nothing here is invented. Prospect-facing prose is `PERSONALISATION`'s own
-copy, raised to a standalone sentence and never rewritten:
+Nothing is invented. Prospect-facing prose is `PERSONALISATION`'s own copy,
+raised to a standalone sentence and never rewritten.
 
 | Field | Source |
 |---|---|
 | `positive_observation` | `PERSONALISATION.fair_observation`, sentence-cased |
 | `main_finding` | `PERSONALISATION.main_finding`, sentence-cased |
 | `commercial_consequence` | `PERSONALISATION.commercial_consequence`, sentence-cased |
-| `property_address` | `PROBES.property_address` through the same `cleanAddressForEmail()` the email uses |
-| `enquiry_date` / `enquiry_time` | `PROBES.probe_timestamp`, Europe/London |
+| `hero_journey`, `personalisation_id` | the `PERSONALISATION` row |
+| `property_*`, `portal`, `probe_reference`, `enquiry_*` | the `PROBES` row (`property_address` through the same `cleanAddressForEmail()` the email uses; `enquiry_date`/`enquiry_time` in Europe/London) |
 | `seller_declared` | `hasVendorDeclaration(probe)` — the deterministic marker, not an AI read |
-| `response_time` … `seller_recognition` | the `INTELLIGENCE` row verbatim (`response_time` is `response_hours` formatted) |
+| `agency_name` | the `AGENCIES` row |
+| `human_contact` … `grade` | the `INTELLIGENCE` row verbatim (`response_time` is `response_hours` formatted) |
 | `observed_events_json` | derived from those `INTELLIGENCE` fields — no prose, no findings text |
 | `novus_detected_json` | this probe's `DIAGNOSIS_FINDINGS` plus the facts that make them real |
 | `novus_decisions_json` | leads with `PERSONALISATION.novus_counterfactual`, then the journey's product decisions |
-| `demo_hook` / `demo_reveal` / `novus_actions_json` / `systemic_bridge` / `cta_headline` | authored per journey in `lib/demo-journeys.mjs` — product copy, identical for every agency on a journey |
+| `demo_hook`, `demo_reveal`, `novus_actions_json`, `systemic_bridge`, `cta_headline` | authored per journey in `lib/demo-journeys.mjs` — product copy, identical for every agency on a journey |
+
+### `ready` vs `needs_review`
+
+The lifecycle is compile-driven, not publish-driven. `reviewReasonsFor()` in
+`lib/demos.mjs` is the whole rule: **any** reason means `needs_review`, none
+means `ready`. The reasons are written to `review_reasons` so a human can
+triage from the sheet.
+
+| Reason | When |
+|---|---|
+| unreviewed journey | `hero_journey` is one of the three draft journeys |
+| `agency_name` blank | the CTA cannot name the agency |
+| `property_address` blank | beat 1 has no property to show |
+| `commercial_consequence` blank | beat 2 has no payoff |
+| `positive_observation` blank | **and** `human_contact = yes` — where nobody responded there is genuinely nothing to credit, so a `complete_miss` demo is not flagged for it |
+| `novus_detected` empty | beat 3 has nothing for NOVUS to have recognised |
+| fewer than 2 observed events | beat 2 has no evidence; one event is just "an enquiry arrived" |
+
+**A missing property image is not a review reason.** The renderer falls back to
+the drawn placeholder and the demo reads correctly without it; it is recorded
+in `property_image_status` (`ok` / `manual` / `unavailable` / `pending` /
+`none`) instead. `pending` (the pass's image budget ran out) is retried next
+pass; `unavailable` is not, so a dead listing is not re-fetched forever.
+
+`needs_review` demos still resolve, flagged in the page chrome, so the URL can
+be checked. `archived` 404s and is **sticky** — a recompile refreshes an
+archived demo's snapshot but never brings its link back.
+
+### A recompile updates the snapshot, never the identity or the history
+
+Rebuilding Personalisation before outreach may recompile the demo. Carried over
+from the existing row, unchanged: `demo_id`, `demo_slug`, `created_at`,
+`ready_at`, and every column in `ANALYTICS_COLUMNS` (`view_count`,
+`first_viewed_at`, `last_viewed_at`, `cta_clicked_at`, `meeting_booked_at`).
+That list lives in code, not in a convention.
 
 ### `hero_journey` support
 
 `lib/demo-journeys.mjs` carries a **shell of four** — `complete_miss`,
 `slow_response_gap`, `fast_response_stalled_follow_up`,
 `weak_seller_qualification` — of which only `weak_seller_qualification` is
-authored and publishable. The other three build, warn, and stay `draft`.
+authored. The other three compile but are held at `needs_review`.
 
 The three journeys `pickHeroJourney()` can still emit and the demo has no
 design for — `automated_ack_only`,
 `strong_handling_database_opportunity`, `strong_handling_no_opportunity` —
-are **refused by name** (HTTP 422) rather than fudged into the nearest shape.
+are **refused by name** rather than fudged into the nearest shape. The
+automatic pass counts them (`skipped_unsupported_journey`) and carries on.
 
 ### The renderer is journey-blind
 
 `demo.html` contains no `hero_journey` branch. It renders whatever the row
-carries and hides whatever is blank, which is what stops four journeys
-becoming four demo pages. Adding a journey is authoring content in
+carries and hides whatever is blank, which is what stops four journeys becoming
+four demo pages. Adding a journey is authoring content in
 `lib/demo-journeys.mjs`; the page does not change.
 
 Regression suite: `npm run novus:demo-selftest`.
@@ -585,13 +649,25 @@ webhook → RAW_EVENTS → deterministic agency + probe match → COMMUNICATIONS
                   DIAGNOSIS row + its DIAGNOSIS_FINDINGS rows + the probe facts +
                   the raw communications → upsert the PERSONALISATION row, its
                   sentence-ready email copy and the assembled email (§4b, §4c)
+  7. COMPILE THE DEMO  no AI call. Every probe step 6 just personalised (plus any
+                  already-personalised probe with no demo row yet) → upsert one
+                  DEMOS row: the render-ready snapshot behind /demo/{demo_slug}
+                  (§4d). Best-effort listing-image fetch; never blocks.
 ```
 
 The full pipeline is therefore:
 
 ```
-COMMUNICATIONS → INTELLIGENCE → DIAGNOSIS → DIAGNOSIS_FINDINGS → PERSONALISATION + PROBE → EMAIL → personalised breakdown / demo journey
+PROBE → COMMUNICATIONS → INTELLIGENCE → DIAGNOSIS → DIAGNOSIS_FINDINGS → PERSONALISATION → DEMOS
+                                                                              │
+                                                                              ├→ EMAIL (§4c)
+                                                                              └→ /demo/{demo_slug} (§4d)
 ```
+
+Steps 1–6 are `recomputeProbeObservation` (the webhook path) and
+`runRebuildPass` (the batch path); **step 7 runs in `runRebuildPass` only**, as
+its last step. A probe finalised by the webhook path gets its demo on the next
+rebuild pass or cron run.
 
 ### Rebuild Intelligence
 
@@ -620,6 +696,18 @@ Two AI calls per probe, once. Roughly 30 live probes → ~60 calls to populate t
 2. Press **Rebuild Intelligence**.
 
 `repo.appendRecord`/`updateById` already drop keys the header doesn't have, so step 1 is the only sheet prerequisite and nothing breaks in between.
+
+### To go live with demos (§4d)
+
+1. Create a `DEMOS` tab whose row 1 is exactly `DEMOS_HEADER` from
+   `lib/demos.mjs` (`node -e "import('./lib/demos.mjs').then(m=>console.log(m.DEMOS_HEADER.join('\t')))"`
+   prints a tab-separated line to paste).
+2. Press **Rebuild Intelligence** once.
+
+That single pass backfills a demo for **every** already-personalised probe —
+the compile step treats "personalised, but no demo row" as work to do. Until
+the tab exists the step is a flagged no-op (`demos_tab_missing`) and nothing
+else in the pipeline is affected.
 
 ---
 

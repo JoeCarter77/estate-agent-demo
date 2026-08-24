@@ -1,4 +1,14 @@
-// scripts/novus-demo.mjs — the operator CLI for personalised demos.
+// scripts/novus-demo.mjs — INTERNAL DEBUGGING / RECOVERY TOOL.
+//
+// NOT PART OF THE ACQUISITION WORKFLOW. Demos are compiled automatically the
+// moment PERSONALISATION completes (lib/demo-compile.mjs, run as the last step
+// of lib/rebuild-pass.mjs). Nobody runs a build command per prospect. This CLI
+// exists for the cases the automatic path cannot cover on its own:
+//
+//   • forcing a recompile of one row while debugging what a demo says
+//   • the property-image backfill, which needs a real browser and therefore
+//     cannot run inside a Serverless Function at all
+//   • retiring or restoring a link
 //
 // WHY IT TALKS HTTP, NOT SHEETS. lib/sheets.mjs authenticates with a Vercel
 // OIDC token federated through Workload Identity Federation — there is no
@@ -16,10 +26,10 @@
 //
 // Usage
 //   node scripts/novus-demo.mjs image <listing-url> [--browser]
-//   node scripts/novus-demo.mjs build <probe_id> [--publish] [--slug s]
+//   node scripts/novus-demo.mjs build <probe_id> [--slug s]
 //                                     [--browser] [--image <url>] [--refresh-image]
 //   node scripts/novus-demo.mjs backfill-images <probe_id> [probe_id ...]
-//   node scripts/novus-demo.mjs publish <probe_id> | unpublish <probe_id>
+//   node scripts/novus-demo.mjs archive <probe_id> | restore <probe_id>
 //
 // Env (or flags):
 //   NOVUS_DEMO_BASE_URL   https://your-deployment            (--base)
@@ -91,11 +101,10 @@ async function cmdImage(args) {
 
 async function cmdBuild(args) {
   const probeId = args._[1];
-  if (!probeId) die('Usage: novus-demo.mjs build <probe_id> [--publish] [--browser]');
+  if (!probeId) die('Usage: novus-demo.mjs build <probe_id> [--browser]');
   const cfg = config(args.flags);
 
-  const body = { action: 'build', probe_id: probeId };
-  if (args.flags.publish === true) body.publish = true;
+  const body = { action: 'build', probe_id: probeId, compiled_by: 'cli' };
   if (typeof args.flags.slug === 'string') body.slug = args.flags.slug;
   if (typeof args.flags.image === 'string') body.property_image_url = args.flags.image;
   if (args.flags['refresh-image'] === true) body.refresh_image = true;
@@ -130,7 +139,7 @@ async function cmdBackfillImages(args) {
     // backfill never overwrites a good image with a blocked fetch.
     let result;
     try {
-      result = await post(cfg, { action: 'build', probe_id: probeId });
+      result = await post(cfg, { action: 'build', probe_id: probeId, compiled_by: 'cli' });
     } catch {
       continue; // post() already reported and exited on hard failures
     }
@@ -138,18 +147,18 @@ async function cmdBackfillImages(args) {
     if (!result.property_url) { console.log('  no property_url on the probe — skipped'); continue; }
     const image = await extractImage(result.property_url, true);
     if (!image) { console.log('  could not extract — left blank (the demo still renders)'); continue; }
-    await post(cfg, { action: 'build', probe_id: probeId, property_image_url: image });
+    await post(cfg, { action: 'build', probe_id: probeId, compiled_by: 'cli', property_image_url: image });
     filled += 1;
     console.log('  ✓ stored');
   }
   console.log(`\nBackfilled ${filled} of ${probeIds.length} probe(s).\n`);
 }
 
-async function cmdPublish(args, publish) {
+async function cmdArchive(args, archive) {
   const probeId = args._[1];
-  if (!probeId) die(`Usage: novus-demo.mjs ${publish ? 'publish' : 'unpublish'} <probe_id>`);
+  if (!probeId) die(`Usage: novus-demo.mjs ${archive ? 'archive' : 'restore'} <probe_id>`);
   const cfg = config(args.flags);
-  const result = await post(cfg, { action: publish ? 'publish' : 'unpublish', probe_id: probeId });
+  const result = await post(cfg, { action: archive ? 'archive' : 'restore', probe_id: probeId });
   console.log(`\n${result.demo_slug} → ${result.demo_status}`);
   console.log(`${cfg.base}/demo/${result.demo_slug}\n`);
 }
@@ -158,29 +167,31 @@ function report(cfg, result) {
   console.log(`  slug     ${result.demo_slug}`);
   console.log(`  status   ${result.demo_status}`);
   console.log(`  journey  ${result.hero_journey}`);
-  console.log(`  image    ${result.property_image_url || '(none — the drawn placeholder is used)'}`);
+  console.log(`  image    ${result.property_image_url || '(none — the drawn placeholder is used)'} [${result.property_image_status}]`);
   console.log(`  url      ${cfg.base}/demo/${result.demo_slug}`);
-  for (const warning of result.warnings || []) console.log(`  ⚠  ${warning}`);
+  for (const reason of result.review_reasons || []) console.log(`  ⚠  ${reason}`);
 }
 
 const COMMANDS = {
   image: cmdImage,
   build: cmdBuild,
   'backfill-images': cmdBackfillImages,
-  publish: (args) => cmdPublish(args, true),
-  unpublish: (args) => cmdPublish(args, false),
+  archive: (args) => cmdArchive(args, true),
+  restore: (args) => cmdArchive(args, false),
 };
 
 const args = parseArgs(process.argv.slice(2));
 const command = COMMANDS[args._[0]];
 if (!command) {
   console.log(`
-NOVUS personalised demos
+NOVUS personalised demos — internal debugging / recovery tool.
+Demos compile automatically when PERSONALISATION completes; none of this is
+needed in the normal acquisition workflow.
 
   image <listing-url> [--browser]            extract a hero photo and print it
-  build <probe_id> [--publish] [--browser]   build/rebuild that probe's DEMOS row
+  build <probe_id> [--browser]               force a recompile of one DEMOS row
   backfill-images <probe_id> [probe_id ...]  fill in missing property images
-  publish <probe_id> / unpublish <probe_id>  flip a demo's status
+  archive <probe_id> / restore <probe_id>    retire or restore a demo link
 
   --base   deployment URL      (or NOVUS_DEMO_BASE_URL)
   --user   / --pass            (or NOVUS_BASIC_AUTH_USER / NOVUS_BASIC_AUTH_PASS)

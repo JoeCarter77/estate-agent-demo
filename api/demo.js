@@ -1,32 +1,38 @@
 // api/demo.js — the DEMOS route. One Serverless Function, three jobs.
 //
-//   GET  /api/demo?slug=<demo_slug>                     PUBLIC  — render the demo
-//   POST /api/demo {action:'cta_click'|'meeting_booked'} PUBLIC  — CTA telemetry
-//   POST /api/demo {action:'build'|'publish'|'unpublish'} AUTHED — manage a row
+//   GET  /api/demo?slug=<demo_slug>                        PUBLIC — render
+//   POST /api/demo {action:'cta_click'|'meeting_booked'}    PUBLIC — telemetry
+//   POST /api/demo {action:'build'|'archive'|'restore'}     AUTHED — recovery
+//
+// THE GET PATH READS ONE ROW AND NOTHING ELSE. It resolves the slug in DEMOS,
+// loads that row, and returns it. No AI call, no join against PROBES /
+// INTELLIGENCE / DIAGNOSIS_FINDINGS / PERSONALISATION, no Rightmove request,
+// no compilation of any kind. The row was compiled when PERSONALISATION
+// completed (lib/demo-compile.mjs, from lib/rebuild-pass.mjs) — opening a
+// demo only reads that snapshot.
+//
+// `build` IS NOT PART OF THE ACQUISITION WORKFLOW. Demos are compiled
+// automatically by the pipeline; this action exists so a human can force a
+// recompile when debugging or recovering one row, and it calls straight into
+// the SAME compiler the pipeline uses, so a hand-triggered rebuild can never
+// produce a row the pipeline would not have produced.
 //
 // PUBLIC ON PURPOSE, AND ONLY HERE. middleware.js gates /novus/* and
 // /api/novus/* behind Basic Auth — a prospect cannot be asked for a password,
-// so the demo read lives at /api/demo, outside that matcher. The admin actions
-// on this same route call requireAuth() explicitly, so the Sheets WRITE path
-// stays behind the same credential as the rest of NOVUS.
+// so the demo read lives at /api/demo, outside that matcher. Every action that
+// writes demo CONTENT calls requireAuth() explicitly.
 //
 // ONE ROUTE, NOT FOUR FILES. Vercel Hobby caps the project at 12 Serverless
 // Functions and api/novus/probe.js was already consolidated for that reason.
 // This route is the twelfth; anything further must merge into an existing one.
-//
-// The prospect's browser reads ONE row. It never queries PROBES, AGENCIES,
-// INTELLIGENCE, DIAGNOSIS_FINDINGS or PERSONALISATION, and it never touches
-// Rightmove — DEMOS is the render-ready projection of all of them, frozen at
-// build time.
 
 import { getRepo } from '../lib/sheets.mjs';
 import { requireAuth } from './novus/_auth.mjs';
-import { loadFindingsTable, groupFindingsByProbe } from '../lib/diagnosis-findings.mjs';
-import { resolvePropertyImageUrl } from '../lib/property-image.mjs';
+import { compileDemoForProbe } from '../lib/demo-compile.mjs';
 import {
   DEMOS_TAB, DEMOS_HEADER,
-  buildDemoRow, buildDemoSlug, demosTabExists, findDemoBySlug, findDemoByProbe,
-  loadDemosTable, slugOwners, toRenderReady, writeDemoRow,
+  demosTabExists, findDemoBySlug, findDemoByProbe,
+  loadDemosTable, toRenderReady, writeDemoRow,
 } from '../lib/demos.mjs';
 
 // Long enough for the build action's six tab reads plus one listing fetch.
@@ -53,14 +59,14 @@ function parseBody(req) {
   }
 }
 
-// ── GET: resolve a slug and render ───────────────────────────────────────────
+// ── GET: resolve a slug and render, from the snapshot alone ──────────────────
 
 async function handleGet(req, res) {
   const slug = text(req.query?.slug);
   if (!slug) return res.status(400).json({ error: 'Missing slug' });
 
   const repo = getRepo();
-  const table = await loadDemosTable(repo);
+  const table = await loadDemosTable(repo);            // ← the only tab read
   if (!demosTabExists(table)) {
     return res.status(404).json({ error: 'No DEMOS tab in the workbook yet' });
   }
@@ -68,9 +74,9 @@ async function handleGet(req, res) {
   const record = findDemoBySlug(table, slug);
   if (!record) return res.status(404).json({ error: 'No demo found for this link' });
 
-  const status = text(record.obj.demo_status) || 'draft';
-  // An archived demo is deliberately gone. A draft one still resolves so the
-  // URL can be checked before it is sent — flagged, so the page can say so.
+  const status = text(record.obj.demo_status) || 'needs_review';
+  // An archived demo is deliberately retired. A needs_review one still
+  // resolves — flagged, so it can be looked at rather than silently sent.
   if (status === 'archived') return res.status(404).json({ error: 'This demo is no longer available' });
 
   // ?preview=1 is how we open our own demo without inflating the prospect's
@@ -83,7 +89,10 @@ async function handleGet(req, res) {
   }
 
   res.setHeader('Cache-Control', 'no-store');
-  return res.status(200).json({ demo: toRenderReady(record.obj), draft: status !== 'published' });
+  return res.status(200).json({
+    demo: toRenderReady(record.obj),
+    needs_review: status === 'needs_review',
+  });
 }
 
 // One read (already done) + one write. Never fails the page: the caller
@@ -102,7 +111,7 @@ async function recordView(repo, table, record) {
   await writeDemoRow(repo, table.header, record.rowNumber, merged);
 }
 
-// ── POST: telemetry (public) and management (authed) ─────────────────────────
+// ── POST: telemetry (public) and recovery (authed) ───────────────────────────
 
 const PUBLIC_ACTIONS = new Set(['cta_click', 'meeting_booked']);
 const TELEMETRY_COLUMN = { cta_click: 'cta_clicked_at', meeting_booked: 'meeting_booked_at' };
@@ -127,105 +136,47 @@ async function handleTelemetry(body, res, action) {
   return res.status(200).json({ ok: true });
 }
 
-// Build (or rebuild) one probe's DEMOS row from the pipeline's own output.
-// Reads five upstream tabs; writes exactly one row. Nothing upstream is
-// modified — DEMOS is downstream of the pipeline and never feeds back into it.
+// DEBUGGING / RECOVERY ONLY — the pipeline compiles demos on its own. This is
+// the same lib/demo-compile.mjs the automatic pass runs, restricted to one
+// probe and forced, so what comes out is byte-identical to what the pipeline
+// would have written.
 async function handleBuild(body, res) {
   const probeId = text(body?.probe_id);
   if (!probeId) return res.status(400).json({ error: 'Missing probe_id' });
 
   const repo = getRepo();
+  const summary = await compileDemoForProbe(repo, probeId, {
+    compiledBy: text(body?.compiled_by) || 'manual',
+    suppliedImageUrl: text(body?.property_image_url),
+    forceImage: body?.refresh_image === true,
+    slug: text(body?.slug),
+  });
 
-  const probeRecord = await repo.findById('PROBES', 'probe_id', probeId);
-  if (!probeRecord) return res.status(404).json({ error: `No PROBES row for ${probeId}` });
-  const probe = probeRecord.obj;
-
-  const personalisationRecord = await repo.findById('PERSONALISATION', 'probe_id', probeId);
-  if (!personalisationRecord) {
-    return res.status(409).json({ error: `No PERSONALISATION row for ${probeId} — the probe has not been diagnosed and personalised yet` });
-  }
-  const personalisation = personalisationRecord.obj;
-
-  const intelligenceRecord = await repo.findById('INTELLIGENCE', 'probe_id', probeId);
-  const intelligence = intelligenceRecord?.obj || {};
-
-  const agencyId = text(probe.agency_id);
-  const agencyRecord = agencyId ? await repo.findById('AGENCIES', 'agency_id', agencyId) : null;
-  const agency = agencyRecord?.obj || {};
-
-  const findings = groupFindingsByProbe(await loadFindingsTable(repo)).get(probeId) || [];
-
-  const demosTable = await loadDemosTable(repo);
-  if (!demosTabExists(demosTable)) {
+  if (summary.demos_tab_missing) {
     return res.status(409).json({
       error: `The workbook has no DEMOS tab yet. Create a "${DEMOS_TAB}" tab whose row 1 is exactly: ${DEMOS_HEADER.join(', ')}`,
     });
   }
-  const existingRecord = findDemoByProbe(demosTable, probeId);
 
-  // The image is resolved ONCE, here. An existing one is kept unless the
-  // caller explicitly asks for a refresh, so a rebuild never re-hits the
-  // portal and never loses a good image to a now-blocked request.
-  let propertyImageUrl = text(existingRecord?.obj.property_image_url);
-  const refreshImage = body?.refresh_image === true;
-  if (text(body?.property_image_url)) {
-    propertyImageUrl = text(body.property_image_url);           // hand-supplied wins
-  } else if (!propertyImageUrl || refreshImage) {
-    // Serverless path only — never Playwright. A blank result is expected on
-    // Rightmove and must not fail the build (see lib/property-image.mjs).
-    const resolved = await resolvePropertyImageUrl(probe.property_url, { allowBrowser: false })
-      .catch(() => '');
-    propertyImageUrl = resolved || propertyImageUrl;
-  }
-
-  const status = body?.publish === true ? 'published' : (text(existingRecord?.obj.demo_status) || 'draft');
-
-  let built;
-  try {
-    built = buildDemoRow({
-      probe, agency, intelligence, findings, personalisation,
-      propertyImageUrl,
-      existing: existingRecord?.obj || null,
-      status,
-    });
-  } catch (err) {
-    if (err?.code === 'unsupported_hero_journey') {
-      return res.status(422).json({ error: err.message, hero_journey: err.hero_journey });
+  const problem = summary.problems[0];
+  if (!summary.result) {
+    if (problem?.hero_journey) {
+      return res.status(422).json({ error: problem.error, hero_journey: problem.hero_journey });
     }
-    throw err;
+    if (problem) return res.status(500).json({ error: problem.error });
+    // No row, no problem reported: the probe exists but has no finalised
+    // PERSONALISATION row, so there is no story to compile a demo from yet.
+    return res.status(409).json({
+      error: `No finalised PERSONALISATION row for ${probeId} — a demo is compiled automatically once the probe is diagnosed and personalised`,
+    });
   }
 
-  const slug = text(body?.slug) || text(existingRecord?.obj.demo_slug) || buildDemoSlug({
-    agencyName: agency.agency_name,
-    probeReference: probe.probe_reference,
-    probeId,
-  }, slugOwners(demosTable));
-  built.row.demo_slug = slug;
-  if (status === 'published' && !text(built.row.published_at)) built.row.published_at = nowIso();
-
-  if (existingRecord) {
-    await writeDemoRow(repo, demosTable.header, existingRecord.rowNumber, built.row);
-  } else {
-    await repo.appendRecord(DEMOS_TAB, built.row);
-  }
-
-  return res.status(200).json({
-    ok: true,
-    created: !existingRecord,
-    demo_slug: slug,
-    demo_status: built.row.demo_status,
-    demo_url: `/demo/${slug}`,
-    // Echoed so a caller that CAN run a real browser (scripts/novus-demo.mjs)
-    // knows which listing to re-extract from when the cheap fetch came back
-    // blank — without needing its own read access to PROBES.
-    property_url: built.row.property_url,
-    property_image_url: built.row.property_image_url,
-    hero_journey: built.row.hero_journey,
-    warnings: built.warnings,
-  });
+  return res.status(200).json({ ok: true, created: summary.demos_created > 0, ...summary.result });
 }
 
-async function handlePublish(body, res, publish) {
+// Retire a demo link, or bring it back. `archived` is sticky across
+// recompiles — see lib/demos.mjs — so this is the only way in or out of it.
+async function handleArchive(body, res, archive) {
   const slug = text(body?.slug);
   const probeId = text(body?.probe_id);
   if (!slug && !probeId) return res.status(400).json({ error: 'Missing slug or probe_id' });
@@ -237,10 +188,13 @@ async function handlePublish(body, res, publish) {
   const record = slug ? findDemoBySlug(table, slug) : findDemoByProbe(table, probeId);
   if (!record) return res.status(404).json({ error: 'No demo found' });
 
+  // Restoring re-derives the status from the reasons already on the row,
+  // rather than assuming `ready` — a demo archived while incomplete comes back
+  // as needs_review, which is what it is.
+  const restored = text(record.obj.review_reasons) ? 'needs_review' : 'ready';
   const merged = {
     ...record.obj,
-    demo_status: publish ? 'published' : 'draft',
-    published_at: publish ? (text(record.obj.published_at) || nowIso()) : record.obj.published_at,
+    demo_status: archive ? 'archived' : restored,
     updated_at: nowIso(),
   };
   await writeDemoRow(repo, table.header, record.rowNumber, merged);
@@ -264,8 +218,8 @@ export default async function handler(req, res) {
       // credential as the rest of NOVUS.
       if (!requireAuth(req, res)) return undefined;
       if (action === 'build') return await handleBuild(body, res);
-      if (action === 'publish') return await handlePublish(body, res, true);
-      if (action === 'unpublish') return await handlePublish(body, res, false);
+      if (action === 'archive') return await handleArchive(body, res, true);
+      if (action === 'restore') return await handleArchive(body, res, false);
       return res.status(400).json({ error: `Unknown action "${action}"` });
     }
 

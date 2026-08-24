@@ -54,7 +54,7 @@
   .brand img{ height:17px; width:auto; filter:brightness(0) invert(1); opacity:.9; }
   .brand-word{ font-size:.78rem; font-weight:800; letter-spacing:.03em; color:#fff; }
   .chrome-agency{ font-size:.62rem; font-weight:600; letter-spacing:.04em; color:rgba(255,255,255,.42); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:38vw; text-align:right; }
-  .draft-flag{ font-size:.55rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#FDE68A; background:rgba(245,158,11,.18); border:1px solid rgba(245,158,11,.45); padding:2px 8px; border-radius:100px; margin-left:8px; }
+  .review-flag{ font-size:.55rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#FDE68A; background:rgba(245,158,11,.18); border:1px solid rgba(245,158,11,.45); padding:2px 8px; border-radius:100px; margin-left:8px; }
 
   /* ── JOURNEY RAIL — subtle, viewport-centred ── */
   .journey{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; align-items:center; }
@@ -142,7 +142,12 @@
 
   .verdict{ font-family:var(--serif); font-size:clamp(.96rem,1.9vw,1.14rem); font-weight:600; line-height:1.38; color:#fff; }
   .verdict .bad{ color:#FCA5A5; }
+  /* PERSONALISATION's own sentence about what was not handled — the most
+     specific line in the whole demo, so it sits directly under the reveal. */
+  .main-finding{ font-size:.8rem; line-height:1.55; color:rgba(255,255,255,.82); max-width:490px; }
+  .main-finding::before{ content:'What stood out: '; color:rgba(255,255,255,.4); font-weight:700; }
   .consequence{ font-size:.78rem; line-height:1.55; color:rgba(255,255,255,.7); max-width:490px; }
+  .consequence::before{ content:'That meant: '; color:rgba(255,255,255,.4); font-weight:700; }
   .consequence b{ color:#fff; font-weight:700; }
 
   .branches{ display:flex; gap:14px; width:100%; max-width:430px; }
@@ -292,7 +297,7 @@
   <div class="chrome">
     <div class="brand"><img src="/novus-icon.png" alt="" /><span class="brand-word">NOVUS</span></div>
     <nav class="journey" id="journey"></nav>
-    <div class="chrome-agency"><span id="chrome-agency-name"></span><span class="draft-flag hidden" id="draft-flag">Draft</span></div>
+    <div class="chrome-agency"><span id="chrome-agency-name"></span><span class="review-flag hidden" id="review-flag" title="This demo is flagged for review — see review_reasons on its DEMOS row">Needs review</span></div>
   </div>
 
   <div class="stage hidden" id="stage">
@@ -368,6 +373,7 @@
         </div>
 
         <p class="verdict" id="demo-reveal"></p>
+        <p class="main-finding hidden" id="main-finding"></p>
         <p class="consequence hidden" id="commercial-consequence"></p>
 
         <button class="stepper-btn" onclick="nextScene()">What NOVUS would have done <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
@@ -738,13 +744,13 @@
     }
   }
 
-  function render(demo, isDraft) {
+  function render(demo, needsReview) {
     demoSlug = txt(demo.demo_slug) || demoSlug;
 
     const agency = txt(demo.agency_name);
     document.title = agency ? 'NOVUS — ' + agency : 'NOVUS';
     setField('chrome-agency-name', agency);
-    show('draft-flag', !!isDraft);
+    show('review-flag', !!needsReview);
 
     // BEAT 1
     setField('b1-eyebrow', agency ? agency + ' · one real enquiry' : 'One real enquiry', { hideWhenEmpty: false });
@@ -765,6 +771,7 @@
     const hasPositive = setField('positive-observation', demo.positive_observation);
     show('positive-block', hasPositive);
     setField('demo-reveal', demo.demo_reveal);
+    setField('main-finding', demo.main_finding);
     setField('commercial-consequence', demo.commercial_consequence);
     // The buyer/seller fork only tells the truth when the enquiry actually
     // declared a property to sell. On every other journey it is removed.
@@ -836,7 +843,7 @@
         fail((data && data.error) || 'We could not load this demo.');
         return;
       }
-      render(data.demo, !!data.draft);
+      render(data.demo, !!data.needs_review);
     } catch (err) {
       fail('We could not reach the demo service. Please try again in a moment.');
     }
