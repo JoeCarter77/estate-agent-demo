@@ -512,12 +512,15 @@ async function run() {
   // ── An answer that never satisfies the contract is bounded, and honest ──
   {
     const { row, calls } = await personaliseWithCaller('weak', () => ({ ...STORIES.weak, commercial_consequence: '' }));
-    assert.strictEqual(calls, 3, 'the repair pass is bounded — it does not loop forever on a model that will not fill the field');
+    // 3 full-story attempts + 1 consequence-only repair (this caller answers
+    // that one with the same empty field, so nothing is rescued and the row is
+    // still stored unsendable).
+    assert.strictEqual(calls, 4, 'the repair pass is bounded — it does not loop forever on a model that will not fill the field');
     assert.strictEqual(row.commercial_consequence, '', 'nothing is invented to fill the gap');
     assert.strictEqual(row.email_body, '', 'so the row stays unsendable and a human gets to look at it');
     assert.ok(row.primary_narrative && row.main_finding && row.fair_observation,
       'and the rest of the story is still stored, rather than the whole analysis being thrown away');
-    ok('a probe the model never completes is asked at most three times, then stored unsendable with its full story — never invented, never looped on');
+    ok('a probe the model never completes is asked at most three times, plus one consequence-only repair, then stored unsendable with its full story — never invented, never looped on');
   }
 
   // ── The repair pass names what was wrong, not just that something was ──

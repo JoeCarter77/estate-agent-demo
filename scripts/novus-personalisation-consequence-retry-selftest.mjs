@@ -70,12 +70,14 @@ function answer(overrides = {}) {
 // resultForAttempt(n, prompt) returns the tool-call answer for attempt n.
 async function personalise(resultForAttempt, { findings = FINDINGS } = {}) {
   const prompts = [];
-  __setAiCallerForTests(async ({ prompt }) => {
+  const tools = [];
+  __setAiCallerForTests(async ({ prompt, tool }) => {
     prompts.push(prompt);
-    return resultForAttempt(prompts.length, prompt);
+    tools.push(tool);
+    return resultForAttempt(prompts.length, prompt, tool);
   });
   const row = await personaliseProbe(PROBE, INTEL, DIAG, findings, {});
-  return { row, calls: prompts.length, prompts };
+  return { row, calls: prompts.length, prompts, tools };
 }
 
 async function run() {
@@ -114,7 +116,8 @@ async function run() {
   // ── 3. PERSISTENT BLANK -> UNSENDABLE, BOUNDED AT THE RETRY LIMIT ─────────
   {
     const { row, calls } = await personalise(() => answer({ commercial_consequence: '' }));
-    assert.strictEqual(calls, _internal.MAX_PERSONALISATION_ATTEMPTS, 'a consequence that never resolves is retried up to the bound, then stops');
+    assert.strictEqual(calls, _internal.MAX_PERSONALISATION_ATTEMPTS + 1,
+      'a consequence that never resolves costs the full-story bound plus exactly one dedicated consequence call, then stops');
     assert.strictEqual(row.commercial_consequence, '', 'commercial_consequence is stored blank — never invented to force a sendable row');
     assert.strictEqual(row.email_body, '', 'and the email is left unsendable — the signal that a human needs to look at this probe');
     assert.strictEqual(row.main_finding_index, 1, 'the rest of the row, including the selection, is still stored so a human has something to look at');
@@ -126,7 +129,8 @@ async function run() {
   {
     const finding = answer().main_finding;
     const { row, calls } = await personalise(() => answer({ commercial_consequence: finding.replace(/^that\s+/i, '') }));
-    assert.strictEqual(calls, _internal.MAX_PERSONALISATION_ATTEMPTS, 'a mechanical repeat of the finding is rejected on every attempt, same as blank');
+    assert.strictEqual(calls, _internal.MAX_PERSONALISATION_ATTEMPTS + 1,
+      'a mechanical repeat of the finding is rejected on every attempt, same as blank, and the dedicated repair is refused the same way');
     assert.strictEqual(row.commercial_consequence, '', 'and never stored — restating the finding is not a consequence');
     assert.strictEqual(row.email_body, '', 'so the row stays unsendable rather than shipping a "That meant" that just repeats "What stood out"');
     ok('3b. MECHANICAL REPEAT OF THE FINDING — refused exactly like blank, bounded at the retry limit, left unsendable');
@@ -145,7 +149,8 @@ async function run() {
       return answer({ wider_finding_index: 1 });
     });
 
-    assert.strictEqual(calls, _internal.MAX_PERSONALISATION_ATTEMPTS, 'still bounded at 3 — the fix does not add extra attempts');
+    assert.strictEqual(calls, _internal.MAX_PERSONALISATION_ATTEMPTS,
+      'still bounded at 3 — the tie-break fix adds no attempts, and the dedicated repair never runs because the consequence is already there');
     assert.strictEqual(row.main_finding_index, 1, 'main_finding_index is populated, exactly as reported');
     assert.notStrictEqual(row.commercial_consequence, '', 'and commercial_consequence is NOT left blank — the fixed attempt is kept over the earlier blank one');
     assert.strictEqual(row.commercial_consequence, answer().commercial_consequence, 'it is exactly the consequence the model produced once it got it right');
@@ -214,6 +219,100 @@ async function run() {
     assert.ok(!r7.email_body.includes(THAT_ALSO_MEANT_PREFIX), '0007: and the wider paragraph never appears at all');
 
     ok('5. 0005/0006/0007 — each produces a valid "That meant..." beat, and 0007\'s seller-duplication guard is intact through the fixed retry path');
+  }
+
+
+  // ── 6. THE ROOT CAUSE: A CONSEQUENCE OUR OWN GATES DELETED IS NOT "BLANK" ──
+  //
+  // commercial_consequence is sanitised BEFORE it is validated: a figure that
+  // is not this probe's own property price takes the whole sentence with it
+  // (stripUnbackedCurrency), so does one that turns the enquiry into money the
+  // agency lost (stripInventedLoss), and so does our own analytical vocabulary
+  // (readsAsInternalReasoning). The consequence is usually ONE sentence and
+  // the brief itself pushes the property price into it, so all three delete
+  // the entire field — and every one of them used to be reported back to the
+  // model as "commercial_consequence came back EMPTY". The model had written a
+  // good sentence, was told it had written nothing, wrote the same kind of
+  // sentence again, and lost it again: three attempts, then a stored row with
+  // main_finding populated and a blank consequence beside it. That is the
+  // 0005/0006/0007 shape, and no tie-break between attempts can reach it,
+  // because EVERY attempt loses the field to the same deterministic filter.
+  {
+    const cases = [
+      ['a figure that is not this probe\'s price', 'you had a £400,000+ enquiry in front of you and nobody established my timescale.', 'monetary figure that is not this probe', 'currency_stripped'],
+      ['money the agency lost', 'a fee-earning conversation with me never happened at all.', 'turned the enquiry into money the agency lost', 'invented_loss'],
+      ['our own analytical vocabulary', 'nobody looked for evidence of whether I could actually proceed.', 'used our own analytical vocabulary', 'internal_reasoning'],
+    ];
+    for (const [label, written, expectedNote, reason] of cases) {
+      const { row, calls, prompts } = await personalise((n) =>
+        (n === 1 ? answer({ commercial_consequence: written }) : answer()));
+
+      assert.strictEqual(_internal.classifyConsequenceLoss(written, PROBE.property_price), reason,
+        `${label}: classified as what actually happened to the sentence`);
+      assert.strictEqual(calls, 2, `${label}: rejected once, repaired once`);
+      assert.ok(prompts[1].includes(expectedNote),
+        `${label}: the repair note says what actually happened to the sentence`);
+      assert.ok(!prompts[1].includes('commercial_consequence came back EMPTY'),
+        `${label}: and never claims the model wrote nothing when it did`);
+      assert.strictEqual(row.commercial_consequence, answer().commercial_consequence, `${label}: the repaired consequence is stored`);
+      ok(`6. SANITISED-AWAY CONSEQUENCE (${label}) — reported as what it was, not as "came back EMPTY", so the model has something it can actually change`);
+    }
+  }
+
+  // ── 7. THE DEDICATED CONSEQUENCE REPAIR (the 0005/0006/0007 live shape) ───
+  //
+  // The model keeps writing the same price-bearing sentence on every
+  // full-story attempt, so the field is deleted every time and the row would
+  // be stored unsendable. Once that ONE field is all that is outstanding, it
+  // is asked for on its own — one small structured call, one field — rather
+  // than as a fourth full story.
+  {
+    const priced = 'you had a £430,000 buyer enquiry in front of you without establishing whether I was ready to move.';
+    const repaired = 'nobody ever established whether I was in a position to proceed, or what the next step with me should have been.';
+
+    const { row, calls, prompts, tools } = await personalise((n, prompt, tool) => {
+      if (tool.name === 'record_commercial_consequence') return { commercial_consequence: repaired };
+      return answer({ commercial_consequence: priced });
+    });
+
+    assert.strictEqual(calls, _internal.MAX_PERSONALISATION_ATTEMPTS + 1, 'exactly one dedicated call, after the full-story attempts are spent');
+    assert.strictEqual(tools[3].name, _internal.CONSEQUENCE_TOOL.name, 'the last call asks for the ONE field, not the whole story again');
+    assert.deepStrictEqual(tools[3].input_schema.required, ['commercial_consequence'], 'and its schema has exactly one required field');
+    assert.ok(prompts[3].includes('THE FINDING THIS RESTS ON'), 'the dedicated call is grounded in the selected finding');
+    assert.ok(prompts[3].includes(FINDINGS[0].finding), 'specifically the finding at main_finding_index, with its evidence');
+    assert.ok(!prompts[3].includes('=== EMAIL VARIANT'), 'and it is not the full-story prompt again');
+
+    assert.strictEqual(row.commercial_consequence, repaired, 'the repaired consequence is stored');
+    assert.strictEqual(row.main_finding_index, 1, 'the selection the full-story attempts settled is untouched');
+    assert.strictEqual(row.main_finding, answer().main_finding, 'and so is every other beat');
+    assert.ok(row.email_body.includes(THAT_MEANT_PREFIX + repaired), 'the email is re-assembled and now carries a complete "That meant..." beat');
+    assert.ok(!/[£$€]/.test(row.commercial_consequence), 'and carries no monetary figure at all');
+    ok('7. DEDICATED CONSEQUENCE REPAIR — a probe whose consequence never survives the full-story attempts is rescued by ONE small structured call for that field alone, and the email assembles');
+  }
+
+  // ── ...and the dedicated answer is held to the SAME gates ─────────────────
+  {
+    const { row, calls } = await personalise((n, prompt, tool) => {
+      if (tool.name === 'record_commercial_consequence') {
+        // A restatement of the main finding — refused here exactly as it is
+        // refused in the full-story path.
+        return { commercial_consequence: answer().main_finding.replace(/^that\s+/i, '') };
+      }
+      return answer({ commercial_consequence: '' });
+    });
+    assert.strictEqual(calls, _internal.MAX_PERSONALISATION_ATTEMPTS + 1, 'still exactly one dedicated call — never a second');
+    assert.strictEqual(row.commercial_consequence, '', 'a restating repair is refused, not stored');
+    assert.strictEqual(row.email_body, '', 'so the row stays honestly unsendable');
+    ok('7b. THE DEDICATED ANSWER IS VALIDATED — a repair that restates the finding, or comes back empty, is refused exactly like a full-story one');
+  }
+
+  // ── 8. THE EXTRA CALL IS ONLY SPENT WHERE IT CAN MAKE THE ROW SENDABLE ────
+  {
+    const { row, calls } = await personalise(() => answer({ commercial_consequence: '', fair_observation: '' }));
+    assert.strictEqual(calls, _internal.MAX_PERSONALISATION_ATTEMPTS,
+      'a row that is ALSO missing its fair observation is not saved by a consequence, so no dedicated call is made');
+    assert.strictEqual(row.email_body, '', 'and it is stored unsendable, exactly as before');
+    ok('8. NO WASTED CALL — the dedicated repair runs only when commercial_consequence is the one thing standing between the row and a sendable email');
   }
 
   console.log(`\n${passed} checks passed.`);

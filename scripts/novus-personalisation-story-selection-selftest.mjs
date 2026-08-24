@@ -400,9 +400,13 @@ async function run() {
 
     // ...and a probe that never satisfies it is BOUNDED.
     const { calls } = await personalise({ result: story({ commercial_consequence: '' }) });
-    assert.strictEqual(calls, _internal.MAX_PERSONALISATION_ATTEMPTS, 'a probe that never satisfies the contract is bounded at the retry limit');
+    // Three full-story attempts, then AT MOST one dedicated call for
+    // commercial_consequence alone (lib/probe-personalisation.mjs) — spent
+    // only when that one field is all that stands between this row and a
+    // sendable email, which is exactly this case.
+    assert.strictEqual(calls, _internal.MAX_PERSONALISATION_ATTEMPTS + 1, 'a probe that never satisfies the contract is bounded at the retry limit plus one dedicated consequence call');
     assert.strictEqual(_internal.MAX_PERSONALISATION_ATTEMPTS, 3, 'which is 3, unchanged by this refactor');
-    ok(`the AI cost is unchanged per probe — one call for a good answer, hard-bounded at ${_internal.MAX_PERSONALISATION_ATTEMPTS} for one that never satisfies the contract`);
+    ok(`the AI cost is unchanged per probe — one call for a good answer, hard-bounded at ${_internal.MAX_PERSONALISATION_ATTEMPTS} full-story attempts plus one consequence-only repair for one that never satisfies the contract`);
   }
 
   console.log(`\n${passed} checks passed.`);
