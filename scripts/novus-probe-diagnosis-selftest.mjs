@@ -7,7 +7,9 @@
 // this suite proves the guarantees the schema requires around it:
 //   - a finding is never written without its own evidence, and vice versa
 //   - findings may legitimately be an empty array
-//   - more than MAX_FINDINGS items returned by the model are truncated
+//   - a probe is capped at FOUR findings in total — at most three
+//     problem/opportunity findings plus at most one positive — and the model
+//     over-returning on either array cannot get a fifth row written
 //   - the grade is passed as context only — two calls with the SAME grade
 //     but DIFFERENT evidence produce different diagnoses, because the
 //     module never looks the grade up in a template
@@ -15,7 +17,7 @@
 // Run: npm run novus:probe-diagnosis-selftest
 
 import assert from 'node:assert';
-import { diagnoseProbe, parseDiagnosisFindings } from '../lib/probe-diagnosis.mjs';
+import { diagnoseProbe, parseDiagnosisFindings, _internal } from '../lib/probe-diagnosis.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 
 let passed = 0;
@@ -85,18 +87,92 @@ async function run() {
     ok('a probe the evidence shows was handled well can legitimately produce an empty findings array');
   }
 
-  // ── More than MAX_FINDINGS returned by the model is truncated, not rejected ──
+  // ── FOUR PER PROBE, BY ROLE ───────────────────────────────────────────────
+  //
+  // Personalisation writes three beats (a fair observation from a positive,
+  // the main story, and an optional wider beat), so a probe carrying six
+  // findings was not telling the agency six things — it was handing the
+  // selection step near-duplicates to tell apart. The budget is now one
+  // positive + up to three problem/opportunity findings, and the caps are
+  // enforced in code as well as in the schema.
   {
     __setAiCallerForTests(async () => ({
-      findings: [1, 2, 3, 4, 5].map((n) => ({ finding: `Finding ${n}`, evidence: `Evidence ${n}`, significance_note: `Significance ${n}` })),
+      findings: [1, 2, 3, 4, 5, 6].map((n) => ({ finding_type: 'problem', finding: `Finding ${n}`, evidence: `Evidence ${n}`, significance_note: `Significance ${n}` })),
+      positive_findings: [1, 2].map((n) => ({ finding: `Positive ${n}`, evidence: `Positive evidence ${n}`, significance_note: `Positive significance ${n}` })),
       strengths: '', missed_opportunities: '', commercial_implication: 'Specific to this agency and probe.',
       novus_opportunity: 'Core (front desk)', diagnosis_summary: 'Multiple genuine findings.',
     }));
     const result = await diagnoseProbe(baseIntelligence(), PROBE);
     const findings = parseDiagnosisFindings(result);
-    assert.strictEqual(findings.length, 4, 'a 5th finding is dropped even if the model over-returns');
-    assert.strictEqual(findings[3].finding, 'Finding 4', 'the first 4, in order, are kept');
-    ok('findings are capped at 4, defensively, even if the schema is somehow exceeded');
+
+    assert.strictEqual(findings.length, 4, 'a probe with six problems and two positives on offer is capped at four findings in total');
+    assert.deepStrictEqual(findings.map((f) => f.finding), ['Finding 1', 'Finding 2', 'Finding 3', 'Positive 1'],
+      'the three strongest problem/opportunity findings, in the order the model ranked them, plus the single strongest positive');
+    assert.deepStrictEqual(findings.map((f) => f.finding_type), ['problem', 'problem', 'problem', 'positive'],
+      'ordering is unchanged: index 1 is still the strongest/main finding, positives still come last');
+    ok('4-FINDING CAP — six problems and two positives on offer come back as three problem findings plus one positive, strongest first');
+  }
+
+  // ── ...and the cap keeps the model's own priority order, so an overlapping
+  //    lower-ranked restatement is what gets dropped, not the strong finding ──
+  {
+    __setAiCallerForTests(async () => ({
+      findings: [
+        { finding_type: 'problem', finding: 'The conversation never established my position — no budget, funding or timescale question was asked.', evidence: 'No qualification question appears in either message.', significance_note: 'The enquiry was never qualified.' },
+        { finding_type: 'opportunity', finding: 'A property of my own to sell was declared and no valuation was ever offered.', evidence: 'The enquiry declared a property to sell; no valuation appears in any reply.', significance_note: 'A seller instruction was left on the table.' },
+        // Two lower-ranked restatements of the first finding, worded
+        // differently — the shape the cap has to survive.
+        { finding_type: 'problem', finding: 'My timescale was never asked about.', evidence: 'No timescale question appears.', significance_note: 'Same qualification gap.' },
+        { finding_type: 'problem', finding: 'Nobody asked about my budget.', evidence: 'No budget question appears.', significance_note: 'Same qualification gap.' },
+      ],
+      positive_findings: [{ finding: 'The team followed up quickly.', evidence: 'Three attempts across phone and email within one day.', significance_note: 'Shows strong persistence.' }],
+      strengths: 'Persistent follow-up.', missed_opportunities: 'The declared vendor opportunity.',
+      commercial_implication: 'A £375,000 Chevington enquiry was never qualified.',
+      novus_opportunity: 'Growth (valuation list / seller conversion)', diagnosis_summary: 'Qualification gap with a live seller opportunity behind it.',
+    }));
+    const result = await diagnoseProbe(baseIntelligence(), PROBE);
+    const findings = parseDiagnosisFindings(result);
+
+    assert.strictEqual(findings.length, 4, 'still four');
+    assert.ok(findings[0].finding.startsWith('The conversation never established my position'), 'the main story keeps index 1');
+    assert.strictEqual(findings[1].finding_type, 'opportunity', 'the evidenced seller/valuation opportunity is retained as the wider beat');
+    assert.ok(findings[1].finding.includes('no valuation was ever offered'), 'with its own evidence intact');
+    assert.strictEqual(findings.filter((f) => f.finding_type === 'positive').length, 1, 'the genuine positive is retained rather than squeezed out by problem findings');
+    assert.ok(!findings.some((f) => f.finding === 'Nobody asked about my budget.'),
+      'and the lowest-ranked restatement of the main finding is the one that falls outside the budget');
+    ok('PRIORITY OVER COMPLETENESS — the main story, the evidenced seller opportunity and the genuine positive all survive; an overlapping lower-ranked restatement is what the cap drops');
+  }
+
+  // ── The instruction the model is actually given: consolidate, don't duplicate ──
+  {
+    const { TOOL, SYSTEM_PROMPT } = _internal;
+    const storyDescription = TOOL.input_schema.properties.findings.description;
+    assert.strictEqual(TOOL.input_schema.properties.findings.maxItems, 3, 'the schema allows at most three problem/opportunity findings');
+    assert.strictEqual(TOOL.input_schema.properties.positive_findings.maxItems, 1, '...and exactly one positive');
+    assert.ok(/consolidate/i.test(storyDescription), 'the schema tells the model to consolidate two findings that are the same underlying issue');
+    assert.ok(/THE MAIN STORY/.test(storyDescription) && /WIDER COMMERCIAL OPPORTUNITY/.test(storyDescription) && /OPTIONAL SUPPORTING PROBLEM/.test(storyDescription),
+      'and states the three roles the slots exist for, rather than asking for a list of everything wrong');
+    assert.ok(/FOUR FINDINGS PER PROBE, MAXIMUM/.test(SYSTEM_PROMPT), 'the system prompt states the per-probe budget');
+    assert.ok(/Never invent a wider opportunity, a supporting problem or a positive to fill a slot/.test(SYSTEM_PROMPT),
+      'and that an empty slot is never filled by invention');
+    ok('THE BRIEF ITSELF — the schema and prompt ask for four role-shaped findings, consolidation over duplication, and nothing invented to fill a slot');
+  }
+
+  // ── Fewer than four is a complete answer ──────────────────────────────────
+  {
+    __setAiCallerForTests(async () => ({
+      findings: [
+        { finding_type: 'problem', finding: 'Nothing reached the enquiry for 17.8 hours.', evidence: 'First human contact at 17.85 hours.', significance_note: 'The enquiry went cold before anyone spoke to me.' },
+      ],
+      positive_findings: [{ finding: 'The reply, when it came, answered the question asked.', evidence: 'The email answered the availability question directly.', significance_note: 'The handling itself was competent.' }],
+      strengths: 'Competent once engaged.', missed_opportunities: '', commercial_implication: 'A £375,000 enquiry sat for 17.8 hours.',
+      novus_opportunity: 'Core (front desk)', diagnosis_summary: 'One clear gap, nothing else evidenced.',
+    }));
+    const result = await diagnoseProbe(baseIntelligence({ seller_recognition: '' }), PROBE);
+    const findings = parseDiagnosisFindings(result);
+    assert.strictEqual(findings.length, 2, 'a probe with one real problem and one real positive stores exactly those two');
+    assert.deepStrictEqual(findings.map((f) => f.finding_type), ['problem', 'positive'], 'nothing is invented to reach four');
+    ok('FEWER THAN FOUR IS COMPLETE — a probe with no distinct wider opportunity and no supporting problem stores two findings, not four');
   }
 
   // ── An invalid novus_opportunity value falls back to the safe default ──

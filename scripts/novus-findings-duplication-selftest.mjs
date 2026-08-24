@@ -149,15 +149,26 @@ function findingsFor(store, probeId) {
 }
 
 // n distinct, evidence-backed findings — the shape lib/probe-diagnosis.mjs's
-// evidence gate lets through. Capped at 4 by that module, so the "8 findings"
-// case in the brief is exercised through the writer directly (case 3) as well
-// as through the full pipeline.
+// evidence gate lets through. That module caps a probe at 4 (3 story + 1
+// positive, split by splitToBudget below), so the "8 findings" case in the
+// brief is exercised through the writer directly (case 3) as well as through
+// the full pipeline.
 function stubFindings(n, tag) {
   return Array.from({ length: n }, (_, i) => ({
     finding: `${tag}: finding number ${i + 1}.`,
     evidence: `${tag}: the specific evidence behind finding ${i + 1}.`,
     significance_note: `${tag}: why finding ${i + 1} matters.`,
   }));
+}
+
+// n stub findings -> the two arrays lib/probe-diagnosis.mjs accepts, inside
+// its 3-story + 1-positive per-probe budget, so N stubs still persist as N
+// rows in Diagnosis's own order (problems/opportunities first, positive last).
+function splitToBudget(findings) {
+  return {
+    findings: findings.slice(0, 3),
+    positive_findings: findings.slice(3, 4).map(({ finding, evidence, significance_note }) => ({ finding, evidence, significance_note })),
+  };
 }
 
 function seedProbe(store, probeId, { address }) {
@@ -194,12 +205,13 @@ function installAi(findingsByTag) {
     if (tool.name === 'record_probe_diagnosis') {
       diagnoseCalls += 1;
       const tag = Object.keys(findingsByTag).find((t) => prompt.includes(t)) || Object.keys(findingsByTag)[0];
+      // Diagnosis's per-probe budget is 3 problem/opportunity findings plus 1
+      // positive (lib/probe-diagnosis.mjs), so a stub of N findings is SPLIT
+      // on that boundary rather than handed over as N problems. This suite
+      // counts ROWS, and a stub that overflowed the story cap would quietly
+      // lose one before it ever reached the tab.
       return {
-        findings: findingsByTag[tag],
-        // This suite is about ROW duplication, not story quality — one
-        // positive keeps the shape realistic without changing the counts it
-        // measures (findingsByTag lengths are asserted separately).
-        positive_findings: [],
+        ...splitToBudget(findingsByTag[tag]),
         strengths: 'Replied the same day.',
         missed_opportunities: 'No qualifying question asked.',
         commercial_implication: 'A viewing slot went to an unqualified buyer.',
@@ -211,7 +223,11 @@ function installAi(findingsByTag) {
       personaliseCalls += 1;
       return {
         primary_narrative: 'You replied the same day but never asked a single qualifying question.',
-        positive_finding_index: null, main_finding_index: 1, wider_finding_index: null,
+        // The stub diagnosis now carries a positive at index 4 (splitToBudget
+        // above), and Personalisation refuses an answer that ignores an
+        // available positive — so the stub selects it rather than burning
+        // this suite's AI-call counts on repair attempts.
+        positive_finding_index: 4, main_finding_index: 1, wider_finding_index: null,
         supporting_findings: 'There were other gaps too.',
         fair_observation: 'you did reply the same day.',
         main_finding: 'that nobody asked anything about my position before inviting me to view.',
@@ -344,7 +360,7 @@ async function run() {
     __setAiCallerForTests(async () => {
       diagnoseCalls += 1;
       return {
-        findings,
+        ...splitToBudget(findings),
         strengths: 'Replied the same day.', missed_opportunities: 'Several.',
         commercial_implication: 'Specific to this probe.',
         novus_opportunity: 'Core (front desk)', diagnosis_summary: 'Four things went wrong.',

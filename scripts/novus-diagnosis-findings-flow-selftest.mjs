@@ -226,9 +226,10 @@ const SCENARIOS = [
     // Handled well: the ONLY findings this probe has are positives, and the
     // hero journey must still read that as strong handling rather than as
     // two problems.
+    // ONE positive: the per-probe budget carries a single positive, because
+    // the email writes exactly one fair observation and never reads a second.
     positives: [
       { finding: 'The callback came inside 36 minutes.', evidence: 'First human contact 0.6 hours after the enquiry.', significance_note: 'Shows the front desk answers fast.' },
-      { finding: 'Both the viewing and the valuation were booked on the same call.', evidence: 'Viewing progression booked; valuation booked.', significance_note: 'Shows both sides of the enquiry were converted.' },
     ],
     story: {
       primary_narrative: 'This was handled about as well as an enquiry can be — the question is whether it happens every time, not just this time.',
@@ -244,7 +245,7 @@ const SCENARIOS = [
     // No findings left over, but the closing transition is locked copy that
     // runs in every email — it hands off to the breakdown rather than
     // claiming a number of other findings.
-    expect: { hero_journey: 'strong_handling_database_opportunity', findings: 2, additional_findings_hook: ADDITIONAL_FINDINGS_HOOK_LINE },
+    expect: { hero_journey: 'strong_handling_database_opportunity', findings: 1, additional_findings_hook: ADDITIONAL_FINDINGS_HOOK_LINE },
   },
   {
     key: 'missed_seller',
@@ -322,21 +323,24 @@ const SCENARIOS = [
     comms: [{ id: 'com_combine', channel: 'email', at: '2020-01-02T06:24:00.000Z', subject: 'Compound Gardens', body: 'Thanks for your interest in Compound Gardens. Let us know if you would like any further information.' }],
     findings: [
       { finding_type: 'problem', finding: 'Nothing reached the enquiry for 21.4 hours.', evidence: 'Probe 09:00 -> first human contact 06:24 the next day = 21.4 hours.', significance_note: 'Overnight enquiries are not being picked up until the following morning.' },
-      { finding_type: 'problem', finding: 'No qualifying question was asked at any point.', evidence: 'Buyer qualification recorded as none; no questions in the single reply.', significance_note: 'The agency has no idea whether this buyer can proceed.' },
-      { finding_type: 'problem', finding: 'No viewing was ever offered.', evidence: 'viewing_progression none across the single contact.', significance_note: 'The enquiry was answered without being advanced.' },
+      // "No viewing was ever offered" used to sit here as a fourth finding.
+      // It is the same underlying issue as the unqualified reply — one
+      // acknowledgement that advanced nothing — so under the 4-finding budget
+      // Diagnosis consolidates rather than returning both.
+      { finding_type: 'problem', finding: 'The reply asked nothing and offered no viewing.', evidence: 'Buyer qualification recorded as none; no questions and no viewing offer in the single reply.', significance_note: 'The enquiry was answered without being qualified or advanced.' },
       { finding_type: 'opportunity', finding: 'The declared property to sell went unmentioned in the reply.', evidence: 'Seller recognition none; no valuation mentioned anywhere in the single email.', significance_note: 'A second, larger opportunity in the same enquiry was not seen at all.' },
     ],
     strengths: 'The reply did at least name the correct property.',
     positives: [{ finding: 'The reply named the correct property.', evidence: 'The email subject and body both name Compound Gardens.', significance_note: 'Shows the enquiry was at least read.' }],
     story: {
-      // Deliberately combines three findings into one broader story and
-      // leaves the fourth as a supporting finding.
+      // Deliberately combines two findings into one broader story and leaves
+      // the third as a supporting finding.
       primary_narrative: 'The enquiry waited overnight, and the reply that eventually arrived asked nothing and offered nothing — it acknowledged the property and stopped there.',
-      // The main story is the overnight gap (1); the seller opportunity (4)
+      // The main story is the overnight gap (1); the seller opportunity (3)
       // is a genuinely different event, so it is the wider beat.
-      positive_finding_index: 5,
+      positive_finding_index: 4,
       main_finding_index: 1,
-      wider_finding_index: 4,
+      wider_finding_index: 3,
       supporting_findings: 'Nothing was asked about our position, and no viewing was ever offered.',
       // "did at least name the right property" would be a backhanded
       // compliment — the hedge guard rejects it, and the email would then be
@@ -347,7 +351,7 @@ const SCENARIOS = [
       wider_observation: "I'd also said in the enquiry that I had a property of my own to sell that wasn't yet on the market.",
       wider_consequence: 'a potential seller instruction sitting inside the same enquiry was never explored.',
     },
-    expect: { hero_journey: 'slow_response_gap', findings: 5, narrative_finding_indexes: '1,4,5' },
+    expect: { hero_journey: 'slow_response_gap', findings: 4, narrative_finding_indexes: '1,3,4' },
   },
 ];
 
@@ -476,8 +480,8 @@ async function run() {
     }
     // Nothing invented: the well-handled probe contributes no PROBLEM rows at
     // all — only the positives that record why it was well handled.
-    assert.deepStrictEqual(findingsFor(store, 'prb_good').map((r) => r.finding_type), ['positive', 'positive'],
-      'a probe with no problems writes only its positive findings');
+    assert.deepStrictEqual(findingsFor(store, 'prb_good').map((r) => r.finding_type), ['positive'],
+      'a probe with no problems writes only its positive finding');
     // ...and the silent one has no positive to invent from.
     assert.strictEqual(findingsFor(store, 'prb_none').filter((r) => r.finding_type === 'positive').length, 0,
       'a probe nobody replied to has no positive finding at all');
@@ -515,24 +519,26 @@ async function run() {
     ok('Personalisation receives exactly its own probe\'s complete findings set, with no cross-probe leakage');
   }
 
-  // ── 4. A five-finding probe SELECTS its three beats, and the beats are
-  //    three genuinely different findings — not finding #1 three times ──
+  // ── 4. A FOUR-finding probe (the per-probe budget, in full) SELECTS its
+  //    three beats, and the beats are three genuinely different findings —
+  //    not finding #1 three times ──
   {
     const p = personalisationFor(store, 'prb_combine');
-    assert.strictEqual(p.narrative_finding_indexes, '1,4,5', 'the narrative records exactly the findings the three beats rest on');
-    assert.strictEqual(String(p.positive_finding_index), '5', 'the fair observation comes from the positive finding');
+    assert.strictEqual(findingsFor(store, 'prb_combine').length, 4, 'the busiest probe in the set carries the full four-finding budget, no more');
+    assert.strictEqual(p.narrative_finding_indexes, '1,3,4', 'the narrative records exactly the findings the three beats rest on');
+    assert.strictEqual(String(p.positive_finding_index), '4', 'the fair observation comes from the positive finding');
     assert.strictEqual(String(p.main_finding_index), '1', 'the main story from the overnight gap');
-    assert.strictEqual(String(p.wider_finding_index), '4', 'and the wider beat from the seller opportunity — a different event');
+    assert.strictEqual(String(p.wider_finding_index), '3', 'and the wider beat from the seller opportunity — a different event');
     assert.notStrictEqual(p.main_finding_index, p.wider_finding_index, 'the main and wider beats are never the same finding');
     assert.ok(p.supporting_findings.includes('no viewing was ever offered'), 'the story findings left outside the selection stay supporting findings');
     assert.strictEqual(p.additional_findings_hook, ADDITIONAL_FINDINGS_HOOK_LINE, 'the email\'s additional-findings hook is exactly the fixed tease line, never AI-written analysis');
     assert.ok(!p.additional_findings_hook.includes('viewing'), 'and it never reveals what the leftover finding actually was');
-    assert.strictEqual(findingsFor(store, 'prb_combine').length, 5, 'all five findings remain available for the audit');
+    assert.strictEqual(findingsFor(store, 'prb_combine').length, 4, 'all four findings remain available for the audit');
     // The evidence recorded is the evidence of the findings selected — not a
     // quote the model produced from a transcript it never saw.
     assert.ok(p.evidence.includes('Probe 09:00 -> first human contact 06:24 the next day = 21.4 hours.'),
       'the stored evidence is the selected findings\' own evidence');
-    ok('a probe with five findings selects three distinct ones — a positive, a main story and a genuinely different wider beat — and keeps the rest as supporting findings');
+    ok('a probe at the full four-finding budget selects three distinct ones — a positive, a main story and a genuinely different wider beat — and keeps the rest as supporting findings');
   }
 
   // ── 5. Each probe shape gets its own journey, story and email variables ──

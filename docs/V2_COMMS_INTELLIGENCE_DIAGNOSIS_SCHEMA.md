@@ -116,7 +116,7 @@ Written only when `observation_status = closed`. Reads the `INTELLIGENCE` row an
 
 | # | Field | Derivation |
 |---|---|---|
-| 1 | `findings` | Every genuine, distinct, evidence-backed problem the probe reveals — **0 to 4 items**, most commercially damaging first. **Persisted to the separate `DIAGNOSIS_FINDINGS` tab, one row per finding** (§4a) — the `DIAGNOSIS` row itself carries no `findings` column. In transit between `lib/probe-diagnosis.mjs` and `lib/diagnosis-rebuild.mjs` it is a JSON array of `{ finding_type, finding, evidence, significance_note }`, with the **`positive_findings[]` the same call now returns appended after it** — problems and opportunities keep indexes 1..N so nothing already written changes meaning. **An empty array is a legal, meaningful value** — see §5. Each item's `evidence` is mandatory whenever `finding` is non-empty (same evidence-gating discipline as the old primary/secondary fields, applied per item). `significance_note` says why this specific finding matters commercially and whether the agency would likely notice it themselves — the raw material Personalisation needs to judge and rank findings, not a whole-probe sentence. |
+| 1 | `findings` | The genuine, distinct, evidence-backed problems and opportunities that earn their place — **0 to 3 items**, most commercially damaging first, plus **at most 1 `positive`** for a hard cap of **4 findings per probe** (§4a). Not a catalogue: the slots are roles — [0] the main story, [1] a genuinely distinct wider commercial opportunity where one is evidenced, [2] one optional supporting problem when it is materially different from [0]. Two candidate findings describing the same underlying issue are consolidated into the stronger one; nothing is invented to fill a slot, so 2–3 findings is a complete answer. **Persisted to the separate `DIAGNOSIS_FINDINGS` tab, one row per finding** (§4a) — the `DIAGNOSIS` row itself carries no `findings` column. In transit between `lib/probe-diagnosis.mjs` and `lib/diagnosis-rebuild.mjs` it is a JSON array of `{ finding_type, finding, evidence, significance_note }`, with the **`positive_findings[]` the same call now returns appended after it** — problems and opportunities keep indexes 1..N so nothing already written changes meaning. **An empty array is a legal, meaningful value** — see §5. Each item's `evidence` is mandatory whenever `finding` is non-empty (same evidence-gating discipline as the old primary/secondary fields, applied per item). `significance_note` says why this specific finding matters commercially and whether the agency would likely notice it themselves — the raw material Personalisation needs to judge and rank findings, not a whole-probe sentence. |
 | 2 | `strengths` | What they did well, from `INTELLIGENCE.did_well` + the numbers. May legitimately be the longest field on the row. **No longer the source the email's fair observation is drawn from** — that comes from the `positive` findings in §4a. Still written, still the prose for the row and the sales call. |
 | 3 | `missed_opportunities` | Named commercial value that was on the table and not taken — the BUYING and SELLING opportunities from §1, specifically. |
 | 4 | `commercial_implication` | What this costs *this* agency. Must contain at least one probe-specific fact — the property, a time, their own words. A sentence that would read identically for another agency is rejected. |
@@ -162,7 +162,7 @@ they are persisted here instead, one row each.
 `DIAGNOSIS.strengths` is unchanged and still written — it is the prose for the
 row and for the sales call. What changed is that it is no longer what the email
 is built from: `lib/probe-diagnosis.mjs` now also returns `positive_findings[]`
-(0–2 items), each one *one specific act* with its own evidence and its own
+(0–1 items — the single strongest one), each one *one specific act* with its own evidence and its own
 one-line significance note, in exactly the same shape as a problem —
 
 > `finding`: "The team followed up quickly."
@@ -173,7 +173,13 @@ one-line significance note, in exactly the same shape as a problem —
 an empty `positive_findings[]`, so a no-response email has no positive to
 invent from.
 
-Findings are capped at 4 problems/opportunities plus 2 positives.
+Findings are capped at **4 per probe**: at most 3 problems/opportunities plus
+at most 1 positive. The budget is shaped by what Personalisation actually uses
+— one fair observation from a `positive`, one main story, and one optional
+wider beat — so a fifth or sixth finding never reached a prospect; it only gave
+the selection step more near-duplicates to tell apart. Every slot may be empty:
+no positive is invented where none is evidenced, and no wider opportunity is
+invented where the enquiry did not carry one.
 
 Written by `lib/diagnosis-rebuild.mjs` in the **same batch write** as the
 `DIAGNOSIS` row — no extra request, no AI call, and a diagnosis can never be
