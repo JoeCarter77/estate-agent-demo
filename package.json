@@ -22,6 +22,7 @@
     "novus:probe-interpretation-selftest": "node scripts/novus-probe-interpretation-selftest.mjs",
     "novus:probe-diagnosis-selftest": "node scripts/novus-probe-diagnosis-selftest.mjs",
     "novus:probe-personalisation-selftest": "node scripts/novus-probe-personalisation-selftest.mjs",
+    "novus:personalisation-story-selection-selftest": "node scripts/novus-personalisation-story-selection-selftest.mjs",
     "novus:email-assembly-selftest": "node scripts/novus-email-assembly-selftest.mjs",
     "novus:email-contract-selftest": "node scripts/novus-email-contract-selftest.mjs",
     "novus:probe-id-whitespace-selftest": "node scripts/novus-probe-id-whitespace-selftest.mjs",

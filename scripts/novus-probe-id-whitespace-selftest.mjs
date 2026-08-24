@@ -53,10 +53,12 @@ const DIAGNOSIS_HEADER = [
   'strengths', 'missed_opportunities', 'commercial_implication', 'novus_opportunity',
   'diagnosis_summary', 'created_at', 'updated_at',
 ];
-const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding', 'evidence', 'significance_note'];
+const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding_type', 'finding', 'evidence', 'significance_note'];
 const PERSONALISATION_HEADER = [
   'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
-  'primary_narrative', 'narrative_finding_indexes', 'supporting_findings', 'evidence',
+  'primary_narrative', 'narrative_finding_indexes',
+  'positive_finding_index', 'main_finding_index', 'wider_finding_index',
+  'supporting_findings', 'evidence',
   'novus_counterfactual',
   'enquiry_date', 'property_address', 'email_variant',
   'fair_observation', 'main_finding', 'commercial_consequence', 'wider_observation', 'wider_consequence',
@@ -186,7 +188,8 @@ async function run() {
     if (tool.name === 'record_probe_personalisation') {
       return {
         primary_narrative: 'You replied the same day but never asked a single qualifying question.',
-        narrative_finding_indexes: [1], supporting_findings: '', evidence_quotes: [],
+        positive_finding_index: null, main_finding_index: 1, wider_finding_index: null,
+        supporting_findings: '',
         fair_observation: 'You did reply the same day.',
         main_finding: 'There is no qualifying question asked before inviting you to view.',
         commercial_consequence: 'a viewing slot went to someone nobody had checked could buy.',
