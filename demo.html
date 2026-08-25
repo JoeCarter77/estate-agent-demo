@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="robots" content="noindex, nofollow" />
-<meta name="description" content="NOVUS — what happened inside one real enquiry to your agency." />
+<meta name="description" content="NOVUS - what happened inside one real enquiry to your agency." />
 <title>NOVUS</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%2711%2016%2080%2080%27%3E%3Crect%20x%3D%2711%27%20y%3D%2716%27%20width%3D%2780%27%20height%3D%2780%27%20rx%3D%2716%27%20fill%3D%27%23172D67%27/%3E%3Cpath%20d%3D%27M29%2082%20L29%2046%20C29%2030%2050%2030%2050%2046%20L73%2082%20L73%2030%27%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%2711%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -58,7 +58,13 @@
   .brand{ display:flex; align-items:center; gap:8px; }
   .brand img{ height:17px; width:auto; filter:brightness(0) invert(1); opacity:.9; }
   .brand-word{ font-size:.78rem; font-weight:800; letter-spacing:.03em; color:#fff; }
+  .chrome-right{ display:flex; align-items:center; justify-content:flex-end; gap:10px; min-width:0; }
   .chrome-agency{ font-size:.62rem; font-weight:600; letter-spacing:.04em; color:rgba(255,255,255,.42); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:38vw; text-align:right; }
+  /* The one interactive element in the chrome — .chrome itself is
+     pointer-events:none so the bar never eats a scroll or a tap. */
+  .chrome-cta{ pointer-events:auto; flex-shrink:0; font-family:'Inter',sans-serif; font-size:.63rem; font-weight:700; letter-spacing:.01em; white-space:nowrap; color:rgba(255,255,255,.86); background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.22); border-radius:100px; padding:6px 13px; cursor:pointer; transition:background .16s ease, border-color .16s ease, color .16s ease; }
+  .chrome-cta:hover{ background:rgba(255,255,255,.16); border-color:rgba(255,255,255,.42); color:#fff; }
+  .chrome-cta:active{ transform:scale(.97); }
   .review-flag{ font-size:.55rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#FDE68A; background:rgba(245,158,11,.18); border:1px solid rgba(245,158,11,.45); padding:2px 8px; border-radius:100px; margin-left:8px; }
 
   /* ── PROGRESS — four dots, and nothing else ──
@@ -171,6 +177,10 @@
   .uda-link::after{ content:''; position:absolute; left:0; width:2px; height:7px; background:var(--cyan); box-shadow:0 0 6px rgba(125,211,252,.9); animation:uda-travel 2.2s linear infinite; }
   @keyframes uda-travel{ 0%{ transform:translateY(-8px); opacity:0; } 25%{ opacity:1; } 75%{ opacity:1; } 100%{ transform:translateY(18px); opacity:0; } }
 
+  /* The turn from one enquiry to the whole business. */
+  .scale-line{ font-size:.85rem; line-height:1.55; color:rgba(255,255,255,.72); max-width:520px; margin-top:14px; }
+  .scale-line b{ color:#fff; font-weight:700; }
+
   /* ═══ ACT 4 — THE MACHINE ACROSS THE AGENCY ═══
      Not a feature grid. An operating machine: everything the agency already
      has flowing in, one intelligence layer, a decision/action layer where
@@ -260,6 +270,7 @@
   @media (max-width:640px){
     :root{ --gutter:14px; }
     .chrome{ height:44px; }
+    .chrome-cta{ font-size:.58rem; padding:5px 10px; }
     .act{ padding:56px var(--gutter) 50px; }
     .property-price-tag{ font-size:1rem; }
     .property-visual{ aspect-ratio:16/8.4; }
@@ -289,7 +300,13 @@
 
   <div class="chrome">
     <div class="brand"><img src="/novus-icon.png" alt="" /><span class="brand-word">NOVUS</span></div>
-    <div class="chrome-agency"><span id="chrome-agency-name"></span><span class="review-flag hidden" id="review-flag" title="This demo is flagged for review — see review_reasons on its DEMOS row">Needs review</span></div>
+    <div class="chrome-right">
+      <div class="chrome-agency"><span id="chrome-agency-name"></span><span class="review-flag hidden" id="review-flag" title="This demo is flagged for review - see review_reasons on its DEMOS row">Needs review</span></div>
+      <!-- Understated, and pointed at the SAME booking flow as the closing
+           button. Hidden until the demo has actually resolved, so it can never
+           scroll to a calendar that is not on the page yet. -->
+      <button class="chrome-cta hidden" id="chrome-cta" onclick="revealCalendly()">See how NOVUS fits</button>
+    </div>
   </div>
 
   <nav class="dots hidden" id="dots" aria-label="Progress"></nav>
@@ -300,7 +317,7 @@
     <section class="act" data-act="1">
       <div class="wrap">
         <div class="eyebrow" id="b1-eyebrow">One real enquiry</div>
-        <h1 class="headline" id="b1-heading">One enquiry. Two commercial opportunities.</h1>
+        <h1 class="headline" id="b1-heading">One enquiry. More than one opportunity.</h1>
         <p class="lede" id="b1-hook"></p>
 
         <div class="property-card rv">
@@ -352,7 +369,7 @@
     <section class="act" data-act="3">
       <div class="wrap">
         <div class="eyebrow">The NOVUS difference</div>
-        <h2 class="headline">Same enquiry. Intelligence on top of it.</h2>
+        <h2 class="headline">Same enquiry. NOVUS understands and acts on the opportunity behind it.</h2>
 
         <div class="uda">
           <div class="rv" style="width:100%">
@@ -376,6 +393,11 @@
             </div>
           </div>
         </div>
+
+        <!-- The turn from one enquiry to the business. Said here, at the end of
+             the single-enquiry example, so act 4 arrives as the answer to it
+             rather than as a new topic. -->
+        <p class="scale-line rv">The value isn't this one missed opportunity. It's what happens when this runs across <b>every enquiry and every existing lead</b> in the business.</p>
       </div>
     </section>
 
@@ -416,7 +438,7 @@
             <span class="core-t1">NOVUS</span>
             <span class="core-t2">INTELLIGENCE</span>
           </div>
-          <p class="core-note">Continuously identifies commercial opportunity that is not being progressed — and understands what should happen next.</p>
+          <p class="core-note">Continuously finds commercial opportunities sitting unprogressed, decides what should happen next, and takes the appropriate action.</p>
 
           <svg class="flow-connector stem" viewBox="0 0 10 24" preserveAspectRatio="none" aria-hidden="true">
             <path class="fc-line" d="M5,0 L5,24" />
@@ -452,10 +474,10 @@
 
         <div class="cta-block rv">
           <p class="cta-headline" id="cta-headline"></p>
-          <button class="cta-btn" onclick="revealCalendly()">Book a 15-minute agency walkthrough
+          <button class="cta-btn" onclick="revealCalendly()">See how NOVUS would fit your agency
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </button>
-          <p class="cta-support">We'll map NOVUS against your current enquiry flow, team and systems and show where it could fit.</p>
+          <p class="cta-support">15 minutes. We'll map this against your actual enquiry flow and show you exactly where NOVUS would sit.</p>
           <p class="cta-phone">or call direct: <a href="tel:07455506761">07455 506761</a></p>
 
           <div class="calendly-wrap" id="calendly-wrap">
@@ -505,12 +527,20 @@
   }
   function txt(value) { return String(value == null ? '' : value).trim(); }
 
+  // HOUSE STYLE: no em or en dashes in prospect-facing copy — only the small
+  // hyphen. lib/demos.mjs applies the same rule when the row is compiled; this
+  // is the second half of it, so a row compiled by an EARLIER build (or any
+  // dash that survives in AI-authored PERSONALISATION copy) still reads
+  // correctly without waiting for a recompile. Deliberately NOT applied to
+  // txt(), which is also used for the listing URL.
+  function copy(value) { return txt(value).replace(/\s*[\u2014\u2013]\s*/g, ' - ').trim(); }
+
   // Sets text, and REMOVES the element when there is nothing to say. Blank
   // upstream data must never render as an empty heading or a stray bullet.
   function setField(id, value, { hideWhenEmpty = true } = {}) {
     const el = document.getElementById(id);
     if (!el) return false;
-    const v = txt(value);
+    const v = copy(value);
     if (!v && hideWhenEmpty) { el.classList.add('hidden'); return false; }
     el.textContent = v;
     el.classList.remove('hidden');
@@ -572,9 +602,12 @@
   // The calendar's data-url is set in the markup above, so Calendly's own
   // auto-init mounts it regardless of when its script lands.
   //
-  // KNOWN MISMATCH, DELIBERATE FOR NOW: the button says "15-minute" and the
-  // link is the existing, known-live /10min event type. Kept this way on
-  // purpose rather than pointing at a /15min slug nobody has created — a
+  // BOTH CTAs LAND HERE — the closing button and the compact one in the top
+  // chrome. One booking flow, one telemetry signal.
+  //
+  // KNOWN MISMATCH, DELIBERATE FOR NOW: the supporting copy says "15 minutes"
+  // and the link is the existing, known-live /10min event type. Kept this way
+  // on purpose rather than pointing at a /15min slug nobody has created - a
   // calendar that 404s costs every booking on the page. Create a 15-minute
   // event type and swap the slug here to close it.
   function revealCalendly() {
@@ -616,9 +649,9 @@
     const list = Array.isArray(items) ? items : [];
     let written = 0;
     for (const item of list) {
-      const label = txt(item && item.label);
+      const label = copy(item && item.label);
       if (!label) continue;
-      const detail = txt(item && item.detail);
+      const detail = copy(item && item.detail);
       const owner = withOwner ? txt(item && item.owner).toLowerCase() : '';
       const ownerChip = owner === 'novus'
         ? '<span class="uda-owner novus">NOVUS</span>'
@@ -657,9 +690,9 @@
     let artefacts = 0;
 
     for (const event of list) {
-      const label = txt(event && event.label);
+      const label = copy(event && event.label);
       if (!label) continue;
-      const detail = txt(event && event.detail);
+      const detail = copy(event && event.detail);
       const tone = toneOf(event);
 
       if (txt(event && event.kind) === 'metric') {
@@ -726,7 +759,7 @@
     demoSlug = txt(demo.demo_slug) || demoSlug;
 
     const agency = txt(demo.agency_name);
-    document.title = agency ? 'NOVUS — ' + agency : 'NOVUS';
+    document.title = agency ? 'NOVUS - ' + agency : 'NOVUS';
     setField('chrome-agency-name', agency);
     show('review-flag', !!needsReview);
 
@@ -738,7 +771,7 @@
     setField('b1-eyebrow', agency ? agency + ' · one real enquiry' : 'One real enquiry', { hideWhenEmpty: false });
     setField(
       'b1-heading',
-      declaredSeller ? 'One enquiry. Two commercial opportunities.' : 'One enquiry. One commercial opportunity missed.',
+      declaredSeller ? 'One enquiry. More than one opportunity.' : 'One enquiry. One commercial opportunity missed.',
       { hideWhenEmpty: false },
     );
     setField('b1-hook', demo.demo_hook);
@@ -793,6 +826,7 @@
     document.getElementById('boot').classList.add('hide');
     document.getElementById('stage').classList.remove('hidden');
     document.getElementById('dots').classList.remove('hidden');
+    show('chrome-cta', true);
     startObservers();
   }
 
