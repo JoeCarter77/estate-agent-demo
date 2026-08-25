@@ -369,7 +369,7 @@
     <section class="act" data-act="3">
       <div class="wrap">
         <div class="eyebrow">The NOVUS difference</div>
-        <h2 class="headline">Same enquiry. NOVUS understands and acts on the opportunity behind it.</h2>
+        <h2 class="headline" id="novus-transition">Same enquiry. NOVUS understands and acts on the opportunity behind it.</h2>
 
         <div class="uda">
           <div class="rv" style="width:100%">
@@ -397,7 +397,7 @@
         <!-- The turn from one enquiry to the business. Said here, at the end of
              the single-enquiry example, so act 4 arrives as the answer to it
              rather than as a new topic. -->
-        <p class="scale-line rv">The value isn't this one missed opportunity. It's what happens when this runs across <b>every enquiry and every existing lead</b> in the business.</p>
+        <p class="scale-line rv" id="scale-line">The value isn't this one missed opportunity. It's what happens when this runs across <b>every enquiry and every existing lead</b> in the business.</p>
       </div>
     </section>
 
@@ -769,9 +769,14 @@
     // property to sell.
     const declaredSeller = txt(demo.seller_declared) === 'yes';
     setField('b1-eyebrow', agency ? agency + ' · one real enquiry' : 'One real enquiry', { hideWhenEmpty: false });
+    // The journey's own headline wins where it wrote one. A journey that
+    // leaves demo_headline blank is saying "the shell's default is already
+    // right", and the default is derived from the row's own seller_declared —
+    // never from hero_journey, which this file still knows nothing about.
     setField(
       'b1-heading',
-      declaredSeller ? 'One enquiry. More than one opportunity.' : 'One enquiry. One commercial opportunity missed.',
+      txt(demo.demo_headline)
+        || (declaredSeller ? 'One enquiry. More than one opportunity.' : 'One enquiry. One commercial opportunity missed.'),
       { hideWhenEmpty: false },
     );
     setField('b1-hook', demo.demo_hook);
@@ -790,7 +795,12 @@
     // The consequence is the "so what". main_finding stands in only where
     // PERSONALISATION never produced one — showing both says the same thing
     // twice, which is exactly the padding this pass removed.
-    setField('commercial-consequence', txt(demo.commercial_consequence) || demo.main_finding);
+    // demo_reveal_support is the journey's own last resort, used only where
+    // PERSONALISATION produced neither sentence for this probe.
+    setField(
+      'commercial-consequence',
+      txt(demo.commercial_consequence) || txt(demo.main_finding) || demo.demo_reveal_support,
+    );
 
     // ── ACT 3 ──
     const detected = renderList('novus-detected', demo.novus_detected);
@@ -813,6 +823,12 @@
     });
     // Renumber, so a demo whose first stage was dropped doesn't open at "2".
     [...document.querySelectorAll('.uda .uda-num')].forEach((el, i) => { el.textContent = String(i + 1); });
+
+    // ── ACT 3 headings ──
+    // Both of these have a shell default written into the markup above; a
+    // journey only replaces one when it has something more specific to say.
+    if (txt(demo.novus_transition)) setField('novus-transition', demo.novus_transition);
+    if (txt(demo.scale_line)) setField('scale-line', demo.scale_line);
 
     // ── ACT 4 ──
     setField('systemic-bridge', demo.systemic_bridge);

@@ -483,7 +483,7 @@ reworded so the offer makes sense when there was nothing to discuss.
 
 ---
 
-## 4d. `DEMOS` — 51 fields, one row per personalised demo
+## 4d. `DEMOS` — 55 fields, one row per personalised demo
 
 The last step of the pipeline:
 
@@ -545,7 +545,7 @@ it says*. Only genuinely derivable fields are left out.
 | Pipeline links | `agency_id`, `probe_id`, `probe_reference`, `personalisation_id`, `hero_journey` |
 | Beat 1 — the real event | `agency_name`, `property_address`, `property_price`, `property_url`, `property_image_url`, `property_image_status`, `portal`, `enquiry_at`, `enquiry_date`, `enquiry_time` |
 | Beat 2 — the observed facts | `seller_declared`, `human_contact`, `response_time`, `response_hours`, `contact_attempts`, `follow_ups`, `channels_used`, `viewing_progression`, `seller_recognition`, `grade` |
-| The copy the prospect reads | `demo_hook`, `positive_observation`, `demo_reveal`, `main_finding`, `commercial_consequence`, `systemic_bridge`, `cta_headline` |
+| The copy the prospect reads | `demo_headline`, `demo_hook`, `positive_observation`, `demo_reveal`, `demo_reveal_support`, `main_finding`, `commercial_consequence`, `novus_transition`, `scale_line`, `systemic_bridge`, `cta_headline` |
 | Collections (JSON, short by design) | `observed_events_json`, `novus_detected_json`, `novus_decisions_json`, `novus_actions_json` |
 | Provenance | `created_at`, `updated_at`, `compiled_at`, `compiled_by`, `ready_at` |
 | Analytics — never reset | `first_viewed_at`, `last_viewed_at`, `view_count`, `cta_clicked_at`, `meeting_booked_at` |
@@ -568,7 +568,8 @@ raised to a standalone sentence and never rewritten.
 | `observed_events_json` | the probe's matched `COMMUNICATIONS` rows, by fixed rules — see below — falling back to an `INTELLIGENCE`-only summary when none are matched |
 | `novus_detected_json` | this probe's `DIAGNOSIS_FINDINGS` plus the facts that make them real |
 | `novus_decisions_json` | leads with `PERSONALISATION.novus_counterfactual`, then the journey's product decisions |
-| `demo_hook`, `demo_reveal`, `novus_actions_json`, `systemic_bridge`, `cta_headline` | authored per journey in `lib/demo-journeys.mjs` — product copy, identical for every agency on a journey |
+| `demo_headline`, `demo_hook`, `demo_reveal`, `demo_reveal_support`, `novus_transition`, `scale_line`, `novus_actions_json`, `systemic_bridge`, `cta_headline` | authored per journey in `lib/demo-journeys.mjs` — product copy, chosen by that probe's own evidence (see "Four journeys, one shell" below) |
+| `demo_reveal_support` | the journey's own supporting sentence, used **only** where `PERSONALISATION` produced neither a `commercial_consequence` nor a `main_finding` |
 
 ### `observed_events_json` — real evidence, zero AI
 
@@ -583,32 +584,84 @@ and the message's own stored `transcript`/`body_text`/`subject`. It never
 calls `lib/ai-client.mjs` — nothing here selects, ranks, summarises or
 rewrites with a model.
 
-Selection, in fixed priority order:
+**One fixed chronology, whichever journey is running.** The blocks are always
+written in this order, and the DATA decides which of them appear:
 
-1. **First human contact** — the first real person to touch the enquiry, any
-   channel.
-2. **Voicemail** — only when a *different* touch left one (skipped when the
-   first contact already was the voicemail, so it is never shown twice).
-3. **The strongest follow-up, or its absence** — the first touch of the LAST
-   contact attempt (`lib/observation.mjs`'s own 30-minute grouping), or, when
-   there was only ever one attempt, the explicit gap: *"No follow-up after the
-   first reply"*.
+| Block | When | What it says |
+|---|---|---|
+| `Enquiry sent` | always (where the probe carries a property or a declaration) | the property, the date and time it was sent, and what the buyer declared — including whether that property was already on the market |
+| `Fast first response` / `First meaningful response` | a human touched the enquiry | the **measured delay first** (`Fast` only where `response_hours < 1` — a fact about the number, never about the journey), then the most useful sentence of that first touch, or simply *"Voicemail left."* for an unanswered call |
+| `Automated acknowledgement` | no human ever touched it, but an automated message exists | named as automated in both the label and the sentence, and always followed by the block below — it is never allowed to stand in for a response |
+| `No meaningful human response` | no human ever touched it | *"No meaningful human contact was recorded by email, phone or SMS during the four-day observation period."* — the window is the probe's own (`resolveObservationDeadline()`), degrading to generic phrasing rather than a guessed number |
+| `Buyer / viewing progression` | `viewing_progression` is set | the ordinal in prospect-facing language, so the agency is **credited** for what it genuinely did before anything is said about the vendor |
+| `What happened next` | a human touched the enquiry | the remaining genuine attempts by count and channel (`lib/observation.mjs`'s own 30-minute grouping, so it can never disagree with the metric strip), or an explicit *"No further contact attempt was made after the first response."* |
+| `Seller opportunity` | the enquiry declared a property to sell | `seller_recognition` in prospect-facing language. `asked_position` is **recognition** — *"recognised … but it never reached a valuation or any other seller-side next step"* — and is never described as ignored or missed |
 
-Where a message's own text is shown, it is a **mechanical truncation** of what
-is already stored (whitespace-collapsed, cut to 90 characters with an
-ellipsis) — never a summary, never reworded. A probe with no matched
-`COMMUNICATIONS` (thin data, or none matched yet) falls back to the old
-`INTELLIGENCE`-only summary (*"Your team responded — N minutes later"*, *"N
-contact attempts"*) so this section is never blank.
+Where a message's own text is shown, it is a **mechanical extraction** of what
+is already stored: the sentences are scored against fixed phrase lists, the
+highest-scoring one is taken and truncated to 170 characters with an ellipsis
+— never a summary, never reworded. A probe with no matched `COMMUNICATIONS`
+still gets the metric strip and the explicit absence, so the section is never
+blank.
 
 "Relevant to the stored `hero_journey`" is satisfied by the **data**, not a
-branch on it: a `complete_miss` probe has no human touches so this returns
-nothing (the fallback carries the demo); a `fast_response_stalled_follow_up`
-probe has exactly one attempt, so rule 3 is exactly the story that journey
-tells. `selectCommunicationEvidence()` stays journey-blind, same as the
-renderer and same as `lib/demo-journeys.mjs`'s own architecture.
+branch on it: a `complete_miss` probe has no human touches, so it gets the
+acknowledgement and absence blocks; a `fast_response_stalled_follow_up` probe
+has one attempt and no follow-up, so `What happened next` states exactly that.
+`selectCommunicationEvidence()` stays journey-blind, same as the renderer and
+same as `lib/demo-journeys.mjs`'s own architecture.
 
 Regression suite: Part N of `npm run novus:demo-selftest`.
+
+### Four journeys, one shell
+
+`/demo/{slug}` is the **single entry point**. The slug resolves to the agency's
+own `DEMOS` row, that row carries `hero_journey`, and `hero_journey` is what
+selected the narrative when the row was compiled. There are no per-journey
+URLs, no hand-assigned pages, and `demo.html` contains **no `hero_journey`
+branch at all** — it renders whatever the row carries.
+
+| `hero_journey` | The story |
+|---|---|
+| `weak_seller_qualification` | the buyer was worked; the declared vendor was not |
+| `slow_response_gap` | the enquiry did get human attention, but only after a commercially meaningful delay |
+| `fast_response_stalled_follow_up` | the response was genuinely fast; the opportunity stopped moving after it |
+| `complete_miss` | no meaningful human progression at all inside the observation window |
+
+Anything else `lib/probe-personalisation.mjs` can emit is **refused**
+(`journeySupport()` → `unsupported_hero_journey`), and a blank `hero_journey`
+is refused too. No row is compiled, so the link resolves to nothing rather
+than to another journey's narrative — the routing fails safe rather than
+silently showing the wrong story.
+
+**The seller finding is never buried.** `hero_journey` names the *primary*
+operational story, not the only one worth telling. Where the enquiry declared
+a property to sell and that opportunity never reached a seller-side next step,
+that finding is carried into the hero and the conclusion of whichever journey
+is running — a slow reply is a speed problem, an unworked vendor is a revenue
+one, and the second is usually the larger.
+
+**Personalisation happens inside a journey, not just between them.** Every
+clause is picked from that probe's own evidence, so two agencies on the same
+journey do not read the same:
+
+| Signal | What it changes |
+|---|---|
+| `seller_declared` | whether the hero, the conclusion and the UNDERSTANDS list mention a vendor at all |
+| `seller_recognition` | `none` → *"never acknowledged or explored"*; `asked_position` / `acknowledged` → *"recognised, but not progressed"*; `valuation_offered` / `valuation_booked` → no seller gap, and the seller story is dropped from the hero entirely |
+| `viewing_progression` | the credit line, and whether the conclusion can draw the *"the viewing was actively progressed, the potential vendor wasn't"* contrast |
+| `response_hours` | the measured delay in the hero, and whether the first-response block reads as fast. "Quickly" is only ever used where no time was established |
+| `contact_attempts` / `follow_ups` | whether the team is described as having followed up, and the real follow-up count in UNDERSTANDS |
+| `channels_used` | the channels named in `What happened next` |
+| `voicemail_present` | *"Voicemail left."* instead of a quoted excerpt |
+
+Three of the journeys also override headings the shell would otherwise write
+itself — `demo_headline` (act 1), `novus_transition` (act 3) and `scale_line`
+(act 3). **A blank value means "the shell's own default is already right"**,
+which is why `weak_seller_qualification` leaves all three empty and renders
+exactly as it did before journeys could set them.
+
+Regression suite: Part Q of `npm run novus:demo-selftest`.
 
 ### `ready` vs `needs_review`
 
@@ -619,7 +672,7 @@ triage from the sheet.
 
 | Reason | When |
 |---|---|
-| unreviewed journey | `hero_journey` is one of the three draft journeys |
+| unreviewed journey | `hero_journey` is supported but not yet in `AUTHORED_HERO_JOURNEYS`. All four current journeys are authored, so nothing produces this reason today; it is the gate a newly added journey passes through |
 | `agency_name` blank | the CTA cannot name the agency |
 | `property_address` blank | beat 1 has no property to show |
 | `commercial_consequence` blank | beat 2 has no payoff |
@@ -754,7 +807,13 @@ Two AI calls per probe, once. Roughly 30 live probes → ~60 calls to populate t
 
 1. Create a `DEMOS` tab whose row 1 is exactly `DEMOS_HEADER` from
    `lib/demos.mjs` (`node -e "import('./lib/demos.mjs').then(m=>console.log(m.DEMOS_HEADER.join('\t')))"`
-   prints a tab-separated line to paste).
+   prints a tab-separated line to paste). **An existing tab needs the same
+   check whenever `DEMO_VERSION` is bumped**: a row is written against the LIVE
+   header, so a column the sheet does not have is silently dropped rather than
+   erroring. `DEMO_VERSION 4` added `demo_headline`, `demo_reveal_support`,
+   `novus_transition` and `scale_line`; until those four columns exist, the
+   three new journeys render with the shell's default headings instead of
+   their own.
 2. Press **Rebuild Intelligence** once.
 
 That single pass backfills a demo for **every** already-personalised probe —

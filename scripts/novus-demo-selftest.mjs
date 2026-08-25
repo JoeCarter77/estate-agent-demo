@@ -32,6 +32,12 @@
 //      matched COMMUNICATIONS rows by fixed rules — never an AI call — and
 //      fall back to the old INTELLIGENCE-only summary when none are matched
 //   O. display formatting
+//   P. the listing price is never attached to the enquirer's own house
+//   Q. FOUR JOURNEYS THROUGH ONE ROUTE: the same probe told under four
+//      hero_journeys produces four different narratives, and inside each
+//      one the copy still moves with that probe's own evidence - the
+//      seller declaration, seller_recognition, viewing_progression, the
+//      measured delay and the follow-up count
 //
 // Run: npm run novus:demo-selftest
 
@@ -523,28 +529,45 @@ async function run() {
     assert.deepStrictEqual(metrics.map((m) => m.tone), ['neutral', 'good', 'good', 'gap', 'gap']);
     ok('the evidence is a compact metric strip: what happened, and the two things that did not');
 
-    // THE MINIMUM REAL PROOF — the declaration as submitted, and ONE actual
-    // message. Two more quotes proved nothing the first did not.
-    assert.strictEqual(artefacts.length, 3, `beat 2 tells the story in three beats, got ${artefacts.length}`);
+    // THE MINIMUM REAL PROOF, IN ONE FIXED CHRONOLOGY — what was sent, what
+    // came back, what it achieved on the buying side, how hard the team kept
+    // going, and what became of the declared vendor. ONE actual message: two
+    // more quotes proved nothing the first did not.
     assert.deepStrictEqual(artefacts.map((a) => a.label), [
-      'Enquiry sent about this property',
-      'First response',
-      'Other contact attempts',
+      'Enquiry sent',
+      'Fast first response',
+      'Buyer / viewing progression',
+      'What happened next',
+      'Seller opportunity',
     ]);
-    // What the buyer declared, INCLUDING that the property was pre-market.
+    // What was sent, and what the buyer declared — INCLUDING that the property
+    // was pre-market.
     assert.strictEqual(
       artefacts[0].detail,
-      'Buyer declared they also had a property to sell, and that it was not yet on the market.',
+      'Barn Field, Chevington, 17 August at 23:34.'
+      + ' Buyer declared they also had a property to sell, and that it was not yet on the market.',
     );
-    // The first touch was an unanswered call, so that is all it says.
-    assert.strictEqual(artefacts[1].detail, 'Voicemail left.');
-    // Everything after it, summarised from the real attempts and the two
-    // INTELLIGENCE ordinals — never a second and third quote.
+    // The measured lag leads. The first touch was an unanswered call, so that
+    // is all the rest of the line says.
+    assert.strictEqual(artefacts[1].detail, '23 minutes after the enquiry. Voicemail left.');
+    // CREDIT WHERE IT IS DUE: the buying side is stated as the good outcome it
+    // was, which is what makes the seller line below a contrast, not an attack.
+    assert.strictEqual(artefacts[2].detail, 'A specific viewing slot was offered.');
+    assert.strictEqual(artefacts[2].tone, 'good');
+    // Everything after the first response, summarised from the real attempts
+    // and the viewing ordinal — never a second and third quote.
     assert.strictEqual(
-      artefacts[2].detail,
-      '2 further contact attempts were made by email and phone, focused on progressing the viewing.'
-      + ' The seller position was asked about once and never taken any further.',
+      artefacts[3].detail,
+      '2 further contact attempts were made by email and phone, focused on progressing the viewing.',
     );
+    // asked_position IS recognition. It is never described as ignored or never
+    // raised — only as recognised and not progressed.
+    assert.strictEqual(
+      artefacts[4].detail,
+      'The seller opportunity was recognised and the position was asked about,'
+      + ' but it never reached a valuation or any other seller-side next step.',
+    );
+    assert.strictEqual(artefacts[4].tone, 'gap');
     assert.ok(!events.some((e) => e.label === 'Enquiry submitted'), 'the enquiry timestamp is on the property card, not repeated as a row');
     ok('beat 2 reads as a chronology: what was declared, what came back, what followed');
 
@@ -632,11 +655,10 @@ async function run() {
     assert.strictEqual(journeySupport('').supported, false);
     ok('a blank hero_journey is refused');
 
-    assert.strictEqual(journeySupport('weak_seller_qualification').warning, undefined);
-    for (const journey of ['complete_miss', 'slow_response_gap', 'fast_response_stalled_follow_up']) {
-      assert.ok(journeySupport(journey).warning.includes('draft copy'));
+    for (const journey of SUPPORTED_HERO_JOURNEYS) {
+      assert.strictEqual(journeySupport(journey).warning, undefined, `${journey} should be authored, not draft`);
     }
-    ok('only weak_seller_qualification is authored; the other three flag for review');
+    ok('all four shell journeys are authored - none of them holds a demo at needs_review on its own');
   }
   {
     // The refusal has to happen BEFORE anything is written.
@@ -688,8 +710,10 @@ async function run() {
     assert.deepStrictEqual(reviewReasonsFor(noContact), []);
     ok('a blank positive observation is fine where nobody responded (human_contact=none)');
 
-    // An unreviewed journey is a review reason on its own.
-    const draftJourney = reviewReasonsFor(complete, { journeyWarning: journeySupport('slow_response_gap').warning });
+    // An unreviewed journey is a review reason on its own. No journey the
+    // shell currently supports produces one, so the rule is exercised with the
+    // warning string a future draft journey would carry.
+    const draftJourney = reviewReasonsFor(complete, { journeyWarning: 'hero_journey "future_journey" uses draft copy' });
     assert.strictEqual(draftJourney.length, 1);
     assert.strictEqual(statusFromReasons(draftJourney), 'needs_review');
     ok('an unreviewed journey alone is enough to hold a demo at needs_review');
@@ -903,17 +927,21 @@ async function run() {
     ok('the automatic pass counts an unsupported journey and carries on');
   }
   {
-    // An unreviewed journey compiles, but is held at needs_review.
+    // An incomplete story compiles, but is held at needs_review.
     const { store, repo } = makeWorkbook();
-    seedWeakSeller(store, { heroJourney: 'slow_response_gap' });
+    seedWeakSeller(store);
+    // PERSONALISATION never produced the payoff sentence for this probe, so
+    // beat 2 has no "so what" — the demo is compiled and flagged rather than
+    // silently sent.
+    store.PERSONALISATION[1][PERSONALISATION_HEADER.indexOf('commercial_consequence')] = '';
     __setRepoForTests(repo);
     const summary = await compileDemos(repo, { justPersonalised: ['prb_demo_001'], resolveImageUrl: noImage });
     assert.strictEqual(summary.demos_compiled, 1);
     assert.strictEqual(summary.demos_needs_review, 1);
     assert.strictEqual(demoRowsOf(store)[0].demo_status, 'needs_review');
-    assert.ok(demoRowsOf(store)[0].review_reasons.includes('draft copy'));
+    assert.ok(demoRowsOf(store)[0].review_reasons.includes('commercial_consequence'));
     assert.strictEqual(demoRowsOf(store)[0].ready_at, '', 'a demo that was never ready has no ready_at');
-    ok('an unreviewed journey compiles to needs_review with the reason on the row');
+    ok('an incomplete story compiles to needs_review with the reason on the row');
 
     // A NORMAL request must not expose it — same 404 an unknown slug gets,
     // so the outside world cannot tell "not ready" from "never existed".
@@ -1027,7 +1055,10 @@ async function run() {
     // The observed events are real evidence from the seeded COMMUNICATIONS
     // row, not just AI-derived personalisation copy.
     const autoEvents = JSON.parse(demo.observed_events_json);
-    assert.ok(autoEvents.some((e) => e.label.startsWith('First response')), 'the compiled demo carries real evidence too');
+    assert.ok(
+      autoEvents.some((e) => e.label === 'First meaningful response' || e.label === 'Fast first response'),
+      'the compiled demo carries real evidence too',
+    );
 
     // And it renders — the same GET a prospect makes.
     const getRes = mockRes();
@@ -1127,8 +1158,9 @@ async function run() {
     for (const field of [
       'agency_name', 'property_address', 'property_price', 'property_url', 'property_image_url',
       'enquiry_date', 'enquiry_time', 'seller_declared', 'response_time',
-      'demo_hook', 'positive_observation', 'demo_reveal', 'main_finding',
-      'commercial_consequence', 'systemic_bridge', 'cta_headline',
+      'demo_headline', 'demo_hook', 'positive_observation',
+      'demo_reveal', 'demo_reveal_support', 'main_finding', 'commercial_consequence',
+      'novus_transition', 'scale_line', 'systemic_bridge', 'cta_headline',
     ]) {
       assert.ok(field in demo, `${field} must be on the render-ready payload`);
     }
@@ -1147,9 +1179,23 @@ async function run() {
   // ══ Part N — COMMUNICATIONS evidence, zero AI ════════════════════════════
   console.log('\nPart N — observed-events evidence, drawn from COMMUNICATIONS, zero AI');
   {
-    assert.deepStrictEqual(selectCommunicationEvidence({ communications: [] }), []);
-    assert.deepStrictEqual(selectCommunicationEvidence({}), []);
-    ok('no COMMUNICATIONS rows -> no evidence events (never a throw, never a guess)');
+    // NOBODY ANSWERED IS ITSELF EVIDENCE. The absence is stated explicitly
+    // rather than left as a hole in the page - which is what carries the
+    // complete_miss journey's beat 2.
+    const none = selectCommunicationEvidence({ communications: [], observationDays: 4 });
+    assert.strictEqual(none.length, 1);
+    assert.strictEqual(none[0].label, 'No meaningful human response');
+    assert.strictEqual(
+      none[0].detail,
+      'No meaningful human contact was recorded by email, phone or SMS during the four-day observation period.',
+    );
+    assert.strictEqual(none[0].tone, 'gap');
+    ok('no COMMUNICATIONS rows -> the absence is stated, with the real observation window');
+
+    // An unknown window degrades to the honest generic phrasing, never to a
+    // wrong number of days.
+    assert.ok(selectCommunicationEvidence({}).at(-1).detail.includes('during the observation period.'));
+    ok('an unestablished observation window degrades to generic phrasing, never a guessed one');
   }
   {
     // An auto-acknowledgement is never evidence of the team doing something —
@@ -1160,8 +1206,17 @@ async function run() {
       channel: 'email', automated_or_human: 'automated', communication_classification: 'auto_acknowledgement',
       body_text: 'Thanks for your enquiry, a member of the team will be in touch.',
     })].map((r) => Object.fromEntries(COMMUNICATIONS_HEADER.map((k, i) => [k, r[i] ?? ''])));
-    assert.deepStrictEqual(selectCommunicationEvidence({ communications: autoAckOnly }), []);
-    ok('an automated acknowledgement alone produces no evidence event');
+    const autoEvents = selectCommunicationEvidence({ communications: autoAckOnly, observationDays: 4 });
+    assert.strictEqual(autoEvents.length, 2);
+    assert.strictEqual(autoEvents[0].label, 'Automated acknowledgement');
+    // THE ONE THING THIS BLOCK MAY NEVER DO is read as though somebody
+    // replied: it is named automated in the label AND in the sentence, and is
+    // followed by the explicit absence rather than standing in for it.
+    assert.ok(autoEvents[0].detail.startsWith('An automated acknowledgement was sent by email.'));
+    assert.ok(autoEvents[0].detail.endsWith('No person followed it.'));
+    assert.strictEqual(autoEvents[0].tone, 'neutral');
+    assert.strictEqual(autoEvents[1].label, 'No meaningful human response');
+    ok('an automated acknowledgement is shown as automated, and never counted as a response');
   }
   {
     // Exactly one human touch, no follow-up: the "absence" case the brief
@@ -1174,18 +1229,33 @@ async function run() {
     }];
     const events = selectCommunicationEvidence({
       communications: oneTouch, intelligence: { seller_recognition: 'none' }, sellerDeclared: true,
+      responseTime: '5 minutes', responseHours: '0.083',
     });
     assert.strictEqual(events.length, 2);
-    assert.strictEqual(events[0].label, 'First response');
-    // THE MOST USEFUL SENTENCE, not the first few words: the greeting and the
-    // thanks are scored down, the sentence that shows what they actually did
-    // is the one shown — and it is a literal extract, never a rewrite.
+    // A MEASURED sub-hour lag is stated as fast on every journey — the label
+    // is a fact about the number, not about which journey is running.
+    assert.strictEqual(events[0].label, 'Fast first response');
+    // THE DELAY LEADS, then THE MOST USEFUL SENTENCE — not the first few
+    // words: the greeting and the thanks are scored down, the sentence that
+    // shows what they actually did is the one shown, and it is a literal
+    // extract, never a rewrite.
     // 09:05 UTC is 10:05 in Europe/London during BST (August).
-    assert.strictEqual(events[0].detail, '"Is Saturday or Sunday any good for a viewing?" (email, 10:05)');
-    assert.strictEqual(events[1].label, 'Other contact attempts');
-    assert.strictEqual(events[1].detail, 'No further contact attempts were made. The seller opportunity was still never explored.');
+    assert.strictEqual(
+      events[0].detail,
+      '5 minutes after the enquiry. "Is Saturday or Sunday any good for a viewing?" (email, 10:05)',
+    );
+    assert.strictEqual(events[1].label, 'What happened next');
+    assert.strictEqual(events[1].detail, 'No further contact attempt was made after the first response.');
     assert.strictEqual(events[1].tone, 'gap');
-    ok('a single touch yields the useful sentence of the first response and an explicit "no further attempts"');
+    ok('a single touch leads with the measured lag, then the useful sentence, then an explicit "no further attempts"');
+
+    // A lag over the hour is NOT dressed up as fast.
+    const slow = selectCommunicationEvidence({
+      communications: oneTouch, responseTime: '17.9 hours', responseHours: '17.85',
+    });
+    assert.strictEqual(slow[0].label, 'First meaningful response');
+    assert.ok(slow[0].detail.startsWith('17.9 hours after the enquiry.'));
+    ok('a lag over an hour is labelled plainly, with the delay stated first');
   }
   {
     // First contact (email) + a later voicemail + a further attempt the next
@@ -1201,13 +1271,15 @@ async function run() {
       sellerDeclared: true,
     });
     assert.strictEqual(events.length, 2, 'the story is always exactly two communication beats');
-    assert.strictEqual(events[0].label, 'First response');
+    assert.strictEqual(events[0].label, 'First meaningful response');
     assert.ok(events[0].detail.startsWith('"Happy to arrange a viewing whenever suits you."'));
     assert.strictEqual(
       events[1].detail,
-      '2 further contact attempts were made by phone and SMS, focused on progressing the viewing.'
-      + ' The seller position was acknowledged and never qualified.',
+      '2 further contact attempts were made by phone and SMS, focused on progressing the viewing.',
     );
+    // The seller finding is its own block now, never a clause bolted onto the
+    // end of the follow-up sentence.
+    assert.ok(!/seller/i.test(events[1].detail));
     ok('the remaining attempts are summarised by count, channel and what they were for');
 
     // An unanswered call as the FIRST touch is stated as exactly that —
@@ -1218,7 +1290,9 @@ async function run() {
     ];
     const events2 = selectCommunicationEvidence({ communications: firstIsVoicemail });
     assert.strictEqual(events2[0].detail, 'Voicemail left.');
-    ok('an unanswered first call reads simply as "Voicemail left."');
+    const events3 = selectCommunicationEvidence({ communications: firstIsVoicemail, responseTime: '2 hours', responseHours: '2' });
+    assert.strictEqual(events3[0].detail, '2 hours after the enquiry. Voicemail left.');
+    ok('an unanswered first call reads simply as "Voicemail left.", behind the measured lag');
   }
   {
     // A seller position that DID reach a valuation gets no gap sentence at
@@ -1234,7 +1308,7 @@ async function run() {
     });
     assert.strictEqual(events[1].detail, '1 further contact attempt was made by email, focused on progressing the viewing.');
     assert.strictEqual(events[1].tone, 'good');
-    ok('no seller-gap sentence is invented where the valuation was actually offered');
+    ok('the follow-up beat reports the attempts and nothing else');
   }
   {
     // Deterministic extraction, never a rewrite: the shown sentence is always
@@ -1283,20 +1357,64 @@ async function run() {
       responseTime: '10 minutes',
       communications: [],
     });
-    assert.ok(events.every((e) => e.kind === 'metric'));
-    assert.ok(events.some((e) => e.label === '2 contact attempts' && e.detail === 'phone and email'));
-    assert.ok(!events.some((e) => e.label.startsWith('First response')));
-    ok('with no matched COMMUNICATIONS the metric strip still stands, with no artefact behind it');
+    assert.ok(events.some((e) => e.kind === 'metric' && e.label === '2 contact attempts' && e.detail === 'phone and email'));
+    // No matched message means no quoted artefact — but the absence of a human
+    // response is still stated, because it is the finding.
+    assert.ok(!events.some((e) => String(e.label).includes('First meaningful response')));
+    assert.ok(events.some((e) => e.label === 'No meaningful human response'));
+    ok('with no matched COMMUNICATIONS the metric strip stands and the absence is named');
 
     // A probe that never declared a seller carries no seller metrics at all —
-    // "2 opportunities" and "No valuation progression" would both be untrue.
+    // "2 opportunities" and "No valuation progression" would both be untrue,
+    // and no SELLER OPPORTUNITY block is written either.
     assert.ok(!events.some((e) => e.label === '2 opportunities'));
     assert.ok(!events.some((e) => e.label === 'No valuation progression'));
+    assert.ok(!events.some((e) => e.label === 'Seller opportunity'));
 
-    // Nothing established at all: no attempts, no ordinals, no messages. The
-    // strip is empty rather than padded, and the demo is flagged for review by
-    // reviewReasonsFor() rather than shipping a page with no evidence on it.
-    assert.deepStrictEqual(buildObservedEvents({ intelligence: {}, sellerDeclared: false, communications: [] }), []);
+    // THE CHRONOLOGY, in one fixed order, whichever journey is running: what
+    // was sent, what came back, what it achieved on the buying side, how hard
+    // the team kept going, and what became of the declared vendor.
+    const full = buildObservedEvents({
+      intelligence: {
+        contact_attempts: '3', channels_used: 'voice,email', response_hours: '17.85',
+        viewing_progression: 'slot_offered', seller_recognition: 'asked_position',
+      },
+      sellerDeclared: true,
+      sellerDeclarationText: 'Declared: has a property to sell, not yet on the market',
+      responseTime: '17.9 hours',
+      propertyAddress: 'Barn Field, Chevington',
+      enquiryDate: '17 August',
+      enquiryTime: '23:34',
+      observationDays: 4,
+      communications: [
+        { communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-18T16:30:00.000Z', channel: 'email', automated_or_human: 'human', body_text: 'Thanks for your enquiry. Would Saturday suit you for a viewing?' },
+        { communication_id: 'c2', probe_id: 'p', occurred_at: '2026-08-19T09:00:00.000Z', channel: 'voice', automated_or_human: 'human', transcript: 'Just chasing the viewing.' },
+      ],
+    });
+    assert.deepStrictEqual(
+      full.filter((e) => e.kind === 'evidence').map((e) => e.label),
+      ['Enquiry sent', 'First meaningful response', 'Buyer / viewing progression', 'What happened next', 'Seller opportunity'],
+    );
+    assert.ok(full.find((e) => e.label === 'Enquiry sent').detail
+      .startsWith('Barn Field, Chevington, 17 August at 23:34.'));
+    // CREDIT WHERE IT IS DUE, THEN THE CONTRAST: the buyer side is stated as a
+    // good outcome, the recognised-but-unprogressed vendor as the gap.
+    const viewing = full.find((e) => e.label === 'Buyer / viewing progression');
+    assert.strictEqual(viewing.detail, 'A specific viewing slot was offered.');
+    assert.strictEqual(viewing.tone, 'good');
+    const seller = full.find((e) => e.label === 'Seller opportunity');
+    assert.strictEqual(seller.tone, 'gap');
+    assert.ok(/recognised/i.test(seller.detail), 'asked_position is recognition, never a miss');
+    assert.ok(!/never (raised|acknowledged)/i.test(seller.detail));
+    ok('the evidence reads as one fixed chronology, crediting the buyer side before naming the seller gap');
+
+    // Nothing established at all: no attempts, no ordinals, no messages, no
+    // property. Only the absence itself, which is honest.
+    assert.deepStrictEqual(
+      buildObservedEvents({ intelligence: {}, sellerDeclared: false, communications: [] })
+        .map((e) => e.label),
+      ['No meaningful human response'],
+    );
     ok('a metric is only shown where the underlying field genuinely established it');
   }
 
@@ -1376,6 +1494,235 @@ async function run() {
       'PERSONALISATION is never rewritten — the email is unaffected',
     );
     ok('the demo compiles money-safe copy without touching the personalisation it came from');
+  }
+
+  // ══ Part Q — the four journeys, and personalisation INSIDE each one ═══════
+  //
+  // ONE ROUTE, ONE SHELL, FOUR STORIES. /demo/{slug} resolves the agency's own
+  // row and renders whatever hero_journey selected — there is no second URL
+  // and no hand-assigned page. These checks prove two separate things:
+  //
+  //   1. the SAME probe, told under four different hero_journeys, produces
+  //      four genuinely different narratives (not one template with a word
+  //      swapped), and
+  //   2. WITHIN one journey, the copy still changes with that probe's own
+  //      evidence — the seller declaration, seller_recognition,
+  //      viewing_progression, the measured delay and the follow-up count.
+  console.log('\nPart Q — four journeys through one route, personalised inside each');
+
+  // One helper, so a case is a line of evidence rather than a fixture.
+  const journeyRow = ({
+    heroJourney, sellerDeclared = true, sellerRecognition = 'none',
+    viewingProgression = 'none', responseHours = '0.38', contactAttempts = '1',
+    followUps = '0', humanContact = 'yes', communications = [],
+  }) => buildDemoRow({
+    probe: {
+      probe_id: 'p', agency_id: 'a', probe_reference: 'RM-1',
+      property_address: 'Barn Field, Chevington', property_price: '£375,000',
+      enquiry_text: sellerDeclared ? SELLER_DECLARATION : 'Interested in viewing this property.',
+      probe_timestamp: '2026-08-17T22:34:41.000Z',
+    },
+    agency: { agency_name: 'Ensum Brown' },
+    intelligence: {
+      human_contact: humanContact, response_hours: responseHours,
+      contact_attempts: contactAttempts, follow_ups: followUps, channels_used: 'email',
+      viewing_progression: viewingProgression,
+      seller_recognition: sellerDeclared ? sellerRecognition : '',
+    },
+    findings: [],
+    personalisation: {
+      hero_journey: heroJourney,
+      primary_narrative: 'x',
+      commercial_consequence: 'the opportunity never reached a next step.',
+      fair_observation: humanContact === 'yes' ? 'you did reply.' : '',
+    },
+    communications,
+    demoSlug: 'ensum-brown-rm-1',
+  }).row;
+
+  {
+    // ── 1. FOUR DISTINCT STORIES FROM ONE ROUTE ──
+    const shared = { sellerDeclared: true, sellerRecognition: 'none', viewingProgression: 'none' };
+    const rows = Object.fromEntries(
+      SUPPORTED_HERO_JOURNEYS.map((j) => [j, journeyRow({ ...shared, heroJourney: j })]),
+    );
+    for (const [journey, r] of Object.entries(rows)) {
+      assert.strictEqual(r.hero_journey, journey);
+    }
+    // Every journey tells the story in its own words: no two share a hero,
+    // a conclusion or a scale line.
+    for (const field of ['demo_hook', 'demo_reveal']) {
+      const values = Object.values(rows).map((r) => r[field]);
+      assert.strictEqual(new Set(values).size, values.length, `${field} must differ between journeys`);
+    }
+    ok('the same probe under four hero_journeys produces four different narratives, not one template');
+
+    // The brief's own transition and scale lines, per journey. Blank on
+    // weak_seller_qualification, which keeps the shell's defaults.
+    assert.strictEqual(rows.slow_response_gap.novus_transition, 'Same enquiry. NOVUS acts while the opportunity is still live.');
+    assert.strictEqual(rows.fast_response_stalled_follow_up.novus_transition, 'Same enquiry. NOVUS keeps the opportunity moving.');
+    assert.strictEqual(rows.complete_miss.novus_transition, 'Same enquiry. NOVUS turns arrival into action.');
+    assert.ok(rows.slow_response_gap.scale_line.startsWith("The value isn't shaving a few hours off one enquiry."));
+    assert.ok(rows.fast_response_stalled_follow_up.scale_line.startsWith("The value isn't one extra follow-up."));
+    assert.ok(rows.complete_miss.scale_line.startsWith("The value isn't rescuing one missed enquiry."));
+    assert.strictEqual(rows.weak_seller_qualification.novus_transition, '');
+    assert.strictEqual(rows.weak_seller_qualification.scale_line, '');
+    assert.strictEqual(rows.weak_seller_qualification.demo_headline, '');
+    ok('each new journey carries its own NOVUS transition and scale line; the reference journey keeps the shell defaults');
+  }
+
+  {
+    // ── 2. slow_response_gap: the seller finding shares the hero ──
+    // The hero_journey names the PRIMARY story, but an unprogressed declared
+    // vendor is the commercially larger finding and is never buried behind it.
+    const withSeller = journeyRow({
+      heroJourney: 'slow_response_gap', sellerRecognition: 'none',
+      viewingProgression: 'invited', responseHours: '17.85',
+    });
+    assert.strictEqual(withSeller.demo_headline, 'The enquiry waited. The seller opportunity went nowhere.');
+    assert.ok(withSeller.demo_hook.includes('17.9 hours'), 'the hero states the MEASURED delay');
+    assert.ok(withSeller.demo_hook.includes('never meaningfully progressed'));
+    assert.strictEqual(withSeller.demo_reveal, 'The buyer waited - and the potential vendor was never meaningfully progressed.');
+
+    // Same journey, same delay — but the vendor WAS recognised. The conclusion
+    // changes to match the evidence, and never claims it was missed.
+    const recognised = journeyRow({
+      heroJourney: 'slow_response_gap', sellerRecognition: 'asked_position',
+      viewingProgression: 'invited', responseHours: '17.85',
+    });
+    assert.strictEqual(
+      recognised.demo_reveal,
+      'The enquiry waited, and although the seller opportunity was recognised, it never reached a meaningful seller-side next step.',
+    );
+
+    // Same journey again, with the vendor genuinely converted: a pure
+    // response-speed story, with no seller claim in it at all.
+    const noSellerGap = journeyRow({
+      heroJourney: 'slow_response_gap', sellerRecognition: 'valuation_offered',
+      viewingProgression: 'slot_offered', responseHours: '17.85',
+    });
+    assert.strictEqual(noSellerGap.demo_headline, 'The enquiry was live. The response came later.');
+    assert.strictEqual(noSellerGap.demo_reveal, 'The opportunity was worked. Just later than it needed to be.');
+    assert.ok(!/vendor|seller/i.test(noSellerGap.demo_hook + noSellerGap.demo_reveal));
+    ok('slow_response_gap carries the seller finding into the hero when there is one, and drops it entirely when there is not');
+  }
+
+  {
+    // ── 3. fast_response_stalled_follow_up: credit, then contrast ──
+    // A buyer side that genuinely moved is stated as such — that contrast IS
+    // the finding, and it is what stops the demo reading as an attack.
+    const contrast = journeyRow({
+      heroJourney: 'fast_response_stalled_follow_up', sellerRecognition: 'asked_position',
+      viewingProgression: 'slot_offered', responseHours: '0.38', contactAttempts: '2', followUps: '1',
+    });
+    assert.strictEqual(contrast.demo_headline, 'A fast response. Two opportunities left unfinished.');
+    assert.ok(contrast.demo_hook.includes('in 23 minutes'), 'the speed claim is the measured one');
+    assert.strictEqual(contrast.demo_reveal, "The viewing was actively progressed. The potential vendor wasn't.");
+
+    // A buyer side that never moved cannot be credited with progression.
+    const neither = journeyRow({
+      heroJourney: 'fast_response_stalled_follow_up', sellerRecognition: 'none',
+      viewingProgression: 'mentioned', responseHours: '0.38',
+    });
+    assert.strictEqual(neither.demo_reveal, 'The enquiry was answered. Neither opportunity was fully progressed.');
+
+    // No seller in the enquiry at all: a pure follow-through story.
+    const buyerOnly = journeyRow({
+      heroJourney: 'fast_response_stalled_follow_up', sellerDeclared: false,
+      viewingProgression: 'invited', responseHours: '0.38',
+    });
+    assert.strictEqual(buyerOnly.demo_headline, 'A fast response. An unfinished opportunity.');
+    assert.strictEqual(buyerOnly.demo_reveal, "The enquiry was answered. It wasn't completed.");
+    assert.ok(!/vendor|seller/i.test(buyerOnly.demo_hook + buyerOnly.demo_reveal + buyerOnly.demo_headline));
+    ok('fast_response_stalled_follow_up credits the buyer progression, then contrasts it against the vendor');
+
+    // "No genuine follow-up" is said clearly, and a real follow-up count is
+    // reported rather than glossed over.
+    const detectedNone = JSON.parse(neither.novus_detected_json);
+    assert.ok(detectedNone.some((d) => d.detail === 'No genuine follow-up after the first contact.'));
+    const detectedSome = JSON.parse(contrast.novus_detected_json);
+    assert.ok(detectedSome.some((d) => d.detail.startsWith('1 follow-up,')));
+    ok('the stalled journey reports the real follow-up count, and says plainly when there was none');
+  }
+
+  {
+    // ── 4. complete_miss: the hardest story, still strictly factual ──
+    const both = journeyRow({
+      heroJourney: 'complete_miss', sellerDeclared: true, sellerRecognition: 'none',
+      humanContact: 'none', responseHours: '', contactAttempts: '0',
+      communications: [{
+        communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-17T22:35:00.000Z',
+        channel: 'email', automated_or_human: 'automated',
+        communication_classification: 'auto_acknowledgement',
+        body_text: 'Thank you for your enquiry. A member of the team will be in touch shortly.',
+      }],
+    });
+    assert.strictEqual(both.demo_headline, 'One enquiry. Two opportunities. Neither progressed.');
+    assert.strictEqual(both.demo_reveal, "The buyer wasn't progressed. The potential vendor wasn't either.");
+    assert.strictEqual(
+      both.demo_reveal_support,
+      'Two commercial opportunities entered the business in one enquiry and neither reached a meaningful next step.',
+    );
+
+    // AN AUTOMATED ACKNOWLEDGEMENT IS NEVER A RESPONSE. It is shown, labelled
+    // as automated, and the absence of a human one is stated separately.
+    const missEvents = JSON.parse(both.observed_events_json);
+    const labels = missEvents.filter((e) => e.kind === 'evidence').map((e) => e.label);
+    assert.deepStrictEqual(labels, [
+      'Enquiry sent', 'Automated acknowledgement', 'No meaningful human response',
+      'Buyer / viewing progression', 'Seller opportunity',
+    ]);
+    assert.ok(!labels.some((l) => l.includes('First meaningful response')));
+    assert.ok(missEvents.find((e) => e.label === 'No meaningful human response').detail
+      .includes('four-day observation period'));
+
+    // No declared vendor: the shorter, quieter story, with no vendor claim.
+    const buyerOnly = journeyRow({ heroJourney: 'complete_miss', sellerDeclared: false, humanContact: 'none', responseHours: '', contactAttempts: '0' });
+    assert.strictEqual(buyerOnly.demo_headline, 'One enquiry. No conversation.');
+    assert.strictEqual(buyerOnly.demo_reveal, 'The opportunity simply sat there.');
+    assert.strictEqual(buyerOnly.demo_reveal_support, '');
+    ok('complete_miss separates the automated acknowledgement from the absent human response, and drops the vendor story when there was none');
+  }
+
+  {
+    // ── 5. asked_position IS RECOGNITION, EVERYWHERE ──
+    // The one claim these journeys may never make about a probe whose agency
+    // did ask about the seller position.
+    for (const journey of SUPPORTED_HERO_JOURNEYS) {
+      const r = journeyRow({ heroJourney: journey, sellerRecognition: 'asked_position', viewingProgression: 'slot_offered' });
+      const copy = [
+        r.demo_headline, r.demo_hook, r.demo_reveal, r.demo_reveal_support,
+        r.observed_events_json, r.novus_detected_json, r.novus_decisions_json, r.novus_actions_json,
+      ].join(' ');
+      assert.ok(
+        !/(never (recognised|acknowledged|raised|mentioned)|completely missed|ignored)/i.test(copy),
+        `${journey} must never call a recognised seller position a miss`,
+      );
+      // And no journey ever asserts an instruction that was never won.
+      assert.ok(!/missed instruction|lost instruction/i.test(copy), `${journey} must not assert a lost instruction`);
+    }
+    ok('no journey describes an asked-about seller position as ignored, missed or never recognised');
+
+    // The same rule the other way round: where it genuinely was never raised,
+    // the demo says so rather than softening it into recognition.
+    const neverRaised = journeyRow({ heroJourney: 'slow_response_gap', sellerRecognition: 'none' });
+    assert.ok(JSON.parse(neverRaised.observed_events_json)
+      .some((e) => e.label === 'Seller opportunity' && /never acknowledged or explored/i.test(e.detail)));
+    ok('a seller opportunity that genuinely was never raised is still stated plainly');
+  }
+
+  {
+    // ── 6. THE ROUTE FAILS SAFE ──
+    // A blank or unknown hero_journey never falls through to another journey's
+    // narrative: no row is compiled at all, so the slug resolves to nothing.
+    for (const journey of ['', 'not_a_journey', 'automated_ack_only']) {
+      assert.throws(
+        () => journeyRow({ heroJourney: journey }),
+        (err) => err.code === 'unsupported_hero_journey',
+        `hero_journey "${journey}" must be refused, never rendered as another journey`,
+      );
+    }
+    ok('a missing or invalid hero_journey fails safely instead of silently showing the wrong journey');
   }
 
   __setRepoForTests(null);
