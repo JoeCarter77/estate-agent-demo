@@ -1,11 +1,11 @@
 # COMMUNICATIONS → INTELLIGENCE → DIAGNOSIS — Proposed V2 (demo-ready)
 
-**Status: IMPLEMENTED.** `COMMUNICATIONS`/`INTELLIGENCE`/`DIAGNOSIS` per §1–§4; `DIAGNOSIS_FINDINGS` per §4a; `PERSONALISATION` per §4b; the email structure per §4c.
+**Status: IMPLEMENTED.** `COMMUNICATIONS`/`INTELLIGENCE`/`DIAGNOSIS` per §1–§4; `DIAGNOSIS_FINDINGS` per §4a; `PERSONALISATION` and the Instantly variable contract per §4b–§4c.
 
 Scope: `COMMUNICATIONS`, `INTELLIGENCE`, `DIAGNOSIS`.
 Not in scope: Demo, SEND DEMO, Outreach, `AGENCIES`, `PROBES`, `RAW_EVENTS`, `ACTIONS`. (`DIAGNOSIS_FINDINGS` and `PERSONALISATION` were added to this document in §4a/§4b when the Personalisation layer was rebuilt — see those sections.)
 
-Totals: **`COMMUNICATIONS` +0 columns**, **`INTELLIGENCE` 20 fields**, **`DIAGNOSIS` 8 fields + `DIAGNOSIS_FINDINGS` 6 fields**, **`PERSONALISATION` 24 fields**. Two AI calls per probe for `COMMUNICATIONS`→`DIAGNOSIS`, plus one for `PERSONALISATION`. No fingerprint layer.
+Totals: **`COMMUNICATIONS` +0 columns**, **`INTELLIGENCE` 20 fields**, **`DIAGNOSIS` 8 fields + `DIAGNOSIS_FINDINGS` 6 fields**, **`PERSONALISATION` 20 fields**. Two AI calls per probe for `COMMUNICATIONS`→`DIAGNOSIS`, plus normally one for `PERSONALISATION` (one bounded correction is possible). No fingerprint layer.
 
 ---
 
@@ -220,266 +220,149 @@ Regression suite: `npm run novus:findings-duplication-selftest`.
 
 ---
 
-## 4b. `PERSONALISATION` — 24 fields, one row per probe
+## 4b. `PERSONALISATION` — 20 fields, one row per probe
 
-One step further on: `DIAGNOSIS` says *what the genuine findings are*;
-`PERSONALISATION` decides **what the story is**, and writes it as
-sentence-ready copy. One AI call, no re-diagnosis, no second engine.
-
-### Two inputs, and only two
+`DIAGNOSIS_FINDINGS` says what genuinely happened. `PERSONALISATION`
+selects one coherent story from those settled findings and supplies the small
+set of prose required by Instantly and the current demo.
 
 ```
 COMMUNICATIONS → INTELLIGENCE → DIAGNOSIS → DIAGNOSIS_FINDINGS
-                                            → PERSONALISATION + PROBE → EMAIL
+                                            → PERSONALISATION
+                                               ├─ Instantly variables
+                                               └─ DEMOS
 ```
 
-The story-generation call receives **the `PROBES` row's factual context**
-(property, value, enquiry date, what our enquiry said) and **that probe's
-`DIAGNOSIS_FINDINGS` rows**. Nothing else. The `DIAGNOSIS` prose, the
-`INTELLIGENCE` prose and the raw `COMMUNICATIONS` are **not** in the prompt —
-every one of them restated in paragraphs what the findings already state as
-structured facts, and handing them back invited the model to re-diagnose from
-the transcript instead of selecting from the findings. `INTELLIGENCE` and
-`DIAGNOSIS` are still *read* by `lib/personalisation-rebuild.mjs`, for the
-deterministic decisions code owns (the eligibility gate, `email_variant`, the
-`hero_journey` lookup); `COMMUNICATIONS` is not loaded for this step at all.
+### Inputs and source boundary
 
-### The story is selected, not composed
+The model receives:
 
-Three indexes into the findings list decide which finding each email beat is
-written from — chosen *before* any sentence — and every one is validated in
-code:
+- the probe id, property value and original enquiry text as factual context;
+- that probe's complete, ordered `DIAGNOSIS_FINDINGS` rows; and
+- the one deterministic agency scale fact, when available.
 
-| Field | Must be | Null when |
-|---|---|---|
-| `positive_finding_index` | a `positive` finding | the list carries no positive, or there was no human contact |
-| `main_finding_index` | a `problem` or `opportunity` | the list carries no problem or opportunity at all |
-| `wider_finding_index` | a `problem` or `opportunity`, **a genuinely different underlying event from the main one** | there is no distinct second finding — a complete and correct answer |
+It does **not** receive raw `COMMUNICATIONS`, `INTELLIGENCE` prose,
+`DIAGNOSIS` prose, the property address, or the probe timestamp.
+`lib/personalisation-rebuild.mjs` still reads `INTELLIGENCE` for eligibility,
+the no-human-contact rule and the deterministic demo journey, and reads
+`DIAGNOSIS` for finalisation/fallback handling. Those rows are not a second
+source of model-authored email claims.
 
-**This is what fixes the duplicated-story bug.** A probe whose sharpest finding
-was the seller / valuation opportunity used to get that opportunity as its main
-story *and again* as its wider beat: two paragraphs, one event, one paragraph
-apart. Nothing could see it, because the two paragraphs were different
-*sentences* about the same *thing* and only the sentences were compared.
-Selecting each beat by index makes the event itself comparable, so the
-duplicate is refused three ways:
+### One authoritative selection
 
-1. **Same index** — the wider beat is the main finding's own number.
-2. **Same event, different number** — two findings whose text is the same thing
-   reworded (`findingsAreDistinct`).
-3. **Same wording** — a valid selection whose `wider_observation` still
-   restates `main_finding` (`isDistinctText`).
+The model chooses the story first:
 
-In every case the wider beat is dropped *and* the answer is sent back for
-repair, so the email says the thing once or the paragraph does not appear.
-**The wider beat exists only where a wider finding was selected** — an
-observation with no finding behind it is an invented finding, whatever it says.
-
-Regression suite: `npm run novus:personalisation-story-selection-selftest`.
-
-**What the email is for.** It is not selling NOVUS. Its only job is to make the
-agency curious enough to ask to see what we found. It reads like: we sent you
-an enquiry, here is what happened from our side, here is what that meant
-commercially, and we found some other interesting things too. The reader should
-think *"fair enough, I can see what they mean"*, and then *"what else did they
-find?"*.
-
-**The single rule at the centre of this layer.** *Do not optimise for
-describing problems. Optimise for revealing missed opportunities.* For every
-finding, the question is: **because this happened, what did the agency fail to
-find out, progress, convert, or uncover?** The answer to *that* is what the
-email is made of — which is why `commercial_consequence`, not `main_finding`,
-is the field this layer exists to get right, and why a consequence that merely
-rephrases the finding is refused in code (`consequenceGoesBeyondFinding`).
-
-**Sentence-ready is the contract.** Every email field is copy that drops
-straight into the email with no repair — never a label like `Poor follow-up`
-or `Weak qualification` (those are Diagnosis concepts, not email copy), never a
-fragment the code has to fix up.
-
-**The grammar contract.** The assembler owns the **fixed opening words** of
-four paragraphs, so those four fields are stored as **lower-case
-continuations** and every other narrative field is a whole sentence:
-
-| Fixed wording (assembler) | Field (continuation) |
+| Field | Valid value |
 |---|---|
-| `I want to say upfront that ` | `fair_observation` |
-| `What stood out, though, was ` | `main_finding` |
-| `That meant ` | `commercial_consequence` |
-| `That also meant ` | `wider_consequence` |
-| *(none — its own sentence)* | `wider_observation` |
+| `positive_finding_index` | One genuine `positive` finding, or blank when none exists / no human contact occurred |
+| `main_finding_index` | The primary `problem` or `opportunity`, or blank only when no story finding exists |
+| `wider_finding_index` | An optional, distinct second `problem` or `opportunity` |
 
-`asContinuation()` enforces the first four (a prefix the model wrote is
-stripped in either tense, the first letter is lower-cased — except the pronoun
-"I" and genuine acronyms — and terminal punctuation is guaranteed);
-`asStandaloneSentence()` enforces the last. `withPrefix()` in the assembler is
-the backstop against a prefix ever printing twice.
+Code validates the index types, finding types and main/second distinctness.
+`narrative_finding_indexes` is then derived from those three fields rather
+than accepted as an independent model answer. `evidence` is likewise rebuilt
+from the selected findings' stored evidence.
 
-**Voice.** The email is written *to* the agency by the person who actually sent
-the enquiry: they are "you", we are "I"/"me"/"we". Detached third-person
-commentary ("They didn't let this one go cold") is the failure mode and is
-blanked by `readsAsDetachedThirdPerson()`.
+That selection is authoritative for both `email_observation` and
+`email_commercial_hook`. The prompt requires both lines to use all and only
+that story. Code rejects either line if distinctive vocabulary reveals an
+unselected diagnosis finding. The model receives at most one bounded correction
+with the exact failed field and previous selection; it cannot switch to a
+separate commercial-classification path.
 
-The row splits in two. **Internal** fields drive the breakdown and the demo and
-are never shown to a prospect. **Email copy** is read by a real estate agent.
+### The 20 columns
 
-### Internal — the breakdown / demo / our own reasoning
-
-| # | Field | Derivation |
+| # | Field | Derivation / consumer |
 |---|---|---|
-| 1 | `hero_journey` | DET — the breakdown/demo journey, a lookup from Intelligence shape + whether findings exist. Never asked of the model. |
-| 2 | `primary_narrative` | The single strongest commercially consequential story. **Combining several findings into one broader problem is the normal answer, not the exception** — most enquiries contain more than one useful finding. Not "finding #1". |
-| 3 | `narrative_finding_indexes` | Which `DIAGNOSIS_FINDINGS.finding_index` values the three beats rest on, ascending, e.g. `1,2,4`. Written from the selection below rather than from a free list the model returns alongside it. |
-| 3a | `positive_finding_index` | **New column.** The finding the fair observation was written from. Blank where none was selected. |
-| 3b | `main_finding_index` | **New column.** The finding the main story was written from. |
-| 3c | `wider_finding_index` | **New column.** The finding the wider beat was written from. Blank when there is no distinct second finding — which is a correct answer, not a gap. |
-| 4 | `supporting_findings` | The genuine `problem`/`opportunity` findings left *outside* the selection. Forced empty when the selection already covers them all. An unselected positive is not an outstanding finding. |
-| 5 | `evidence` | **No longer asked of the model.** The evidence of the findings the story selected, joined — grounded by construction, since the model never sees a raw message to misquote. |
-| 6 | `novus_counterfactual` | What NOVUS would have done at *this* moment. Matches the handling, rather than inventing a gap, when the handling was strong. |
+| 1 | `personalisation_id` | DET id assigned by the rebuild |
+| 2 | `agency_id` | DET from the probe |
+| 3 | `probe_id` | DET from the probe |
+| 4 | `hero_journey` | DET lookup from the Intelligence shape and available findings; consumed by DEMOS |
+| 5 | `primary_narrative` | AI internal/demo summary of the selected story |
+| 6 | `narrative_finding_indexes` | DET sorted union of the three selected indexes |
+| 7 | `positive_finding_index` | AI selection, validated as `positive` |
+| 8 | `main_finding_index` | AI selection, validated as `problem`/`opportunity` |
+| 9 | `wider_finding_index` | AI optional second selection, validated as distinct |
+| 10 | `supporting_findings` | AI internal/demo prose for genuine unselected story findings; forced blank when none remain |
+| 11 | `evidence` | DET join of the selected findings' stored evidence |
+| 12 | `novus_counterfactual` | AI demo copy describing what NOVUS would do |
+| 13 | `fair_observation` | AI demo-required sentence, available only when a selected positive exists |
+| 14 | `main_finding` | AI demo-required sentence, blank in the no-response case |
+| 15 | `commercial_consequence` | AI demo-required consequence retained for the current renderer |
+| 16 | `property_reference` | DET from `PROBES.property_address` + `probe_timestamp`, Europe/London |
+| 17 | `email_observation` | AI concise Instantly variable from the authoritative selected findings |
+| 18 | `email_commercial_hook` | AI Instantly variable that sharpens/quantifies the same selected findings |
+| 19 | `created_at` | DET timestamp |
+| 20 | `updated_at` | DET timestamp |
 
-### Email copy — sentence-ready, read by the prospect
+### `property_reference`
 
-| # | Field | Derivation |
-|---|---|---|
-| 7 | `enquiry_date` | DET — the probe's own `probe_timestamp`, formatted `18 August` in Europe/London so an evening probe keeps the date the agency would recognise. |
-| 8 | `property_address` | DET — `PROBES.property_address`, stripped of the analyst's trailing bracketed note (which can contain a stray price). **Blank when the address was never established**, which makes the row unsendable (field 14). |
-| 9 | `email_variant` | DET — `no_response` when `INTELLIGENCE.human_contact` is `none`, otherwise `normal`. Selects the email structure (§4c). |
-| 10 | `fair_observation` | **Mandatory in the normal variant. Continuation of `"I want to say upfront that "`.** Written from the finding at `positive_finding_index`. Its job is to *disarm*: something genuinely good, backed by the strongest specific evidence available — *"…you followed up properly — three attempts across phone and email inside 14.5 hours, with my name and Fox Cottage referenced correctly and a clear way to get back in touch."* Specific, but not a dump of every positive detail. Rejected (and the row left unsendable) when it reads as detached commentary or **sneaks criticism in** with *eventually / although / despite / however* (`readsAsSnuckCriticism`); forced blank in the no-response case, where there is no positive finding to write it from. |
-| 11 | `main_finding` | **Continuation of `"What stood out, though, was "`.** The most important thing not handled well: specific, grounded in what actually happened, understandable without the underlying analysis, written from the enquiry's perspective, and about **behaviour** rather than an abstract business judgement (*"Your qualification process was weak"* is wrong). Where several findings are really one story, they are woven into this so it reads as one thing that happened. Blank in the no-response case. |
-| 12 | `commercial_consequence` | **Continuation of `"That meant "`. The most important field in the email.** Answers *"so what did this actually mean for the agency?"*: what happened → what opportunity should have been captured → what was not captured or progressed → why that matters. It must **not paraphrase field 11** — one that restates it is dropped, which makes the row unsendable (field 16) rather than sending an email that describes a problem and never says what it cost. |
-| 13 | `wider_observation` | **Optional.** A standalone sentence naming a second thing the enquiry carried that never came into the conversation — *"I'd also mentioned that I had a property of my own that I was considering selling, but that never really came into the conversation."* Never invented to fill the field. |
-| 14 | `wider_consequence` | **Optional. Continuation of `"That also meant "`.** One level beyond field 12, only when there is a genuinely *distinct* second commercial implication — *"…a potential seller instruction sitting inside the same enquiry was never explored."* A value that merely restates field 12 is dropped rather than printed twice (`distinctWiderConsequence`). If the main consequence tells the whole story, this stays empty. Never forced. |
-| 15 | `additional_findings_hook` | DET — **not AI-authored.** One fixed tease line ("There were a couple of other things from the enquiry that caught our attention too.") shown only when a real finding sits outside the primary narrative; blank otherwise, and always blank in the no-response case. It must **not** reveal what the other findings were — that is the question the email exists to provoke. |
-| 16 | `email_body` | DET — the complete email, assembled by `lib/email-assembly.mjs` from fields 7–15 (§4c). **Blank when the row cannot make a complete, honest email**, which is the signal that a human should look. |
+No model call is involved. Code strips the analyst's trailing bracketed address
+note and formats the probe timestamp in `Europe/London`:
 
-Plus `personalisation_id`, `agency_id`, `probe_id`, `created_at`, `updated_at`.
+```
+Grey Lady Place on 21 August at 21:14
+```
 
-**The seller side** is considered explicitly. When our enquiry said we also had
-a property of our own to sell, that enquiry was not just a potential buyer —
-there was a valuation and an instruction sitting inside it — and that is often
-the sharpest part of `commercial_consequence` or `wider_consequence`. It is
-never forced onto an enquiry that did not say so.
+If either part is unresolved, the value is blank. BST and GMT are handled by
+`Intl.DateTimeFormat`, not by manual offsets.
 
-**Retired from `PERSONALISATION`:** `personalised_opener`, `quotes_used`
-(renamed `evidence`), `wider_leakage`, `systemic_promise`, `why_novus`,
-`objection_response`, `demo_intro`, `email_main_point` (renamed
-`main_finding`), `email_consequence` (renamed `commercial_consequence`),
-`email_secondary_hook` (renamed `additional_findings_hook`), and
-`commercial_story` — superseded by `commercial_consequence` /
-`wider_consequence`, which say the same thing in copy the email can use.
+### AI use and bounded correction
 
-**Added:** `wider_observation` — the standalone sentence that sets up
-`wider_consequence` (the *"I'd also mentioned…"* line) — and
-`positive_finding_index` / `main_finding_index` / `wider_finding_index`, the
-stored selection. All four are written through the same header-driven row
-builder as every other column: if the live `PERSONALISATION` tab does not carry
-one yet, the value is simply not persisted, and `email_body` is assembled and
-stored at write time so the sent email is unaffected. The columns should be
-added to keep the row complete and the selection auditable.
+A complete valid result costs one Personalisation call. A second and final call
+is made only for a fixable selection/coherence failure: invalid selection,
+blank/overlong observation, fake praise in a no-response case, or either
+Instantly variable introducing an unselected finding.
 
-**Retired (this revision):** `evidence_quotes` on the AI tool — the model no
-longer sees the raw messages, so there is no quote for it to produce or
-fabricate, and `evidence` is derived from the selected findings instead.
+The retained demo prose does not trigger an email retry. There is no full-email
+sendability contract, email-body reassembly loop, variant repair, wider
+paragraph repair, or consequence-only repair tool.
+
+Regression suite: `npm run novus:email-personalisation-selftest`.
 
 ---
 
-## 4c. The email — a fixed structure in `lib/email-assembly.mjs`
+## 4c. The Instantly email contract
 
-The email is **not** generated as a blob by the AI, and it does not live in a
-template in another product. The *sentences* come from Personalisation; the
-*shape* is fixed, so it lives in code where a human controls it:
-`assembleEmail()` owns the intro, the paragraph order, which optional
-paragraphs appear, which structure to use, the locked CTA and the merge fields.
-Nothing in the assembler rewrites an AI sentence.
-
-### The normal structure
+Instantly owns the fixed template. NOVUS supplies only
+`property_reference`, `email_observation` and `email_commercial_hook`:
 
 ```
 Hi {{first_name}},
 
-We sent your team an enquiry on {enquiry_date} about {property_address}.
+We sent your team an enquiry about {{property_reference}}.
 
-I want to say upfront that {fair_observation}        (optional)
+{{email_observation}}
 
-What stood out, though, was {main_finding}
+{{email_commercial_hook}}
 
-That meant {commercial_consequence}
+We picked up a couple of other things from the same enquiry and put together a short personalised breakdown around it.
 
-{wider_observation}                 (optional)
-
-That also meant {wider_consequence} (optional)
-
-{additional_findings_hook}          (optional)
-
-I've put together a personalised breakdown of what we found. Happy to send it
-over if you'd like to see it.
+Worth sending it over?
 
 Joe
 ```
 
-### The no-response structure (`email_variant = no_response`)
+NOVUS does not generate a greeting, CTA, sign-off, email variant, date/address
+paragraph, wider email paragraphs or complete body. A no-response probe uses the
+same fixed template; its observation simply states the evidenced absence of a
+meaningful response and never forces a positive.
 
-A probe that was never replied to has no conversation to describe, so it gets
-its own shape rather than a normal email with empty paragraphs. **The failure
-IS the silence**, so nothing is invented to fill it: no imagined replies, no
-imagined conversation, and no extra communication findings.
+The following former `PERSONALISATION` columns and their dedicated production
+logic are retired:
 
-```
-Hi {{first_name}},
+- `email_variant`
+- `wider_observation`
+- `wider_consequence`
+- `additional_findings_hook`
+- `email_body`
+- `enquiry_date`
+- `property_address`
 
-We sent your team an enquiry on {enquiry_date} about {property_address}.
-
-We never received a reply.
-
-That meant {commercial_consequence}
-
-{wider_observation}                 (optional)
-
-That also meant {wider_consequence} (optional)
-
-We found a couple of things that may explain it, so we've put together a short
-breakdown that might be useful.
-
-Happy to send it over if you'd like to see it.
-
-Joe
-```
-
-The wider consequence still applies here — a seller/valuation opportunity our
-own enquiry explicitly declared is still lost — and the closing lines are
-reworded so the offer makes sense when there was nothing to discuss.
-
-### Consequences enforced in code, not just prompted for
-
-- **The CTA is locked** and never AI-authored. It is a *breakdown*, never an
-  "audit" — the assembler's own test asserts the word never appears.
-- **The fixed openers are never printed twice.** Each of the four prefixed
-  fields is stored as a continuation with any prefix the model wrote stripped,
-  and `withPrefix()` in the assembler refuses to double one that survived.
-- **`fair_observation` is either genuinely fair or absent** — hedged praise
-  (*eventually / although / despite / however*) is dropped, not repaired.
-- **`commercial_consequence` must go beyond `main_finding`** — a restatement is
-  dropped, and the row then assembles no email at all.
-- No field may carry a greeting, sign-off, CTA, transition, or merge-field
-  syntax of its own.
-- No field may carry our internal reasoning about the analysis. A model asked
-  for a fair observation when there is nothing fair to say will often explain
-  *itself* ("there is no strength to point to here") instead of returning the
-  empty string it was asked for; `readsAsInternalReasoning()` blanks any such
-  value rather than sending it.
-- Optional paragraphs are **omitted entirely** when blank — the email closes
-  up rather than leaving a gap.
-- `additional_findings_hook` is never free text the model writes — one fixed
-  tease line or blank — so it can never turn into a second paragraph of
-  analysis, a second consequence, or a reveal of the findings it exists to
-  tease.
-- `{{first_name}}` is the **only** unresolved merge field in the assembled
-  body; `enquiry_date` and `property_address` are resolved from the probe's own
-  facts.
-- A row missing anything its structure needs (no address, no date, no
-  consequence, or no main finding in the normal structure) assembles **no
-  email at all**. A blank `email_body` means a human decides, never a
-  half-written email.
+`PROBES.property_address` and `DEMOS.property_address` remain: the former is
+the deterministic source of `property_reference`, and the latter is still
+required by the demo's first beat. `DEMOS.enquiry_date` also remains and is
+compiled deterministically from the probe timestamp.
 
 ---
 
@@ -561,7 +444,7 @@ raised to a standalone sentence and never rewritten.
 | `main_finding` | `PERSONALISATION.main_finding`, sentence-cased |
 | `commercial_consequence` | `PERSONALISATION.commercial_consequence`, sentence-cased |
 | `hero_journey`, `personalisation_id` | the `PERSONALISATION` row |
-| `property_*`, `portal`, `probe_reference`, `enquiry_*` | the `PROBES` row (`property_address` through the same `cleanAddressForEmail()` the email uses; `enquiry_date`/`enquiry_time` in Europe/London) |
+| `property_*`, `portal`, `probe_reference`, `enquiry_*` | the `PROBES` row (`property_address` through the same address cleaner used by `property_reference`; `enquiry_date`/`enquiry_time` in Europe/London) |
 | `seller_declared` | `hasVendorDeclaration(probe)` — the deterministic marker, not an AI read |
 | `agency_name` | the `AGENCIES` row |
 | `human_contact` … `grade` | the `INTELLIGENCE` row verbatim (`response_time` is `response_hours` formatted) |
@@ -751,10 +634,10 @@ webhook → RAW_EVENTS → deterministic agency + probe match → COMMUNICATIONS
   5. DIAGNOSE  if observation_status = closed → one AI call → upsert the DIAGNOSIS row
                                                + one DIAGNOSIS_FINDINGS row per finding
                                                  (same batch write — see §4a)
-  6. PERSONALISE  if the DIAGNOSIS is finalised → one AI call, reading the whole
-                  DIAGNOSIS row + its DIAGNOSIS_FINDINGS rows + the probe facts +
-                  the raw communications → upsert the PERSONALISATION row, its
-                  sentence-ready email copy and the assembled email (§4b, §4c)
+  6. PERSONALISE  if the DIAGNOSIS is finalised → normally one AI call, reading
+                  this probe's DIAGNOSIS_FINDINGS plus limited probe context →
+                  upsert the PERSONALISATION row and its Instantly variables
+                  (one bounded selection/coherence correction is possible; §4b, §4c)
   7. COMPILE THE DEMO  no AI call. Every probe step 6 just personalised (plus any
                   already-personalised probe with no demo row yet) → upsert one
                   DEMOS row: the render-ready snapshot behind /demo/{demo_slug}
