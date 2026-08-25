@@ -191,7 +191,9 @@ async function run() {
         main_finding: 'There is no qualifying question asked before inviting you to view.',
         commercial_consequence: 'a viewing slot went to someone nobody had checked could buy.',
         email_observation: 'You replied the same day, but no qualifying question was asked before the viewing invitation.',
-        email_commercial_hook: 'So the buyer opportunity reached a viewing invitation without being qualified.',
+        // States the SHAPE rather than rewording the observation, so this
+        // suite costs exactly the one personalisation call it asserts on.
+        email_commercial_hook: 'So 1 of the 2 commercial opportunities in that enquiry was never worked.',
         novus_counterfactual: 'NOVUS would have asked budget and timescale on the first call.',
       };
     }

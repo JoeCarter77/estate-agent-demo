@@ -176,8 +176,16 @@ function installAiStub() {
         main_finding: 'stub main finding.',
         commercial_consequence: 'stub consequence.',
         email_observation: 'This enquiry did not reach a complete next step.',
-        email_commercial_hook: 'So the selected opportunity remained unprogressed.',
+        // States the SHAPE, not the observation again: the hook guard now
+        // requires a count drawn from the code-computed opportunity shape.
+        email_commercial_hook: 'That is 2 commercial opportunities from 1 enquiry, with 0 progressed.',
       };
+    }
+    // The bounded, field-scoped correction call.
+    if (tool?.name === 'correct_probe_personalisation_fields') {
+      personaliseCallCount += 1;
+      return Object.fromEntries(tool.input_schema.required
+        .map((field) => [field, 'That is 2 commercial opportunities from 1 enquiry, with 0 progressed.']));
     }
     if (tool?.name === 'record_probe_diagnosis') {
       diagnoseCallCount += 1;
@@ -189,6 +197,9 @@ function installAiStub() {
               evidence: 'Human contact: none; response_hours blank; contact_attempts 0.',
               significance_note: 'Total silence the agency has no internal visibility into.',
             }],
+            // Required by the tool schema, and the AI client now validates a
+            // fake exactly as it validates the wire.
+            positive_findings: [],
             strengths: '', missed_opportunities: 'Both the viewing and the declared property to sell went entirely unanswered.',
             commercial_implication: 'This agency never engaged with this specific enquiry at all.',
             novus_opportunity: 'Core (front desk)',
@@ -196,6 +207,7 @@ function installAiStub() {
           }
         : {
             findings: [],
+            positive_findings: [],
             strengths: 'Responded and engaged across the communications received.',
             missed_opportunities: '', commercial_implication: 'Handled promptly for this specific enquiry.',
             novus_opportunity: 'None evidenced',
