@@ -551,24 +551,35 @@ async function run() {
     const detected = JSON.parse(built.novus_detected_json);
     const decisions = JSON.parse(built.novus_decisions_json);
     const actions = JSON.parse(built.novus_actions_json);
-    // UNDERSTAND -> DECIDE -> ACT stays the visual signature; the operating
-    // manual around it does not. Two lines per stage, and no stage carries a
-    // sentence longer than the label it explains.
-    assert.deepStrictEqual(detected.map((d) => d.label), ['Both opportunities in one enquiry', 'Seller position still unknown']);
-    assert.deepStrictEqual(decisions.map((d) => d.label), [
-      'Progress both opportunities',
-      'Qualify the seller position while the enquiry is still live',
-    ]);
-    assert.deepStrictEqual(actions.map((a) => a.label), [
-      'Progresses the viewing and qualifies the seller',
-      'Takes the opportunity that needs a person',
-    ]);
-    const longest = [...detected, ...decisions, ...actions].reduce((n, i) => Math.max(n, (i.detail || '').length), 0);
-    assert.ok(longest <= 60, `beat 3 details must stay glanceable, longest was ${longest} chars`);
-    ok('UNDERSTANDS / DECIDES / ACTS are two glanceable lines each, not an operating manual');
+    // UNDERSTAND -> DECIDE -> ACT stays the visual signature. Each stage is now
+    // ONE line, because the claim being made is that NOVUS comprehends the
+    // commercial context, chooses, and then executes - not that it sends
+    // messages. A second bullet per stage reads as a feature list and pulls the
+    // section back towards "chatbot".
+    assert.deepStrictEqual(detected.map((d) => d.label), ['Recognises both sides of the enquiry']);
+    assert.deepStrictEqual(decisions.map((d) => d.label), ['Chooses the right next action for each opportunity']);
+    assert.deepStrictEqual(actions.map((a) => a.label), ['Carries out the next step - or brings your team in']);
+    ok('UNDERSTANDS / DECIDES / ACTS is one claim per stage, not a feature list');
 
-    assert.ok(actions.some((a) => a.owner === 'novus') && actions.some((a) => a.owner === 'team'));
-    ok('ACTS names both what NOVUS does and what routes to the team');
+    // UNDERSTANDS names both opportunities AND the gap - comprehension, not
+    // detection. The seller half is only asserted because this probe declared one.
+    assert.strictEqual(
+      detected[0].detail,
+      'Understands the buyer opportunity, the declared seller opportunity, and what information is still missing.',
+    );
+    // DECIDES has to show a CHOICE being made across a wider set of actions than
+    // this one enquiry needed, or it reads as "always books a viewing".
+    ['viewing progression', 'seller qualification', 'valuation', 'follow-up', 'escalation'].forEach((option) => {
+      assert.ok(decisions[0].detail.includes(option), `DECIDES must show ${option} as one of the options weighed`);
+    });
+    // ACTS is execution AND routing in one line, so it carries no owner chip:
+    // choosing between the two is the capability being described.
+    assert.ok(actions.every((a) => !a.owner), 'ACTS is one line covering both paths, so no stage is labelled NOVUS or Your team');
+    assert.ok(
+      actions[0].detail.includes('automatically') && actions[0].detail.includes('routes the opportunity to the team'),
+      'ACTS must say NOVUS executes where it should and routes where a person is needed',
+    );
+    ok('beat 3 reads as understands commercial context -> decides -> executes or routes');
 
     assert.strictEqual(
       built.cta_headline,
