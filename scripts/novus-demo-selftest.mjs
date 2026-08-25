@@ -55,7 +55,9 @@ import { compileDemos, compileDecision } from '../lib/demo-compile.mjs';
 import { runRebuildPass } from '../lib/rebuild-pass.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import { extractPropertyImageUrl, fetchPropertyImageUrl, isUsablePropertyImage } from '../lib/property-image.mjs';
-import { journeySupport, SUPPORTED_HERO_JOURNEYS, commercialPriority, heroTitle } from '../lib/demo-journeys.mjs';
+import {
+  journeySupport, SUPPORTED_HERO_JOURNEYS, commercialPriority, heroTitle, HERO_TITLES,
+} from '../lib/demo-journeys.mjs';
 
 // ── live-shaped headers ──────────────────────────────────────────────────────
 const PROBES_HEADER = [
@@ -492,10 +494,11 @@ async function run() {
       'A buyer enquiry - and a potential seller your process could have identified and progressed.',
     );
     assert.ok(!/missed instruction/i.test(built.demo_hook), 'a declared vendor is never a definite missed instruction');
-    // THE HERO IS THE FINDING, NOT THE JOURNEY NAME. This probe's seller
-    // position WAS asked about, so the title says spotted-and-dropped rather
-    // than never-raised, and never repeats the shell's old global headline.
-    assert.strictEqual(built.demo_headline, 'The seller opportunity was spotted. It still went nowhere.');
+    // THE HERO IS THE FINDING, NOT THE JOURNEY NAME. This probe's declared
+    // vendor never reached a seller-side next step, so the strongest finding
+    // here is the unworked second opportunity - and the hero is the fixed line
+    // for it, never the shell's old global headline.
+    assert.strictEqual(built.demo_headline, 'One enquiry. Two opportunities. Only one was seen.');
     assert.ok(
       !/More than one opportunity/i.test(built.demo_headline),
       'the hero is derived from the findings, never the shell default',
@@ -786,6 +789,23 @@ async function run() {
     const mangled = toRenderReady({ ...builtRow, observed_events_json: '{not json' });
     assert.deepStrictEqual(mangled.observed_events, []);
     ok('a hand-mangled JSON cell renders as an absent section, never a broken page');
+
+    // THE HERO IS NEVER THE SHELL'S PROBLEM. A row compiled before the four
+    // fixed headlines existed carries a blank demo_headline; the browser must
+    // still receive the one its own stored ordinals select, because demo.html
+    // has no default of its own to fall back to.
+    assert.ok(rendered.demo_headline, 'a compiled row arrives with its hero title');
+    const legacy = toRenderReady({ ...builtRow, demo_headline: '' });
+    assert.strictEqual(legacy.demo_headline, builtRow.demo_headline);
+    assert.ok(
+      Object.values(HERO_TITLES).includes(legacy.demo_headline),
+      'the derived hero is one of the four fixed headlines',
+    );
+    // Same row, one ordinal changed: the derivation reads the findings rather
+    // than repeating a stored string.
+    const missed = toRenderReady({ ...builtRow, demo_headline: '', human_contact: 'none' });
+    assert.strictEqual(missed.demo_headline, HERO_TITLES.complete_miss);
+    ok('a row with no stored hero headline is served the one its own findings select');
   }
 
   // ══ Part G/H/I/J — the route, end to end ══════════════════════════════════
@@ -1636,16 +1656,26 @@ async function run() {
     assert.strictEqual(rows.weak_seller_qualification.scale_line, '');
     ok('each new journey carries its own NOVUS transition and scale line; the reference journey keeps the shell defaults');
 
-    // EVERY JOURNEY WRITES ITS OWN HERO. Nothing falls through to the shell's
-    // old global headline, and no two of these four stories open the same way.
+    // EVERY JOURNEY WRITES A HERO ONTO THE ROW, and it is always one of the
+    // four fixed lines. The hero follows the FINDINGS, not the journey name -
+    // these four rows share one set of findings (a declared vendor nobody
+    // progressed), so the three that reached a human all open on the seller
+    // line and only complete_miss differs.
     const headlines = Object.values(rows).map((r) => r.demo_headline);
     assert.ok(headlines.every((h) => h), 'every journey writes a hero title onto the row');
-    assert.strictEqual(new Set(headlines).size, headlines.length, 'no two journeys share a hero title');
+    assert.ok(
+      headlines.every((h) => Object.values(HERO_TITLES).includes(h)),
+      'every hero is one of the four fixed headlines',
+    );
+    assert.strictEqual(rows.complete_miss.demo_headline, HERO_TITLES.complete_miss);
+    for (const journey of ['slow_response_gap', 'fast_response_stalled_follow_up', 'weak_seller_qualification']) {
+      assert.strictEqual(rows[journey].demo_headline, HERO_TITLES.seller_unprogressed, journey);
+    }
     assert.ok(
       !headlines.some((h) => /More than one opportunity/i.test(h)),
       'the hard-coded global headline is never what a compiled demo shows',
     );
-    ok('the hero title is written per demo, from the findings, on all four journeys');
+    ok('the hero title is one of the four fixed headlines, chosen from the findings rather than the journey name');
   }
 
   {
@@ -1658,7 +1688,7 @@ async function run() {
     });
     // The buyer side genuinely moved, so it is credited - and the finding the
     // agency should read first is the vendor, not the 17.9-hour delay.
-    assert.strictEqual(withSeller.demo_headline, "The buyer enquiry was handled. The seller opportunity wasn't.");
+    assert.strictEqual(withSeller.demo_headline, HERO_TITLES.seller_unprogressed);
     assert.ok(withSeller.demo_hook.includes('17.9 hours'), 'the measured delay is still stated, as evidence');
     assert.ok(!/17\.9 hours/.test(withSeller.demo_headline), 'the delay is not the hero when a vendor went unworked');
     assert.ok(withSeller.demo_hook.includes('never progressed'));
@@ -1682,7 +1712,7 @@ async function run() {
       viewingProgression: 'slot_offered', responseHours: '17.85',
       contactAttempts: '3', followUps: '2',
     });
-    assert.strictEqual(noSellerGap.demo_headline, 'The enquiry was live. The response came later.');
+    assert.strictEqual(noSellerGap.demo_headline, HERO_TITLES.slow_response);
     assert.strictEqual(noSellerGap.demo_reveal, 'The opportunity was worked. Just later than it needed to be.');
     assert.ok(!/vendor|seller/i.test(noSellerGap.demo_hook + noSellerGap.demo_reveal));
     ok('slow_response_gap carries the seller finding into the hero when there is one, and drops it entirely when there is not');
@@ -1696,7 +1726,7 @@ async function run() {
       heroJourney: 'fast_response_stalled_follow_up', sellerRecognition: 'asked_position',
       viewingProgression: 'slot_offered', responseHours: '0.38', contactAttempts: '2', followUps: '1',
     });
-    assert.strictEqual(contrast.demo_headline, 'A fast response. Two opportunities left unfinished.');
+    assert.strictEqual(contrast.demo_headline, HERO_TITLES.seller_unprogressed);
     assert.ok(contrast.demo_hook.includes('in 23 minutes'), 'the speed claim is the measured one');
     assert.strictEqual(contrast.demo_reveal, "The viewing was actively progressed. The potential vendor wasn't.");
 
@@ -1712,7 +1742,7 @@ async function run() {
       heroJourney: 'fast_response_stalled_follow_up', sellerDeclared: false,
       viewingProgression: 'invited', responseHours: '0.38',
     });
-    assert.strictEqual(buyerOnly.demo_headline, 'A fast response. An unfinished opportunity.');
+    assert.strictEqual(buyerOnly.demo_headline, HERO_TITLES.stalled_progression);
     assert.strictEqual(buyerOnly.demo_reveal, "The enquiry was answered. It wasn't completed.");
     assert.ok(!/vendor|seller/i.test(buyerOnly.demo_hook + buyerOnly.demo_reveal + buyerOnly.demo_headline));
     ok('fast_response_stalled_follow_up credits the buyer progression, then contrasts it against the vendor');
@@ -1739,7 +1769,7 @@ async function run() {
         body_text: 'Thank you for your enquiry. A member of the team will be in touch shortly.',
       }],
     });
-    assert.strictEqual(both.demo_headline, 'One enquiry. Two opportunities. Neither progressed.');
+    assert.strictEqual(both.demo_headline, HERO_TITLES.complete_miss);
     assert.strictEqual(both.demo_reveal, "The buyer wasn't progressed. The potential vendor wasn't either.");
     assert.strictEqual(
       both.demo_reveal_support,
@@ -1760,7 +1790,7 @@ async function run() {
 
     // No declared vendor: the shorter, quieter story, with no vendor claim.
     const buyerOnly = journeyRow({ heroJourney: 'complete_miss', sellerDeclared: false, humanContact: 'none', responseHours: '', contactAttempts: '0' });
-    assert.strictEqual(buyerOnly.demo_headline, 'One enquiry. No conversation.');
+    assert.strictEqual(buyerOnly.demo_headline, HERO_TITLES.complete_miss);
     assert.strictEqual(buyerOnly.demo_reveal, 'The opportunity simply sat there.');
     assert.strictEqual(buyerOnly.demo_reveal_support, '');
     ok('complete_miss separates the automated acknowledgement from the absent human response, and drops the vendor story when there was none');
@@ -1819,45 +1849,62 @@ async function run() {
 
   {
     // ── 1. THE MATRIX ──
-    // One case per shape the four journeys can actually produce. Every title
-    // is different, and every one of them is true of that probe's ordinals.
+    // One case per shape the four journeys can actually produce, each mapped
+    // to the commercial priority its ordinals establish - and from there to
+    // one of the four fixed headlines. The point of this table is that the
+    // SELECTION is driven by the findings: a seller opportunity being present
+    // does not win the hero on its own (cases 7-9 all carry one), and the
+    // journey name never picks the line (cases 1, 3 and 5 are three different
+    // journeys landing on the same finding).
     const cases = [
       ['weak_seller_qualification, seller never raised',
         { heroJourney: 'weak_seller_qualification', sellerRecognition: 'none', viewingProgression: 'slot_offered' },
-        "The buyer was worked. The potential vendor wasn't."],
-      ['weak_seller_qualification, seller position asked about',
+        'seller_unprogressed'],
+      ['weak_seller_qualification, seller position asked about but never progressed',
         { heroJourney: 'weak_seller_qualification', sellerRecognition: 'asked_position', viewingProgression: 'slot_offered' },
-        'The seller opportunity was spotted. It still went nowhere.'],
+        'seller_unprogressed'],
       ['fast response, vendor left unworked',
         { heroJourney: 'fast_response_stalled_follow_up', sellerRecognition: 'none', viewingProgression: 'invited' },
-        'A fast response. Two opportunities left unfinished.'],
+        'seller_unprogressed'],
       ['fast response, no vendor in the enquiry',
         { heroJourney: 'fast_response_stalled_follow_up', sellerDeclared: false, viewingProgression: 'invited' },
-        'A fast response. An unfinished opportunity.'],
+        'stalled_progression'],
       ['slow response, buyer handled, vendor not',
         { heroJourney: 'slow_response_gap', sellerRecognition: 'none', viewingProgression: 'slot_offered', responseHours: '17.85' },
-        "The buyer enquiry was handled. The seller opportunity wasn't."],
+        'seller_unprogressed'],
       ['slow response, neither side progressed',
         { heroJourney: 'slow_response_gap', sellerRecognition: 'none', viewingProgression: 'none', responseHours: '16.1' },
-        'A buyer and a potential seller. Neither opportunity progressed.'],
+        'seller_unprogressed'],
       ['a genuinely severe delay, well handled after it',
         { heroJourney: 'slow_response_gap', sellerDeclared: false, viewingProgression: 'booked', responseHours: '52', contactAttempts: '3', followUps: '2' },
-        'The enquiry was live. The response came much later.'],
+        'slow_response'],
       ['complete miss, two opportunities',
         { heroJourney: 'complete_miss', humanContact: 'none', responseHours: '', contactAttempts: '0' },
-        'One enquiry. Two opportunities. Neither progressed.'],
+        'complete_miss'],
       ['complete miss, buyer only',
         { heroJourney: 'complete_miss', sellerDeclared: false, humanContact: 'none', responseHours: '', contactAttempts: '0' },
-        'One enquiry. No conversation.'],
+        'complete_miss'],
     ];
     const seen = new Set();
-    for (const [name, evidence, expected] of cases) {
+    for (const [name, evidence, expectedPriority] of cases) {
       const built = journeyRow(evidence);
-      assert.strictEqual(built.demo_headline, expected, `hero title for ${name}`);
+      assert.strictEqual(built.demo_headline, HERO_TITLES[expectedPriority], `hero title for ${name}`);
       seen.add(built.demo_headline);
     }
-    assert.strictEqual(seen.size, cases.length, 'every distinct set of findings gets its own hero title');
-    ok(`${cases.length} different sets of findings produce ${seen.size} different hero titles`);
+    // All four lines are reachable, and nothing outside the four is ever
+    // written onto a row.
+    assert.strictEqual(seen.size, 4, 'all four fixed headlines are reachable from real findings');
+    assert.deepStrictEqual([...seen].sort(), Object.values(HERO_TITLES).sort());
+    ok(`${cases.length} sets of findings select between the four fixed hero titles, and reach all four`);
+
+    // A DECLARED VENDOR DOES NOT AUTOMATICALLY WIN THE HERO. Same seller gap
+    // in all three, three different strongest findings.
+    assert.strictEqual(
+      journeyRow({ heroJourney: 'complete_miss', sellerRecognition: 'none', humanContact: 'none', responseHours: '', contactAttempts: '0' }).demo_headline,
+      HERO_TITLES.complete_miss,
+      'a complete miss outranks the seller line even with a declared vendor',
+    );
+    ok('the seller headline is used only where the unworked vendor is the strongest finding');
 
     // The old hard-coded global headline is gone from every one of them.
     for (const [, evidence] of cases) {
@@ -1894,7 +1941,7 @@ async function run() {
       },
     };
     assert.strictEqual(commercialPriority('slow_response_gap', ctx), 'seller_unprogressed');
-    assert.strictEqual(built.demo_headline, 'A buyer and a potential seller. Neither opportunity progressed.');
+    assert.strictEqual(built.demo_headline, HERO_TITLES.seller_unprogressed);
     assert.ok(!/16\.1|hour/i.test(built.demo_headline), 'the measured delay is not the hero here');
     ok('a 16.1-hour reply with an unworked vendor leads on the two opportunities, not on the delay');
 
@@ -1915,7 +1962,7 @@ async function run() {
       heroJourney: 'slow_response_gap', sellerDeclared: false,
       viewingProgression: 'slot_offered', responseHours: '17.85', contactAttempts: '1', followUps: '0',
     });
-    assert.strictEqual(modest.demo_headline, 'The enquiry was answered. The opportunity was never finished.');
+    assert.strictEqual(modest.demo_headline, HERO_TITLES.stalled_progression);
     assert.ok(modest.demo_hook.includes('17.9 hours'), 'the delay is still evidence on this one too');
     ok('a modest delay just past the internal 16-hour line does not take the hero from a stalled opportunity');
 
@@ -1925,7 +1972,7 @@ async function run() {
       heroJourney: 'slow_response_gap', sellerDeclared: false,
       viewingProgression: 'booked', responseHours: '52', contactAttempts: '3', followUps: '2',
     });
-    assert.strictEqual(severe.demo_headline, 'The enquiry was live. The response came much later.');
+    assert.strictEqual(severe.demo_headline, HERO_TITLES.slow_response);
     ok('a genuinely severe delay, with nothing bigger alongside it, still leads the demo');
 
     // The full ladder, one probe at a time: each stronger finding takes the

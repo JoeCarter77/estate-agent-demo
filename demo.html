@@ -331,7 +331,7 @@
     <section class="act" data-act="1">
       <div class="wrap">
         <div class="eyebrow" id="b1-eyebrow">One real enquiry</div>
-        <h1 class="headline" id="b1-heading">One enquiry. More than one opportunity.</h1>
+        <h1 class="headline" id="b1-heading"></h1>
         <p class="lede" id="b1-hook"></p>
 
         <div class="property-card rv">
@@ -785,21 +785,14 @@
     show('review-flag', !!needsReview);
 
     // ── ACT 1 ──
-    // "Two commercial opportunities" is DERIVED FROM THE ROW'S OWN DATA, not
-    // from hero_journey: it is only true where the enquiry actually declared a
-    // property to sell.
-    const declaredSeller = txt(demo.seller_declared) === 'yes';
     setField('b1-eyebrow', agency ? agency + ' · one real enquiry' : 'One real enquiry', { hideWhenEmpty: false });
-    // The journey's own headline wins where it wrote one. A journey that
-    // leaves demo_headline blank is saying "the shell's default is already
-    // right", and the default is derived from the row's own seller_declared —
-    // never from hero_journey, which this file still knows nothing about.
-    setField(
-      'b1-heading',
-      txt(demo.demo_headline)
-        || (declaredSeller ? 'One enquiry. More than one opportunity.' : 'One enquiry. One commercial opportunity missed.'),
-      { hideWhenEmpty: false },
-    );
+    // NO SHELL DEFAULT. The hero is one of four fixed headlines, selected from
+    // the strongest commercial finding in lib/demo-journeys.mjs and served on
+    // demo_headline for every row — including rows compiled before the four
+    // existed, which /api/demo derives on the way out. A headline written here
+    // would be a second, findings-blind source of truth for the one line the
+    // prospect reads first.
+    setField('b1-heading', demo.demo_headline, { hideWhenEmpty: false });
     setField('b1-hook', demo.demo_hook);
     renderProperty(demo);
 
