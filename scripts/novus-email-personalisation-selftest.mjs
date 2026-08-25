@@ -37,9 +37,9 @@ function answer({ positive = 4, main = 1, second = 2, observation, hook, overrid
     supporting_findings: '',
     fair_observation: positive == null ? '' : 'you replied quickly and progressed the viewing.',
     main_finding: main == null ? '' : 'the enquiry did not receive the next step it needed.',
-    commercial_consequence: main == null ? '' : 'one part of the commercial opportunity remained unprogressed.',
+    commercial_consequence: main == null ? '' : 'the declared seller side of the enquiry was never worked at all.',
     email_observation: observation || 'You replied quickly and progressed the viewing, but no follow-up was sent and nobody picked up that I also had a property to sell.',
-    email_commercial_hook: hook || 'That is 2 commercial opportunities from 1 enquiry, with the seller side and the follow-up both left unprogressed.',
+    email_commercial_hook: hook || "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.",
     novus_counterfactual: 'NOVUS would have progressed both sides in the same conversation.',
     ...overrides,
   };
@@ -93,7 +93,7 @@ async function main() {
     assert.strictEqual(row.narrative_finding_indexes, '1,2,4');
     assert.match(row.email_observation, /no follow-up/i);
     assert.match(row.email_observation, /property to sell/i);
-    assert.match(row.email_commercial_hook, /2 commercial opportunities/i);
+    assert.match(row.email_commercial_hook, /1 buyer enquiry and 1 potential seller/i);
     assert.doesNotMatch(row.evidence, /qualification/i);
     ok('positive + two connected problems, including no follow-up + seller missed, share the same selected findings');
   }
@@ -131,11 +131,11 @@ async function main() {
   {
     const { row } = await runPersonalisation({
       findings: ordered(F.sellerMissed, F.positive),
-      result: answer({ main: 2, second: null, observation: 'You handled the viewing side quickly, but nobody picked up that I had also said I had a property to sell.', hook: 'So 1 of the 2 commercial opportunities in that enquiry was invisible to the process.' }),
+      result: answer({ main: 2, second: null, observation: 'You handled the viewing side quickly, but nobody picked up that I had also said I had a property to sell.', hook: 'So the buyer side moved forward, while the potential seller was missed entirely.' }),
       intelligence: { viewing_progression: 'booked' },
     });
     assert.match(row.email_observation, /viewing side/i);
-    assert.match(row.email_commercial_hook, /1 of the 2/i);
+    assert.match(row.email_commercial_hook, /potential seller was missed/i);
     ok('buyer progressed + seller missed stays one coherent commercial story');
   }
 

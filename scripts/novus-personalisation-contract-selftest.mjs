@@ -23,6 +23,7 @@ import { normaliseToolInput, containsToolMarkup, splitLeakedValue, AiStructuredO
 import {
   personaliseProbe, buildOpportunityShape, hookFailureAgainstObservation,
   quantifiesOpportunityShape, readsAsThirdPersonProspect, normalizeCurrencyFigure,
+  readsAsConsultantSpeak, claimsUnaskedQuestions, namesConcreteOutcome,
   introducesUnselectedFinding, _internal,
 } from '../lib/probe-personalisation.mjs';
 import { buildDemoRow, reviewReasonsFor } from '../lib/demos.mjs';
@@ -66,7 +67,7 @@ function answer(overrides = {}) {
     main_finding: 'no follow-up was sent and the seller side was never raised.',
     commercial_consequence: 'a declared valuation opportunity was never opened at all.',
     email_observation: "You got back to me almost instantly, but no follow-ups were sent and nobody picked up that I'd also said I had a property to sell.",
-    email_commercial_hook: "That's 2 commercial opportunities from 1 enquiry, with neither fully progressed.",
+    email_commercial_hook: "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.",
     novus_counterfactual: 'NOVUS would have opened both threads in the same conversation.',
     ...overrides,
   };
@@ -151,9 +152,9 @@ async function main() {
         reply: answer({
           main_finding_index: 2, wider_finding_index: null,
           email_observation: "You handled the viewing side well, but nobody picked up that I'd also said I had a property to sell.",
-          email_commercial_hook: 'So 1 of the 2 commercial opportunities in that enquiry was effectively invisible to the process.',
+          email_commercial_hook: 'So the buyer side moved forward, while the potential seller was missed entirely.',
         }),
-        expect: (row) => { assert.match(row.email_commercial_hook, /1 of the 2/); },
+        expect: (row) => { assert.match(row.email_commercial_hook, /potential seller was missed/); },
       },
       {
         name: '6. seller recognised but weakly progressed',
@@ -188,7 +189,7 @@ async function main() {
           main_finding_index: null, wider_finding_index: null,
           main_finding: '', commercial_consequence: '',
           email_observation: 'You came back within minutes, booked the viewing and picked up that I had a place to sell too.',
-          email_commercial_hook: 'That is 2 commercial opportunities from 1 enquiry, with both progressed.',
+          email_commercial_hook: 'So both the viewing and the valuation came out of that one enquiry.',
         }),
         expect: (row) => {
           assert.strictEqual(row.main_finding_index, '', 'no problem finding exists, so none is selected');
@@ -253,6 +254,63 @@ async function main() {
     ok('9c. a truthfulness failure still blanks the field — that blank has a real reason');
   }
 
+  // ══ LIVE REGRESSION: prb_hist_0002 / prb_hist_0005 blank email_observation ═
+  {
+    // ParaBar's real shape. Findings 1, 2 and 4 are selected; finding 3 — the
+    // passive "call us" viewing line — is not. A correct observation shares
+    // exactly two ordinary words with it, "viewing" and "times", and the old
+    // scope guard read that as importing an unselected finding, blanked the
+    // field HARD, and banked no fallback. Two attempts later the row persisted
+    // blank. This is that exact case.
+    const parabar = [
+      { finding_index: 1, finding_type: 'opportunity', finding: 'Seller recognition: none; all three emails are brochure-and-call-us templates with no mention of his own property.', evidence: 'Seller recognition: none across three emails.', significance_note: '' },
+      { finding_index: 2, finding_type: 'problem', finding: 'Buyer qualification depth: none (questions asked: none) across three emails.', evidence: 'No budget, timescale or finance questions.', significance_note: '' },
+      { finding_index: 3, finding_type: 'problem', finding: 'Viewing progression stayed passive with a generic call-us line rather than proactively offering times.', evidence: '"Please contact me if you are interested in arranging any viewings."', significance_note: '' },
+      { finding_index: 4, finding_type: 'positive', finding: 'Emails addressed to Dear Joe Carter and included personalised, well-matched brochures.', evidence: 'Brochures for Outwood Common Road and Kilbarry Walk.', significance_note: '' },
+    ];
+    const observation = "You replied three times with brochures for me, but no viewing was ever offered and nobody picked up that I'd also said I had a property to sell.";
+    const selected = parabar.filter((f) => [1, 2, 4].includes(f.finding_index));
+    assert.strictEqual(introducesUnselectedFinding(observation, selected, parabar, PROBE), false,
+      '"viewing" and "times" are the enquiry\'s own vocabulary, not finding 3\'s content');
+
+    const { row, calls } = await run({
+      findings: parabar,
+      reply: () => answer({ positive_finding_index: 4, main_finding_index: 1, wider_finding_index: 2, email_observation: observation }),
+    });
+    assert.strictEqual(calls, 1, 'and it no longer costs a repair call either');
+    assert.ok(has(row.email_observation), 'email_observation is not blank');
+    ok('LIVE 0005: ordinary enquiry vocabulary no longer reads as an unselected finding');
+  }
+  {
+    // The structural half of the same bug: even when a guard DOES fire twice,
+    // a grounded sentence must not vanish. Only ungroundable copy may.
+    const { row, calls } = await run({
+      findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
+      reply: () => answer({
+        email_observation: 'Terry got back to me and named the property correctly, but it took nearly 37 hours to arrive and nobody at all picked up on the fact that I had also said I had a property of my own to sell.',
+      }),
+    });
+    assert.strictEqual(calls, 2, 'the repair is attempted');
+    assert.ok(has(row.email_observation),
+      'and when it still misses, the sanitised sentence is persisted rather than a blank');
+    ok('LIVE 0002: a twice-rejected but grounded email_observation is persisted, never blanked');
+  }
+  {
+    // The one thing that still legitimately blanks it.
+    const { row } = await run({
+      findings: ordered(F.sellerMissed, F.noResponse),
+      intelligence: { human_contact: 'none', response_hours: '', contact_attempts: 0, follow_ups: 0, viewing_progression: 'none' },
+      reply: () => answer({
+        positive_finding_index: null, main_finding_index: 6, wider_finding_index: 2,
+        fair_observation: '', main_finding: '',
+        email_observation: 'You replied quickly and handled the enquiry well.',
+      }),
+    });
+    assert.strictEqual(row.email_observation, '',
+      'praise on a probe that got no reply at all is ungroundable and stays blank');
+    ok('and the one guard that may still blank it — praise with no response — still does');
+  }
+
   // ══ 10-11: the two Instantly variables are never blank where findings exist
   {
     for (const [field, broken] of [
@@ -270,37 +328,66 @@ async function main() {
     }
   }
 
-  // ══ 12: the hook must go beyond the observation ═══════════════════════════
+  // ══ 12: the hook must go beyond the observation, in the agency's words ═══
   {
-    const observation = 'This enquiry, from someone with a property to sell, received no contact on any channel across the full four-day window.';
-    // Both verbatim from the historical run.
+    const observation = "It took nearly 19 hours to get back to the enquiry, and even then nobody picked up that I'd also said I had a property to sell.";
+
+    // The five target hooks, verbatim from the brief. TWO OF THEM CARRY NO
+    // NUMBER AT ALL — "So the buyer side moved forward, while the potential
+    // seller was missed entirely." A strict count requirement rejected both,
+    // which is why the rule is now count OR concrete outcome.
+    for (const good of [
+      "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.",
+      'So 1 enquiry contained both a buyer and a potential vendor, but only one side was ever worked.',
+      "That's 1 buyer enquiry and 1 potential seller, with neither ever becoming a conversation.",
+      'So the buyer side moved forward, while the potential seller was missed entirely.',
+      'So the seller lead was spotted, but it still never became a valuation conversation.',
+    ]) assert.strictEqual(hookFailureAgainstObservation(good, observation), null, `must pass: ${good}`);
+
+    // Deck language is rejected wherever it appears, including inside a hook
+    // that is otherwise well formed and correctly counted.
+    for (const jargon of [
+      "That's 2 commercial opportunities from 1 enquiry, with neither fully progressed.",
+      'This is revenue leakage the branch never sees.',
+      'That points to a process failure in how enquiries are handled.',
+      'The commercial value of that enquiry was never realised.',
+    ]) assert.strictEqual(hookFailureAgainstObservation(jargon, observation), 'consultant_speak', `must fail: ${jargon}`);
+
+    // Lexical restatement is still caught.
+    assert.strictEqual(hookFailureAgainstObservation(`${observation} Really.`, observation), 'restates_observation');
+    // And a hook that names nothing an agent counts or recognises.
+    assert.strictEqual(
+      hookFailureAgainstObservation('That is a real shame and worth a look.', observation), 'no_quantification');
+    // "no valuation conversation" describes an absence; it is not a count.
+    assert.strictEqual(quantifiesOpportunityShape('no valuation conversation ever started'), false);
+
+    // HONESTY BOUNDARY, asserted so nobody later "fixes" it by heuristic.
+    // This hook is flat — it redescribes the observation instead of naming what
+    // was missed — and it passes every mechanical test here, because it is
+    // written in concrete agency terms and is not a lexical restatement. The
+    // difference between it and the target hook above is semantic, and the
+    // PROMPT carries it (the good/bad pairs sit side by side in
+    // SYSTEM_PROMPT). Do not add a heuristic that pretends to decide this.
     assert.strictEqual(
       hookFailureAgainstObservation('A potential seller went completely unengaged, meaning no valuation conversation ever had the chance to start.', observation),
-      'no_quantification', 'a hook that only redescribes the observation is rejected');
-    assert.strictEqual(
-      hookFailureAgainstObservation('A self-declared seller not yet on the market is a live valuation lead, and it went completely unacknowledged alongside the viewing chase.', observation),
-      'no_quantification');
-    assert.strictEqual(hookFailureAgainstObservation(`${observation} Really.`, observation), 'restates_observation');
-    for (const good of [
-      "That's 2 commercial opportunities from 1 enquiry, with neither fully progressed.",
-      'So even with 3 contact attempts, half the commercial opportunity inside the enquiry was never worked.',
-      "That's 2 live opportunities from 1 enquiry, with 0 conversations created.",
-      'So 1 of the 2 commercial opportunities in that enquiry was effectively invisible to the process.',
-    ]) assert.strictEqual(hookFailureAgainstObservation(good, observation), null, `accepted: ${good}`);
-    // "no valuation conversation" is a description of an absence, not a count.
-    assert.strictEqual(quantifiesOpportunityShape('no valuation conversation ever started'), false);
-    ok('12. the hook must state the shape, not paraphrase the observation — both historical bad hooks are rejected, all four target hooks pass');
+      null, 'a well-formed but flat hook is the prompt\'s job, not the guard\'s');
+    assert.ok(_internal.SYSTEM_PROMPT.includes("That's 1 buyer enquiry and 1 potential seller"),
+      'so the prompt must carry the target hooks');
+    assert.ok(_internal.SYSTEM_PROMPT.includes('TOO SOFT:'),
+      'and the observation pair that shows what soft looks like');
+    ok('12. the hook lands in the agency\'s own words — all five target hooks pass, deck language is rejected, and the semantic judgement is left to the prompt on purpose');
   }
   {
     const { row, calls } = await run({
       findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
       reply: (call) => (call === 1
-        ? answer({ email_commercial_hook: 'A potential seller went completely unengaged, so no valuation conversation started.' })
-        : { email_commercial_hook: "That's 2 commercial opportunities from 1 enquiry, with neither fully progressed." }),
+        ? answer({ email_commercial_hook: "That's 2 commercial opportunities from 1 enquiry, with neither fully progressed." })
+        : { email_commercial_hook: "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed." }),
     });
     assert.strictEqual(calls, 2);
-    assert.match(row.email_commercial_hook, /2 commercial opportunities/);
-    ok('12b. a paraphrasing hook is repaired end to end inside the two-call budget');
+    assert.match(row.email_commercial_hook, /1 buyer enquiry and 1 potential seller/);
+    assert.doesNotMatch(row.email_commercial_hook, /commercial opportunit/i);
+    ok('12b. a deck-language hook is repaired into the agency\'s own words inside the two-call budget');
   }
 
   // ══ 13: the hook cannot introduce an unselected finding ═══════════════════
@@ -325,7 +412,7 @@ async function main() {
     for (const bad of [
       "Your initial email correctly personalised Joe's enquiry by name and property.",
       'Joe explicitly flagged an off-market property to sell.',
-      'That means a declared seller lead went unpursued and the buyer enquiry never progressed to a viewing.',
+      'That means the buyer was never qualified and the seller lead went unpursued.',
       'no acknowledgement of the property he wants to sell',
       'The enquirer declared an unlisted property to sell.',
     ]) assert.strictEqual(readsAsThirdPersonProspect(bad), true, `third person: ${bad}`);
@@ -333,6 +420,12 @@ async function main() {
       "Terry's callback was well personalised, using my name and the exact property details.",
       'The declared property to sell was never acknowledged in any contact.',
       "You handled the viewing side well, but nobody picked up that I'd also said I had a property to sell.",
+      // The target hooks name SIDES of the enquiry, not the person who sent
+      // it. "the buyer side" / "the buyer enquiry" is the agency's own
+      // vocabulary and must not be mistaken for third-person reference.
+      'So the buyer side moved forward, while the potential seller was missed entirely.',
+      "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.",
+      'So 1 enquiry contained both a buyer and a potential vendor, but only one side was ever worked.',
     ]) assert.strictEqual(readsAsThirdPersonProspect(fine), false, `must stay valid: ${fine}`);
 
     const { row, calls } = await run({
@@ -431,16 +524,22 @@ async function main() {
   // ══ the counts the hook is built from ═════════════════════════════════════
   {
     const shape = buildOpportunityShape(PROBE, { ...INTEL, contact_attempts: 3, follow_ups: 2, viewing_progression: 'booked', seller_recognition: 'none', response_hours: 14.5 });
-    assert.match(shape, /Commercial opportunities inside this one enquiry: 2/);
-    assert.match(shape, /concrete next step: 1 of 2/);
+    assert.match(shape, /1 buyer enquiry \+ 1 potential seller/);
+    assert.match(shape, /real next step: 1 of 2/);
     assert.match(shape, /Contact attempts: 3/);
-    assert.match(shape, /First human response: 14\.5 hours/);
+    assert.match(shape, /First reply: 14\.5 hours/);
+    // The block must speak the agency's language, because it is where the hook
+    // gets its vocabulary. An earlier version called these "commercial
+    // opportunities" and the hooks came back sounding like a consultant.
+    assert.doesNotMatch(shape, /commercial opportunit/i, 'the counts block never teaches deck language');
+    assert.strictEqual(readsAsConsultantSpeak(shape), false);
     const buyerOnly = buildOpportunityShape(BUYER_ONLY_PROBE, INTEL);
-    assert.match(buyerOnly, /enquiry: 1 /, 'a buyer-only enquiry is one opportunity, not two');
+    assert.match(buyerOnly, /1 buyer enquiry \(no property to sell was declared\)/,
+      'a buyer-only enquiry is one side, not two');
     assert.doesNotMatch(buyerOnly, /Seller \/ valuation side/);
     const silent = buildOpportunityShape(PROBE, { human_contact: 'none' });
-    assert.match(silent, /Conversations genuinely created: 0/);
-    ok('the opportunity shape is code-computed from this enquiry alone, and never invents a seller side');
+    assert.match(silent, /Conversations created: 0/);
+    ok('the counts block is code-computed from this enquiry alone, speaks in buyer/seller terms, and never invents a seller side');
   }
 
   // ══ 16-18: the 14 historical probes ══════════════════════════════════════

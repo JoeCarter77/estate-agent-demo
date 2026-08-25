@@ -193,7 +193,7 @@ async function run() {
         email_observation: 'You replied the same day, but no qualifying question was asked before the viewing invitation.',
         // States the SHAPE rather than rewording the observation, so this
         // suite costs exactly the one personalisation call it asserts on.
-        email_commercial_hook: 'So 1 of the 2 commercial opportunities in that enquiry was never worked.',
+        email_commercial_hook: 'So the buyer side moved forward, while the potential seller was missed entirely.',
         novus_counterfactual: 'NOVUS would have asked budget and timescale on the first call.',
       };
     }

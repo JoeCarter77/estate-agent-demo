@@ -379,7 +379,7 @@ function installAiStub() {
       const patch = {};
       for (const field of tool.input_schema.required) {
         patch[field] = field === 'email_commercial_hook'
-          ? `That is 2 commercial opportunities from 1 enquiry about ${scenario.address}, with 1 progressed.`
+          ? `That's 1 buyer enquiry and 1 potential seller on ${scenario.address}, with only one side worked.`
           : field === 'email_observation'
             ? `You picked up my ${scenario.address} enquiry, but the second opportunity inside it was never worked.`
             : `a concrete corrected line about ${scenario.address} for the demo.`;
@@ -413,7 +413,7 @@ function installAiStub() {
         // — a fake that paraphrases would spend the bounded correction call on
         // every probe and make the "one call per probe" assertion below
         // measure the fixture's copy rather than the flow.
-        email_commercial_hook: `That is ${selected.length} commercial opportunities from 1 enquiry about ${scenario.address}, with 0 fully progressed.`,
+        email_commercial_hook: `That's 1 buyer enquiry and 1 potential seller on ${scenario.address}, with neither properly progressed.`,
       };
     }
     // Intelligence interpretation — deterministic fields are already seeded,

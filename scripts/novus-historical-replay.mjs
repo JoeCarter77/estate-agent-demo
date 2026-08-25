@@ -54,23 +54,25 @@ function shapeCounts(fixture) {
   const shape = buildOpportunityShape(fixture.probe, fixture.intelligence);
   const num = (re) => { const m = shape.match(re); return m ? Number(m[1]) : null; };
   return {
-    opportunities: num(/opportunities inside this one enquiry: (\d+)/),
-    progressed: num(/concrete next step: (\d+) of/),
+    opportunities: /potential seller/.test(shape) ? 2 : 1,
+    progressed: num(/real next step: (\d+) of/),
     attempts: num(/Contact attempts: (\d+)/),
     followUps: num(/follow-ups(?: after the first)?: (\d+)/),
-    conversations: num(/Conversations genuinely created: (\d+)/),
-    noContact: /no meaningful human response/.test(shape),
+    conversations: num(/Conversations created: (\d+)/),
+    noContact: /no reply at all during/.test(shape),
   };
 }
 
 function simulatedHook(fixture) {
   const c = shapeCounts(fixture);
-  if (c.noContact) return `That's ${c.opportunities} live opportunities from 1 enquiry, with 0 conversations created.`;
+  const twoSided = c.opportunities === 2;
+  if (!twoSided) return `That's 1 buyer enquiry that never reached a next step, with ${c.attempts || 0} contact attempts behind it.`;
+  if (c.noContact) return "That's 1 buyer enquiry and 1 potential seller, with neither ever becoming a conversation.";
   if (c.progressed === 0 && c.attempts > 1) {
-    return `So even with ${c.attempts} contact attempts, ${c.opportunities === 2 ? 'neither of the 2 commercial opportunities' : 'the commercial opportunity'} in that enquiry was taken to a next step.`;
+    return `So even after ${c.attempts} contact attempts, the buyer enquiry and the potential seller were both left where they started.`;
   }
-  if (c.progressed === 0) return `That's ${c.opportunities} commercial opportunities from 1 enquiry, with neither fully progressed.`;
-  return `So ${c.opportunities - c.progressed} of the ${c.opportunities} commercial opportunities in that enquiry was effectively invisible to the process.`;
+  if (c.progressed === 0) return "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.";
+  return 'So the buyer side moved forward, while the potential seller was missed entirely.';
 }
 
 // A first-person rewrite of the recorded observation, used only when the
@@ -78,7 +80,7 @@ function simulatedHook(fixture) {
 function simulatedObservation(fixture, recorded) {
   const c = shapeCounts(fixture);
   if (c.noContact) {
-    return "We didn't receive a response during the four-day observation period, and nobody picked up that I'd also said I had a property to sell.";
+    return "We didn't receive any response 4 days after the enquiry, and nobody picked up that I'd also mentioned I had a property to sell.";
   }
   const trimmed = text(recorded)
     .replace(/\bJoe(?:'s|’s)\s+enquiry\b/gi, 'my enquiry')
@@ -88,8 +90,8 @@ function simulatedObservation(fixture, recorded) {
   const words = trimmed.split(/\s+/);
   if (words.length <= 40 && trimmed) return trimmed;
   return c.progressed > 0
-    ? "You handled the viewing side properly, but nobody picked up that I'd also said I had a property to sell."
-    : "You did come back to me, but the enquiry never reached a next step and nobody picked up that I'd also said I had a property to sell.";
+    ? "You handled the viewing side well, but nobody picked up that I'd also said I had a property to sell."
+    : "You got back to the enquiry, but nobody picked up that I'd also said I had a property to sell.";
 }
 
 function simulatedDemoLine(field, fixture, recordedResult) {
@@ -103,10 +105,10 @@ function simulatedDemoLine(field, fixture, recordedResult) {
       || 'the enquiry never reached the next step it needed.';
   }
   const unworked = c.opportunities - c.progressed;
-  if (c.opportunities < 2) return 'that leaves the one commercial opportunity in this enquiry sitting unworked.';
+  if (c.opportunities < 2) return 'that leaves the buyer enquiry itself sitting without a next step.';
   return unworked === c.opportunities
-    ? `that leaves both commercial opportunities in this one enquiry sitting unworked.`
-    : `that leaves ${unworked} of the ${c.opportunities} commercial opportunities in this one enquiry sitting unworked.`;
+    ? 'that leaves both the buyer enquiry and the potential seller sitting without a next step.'
+    : 'that leaves the potential seller sitting without a valuation conversation.';
 }
 
 // THE STEADY-STATE CONTROL. Replaying the recorded regression as call 1 makes
