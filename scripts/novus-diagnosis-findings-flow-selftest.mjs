@@ -370,6 +370,22 @@ function installAiStub() {
         diagnosis_summary: `Diagnosis for ${scenario.address}.`,
       };
     }
+    // The bounded, field-scoped correction call. These synthetic hooks are
+    // findings text joined together, so they legitimately fail the "state the
+    // shape, don't restate the observation" guard; the flow test's job is to
+    // prove the scoped repair returns a usable record, not to write good copy.
+    if (tool.name === 'correct_probe_personalisation_fields') {
+      personaliseCalls += 1;
+      const patch = {};
+      for (const field of tool.input_schema.required) {
+        patch[field] = field === 'email_commercial_hook'
+          ? `That is 2 commercial opportunities from 1 enquiry about ${scenario.address}, with 1 progressed.`
+          : field === 'email_observation'
+            ? `You picked up my ${scenario.address} enquiry, but the second opportunity inside it was never worked.`
+            : `a concrete corrected line about ${scenario.address} for the demo.`;
+      }
+      return patch;
+    }
     if (tool.name === 'record_probe_personalisation') {
       personaliseCalls += 1;
       personalisationPrompts.set(scenario.probe_id, prompt);
@@ -380,10 +396,24 @@ function installAiStub() {
         scenario.story.wider_finding_index,
       ].filter((value) => Number.isInteger(value));
       const selected = selectedIndexes.map((index) => ordered[index - 1]);
+      // Every key the tool schema declares required, because the AI client
+      // now normalises and validates a fake exactly as it validates the wire —
+      // a fixture must not be able to assert on a shape production rejects.
       return {
+        story_reasoning: `Selected ${selectedIndexes.join(', ') || 'none'} for ${scenario.probe_id}.`,
+        novus_counterfactual: 'NOVUS would have progressed both sides of the enquiry in the same conversation.',
         ...scenario.story,
-        email_observation: selected.map((finding) => finding.finding).join(' '),
-        email_commercial_hook: selected.map((finding) => finding.significance_note).join(' '),
+        // The main story only, not every selected finding joined together:
+        // email_observation is capped at 40 words precisely to stop the
+        // shopping-list shape, so a fixture that concatenates three findings
+        // is testing the cap rather than the flow.
+        email_observation: selected.map((finding) => finding.finding).slice(0, 2).join(' '),
+        // A hook that STATES THE SHAPE rather than restating the observation,
+        // which is what the OPPORTUNITY SHAPE counts in the prompt now ask for
+        // — a fake that paraphrases would spend the bounded correction call on
+        // every probe and make the "one call per probe" assertion below
+        // measure the fixture's copy rather than the flow.
+        email_commercial_hook: `That is ${selected.length} commercial opportunities from 1 enquiry about ${scenario.address}, with 0 fully progressed.`,
       };
     }
     // Intelligence interpretation — deterministic fields are already seeded,

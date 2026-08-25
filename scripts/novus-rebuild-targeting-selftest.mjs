@@ -205,7 +205,10 @@ function installAiStub() {
         novus_counterfactual: 'Stub counterfactual.', main_finding: 'that nobody asked what we were looking for.',
         commercial_consequence: 'stub consequence.',
         email_observation: 'You did come back to us, but nobody asked what we were looking for.',
-        email_commercial_hook: 'So the selected opportunity remained unqualified.',
+        // States the SHAPE. A hook that only reworded the observation would
+        // be sent back for a scoped repair, costing a second call and turning
+        // this suite into a measurement of the contract gate.
+        email_commercial_hook: 'That is 2 commercial opportunities from 1 enquiry, with 0 progressed.',
       };
     }
     interpretCalls += 1;

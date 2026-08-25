@@ -1,0 +1,1136 @@
+[
+  {
+    "probe_id": "prb_hist_0001",
+    "agency_id": "ag_hist_ashtonwhite",
+    "agency_name": "Ashton White Estate Agents Billericay",
+    "probe": {
+      "probe_id": "prb_hist_0001",
+      "agency_id": "ag_hist_ashtonwhite",
+      "property_address": "4,High Street, Billericay",
+      "property_price": "£255,000",
+      "probe_timestamp": "2026-08-10T20:53:05Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0001",
+      "human_contact": "none",
+      "response_hours": "",
+      "contact_attempts": "0",
+      "follow_ups": "0",
+      "channels_used": "",
+      "viewing_progression": "none",
+      "seller_recognition": "none",
+      "grade": "H"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0001",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 1,
+        "finding_type": "problem",
+        "finding": "Contact attempts: 0, follow-ups: 0, channels used: none — observation window closed after 4 days with no meaningful response on any channel (Source Master §10)",
+        "evidence": "Contact attempts: 0, follow-ups: 0, channels used: none — observation window closed after 4 days with no meaningful response on any channel (Source Master §10)",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 2,
+        "finding_type": "opportunity",
+        "finding": "Seller/vendor recognition: none; neither the viewing nor the declared property to sell was ever addressed",
+        "evidence": "Seller/vendor recognition: none; neither the viewing nor the declared property to sell was ever addressed",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": null,
+      "main_finding_index": 1,
+      "wider_finding_index": 2
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0001.",
+      "positive_finding_index": null,
+      "main_finding_index": 1,
+      "wider_finding_index": 2,
+      "primary_narrative": "This enquiry, which declared a property to sell at 4 High Street, Billericay valued at £255,000, received zero human contact across any channel over the full 4-day observation window. No follow-up was logged and no valuation conversation was ever opened, meaning the agency likely has no record this enquiry, or the seller opportunity behind it, ever existed.</primary_narrative>\n<parameter name=\"supporting_findings\">",
+      "supporting_findings": "",
+      "fair_observation": "",
+      "main_finding": "",
+      "commercial_consequence": "this left a named £255,000 property to sell completely unaddressed and unvalued, representing pipeline the agency likely has no visibility into.",
+      "email_observation": "I contacted you about a property to sell at 4 High Street, Billericay, but received no reply on any channel across 4 days, and the valuation was never addressed.",
+      "email_commercial_hook": "That's a £255,000 seller opportunity that went completely untouched, with no record it was ever pursued.",
+      "novus_counterfactual": "NOVUS would have responded immediately, recognised the declared property to sell, and opened a valuation conversation on the £255,000 Billericay property before the 4-day window closed."
+    },
+    "recorded_persisted": {
+      "fair_observation": "",
+      "main_finding": "",
+      "commercial_consequence": "this left a named £255,000 property to sell completely unaddressed and unvalued, representing pipeline the agency likely has no visibility into.",
+      "email_observation": "I contacted you about a property to sell at 4 High Street, Billericay, but received no reply on any channel across 4 days, and the valuation was never addressed.",
+      "email_commercial_hook": "That's a £255,000 seller opportunity that went completely untouched, with no record it was ever pursued.",
+      "primary_narrative": "This enquiry, which declared a property to sell at 4 High Street, Billericay valued at £255,000, received zero human contact across any channel over the full 4-day observation window. No follow-up was logged and no valuation conversation was ever opened, meaning the agency likely has no record this enquiry, or the seller opportunity behind it, ever existed.</primary_narrative>\n<parameter name=\"supporting_findings\">"
+    },
+    "recorded_demo": {
+      "demo_status": "ready",
+      "review_reasons": ""
+    }
+  },
+  {
+    "probe_id": "prb_hist_0002",
+    "agency_id": "ag_hist_stantonhockett",
+    "agency_name": "Stanton Hockett Limited",
+    "probe": {
+      "probe_id": "prb_hist_0002",
+      "agency_id": "ag_hist_stantonhockett",
+      "property_address": "Wedgwood Way",
+      "property_price": "£450,000.00",
+      "probe_timestamp": "2026-08-10T20:53:05Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0002",
+      "human_contact": "yes",
+      "response_hours": "37.11527778",
+      "contact_attempts": "2",
+      "follow_ups": "1",
+      "channels_used": "voice",
+      "viewing_progression": "mentioned",
+      "seller_recognition": "none",
+      "grade": "E"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0002",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 1,
+        "finding_type": "problem",
+        "finding": "Response time 37.12 hours; voicemail says only \"Give me a call back when you're free\" with no viewing invitation and buyer qualification depth recorded as none (questi...",
+        "evidence": "Response time 37.12 hours; voicemail says only \"Give me a call back when you're free\" with no viewing invitation and buyer qualification depth recorded as none (questions asked: none).",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 2,
+        "finding_type": "opportunity",
+        "finding": "Communications note: \"No mention or acknowledgement of the enquirer's own property to sell despite this being explicitly declared in the enquiry.\"",
+        "evidence": "Communications note: \"No mention or acknowledgement of the enquirer's own property to sell despite this being explicitly declared in the enquiry.\"",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 4,
+        "finding_type": "positive",
+        "finding": "\"Hi, Jerry, it's Terry from Stanton Hockett estate agents... our lovely Wedgewood Way property in Ashingdon area of Rochford. It's one on the market for 450,000.\"",
+        "evidence": "\"Hi, Jerry, it's Terry from Stanton Hockett estate agents... our lovely Wedgewood Way property in Ashingdon area of Rochford. It's one on the market for 450,000.\"",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": 4,
+      "main_finding_index": 1,
+      "wider_finding_index": 2
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0002.",
+      "positive_finding_index": 4,
+      "main_finding_index": 1,
+      "wider_finding_index": 2,
+      "primary_narrative": "Terry called back and got the personal touch right, using the enquirer's name and correctly citing the Wedgewood Way property. But the call itself came 37 hours late, asked no questions, and never invited a viewing. On top of that, the enquirer had clearly stated they have their own property to sell, and this was never picked up on or explored.",
+      "supporting_findings": "A second, entirely empty voicemail follow-up (Finding 3) added contact volume without any substance, reinforcing the same pattern of activity without progress.",
+      "fair_observation": "terry personalised the call well, using the enquirer's name and the correct property details, and identified himself clearly for a callback.",
+      "main_finding": "",
+      "commercial_consequence": "a buyer left waiting 37 hours with no viewing offer and no questions asked may already be progressing with a faster-moving agent.",
+      "email_observation": "Terry's callback was well personalised, using my name and the exact property details, but it came over 37 hours late, asked no questions, offered no viewing, and never picked up on the fact I have a property of my own to sell.",
+      "email_commercial_hook": "",
+      "novus_counterfactual": "NOVUS would have responded within minutes, asked qualifying questions, proposed a viewing time, and flagged the enquirer's own property as an immediate valuation opportunity for the branch to action."
+    },
+    "recorded_persisted": {
+      "fair_observation": "terry personalised the call well, using the enquirer's name and the correct property details, and identified himself clearly for a callback.",
+      "main_finding": "",
+      "commercial_consequence": "a buyer left waiting 37 hours with no viewing offer and no questions asked may already be progressing with a faster-moving agent.",
+      "email_observation": "Terry's callback was well personalised, using my name and the exact property details, but it came over 37 hours late, asked no questions, offered no viewing, and never picked up on the fact I have a property of my own to sell.",
+      "email_commercial_hook": "",
+      "primary_narrative": "Terry called back and got the personal touch right, using the enquirer's name and correctly citing the Wedgewood Way property. But the call itself came 37 hours late, asked no questions, and never invited a viewing. On top of that, the enquirer had clearly stated they have their own property to sell, and this was never picked up on or explored."
+    },
+    "recorded_demo": {
+      "demo_status": "ready",
+      "review_reasons": ""
+    }
+  },
+  {
+    "probe_id": "prb_hist_0003",
+    "agency_id": "ag_hist_quirkandpartners",
+    "agency_name": "Quirks Estate Agents Billericay",
+    "probe": {
+      "probe_id": "prb_hist_0003",
+      "agency_id": "ag_hist_quirkandpartners",
+      "property_address": "Perry Street",
+      "property_price": "£425,000.00",
+      "probe_timestamp": "2026-08-10T20:53:05Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0003",
+      "human_contact": "none",
+      "response_hours": "",
+      "contact_attempts": "0",
+      "follow_ups": "0",
+      "channels_used": "",
+      "viewing_progression": "none",
+      "seller_recognition": "none",
+      "grade": "H"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0003",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 1,
+        "finding_type": "problem",
+        "finding": "Contact attempts: 0, follow-ups after the first: 0, channels used: none, observation window closed after 4 days with no meaningful response on any channel (Source Mast...",
+        "evidence": "Contact attempts: 0, follow-ups after the first: 0, channels used: none, observation window closed after 4 days with no meaningful response on any channel (Source Master §10)",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 2,
+        "finding_type": "opportunity",
+        "finding": "\"neither the viewing nor the declared property to sell was ever addressed\"",
+        "evidence": "\"neither the viewing nor the declared property to sell was ever addressed\"",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": null,
+      "main_finding_index": 1,
+      "wider_finding_index": 2
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0003.",
+      "positive_finding_index": null,
+      "main_finding_index": 1,
+      "wider_finding_index": 2,
+      "primary_narrative": "No one reached out on any channel, and the declared seller intent was never followed up, so no valuation conversation ever began.",
+      "supporting_findings": "",
+      "fair_observation": "",
+      "main_finding": "",
+      "commercial_consequence": "a declared seller was left completely unengaged, so no valuation conversation ever started.",
+      "email_observation": "This enquiry, from someone with a property to sell, received no contact on any channel across the full 4-day window, and that declared seller intent was never followed up.",
+      "email_commercial_hook": "A potential seller went completely unengaged, meaning no valuation conversation ever had the chance to start.",
+      "novus_counterfactual": "NOVUS would have flagged the declared property-to-sell within hours and surfaced it as an unactioned valuation opportunity before the 4-day window closed, prompting outreach on at least one channel."
+    },
+    "recorded_persisted": {
+      "fair_observation": "",
+      "main_finding": "",
+      "commercial_consequence": "a declared seller was left completely unengaged, so no valuation conversation ever started.",
+      "email_observation": "This enquiry, from someone with a property to sell, received no contact on any channel across the full 4-day window, and that declared seller intent was never followed up.",
+      "email_commercial_hook": "A potential seller went completely unengaged, meaning no valuation conversation ever had the chance to start.",
+      "primary_narrative": "No one reached out on any channel, and the declared seller intent was never followed up, so no valuation conversation ever began."
+    },
+    "recorded_demo": {
+      "demo_status": "ready",
+      "review_reasons": ""
+    }
+  },
+  {
+    "probe_id": "prb_hist_0004",
+    "agency_id": "ag_hist_hentonkirkman",
+    "agency_name": "Henton Kirkman Residential",
+    "probe": {
+      "probe_id": "prb_hist_0004",
+      "agency_id": "ag_hist_hentonkirkman",
+      "property_address": "Southend Road",
+      "property_price": "£225,000.00",
+      "probe_timestamp": "2026-08-10T20:53:05Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0004",
+      "human_contact": "yes",
+      "response_hours": "18.91527778",
+      "contact_attempts": "1",
+      "follow_ups": "0",
+      "channels_used": "voice",
+      "viewing_progression": "none",
+      "seller_recognition": "none",
+      "grade": "F"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0004",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 1,
+        "finding_type": "problem",
+        "finding": "Response time 18.92 hours, 1 contact attempt with 0 follow-ups, voice call with no content/transcript, questions asked: none.",
+        "evidence": "Response time 18.92 hours, 1 contact attempt with 0 follow-ups, voice call with no content/transcript, questions asked: none.",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 2,
+        "finding_type": "opportunity",
+        "finding": "Seller/vendor recognition: none; \"declared seller opportunity (unsold property, not yet on market) was not acknowledged in any way, no valuation was offered.\"",
+        "evidence": "Seller/vendor recognition: none; \"declared seller opportunity (unsold property, not yet on market) was not acknowledged in any way, no valuation was offered.\"",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": null,
+      "main_finding_index": 1,
+      "wider_finding_index": 2
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0004.",
+      "positive_finding_index": null,
+      "main_finding_index": 1,
+      "wider_finding_index": 2,
+      "primary_narrative": "The enquirer asked for more details on a property and also mentioned they have an unsold property not yet on the market. The only contact came almost 19 hours later, a phone call with no questions asked and no content — the property details request went unanswered and the seller opportunity was never acknowledged or offered a valuation.",
+      "supporting_findings": "",
+      "fair_observation": "",
+      "main_finding": "the single voice contact took nearly 19 hours, had no follow-up, and left the buyer's request for more property details unanswered.",
+      "commercial_consequence": "the same delayed, empty call also meant the enquirer's declared unsold property was never acknowledged or offered a valuation, leaving that opportunity completely untouched.",
+      "email_observation": "I asked for more details on the property and also mentioned I have one to sell, but your only contact came nearly 19 hours later by phone with no answers given and no questions asked.",
+      "email_commercial_hook": "That single, delayed, content-free call meant neither my property enquiry nor my unsold home — a valuation opportunity worth pursuing — received any substantive response.",
+      "novus_counterfactual": "NOVUS would have responded within minutes, answered the property details request directly, and flagged the declared unsold property for immediate valuation follow-up rather than letting one silent call cover both."
+    },
+    "recorded_persisted": {
+      "fair_observation": "",
+      "main_finding": "the single voice contact took nearly 19 hours, had no follow-up, and left the buyer's request for more property details unanswered.",
+      "commercial_consequence": "the same delayed, empty call also meant the enquirer's declared unsold property was never acknowledged or offered a valuation, leaving that opportunity completely untouched.",
+      "email_observation": "I asked for more details on the property and also mentioned I have one to sell, but your only contact came nearly 19 hours later by phone with no answers given and no questions asked.",
+      "email_commercial_hook": "That single, delayed, content-free call meant neither my property enquiry nor my unsold home — a valuation opportunity worth pursuing — received any substantive response.",
+      "primary_narrative": "The enquirer asked for more details on a property and also mentioned they have an unsold property not yet on the market. The only contact came almost 19 hours later, a phone call with no questions asked and no content — the property details request went unanswered and the seller opportunity was never acknowledged or offered a valuation."
+    },
+    "recorded_demo": {
+      "demo_status": "needs_review",
+      "review_reasons": "positive_observation is blank although the agency did respond — beat 2 has no credit line"
+    }
+  },
+  {
+    "probe_id": "prb_hist_0005",
+    "agency_id": "ag_hist_parabar",
+    "agency_name": "ParaBar Estates",
+    "probe": {
+      "probe_id": "prb_hist_0005",
+      "agency_id": "ag_hist_parabar",
+      "property_address": "Grey Lady Place",
+      "property_price": "£450,000.00",
+      "probe_timestamp": "2026-08-10T20:53:05Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0005",
+      "human_contact": "yes",
+      "response_hours": "10.63916667",
+      "contact_attempts": "2",
+      "follow_ups": "1",
+      "channels_used": "email",
+      "viewing_progression": "mentioned",
+      "seller_recognition": "none",
+      "grade": "B"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0005",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 1,
+        "finding_type": "opportunity",
+        "finding": "Seller/vendor recognition: none; all three emails are identical brochure-and-call-us templates with no mention of his own property.",
+        "evidence": "Seller/vendor recognition: none; all three emails are identical brochure-and-call-us templates with no mention of his own property.",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 2,
+        "finding_type": "problem",
+        "finding": "Buyer qualification depth: none (questions asked: none) across three emails to Joe Carter.",
+        "evidence": "Buyer qualification depth: none (questions asked: none) across three emails to Joe Carter.",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 4,
+        "finding_type": "positive",
+        "finding": "Emails addressed to 'Dear Joe Carter' and included brochures for Outwood Common Road and Kilbarry Walk.",
+        "evidence": "Emails addressed to 'Dear Joe Carter' and included brochures for Outwood Common Road and Kilbarry Walk.",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": 4,
+      "main_finding_index": 1,
+      "wider_finding_index": 2
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0005.",
+      "positive_finding_index": 4,
+      "main_finding_index": 1,
+      "wider_finding_index": 2,
+      "primary_narrative": "The agency responded three times with personalised, well-matched brochures for two other properties. However, none of the three emails asked about his property to sell, and none asked any qualifying questions about his budget, timescale or finance as a buyer.",
+      "supporting_findings": "Finding 3 notes viewing progression stayed passive with a generic 'call us' line rather than proactively offering times.",
+      "fair_observation": "",
+      "main_finding": "",
+      "commercial_consequence": "",
+      "email_observation": "",
+      "email_commercial_hook": "",
+      "novus_counterfactual": ""
+    },
+    "recorded_persisted": {
+      "fair_observation": "",
+      "main_finding": "",
+      "commercial_consequence": "",
+      "email_observation": "",
+      "email_commercial_hook": "",
+      "primary_narrative": "The agency responded three times with personalised, well-matched brochures for two other properties. However, none of the three emails asked about his property to sell, and none asked any qualifying questions about his budget, timescale or finance as a buyer."
+    },
+    "recorded_demo": {
+      "demo_status": "needs_review",
+      "review_reasons": "commercial_consequence is blank — beat 2 has no payoff · positive_observation is blank although the agency did respond — beat 2 has no credit line"
+    }
+  },
+  {
+    "probe_id": "prb_hist_0006",
+    "agency_id": "ag_hist_tylerestates",
+    "agency_name": "Tyler Estates",
+    "probe": {
+      "probe_id": "prb_hist_0006",
+      "agency_id": "ag_hist_tylerestates",
+      "property_address": "Southend Road",
+      "property_price": "£535,000.00",
+      "probe_timestamp": "2026-08-10T21:03:08Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0006",
+      "human_contact": "yes",
+      "response_hours": "11.63111111",
+      "contact_attempts": "2",
+      "follow_ups": "1",
+      "channels_used": "email,voice",
+      "viewing_progression": "none",
+      "seller_recognition": "none",
+      "grade": "B"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0006",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 1,
+        "finding_type": "problem",
+        "finding": "\"No agent ever acknowledged or asked about the property Joe declared he has to sell, despite this being explicitly stated in the enquiry\"",
+        "evidence": "\"No agent ever acknowledged or asked about the property Joe declared he has to sell, despite this being explicitly stated in the enquiry\"",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 2,
+        "finding_type": "problem",
+        "finding": "Martin's second call on 2026-08-13 was still exploratory voicemail (\"I'm not sure if it's, what, what your situation is\") and the first two emails were generic automat...",
+        "evidence": "Martin's second call on 2026-08-13 was still exploratory voicemail (\"I'm not sure if it's, what, what your situation is\") and the first two emails were generic automated templates asking Joe to register rather than offering a slot",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 4,
+        "finding_type": "positive",
+        "finding": "Freddy and Martin both called, with Martin's second call on 2026-08-13 beginning to probe Joe's situation (\"what your situation is, where you're looking at your profil...",
+        "evidence": "Freddy and Martin both called, with Martin's second call on 2026-08-13 beginning to probe Joe's situation (\"what your situation is, where you're looking at your profile bedroom\")",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": 4,
+      "main_finding_index": 1,
+      "wider_finding_index": 2
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0006.",
+      "positive_finding_index": 4,
+      "main_finding_index": 1,
+      "wider_finding_index": 2,
+      "primary_narrative": "Freddy and Martin both called him rather than relying solely on automated emails, with Martin's second call starting to probe his situation. But across two emails and two calls, nobody picked up on the property he has to sell, and no viewing was ever booked for the property he enquired about.",
+      "supporting_findings": "Finding 3 (no qualification questions on budget, finance, timescale or motivation) underlies both missed opportunities but is not needed to tell this story.",
+      "fair_observation": "",
+      "main_finding": "joe explicitly declared he has a property to sell, but no agent ever acknowledged or asked about it across two emails and two calls.",
+      "commercial_consequence": "",
+      "email_observation": "I appreciated the two phone call attempts rather than just automated emails, but nobody picked up on the property I mentioned I have to sell, and no viewing was ever booked for the one I enquired about.",
+      "email_commercial_hook": "That means a declared seller lead went unpursued and the buyer enquiry itself never progressed to a viewing across two calls and two emails.",
+      "novus_counterfactual": "NOVUS would have flagged Joe's declared property to sell immediately, prompting a specific question about it on the first contact, while also offering a concrete viewing slot for the property he enquired about rather than a generic registration email."
+    },
+    "recorded_persisted": {
+      "fair_observation": "",
+      "main_finding": "joe explicitly declared he has a property to sell, but no agent ever acknowledged or asked about it across two emails and two calls.",
+      "commercial_consequence": "",
+      "email_observation": "I appreciated the two phone call attempts rather than just automated emails, but nobody picked up on the property I mentioned I have to sell, and no viewing was ever booked for the one I enquired about.",
+      "email_commercial_hook": "That means a declared seller lead went unpursued and the buyer enquiry itself never progressed to a viewing across two calls and two emails.",
+      "primary_narrative": "Freddy and Martin both called him rather than relying solely on automated emails, with Martin's second call starting to probe his situation. But across two emails and two calls, nobody picked up on the property he has to sell, and no viewing was ever booked for the property he enquired about."
+    },
+    "recorded_demo": {
+      "demo_status": "needs_review",
+      "review_reasons": "commercial_consequence is blank — beat 2 has no payoff · positive_observation is blank although the agency did respond — beat 2 has no credit line"
+    }
+  },
+  {
+    "probe_id": "prb_hist_0007",
+    "agency_id": "ag_hist_thepropertyspecialists",
+    "agency_name": "The Property Specialists | Estate agents in Billericay",
+    "probe": {
+      "probe_id": "prb_hist_0007",
+      "agency_id": "ag_hist_thepropertyspecialists",
+      "property_address": "St Ediths Court",
+      "property_price": "£280,000.00",
+      "probe_timestamp": "2026-08-10T21:00:05Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0007",
+      "human_contact": "yes",
+      "response_hours": "14.27166667",
+      "contact_attempts": "1",
+      "follow_ups": "0",
+      "channels_used": "email",
+      "viewing_progression": "invited",
+      "seller_recognition": "none",
+      "grade": "D"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0007",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 1,
+        "finding_type": "opportunity",
+        "finding": "\"the enquirer declared they have a property to sell that is not yet on the market, but the agency's reply made no mention of this\"",
+        "evidence": "\"the enquirer declared they have a property to sell that is not yet on the market, but the agency's reply made no mention of this\"",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 2,
+        "finding_type": "problem",
+        "finding": "\"I understand you would like to arrange a viewing - if so, just let me know when [suits].\"",
+        "evidence": "\"I understand you would like to arrange a viewing - if so, just let me know when [suits].\"",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 3,
+        "finding_type": "positive",
+        "finding": "\"Hi Joe, thanks for your enquiry regarding the property we have for sale in Walman House, St Ediths Court, Billericay.\"",
+        "evidence": "\"Hi Joe, thanks for your enquiry regarding the property we have for sale in Walman House, St Ediths Court, Billericay.\"",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": 3,
+      "main_finding_index": 1,
+      "wider_finding_index": 2
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0007.",
+      "positive_finding_index": 3,
+      "main_finding_index": 1,
+      "wider_finding_index": 2,
+      "primary_narrative": "Joe enquired about the Walman House property and also mentioned he has his own property to sell that isn't yet on the market. The agent replied promptly, addressing him by name and referencing the correct property, and invited him to arrange a viewing. However, the reply contained an unedited template placeholder and made no mention at all of Joe's own property to sell.",
+      "supporting_findings": "",
+      "fair_observation": "",
+      "main_finding": "joe declared he has a property to sell that isn't yet on the market, but the reply made no mention of this at all, missing a valuation opportunity.",
+      "commercial_consequence": "",
+      "email_observation": "",
+      "email_commercial_hook": "That means a self-declared seller lead went unaddressed, while the visible template artefact suggests the personal touch wasn't as thorough as it looked.",
+      "novus_counterfactual": "NOVUS would have flagged Joe's declared unlisted property and prompted a valuation conversation in the same reply, while catching the unedited placeholder before it went out."
+    },
+    "recorded_persisted": {
+      "fair_observation": "",
+      "main_finding": "joe declared he has a property to sell that isn't yet on the market, but the reply made no mention of this at all, missing a valuation opportunity.",
+      "commercial_consequence": "",
+      "email_observation": "",
+      "email_commercial_hook": "That means a self-declared seller lead went unaddressed, while the visible template artefact suggests the personal touch wasn't as thorough as it looked.",
+      "primary_narrative": "Joe enquired about the Walman House property and also mentioned he has his own property to sell that isn't yet on the market. The agent replied promptly, addressing him by name and referencing the correct property, and invited him to arrange a viewing. However, the reply contained an unedited template placeholder and made no mention at all of Joe's own property to sell."
+    },
+    "recorded_demo": {
+      "demo_status": "needs_review",
+      "review_reasons": "commercial_consequence is blank — beat 2 has no payoff · positive_observation is blank although the agency did respond — beat 2 has no credit line"
+    }
+  },
+  {
+    "probe_id": "prb_hist_0008",
+    "agency_id": "ag_hist_gibsonandbrennan",
+    "agency_name": "Gibson & Brennan Estate Agents",
+    "probe": {
+      "probe_id": "prb_hist_0008",
+      "agency_id": "ag_hist_gibsonandbrennan",
+      "property_address": "Whitmore Way",
+      "property_price": "£425,000.00",
+      "probe_timestamp": "2026-08-10T21:00:05Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0008",
+      "human_contact": "yes",
+      "response_hours": "12.43194444",
+      "contact_attempts": "1",
+      "follow_ups": "0",
+      "channels_used": "email,voice",
+      "viewing_progression": "availability_requested",
+      "seller_recognition": "none",
+      "grade": "D"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0008",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 1,
+        "finding_type": "opportunity",
+        "finding": "\"The declared intention to sell a property not yet on the market was never acknowledged or explored in any communication - no seller questions asked, no valuation offe...",
+        "evidence": "\"The declared intention to sell a property not yet on the market was never acknowledged or explored in any communication - no seller questions asked, no valuation offered.\"",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 3,
+        "finding_type": "problem",
+        "finding": "\"Thanks for your enquiry about 2 bedroom terraced house for sale in Whitmore Way... Before we move this forward we just need you to complete our online [registration].\"",
+        "evidence": "\"Thanks for your enquiry about 2 bedroom terraced house for sale in Whitmore Way... Before we move this forward we just need you to complete our online [registration].\"",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 4,
+        "finding_type": "positive",
+        "finding": "\"Hello Joe, this is Dan from Gibson and Brennan. Give me a call back when you get this.\" followed by an email asking for a suitable date and time for the viewing.",
+        "evidence": "\"Hello Joe, this is Dan from Gibson and Brennan. Give me a call back when you get this.\" followed by an email asking for a suitable date and time for the viewing.",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": 4,
+      "main_finding_index": 1,
+      "wider_finding_index": 3
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0008.",
+      "positive_finding_index": 4,
+      "main_finding_index": 1,
+      "wider_finding_index": 3,
+      "primary_narrative": "Joe enquired about a viewing at Whitmore Way and also mentioned he has a property to sell that isn't yet on the market. Dan from the agency called and emailed to try to arrange the viewing, keeping the enquiry moving. But the messaging was generic and registration-first, and nobody asked Joe any seller questions or offered a valuation, so his declared selling intention was never picked up.",
+      "supporting_findings": "Finding 2 notes no buyer qualification questions were asked either, meaning the viewing itself was booked without checking Joe's position.",
+      "fair_observation": "you made a phone attempt and followed up by email to keep the viewing enquiry moving.",
+      "main_finding": "joe told you he has a property to sell that isn't yet on the market, but no one asked him any seller questions or offered a valuation.",
+      "commercial_consequence": "that leaves a self-declared seller lead worth a potential additional instruction sitting completely unexplored.",
+      "email_observation": "I appreciated that Dan called and emailed to arrange my viewing, but although I mentioned I have a property to sell, the messaging stayed generic and nobody asked me any seller questions or offered a valuation.",
+      "email_commercial_hook": "A self-declared seller not yet on the market is a live valuation lead, and it went completely unacknowledged alongside the viewing chase.",
+      "novus_counterfactual": "NOVUS would have flagged Joe's declared selling intention immediately, prompting a tailored response that asked seller questions and offered a valuation alongside arranging the viewing."
+    },
+    "recorded_persisted": {
+      "fair_observation": "you made a phone attempt and followed up by email to keep the viewing enquiry moving.",
+      "main_finding": "joe told you he has a property to sell that isn't yet on the market, but no one asked him any seller questions or offered a valuation.",
+      "commercial_consequence": "that leaves a self-declared seller lead worth a potential additional instruction sitting completely unexplored.",
+      "email_observation": "I appreciated that Dan called and emailed to arrange my viewing, but although I mentioned I have a property to sell, the messaging stayed generic and nobody asked me any seller questions or offered a valuation.",
+      "email_commercial_hook": "A self-declared seller not yet on the market is a live valuation lead, and it went completely unacknowledged alongside the viewing chase.",
+      "primary_narrative": "Joe enquired about a viewing at Whitmore Way and also mentioned he has a property to sell that isn't yet on the market. Dan from the agency called and emailed to try to arrange the viewing, keeping the enquiry moving. But the messaging was generic and registration-first, and nobody asked Joe any seller questions or offered a valuation, so his declared selling intention was never picked up."
+    },
+    "recorded_demo": {
+      "demo_status": "ready",
+      "review_reasons": ""
+    }
+  },
+  {
+    "probe_id": "prb_hist_0009",
+    "agency_id": "ag_hist_crownestatesagents",
+    "agency_name": "Crown Estate Agents",
+    "probe": {
+      "probe_id": "prb_hist_0009",
+      "agency_id": "ag_hist_crownestatesagents",
+      "property_address": "Church Road",
+      "property_price": "£650,000.00",
+      "probe_timestamp": "2026-08-10T21:00:05Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0009",
+      "human_contact": "yes",
+      "response_hours": "14.48194444",
+      "contact_attempts": "3",
+      "follow_ups": "2",
+      "channels_used": "voice,email",
+      "viewing_progression": "invited",
+      "seller_recognition": "none",
+      "grade": "B"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0009",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 1,
+        "finding_type": "opportunity",
+        "finding": "Both the voicemail (\"regarding a property we've got for sale. Fox Cottage\") and the email focus solely on booking a Fox Cottage viewing; the declared seller property i...",
+        "evidence": "Both the voicemail (\"regarding a property we've got for sale. Fox Cottage\") and the email focus solely on booking a Fox Cottage viewing; the declared seller property is not mentioned in either communication.",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 2,
+        "finding_type": "problem",
+        "finding": "Buyer qualification depth recorded as 'none' - no requirements, budget, timescale or finance position explored in the voicemail or email.",
+        "evidence": "Buyer qualification depth recorded as 'none' - no requirements, budget, timescale or finance position explored in the voicemail or email.",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 3,
+        "finding_type": "positive",
+        "finding": "Voicemail on 2026-08-11 and follow-up email on 2026-08-12 (14.48 hours after enquiry) both correctly reference \"Joe\" and \"Fox Cottage\", with 3 total contact attempts i...",
+        "evidence": "Voicemail on 2026-08-11 and follow-up email on 2026-08-12 (14.48 hours after enquiry) both correctly reference \"Joe\" and \"Fox Cottage\", with 3 total contact attempts including 2 follow-ups.",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": 3,
+      "main_finding_index": 1,
+      "wider_finding_index": 2
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0009.",
+      "positive_finding_index": 3,
+      "main_finding_index": 1,
+      "wider_finding_index": 2,
+      "primary_narrative": "The agency responded quickly and personally across two channels about the Fox Cottage viewing, correctly naming the enquirer both times. But the enquirer's own property, not yet on the market, was never mentioned or offered a valuation, and no attempt was made to establish the enquirer's budget, timescale or seriousness as a buyer.</primary_narrative>\n<parameter name=\"supporting_findings\">",
+      "supporting_findings": "",
+      "fair_observation": "",
+      "main_finding": "the declared seller property was never acknowledged in either contact, and no valuation was ever offered.",
+      "commercial_consequence": "that leaves a live seller lead sitting unexplored alongside a buyer enquiry whose budget and timescale were never established.",
+      "email_observation": "I appreciated the quick, personalised voicemail and email about my Fox Cottage viewing, but neither mentioned the property I've got coming up for sale, and no one asked about my budget or timescale.",
+      "email_commercial_hook": "That means a live seller lead and a buyer's real budget and timescale both went unexplored during that same well-executed follow-up.",
+      "novus_counterfactual": "NOVUS would have flagged the declared seller property immediately, prompting a valuation offer alongside the viewing booking, and would have run through basic buyer qualification questions on budget and timescale during that first contact."
+    },
+    "recorded_persisted": {
+      "fair_observation": "",
+      "main_finding": "the declared seller property was never acknowledged in either contact, and no valuation was ever offered.",
+      "commercial_consequence": "that leaves a live seller lead sitting unexplored alongside a buyer enquiry whose budget and timescale were never established.",
+      "email_observation": "I appreciated the quick, personalised voicemail and email about my Fox Cottage viewing, but neither mentioned the property I've got coming up for sale, and no one asked about my budget or timescale.",
+      "email_commercial_hook": "That means a live seller lead and a buyer's real budget and timescale both went unexplored during that same well-executed follow-up.",
+      "primary_narrative": "The agency responded quickly and personally across two channels about the Fox Cottage viewing, correctly naming the enquirer both times. But the enquirer's own property, not yet on the market, was never mentioned or offered a valuation, and no attempt was made to establish the enquirer's budget, timescale or seriousness as a buyer.</primary_narrative>\n<parameter name=\"supporting_findings\">"
+    },
+    "recorded_demo": {
+      "demo_status": "needs_review",
+      "review_reasons": "positive_observation is blank although the agency did respond — beat 2 has no credit line"
+    }
+  },
+  {
+    "probe_id": "prb_hist_0010",
+    "agency_id": "ag_hist_chalmersagency",
+    "agency_name": "Chalmers Agency",
+    "probe": {
+      "probe_id": "prb_hist_0010",
+      "agency_id": "ag_hist_chalmersagency",
+      "property_address": "High Street",
+      "property_price": "£450,000.00",
+      "probe_timestamp": "2026-08-10T21:12:56Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0010",
+      "human_contact": "yes",
+      "response_hours": "63.56777778",
+      "contact_attempts": "1",
+      "follow_ups": "0",
+      "channels_used": "email,voice",
+      "viewing_progression": "none",
+      "seller_recognition": "none",
+      "grade": "F"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0010",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 2,
+        "finding_type": "opportunity",
+        "finding": "\"The enquirer explicitly declared they have a property to sell that is not yet on the market, but none of the communications acknowledge this, ask about its position, ...",
+        "evidence": "\"The enquirer explicitly declared they have a property to sell that is not yet on the market, but none of the communications acknowledge this, ask about its position, or offer a valuation.\"",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 3,
+        "finding_type": "problem",
+        "finding": "Buyer qualification depth: none (questions asked: none); Viewing progression: none; second email was a \"generic automated property blast unrelated to the enquiry\".",
+        "evidence": "Buyer qualification depth: none (questions asked: none); Viewing progression: none; second email was a \"generic automated property blast unrelated to the enquiry\".",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 4,
+        "finding_type": "positive",
+        "finding": "\"Hi Joe. Thank you for your Rightmove enquiry regarding Flat 7, 151A High Street, Brentwood. A member of our team will be in touch soon.\"",
+        "evidence": "\"Hi Joe. Thank you for your Rightmove enquiry regarding Flat 7, 151A High Street, Brentwood. A member of our team will be in touch soon.\"",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": 4,
+      "main_finding_index": 2,
+      "wider_finding_index": 3
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0010.",
+      "positive_finding_index": 4,
+      "main_finding_index": 2,
+      "wider_finding_index": 3,
+      "primary_narrative": "Joe's enquiry was correctly logged and personalised by the automated system, matching his name and the specific flat. But when a human follow-up did happen two days later, it was a generic automated blast rather than a genuine conversation — no questions about budget or timescale, no mention of viewing, and no acknowledgement at all that Joe had a property to sell that isn't yet on the market.",
+      "supporting_findings": "Finding 1 notes the 63.57-hour response time with no follow-up attempts, which underlies why engagement was thin, but is not needed alongside the qualification/seller-opportunity story.",
+      "fair_observation": "the initial automated email correctly personalised the enquiry by name and specific property.",
+      "main_finding": "joe declared he has a property to sell that is not yet on the market, but no communication acknowledged this, asked about its position, or offered a valuation.",
+      "commercial_consequence": "this leaves a self-declared off-market seller — a valuation opportunity — completely unpursued, regardless of how the buying side of the enquiry resolves.",
+      "email_observation": "Your initial email correctly personalised Joe's enquiry by name and property, but the follow-up two days later was a generic automated blast — no qualification questions, no viewing mention, and no acknowledgement of the property he wants to sell.",
+      "email_commercial_hook": "Joe explicitly flagged an off-market property to sell, but that valuation opportunity, along with his buyer qualification and viewing interest, was never followed up.",
+      "novus_counterfactual": "NOVUS would have flagged Joe's declared off-market property immediately, prompting a genuine call that both qualified his buying needs and opened a valuation conversation about his own home, rather than sending a generic automated blast two days later."
+    },
+    "recorded_persisted": {
+      "fair_observation": "the initial automated email correctly personalised the enquiry by name and specific property.",
+      "main_finding": "joe declared he has a property to sell that is not yet on the market, but no communication acknowledged this, asked about its position, or offered a valuation.",
+      "commercial_consequence": "this leaves a self-declared off-market seller — a valuation opportunity — completely unpursued, regardless of how the buying side of the enquiry resolves.",
+      "email_observation": "Your initial email correctly personalised Joe's enquiry by name and property, but the follow-up two days later was a generic automated blast — no qualification questions, no viewing mention, and no acknowledgement of the property he wants to sell.",
+      "email_commercial_hook": "Joe explicitly flagged an off-market property to sell, but that valuation opportunity, along with his buyer qualification and viewing interest, was never followed up.",
+      "primary_narrative": "Joe's enquiry was correctly logged and personalised by the automated system, matching his name and the specific flat. But when a human follow-up did happen two days later, it was a generic automated blast rather than a genuine conversation — no questions about budget or timescale, no mention of viewing, and no acknowledgement at all that Joe had a property to sell that isn't yet on the market."
+    },
+    "recorded_demo": {
+      "demo_status": "ready",
+      "review_reasons": ""
+    }
+  },
+  {
+    "probe_id": "prb_hist_0011",
+    "agency_id": "ag_hist_carterremy",
+    "agency_name": "Carter Remy Estate Agents",
+    "probe": {
+      "probe_id": "prb_hist_0011",
+      "agency_id": "ag_hist_carterremy",
+      "property_address": "Bellhouse Avenue",
+      "property_price": "£350,000.00",
+      "probe_timestamp": "2026-08-11T21:18:38Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0011",
+      "human_contact": "yes",
+      "response_hours": "16.12111111",
+      "contact_attempts": "2",
+      "follow_ups": "1",
+      "channels_used": "email",
+      "viewing_progression": "slot_offered",
+      "seller_recognition": "none",
+      "grade": "E"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0011",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 1,
+        "finding_type": "opportunity",
+        "finding": "Enquirer stated they have a property to sell that is not yet on the market; none of the three messages (2026-08-11, 2026-08-12, 2026-08-14) reference this or mention v...",
+        "evidence": "Enquirer stated they have a property to sell that is not yet on the market; none of the three messages (2026-08-11, 2026-08-12, 2026-08-14) reference this or mention valuation.",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 2,
+        "finding_type": "problem",
+        "finding": "Qualification depth recorded as 'none' with zero questions asked (budget, finance, timescale, current position all absent) across all three emails.",
+        "evidence": "Qualification depth recorded as 'none' with zero questions asked (budget, finance, timescale, current position all absent) across all three emails.",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 4,
+        "finding_type": "positive",
+        "finding": "\"Please let me know if you would be able to attend a viewing of this property on Saturday 15th August at 3pm.\"",
+        "evidence": "\"Please let me know if you would be able to attend a viewing of this property on Saturday 15th August at 3pm.\"",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": 4,
+      "main_finding_index": 1,
+      "wider_finding_index": 2
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0011.",
+      "positive_finding_index": 4,
+      "main_finding_index": 1,
+      "wider_finding_index": 2,
+      "primary_narrative": "The enquirer mentioned they have a property to sell that isn't yet on the market, alongside their interest in viewing. The agency responded with a clear, specific viewing slot for Saturday 15th August at 3pm, which is a helpful, low-friction touch. However, none of the three follow-up emails acknowledged the seller side of the enquiry, asked about the property's position, or offered a valuation. At the same time, no buyer qualification questions were asked before offering the viewing slot.</primary_narrative>\n<parameter name=\"supporting_findings\">Finding 3 notes the first response took over 16 hours and was templated rather than personalised, but this is secondary to the missed seller opportunity and qualification gap.",
+      "supporting_findings": "",
+      "fair_observation": "you offered a specific, concrete viewing slot (Saturday 15th August at 3pm) rather than a vague invitation.",
+      "main_finding": "the enquirer declared an unlisted property to sell, but none of the three emails acknowledged it, asked about its position, or offered a valuation.",
+      "commercial_consequence": "",
+      "email_observation": "I appreciated the specific Saturday 3pm viewing slot you offered, but I mentioned I have a property to sell and none of your three emails asked about it, and no buyer questions were asked either.",
+      "email_commercial_hook": "",
+      "novus_counterfactual": "NOVUS would have flagged the declared unlisted property immediately, prompting a valuation offer and a couple of qualifying questions before or alongside confirming the viewing slot, so both opportunities were captured in the same conversation."
+    },
+    "recorded_persisted": {
+      "fair_observation": "you offered a specific, concrete viewing slot (Saturday 15th August at 3pm) rather than a vague invitation.",
+      "main_finding": "the enquirer declared an unlisted property to sell, but none of the three emails acknowledged it, asked about its position, or offered a valuation.",
+      "commercial_consequence": "",
+      "email_observation": "I appreciated the specific Saturday 3pm viewing slot you offered, but I mentioned I have a property to sell and none of your three emails asked about it, and no buyer questions were asked either.",
+      "email_commercial_hook": "",
+      "primary_narrative": "The enquirer mentioned they have a property to sell that isn't yet on the market, alongside their interest in viewing. The agency responded with a clear, specific viewing slot for Saturday 15th August at 3pm, which is a helpful, low-friction touch. However, none of the three follow-up emails acknowledged the seller side of the enquiry, asked about the property's position, or offered a valuation. At the same time, no buyer qualification questions were asked before offering the viewing slot.</primary_narrative>\n<parameter name=\"supporting_findings\">Finding 3 notes the first response took over 16 hours and was templated rather than personalised, but this is secondary to the missed seller opportunity and qualification gap."
+    },
+    "recorded_demo": {
+      "demo_status": "needs_review",
+      "review_reasons": "commercial_consequence is blank — beat 2 has no payoff"
+    }
+  },
+  {
+    "probe_id": "prb_hist_0012",
+    "agency_id": "ag_hist_periodhomes",
+    "agency_name": "Period Homes Essex",
+    "probe": {
+      "probe_id": "prb_hist_0012",
+      "agency_id": "ag_hist_periodhomes",
+      "property_address": "Milton Road",
+      "property_price": "£465,000.00",
+      "probe_timestamp": "2026-08-11T21:19:53Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0012",
+      "human_contact": "yes",
+      "response_hours": "11.45194444",
+      "contact_attempts": "2",
+      "follow_ups": "1",
+      "channels_used": "voice,email",
+      "viewing_progression": "availability_requested",
+      "seller_recognition": "asked_position",
+      "grade": "B"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0012",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 1,
+        "finding_type": "opportunity",
+        "finding": "Enquirer stated he has a property to sell that is not yet on the market and wanted more details; agency's email only asked \"Please could you also confirm your position...",
+        "evidence": "Enquirer stated he has a property to sell that is not yet on the market and wanted more details; agency's email only asked \"Please could you also confirm your position - sold/selling/nothing to sell?\"",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 2,
+        "finding_type": "positive",
+        "finding": "Email sent 2026-08-15T16:00:34Z requests \"your availability for a viewing next week - days and times\" and separately asks \"Please could you also confirm your position\"...",
+        "evidence": "Email sent 2026-08-15T16:00:34Z requests \"your availability for a viewing next week - days and times\" and separately asks \"Please could you also confirm your position\" in the same message.",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": 2,
+      "main_finding_index": 1,
+      "wider_finding_index": null
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0012.",
+      "positive_finding_index": 2,
+      "main_finding_index": 1,
+      "wider_finding_index": null,
+      "primary_narrative": "I enquired about a property while also flagging that I have a home to sell that isn't yet on the market, and asked for more details on that side. You replied in one efficient email that covered both the viewing request and a seller status question. However, instead of engaging with my specific request for information about selling, the reply only asked me to confirm whether I was sold/selling/nothing to sell - a generic tick-box question rather than a real valuation conversation.",
+      "supporting_findings": "",
+      "fair_observation": "the single email efficiently moved both the buying and selling threads forward at once, naming the property and me directly.",
+      "main_finding": "i explicitly flagged an unlisted property i want to sell and asked for details, but was only met with a generic status tick-box question rather than a valuation offer or next steps.",
+      "commercial_consequence": "a named, live seller lead with a specific request for information went unaddressed, leaving a valuation conversation on the table.",
+      "email_observation": "I mentioned I have a property to sell that isn't listed yet and asked for details, and while your email efficiently covered a viewing request too, my selling question only got a generic sold/selling/nothing tick-box reply.",
+      "email_commercial_hook": "A live seller with a specific information request was left with a form-filling question instead of a valuation conversation.",
+      "novus_counterfactual": "NOVUS would have recognised the explicit seller request and responded with a genuine valuation offer or next steps for the unlisted property, rather than a generic status question."
+    },
+    "recorded_persisted": {
+      "fair_observation": "the single email efficiently moved both the buying and selling threads forward at once, naming the property and me directly.",
+      "main_finding": "i explicitly flagged an unlisted property i want to sell and asked for details, but was only met with a generic status tick-box question rather than a valuation offer or next steps.",
+      "commercial_consequence": "a named, live seller lead with a specific request for information went unaddressed, leaving a valuation conversation on the table.",
+      "email_observation": "I mentioned I have a property to sell that isn't listed yet and asked for details, and while your email efficiently covered a viewing request too, my selling question only got a generic sold/selling/nothing tick-box reply.",
+      "email_commercial_hook": "A live seller with a specific information request was left with a form-filling question instead of a valuation conversation.",
+      "primary_narrative": "I enquired about a property while also flagging that I have a home to sell that isn't yet on the market, and asked for more details on that side. You replied in one efficient email that covered both the viewing request and a seller status question. However, instead of engaging with my specific request for information about selling, the reply only asked me to confirm whether I was sold/selling/nothing to sell - a generic tick-box question rather than a real valuation conversation."
+    },
+    "recorded_demo": {
+      "demo_status": "ready",
+      "review_reasons": ""
+    }
+  },
+  {
+    "probe_id": "prb_hist_0013",
+    "agency_id": "ag_hist_wnproperties",
+    "agency_name": "WN Properties",
+    "probe": {
+      "probe_id": "prb_hist_0013",
+      "agency_id": "ag_hist_wnproperties",
+      "property_address": "Bounderby Grove",
+      "property_price": "£140,000.00",
+      "probe_timestamp": "2026-08-11T21:21:04Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0013",
+      "human_contact": "yes",
+      "response_hours": "42.68222222",
+      "contact_attempts": "1",
+      "follow_ups": "0",
+      "channels_used": "voice",
+      "viewing_progression": "mentioned",
+      "seller_recognition": "none",
+      "grade": "F"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0013",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 1,
+        "finding_type": "problem",
+        "finding": "Response time 42.68 hours, 1 contact attempt with 0 follow-ups; the call as captured only says 'You sent us an inquiry for a possible viewing on a...' with no availabi...",
+        "evidence": "Response time 42.68 hours, 1 contact attempt with 0 follow-ups; the call as captured only says 'You sent us an inquiry for a possible viewing on a...' with no availability requested or slot offered",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 2,
+        "finding_type": "problem",
+        "finding": "Buyer qualification depth recorded as none, with zero questions asked on finance, timescale, budget or requirements",
+        "evidence": "Buyer qualification depth recorded as none, with zero questions asked on finance, timescale, budget or requirements",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 3,
+        "finding_type": "positive",
+        "finding": "\"Hello Joe, this is Jackie calling from WN Properties and Northwood Group.\"",
+        "evidence": "\"Hello Joe, this is Jackie calling from WN Properties and Northwood Group.\"",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": 3,
+      "main_finding_index": 1,
+      "wider_finding_index": 2
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0013.",
+      "positive_finding_index": 3,
+      "main_finding_index": 1,
+      "wider_finding_index": 2,
+      "primary_narrative": "The agent, Jackie, called and personalised the greeting correctly, but the call took over 42 hours to happen, was never followed up, and did not ask about viewing availability or Joe's finance, timescale or requirements.</primary_narrative>\n<parameter name=\"supporting_findings\">",
+      "supporting_findings": "",
+      "fair_observation": "",
+      "main_finding": "the initial response took over 42 hours, was never followed up, and the call itself did not progress to a viewing.",
+      "commercial_consequence": "",
+      "email_observation": "I liked that Jackie personalised the call with my name and your agency, but it took over 42 hours to reach me, was never followed up, and the call didn't ask about viewing times or my situation.",
+      "email_commercial_hook": "",
+      "novus_counterfactual": "NOVUS would have responded within minutes, offered a specific viewing slot on that first contact, and asked about my timescale and the property I have to sell, capturing both threads of the enquiry immediately."
+    },
+    "recorded_persisted": {
+      "fair_observation": "",
+      "main_finding": "the initial response took over 42 hours, was never followed up, and the call itself did not progress to a viewing.",
+      "commercial_consequence": "",
+      "email_observation": "I liked that Jackie personalised the call with my name and your agency, but it took over 42 hours to reach me, was never followed up, and the call didn't ask about viewing times or my situation.",
+      "email_commercial_hook": "",
+      "primary_narrative": "The agent, Jackie, called and personalised the greeting correctly, but the call took over 42 hours to happen, was never followed up, and did not ask about viewing availability or Joe's finance, timescale or requirements.</primary_narrative>\n<parameter name=\"supporting_findings\">"
+    },
+    "recorded_demo": {
+      "demo_status": "needs_review",
+      "review_reasons": "commercial_consequence is blank — beat 2 has no payoff · positive_observation is blank although the agency did respond — beat 2 has no credit line"
+    }
+  },
+  {
+    "probe_id": "prb_hist_0014",
+    "agency_id": "ag_hist_keithashton",
+    "agency_name": "Keith Ashton Estate Agents",
+    "probe": {
+      "probe_id": "prb_hist_0014",
+      "agency_id": "ag_hist_keithashton",
+      "property_address": "Hammonds Lane",
+      "property_price": "£500,000.00",
+      "probe_timestamp": "2026-08-11T21:21:55Z",
+      "enquiry_text": "Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market."
+    },
+    "intelligence": {
+      "probe_id": "prb_hist_0014",
+      "human_contact": "yes",
+      "response_hours": "11.96805556",
+      "contact_attempts": "2",
+      "follow_ups": "1",
+      "channels_used": "voice",
+      "viewing_progression": "mentioned",
+      "seller_recognition": "none",
+      "grade": "B"
+    },
+    "diagnosis": {
+      "probe_id": "prb_hist_0014",
+      "diagnosis_summary": "final",
+      "novus_opportunity": "Core (front desk)"
+    },
+    "findings": [
+      {
+        "finding_index": 2,
+        "finding_type": "opportunity",
+        "finding": "\"I'd love to arrange the...\" - the message ends there, with no availability request or callback instruction given.",
+        "evidence": "\"I'd love to arrange the...\" - the message ends there, with no availability request or callback instruction given.",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 3,
+        "finding_type": "problem",
+        "finding": "Buyer qualification depth: none (questions asked: none) - no budget, finance, timescale or requirements questions asked.",
+        "evidence": "Buyer qualification depth: none (questions asked: none) - no budget, finance, timescale or requirements questions asked.",
+        "significance_note": ""
+      },
+      {
+        "finding_index": 4,
+        "finding_type": "positive",
+        "finding": "\"You were interested in viewing a property we have in number 11 Hammonds Lane\" - correct address cited in the voicemail.",
+        "evidence": "\"You were interested in viewing a property we have in number 11 Hammonds Lane\" - correct address cited in the voicemail.",
+        "significance_note": ""
+      }
+    ],
+    "selection": {
+      "positive_finding_index": 4,
+      "main_finding_index": 2,
+      "wider_finding_index": 3
+    },
+    "recorded_model_output": {
+      "story_reasoning": "Recorded selection for prb_hist_0014.",
+      "positive_finding_index": 4,
+      "main_finding_index": 2,
+      "wider_finding_index": 3,
+      "primary_narrative": "The agent called back within two days and correctly named the Hammonds Lane property, showing genuine personalised effort.",
+      "supporting_findings": "Finding 1 notes the caller's own declared property to sell was never acknowledged, leaving a valuation opportunity untouched - a separate thread from the buyer follow-up story.",
+      "fair_observation": "",
+      "main_finding": "the voicemail left for the buyer cut off mid-sentence with no availability request or callback instruction given.",
+      "commercial_consequence": "without a completed message or any qualifying questions, the buyer has little reason or means to call back, and the agency has no sense of how serious their interest is.",
+      "email_observation": "I appreciated the callback naming the exact property, but the voicemail cut off mid-sentence with no next step given, and no questions were asked about my budget or timescale despite inviting me to view.",
+      "email_commercial_hook": "",
+      "novus_counterfactual": "NOVUS would have delivered a complete message with a clear availability request, and would have asked qualifying questions about budget, finance and timescale before extending the viewing invite."
+    },
+    "recorded_persisted": {
+      "fair_observation": "",
+      "main_finding": "the voicemail left for the buyer cut off mid-sentence with no availability request or callback instruction given.",
+      "commercial_consequence": "without a completed message or any qualifying questions, the buyer has little reason or means to call back, and the agency has no sense of how serious their interest is.",
+      "email_observation": "I appreciated the callback naming the exact property, but the voicemail cut off mid-sentence with no next step given, and no questions were asked about my budget or timescale despite inviting me to view.",
+      "email_commercial_hook": "",
+      "primary_narrative": "The agent called back within two days and correctly named the Hammonds Lane property, showing genuine personalised effort."
+    },
+    "recorded_demo": {
+      "demo_status": "needs_review",
+      "review_reasons": "positive_observation is blank although the agency did respond — beat 2 has no credit line"
+    }
+  }
+]

@@ -1,0 +1,527 @@
+// scripts/novus-personalisation-contract-selftest.mjs — the OUTPUT CONTRACT
+// for Personalisation, hermetic and AI-free.
+//
+// The simplified architecture (findings-driven selection, two Instantly
+// variables, no email assembly, at most two AI calls) is not what regressed.
+// The CONTRACT regressed: across 14 historical probes, fair_observation was
+// blank 9 times, commercial_consequence 5, email_commercial_hook 5, tool
+// markup reached primary_narrative 4 times, and 8 of 14 demos compiled
+// needs_review. Every check below pins one of those failures shut.
+//
+// Sibling suites, deliberately not duplicated here:
+//   novus:email-personalisation-selftest   the simplified email's own shape
+//   novus:diagnosis-findings-flow-selftest DIAGNOSIS_FINDINGS -> PERSONALISATION
+//   novus:demo-selftest                    the demo compiler in full
+//   novus:historical-replay (not a test)   the 14-probe before/after report
+
+import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { __setAiCallerForTests } from '../lib/ai-client.mjs';
+import { normaliseToolInput, containsToolMarkup, splitLeakedValue, AiStructuredOutputError } from '../lib/ai-structured-output.mjs';
+import {
+  personaliseProbe, buildOpportunityShape, hookFailureAgainstObservation,
+  quantifiesOpportunityShape, readsAsThirdPersonProspect, normalizeCurrencyFigure,
+  introducesUnselectedFinding, _internal,
+} from '../lib/probe-personalisation.mjs';
+import { buildDemoRow, reviewReasonsFor } from '../lib/demos.mjs';
+
+let passed = 0;
+const ok = (m) => { passed += 1; console.log(`  ✓ ${m}`); };
+const has = (v) => Boolean(String(v ?? '').trim());
+
+const PROBE = {
+  probe_id: 'prb_contract_1', agency_id: 'agc_contract', probe_reference: 'NOV-C-1',
+  property_address: 'Grey Lady Place', property_price: '£450,000.00',
+  portal: 'Rightmove', probe_timestamp: '2026-08-21T20:14:00Z',
+  observation_deadline: '2026-08-25T20:14:00Z',
+  enquiry_text: 'Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market.',
+};
+const BUYER_ONLY_PROBE = { ...PROBE, probe_id: 'prb_contract_2', enquiry_text: 'Interested in viewing this property. Please call me back to arrange a time.' };
+
+const F = {
+  positive: { finding_index: 4, finding_type: 'positive', finding: 'The team replied quickly and progressed the viewing.', evidence: 'A human reply arrived in 8 minutes and offered a viewing slot.', significance_note: 'Fast buyer-side handling.' },
+  noFollowUp: { finding_index: 1, finding_type: 'problem', finding: 'No follow-up was sent after the first reply.', evidence: 'Contact attempts: 1; follow-ups: 0.', significance_note: 'The enquiry had no second attempt.' },
+  sellerMissed: { finding_index: 2, finding_type: 'opportunity', finding: 'The declared seller opportunity was missed completely.', evidence: 'The enquiry declared a property to sell; nobody mentioned it.', significance_note: 'A potential valuation was invisible.' },
+  qualification: { finding_index: 3, finding_type: 'problem', finding: 'Buyer qualification was weak and incomplete.', evidence: 'No budget, funding or timescale questions were asked.', significance_note: 'Buyer readiness remained unknown.' },
+  sellerWeak: { finding_index: 5, finding_type: 'opportunity', finding: 'The declared seller opportunity was recognised but never progressed.', evidence: 'The team asked whether the property was on the market but offered no valuation.', significance_note: 'Recognition did not become progression.' },
+  noResponse: { finding_index: 6, finding_type: 'problem', finding: 'No meaningful human response arrived in the four-day observation period.', evidence: 'Human contact: none across four days.', significance_note: 'No conversation was created.' },
+  slowCall: { finding_index: 7, finding_type: 'problem', finding: 'The only contact came 37 hours later and offered no viewing.', evidence: 'Response time 37.1 hours; no viewing invitation.', significance_note: 'The buyer waited a day and a half.' },
+};
+const ordered = (...items) => [...items].sort((a, b) => a.finding_index - b.finding_index);
+
+const INTEL = {
+  human_contact: 'yes', response_hours: 0.13, contact_attempts: 2, follow_ups: 1,
+  channels_used: 'email', viewing_progression: 'invited', seller_recognition: 'none', grade: 'D',
+};
+
+function answer(overrides = {}) {
+  return {
+    story_reasoning: '1. positive 4. 2. main 1. 3. second 2.',
+    positive_finding_index: 4, main_finding_index: 1, wider_finding_index: 2,
+    primary_narrative: 'The buying side moved and the selling side never did.',
+    supporting_findings: '',
+    fair_observation: 'you replied quickly and progressed the viewing.',
+    main_finding: 'no follow-up was sent and the seller side was never raised.',
+    commercial_consequence: 'a declared valuation opportunity was never opened at all.',
+    email_observation: "You got back to me almost instantly, but no follow-ups were sent and nobody picked up that I'd also said I had a property to sell.",
+    email_commercial_hook: "That's 2 commercial opportunities from 1 enquiry, with neither fully progressed.",
+    novus_counterfactual: 'NOVUS would have opened both threads in the same conversation.',
+    ...overrides,
+  };
+}
+
+async function run({ probe = PROBE, findings, intelligence = {}, reply }) {
+  let calls = 0;
+  const toolNames = [];
+  __setAiCallerForTests(async ({ tool }) => {
+    calls += 1;
+    toolNames.push(tool.name);
+    return typeof reply === 'function' ? reply(calls, tool) : reply;
+  });
+  const row = await personaliseProbe(
+    probe, { ...INTEL, ...intelligence },
+    { diagnosis_summary: 'final', novus_opportunity: 'Core (front desk)' },
+    findings, { agency_name: 'Example Estates' },
+  );
+  return { row, calls, toolNames };
+}
+
+const compileDemo = (row, { findings, intelligence = {}, probe = PROBE }) => buildDemoRow({
+  probe, agency: { agency_name: 'Example Estates' },
+  intelligence: { ...INTEL, ...intelligence }, findings,
+  personalisation: { personalisation_id: 'psn_contract', ...row },
+  communications: [], now: '2026-08-25T12:00:00.000Z',
+});
+
+async function main() {
+  console.log('Personalisation output contract — hermetic selftest\n');
+
+  // ══ 1-8: the eight probe shapes ═══════════════════════════════════════════
+  {
+    const shapes = [
+      {
+        name: '1. no response + seller opportunity',
+        findings: ordered(F.noResponse, F.sellerMissed),
+        intelligence: { human_contact: 'none', response_hours: '', contact_attempts: 0, follow_ups: 0, viewing_progression: 'none' },
+        reply: answer({
+          positive_finding_index: null, main_finding_index: 6, wider_finding_index: 2,
+          fair_observation: '', main_finding: '',
+          commercial_consequence: 'no buyer or seller conversation was ever created.',
+          email_observation: "We didn't receive a response during the four-day observation period, and nobody picked up that I'd also said I had a property to sell.",
+          email_commercial_hook: "That's 2 live opportunities from 1 enquiry, with 0 conversations created.",
+        }),
+        expect: (row) => {
+          assert.strictEqual(row.fair_observation, '', 'no fake positive on a no-response probe');
+          assert.strictEqual(row.positive_finding_index, '');
+          assert.ok(has(row.commercial_consequence) && has(row.email_observation) && has(row.email_commercial_hook));
+          assert.match(row.email_commercial_hook, /0 conversations/);
+        },
+      },
+      {
+        name: '2. fast personalised response + no progression',
+        findings: ordered(F.positive, F.noFollowUp),
+        reply: answer({
+          wider_finding_index: null,
+          email_observation: 'You got back to me almost instantly, but nothing followed that first reply.',
+          email_commercial_hook: 'So 1 enquiry got a fast first reply and 0 follow-ups after it.',
+        }),
+        expect: (row) => {
+          assert.strictEqual(row.narrative_finding_indexes, '1,4');
+          assert.ok(has(row.fair_observation) && has(row.main_finding) && has(row.commercial_consequence));
+        },
+      },
+      {
+        name: '3. genuine positive + seller missed',
+        findings: ordered(F.positive, F.sellerMissed),
+        reply: answer({ main_finding_index: 2, wider_finding_index: null }),
+        expect: (row) => { assert.strictEqual(row.main_finding_index, 2); assert.ok(has(row.fair_observation)); },
+      },
+      {
+        name: '4. positive + seller missed + buyer qualification missed',
+        findings: ordered(F.positive, F.sellerMissed, F.qualification),
+        reply: answer({ main_finding_index: 2, wider_finding_index: 3 }),
+        expect: (row) => { assert.strictEqual(row.narrative_finding_indexes, '2,3,4'); },
+      },
+      {
+        name: '5. buyer progressed + seller missed',
+        findings: ordered(F.positive, F.sellerMissed),
+        intelligence: { viewing_progression: 'booked' },
+        reply: answer({
+          main_finding_index: 2, wider_finding_index: null,
+          email_observation: "You handled the viewing side well, but nobody picked up that I'd also said I had a property to sell.",
+          email_commercial_hook: 'So 1 of the 2 commercial opportunities in that enquiry was effectively invisible to the process.',
+        }),
+        expect: (row) => { assert.match(row.email_commercial_hook, /1 of the 2/); },
+      },
+      {
+        name: '6. seller recognised but weakly progressed',
+        findings: ordered(F.positive, F.sellerWeak),
+        intelligence: { seller_recognition: 'asked_position' },
+        reply: answer({
+          main_finding_index: 5, wider_finding_index: null,
+          email_observation: 'You did ask whether my place was on the market, but nothing came back about actually valuing it.',
+          email_commercial_hook: 'So the seller opportunity was seen, and 0 seller next steps came out of it.',
+        }),
+        expect: (row) => { assert.strictEqual(row.main_finding_index, 5); assert.ok(has(row.email_commercial_hook)); },
+      },
+      {
+        name: '7. no seller opportunity (buyer-only enquiry)',
+        probe: BUYER_ONLY_PROBE,
+        findings: ordered(F.positive, F.noFollowUp),
+        reply: answer({
+          wider_finding_index: null,
+          email_observation: 'You came back to me quickly, but nothing followed that first reply.',
+          email_commercial_hook: 'So 1 enquiry received 1 reply and 0 follow-ups.',
+        }),
+        expect: (row) => {
+          assert.doesNotMatch(`${row.email_observation} ${row.email_commercial_hook}`, /property to sell|valuation/i,
+            'a buyer-only enquiry never grows a seller beat');
+        },
+      },
+      {
+        name: '8. strong handling — no manufactured weakness',
+        findings: [F.positive],
+        intelligence: { viewing_progression: 'booked', seller_recognition: 'valuation_booked' },
+        reply: answer({
+          main_finding_index: null, wider_finding_index: null,
+          main_finding: '', commercial_consequence: '',
+          email_observation: 'You came back within minutes, booked the viewing and picked up that I had a place to sell too.',
+          email_commercial_hook: 'That is 2 commercial opportunities from 1 enquiry, with both progressed.',
+        }),
+        expect: (row) => {
+          assert.strictEqual(row.main_finding_index, '', 'no problem finding exists, so none is selected');
+          assert.strictEqual(row.main_finding, '', 'and no weakness is invented to fill the slot');
+          assert.strictEqual(row.commercial_consequence, '');
+          assert.ok(has(row.fair_observation), 'the genuine positive is still credited');
+        },
+      },
+    ];
+
+    for (const shape of shapes) {
+      const { row, calls } = await run(shape);
+      assert.ok(calls <= _internal.MAX_PERSONALISATION_ATTEMPTS, `${shape.name}: within the AI-call cap`);
+      shape.expect(row);
+      ok(shape.name);
+    }
+  }
+
+  // ══ 9: demo-required fields are never blank where valid findings exist ════
+  {
+    // Every wording guard fires at once on copy that is TRUE. The old code
+    // blanked all three demo fields silently and never told the correction
+    // call; the row persisted half-empty and the demo failed to compile.
+    const hostile = answer({
+      fair_observation: 'you eventually got back to me, although it took a while.',   // snuck_criticism
+      commercial_consequence: 'no follow-up was sent and the seller side was never raised.', // restates main_finding
+    });
+    const { row, calls, toolNames } = await run({
+      findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
+      reply: (call) => (call === 1 ? hostile : {
+        fair_observation: 'you replied within minutes of the enquiry landing.',
+        commercial_consequence: 'a declared valuation opportunity was never opened at all.',
+      }),
+    });
+    assert.strictEqual(calls, 2, 'exactly one bounded correction');
+    assert.strictEqual(toolNames[1], 'correct_probe_personalisation_fields', 'and it is SCOPED to the failed fields');
+    for (const field of ['fair_observation', 'main_finding', 'commercial_consequence']) {
+      assert.ok(has(row[field]), `${field} is populated after the scoped repair`);
+    }
+    ok('9. demo-required fields survive a wording failure via a scoped repair, not a blank');
+  }
+  {
+    // And when the repair ALSO misses, a true sentence beats a blank.
+    const hostile = answer({ fair_observation: 'you eventually got back to me, although it took a while.' });
+    const { row, calls } = await run({
+      findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
+      reply: () => hostile,
+    });
+    assert.strictEqual(calls, 2);
+    assert.ok(has(row.fair_observation),
+      'a stylistic guard that fails twice persists the sanitised sentence rather than deleting the field');
+    ok('9b. a repeatedly-rejected WORDING guard never leaves a mandatory demo field blank');
+  }
+  {
+    // A TRUTHFULNESS failure is different: it stays blank, on purpose.
+    const { row } = await run({
+      findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
+      reply: () => answer({ fair_observation: 'the evidence in the findings shows they replied quickly.' }),
+    });
+    assert.strictEqual(row.fair_observation, '',
+      'copy that leaks our own analytical vocabulary is never persisted, repaired or not');
+    ok('9c. a truthfulness failure still blanks the field — that blank has a real reason');
+  }
+
+  // ══ 10-11: the two Instantly variables are never blank where findings exist
+  {
+    for (const [field, broken] of [
+      ['email_observation', { email_observation: '' }],
+      ['email_commercial_hook', { email_commercial_hook: '' }],
+    ]) {
+      const good = answer();
+      const { row, calls } = await run({
+        findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
+        reply: (call) => (call === 1 ? answer(broken) : { [field]: good[field] }),
+      });
+      assert.strictEqual(calls, 2);
+      assert.ok(has(row[field]), `${field} is recovered rather than persisted blank`);
+      ok(`${field === 'email_observation' ? '10' : '11'}. ${field} is never blank where valid selected findings exist`);
+    }
+  }
+
+  // ══ 12: the hook must go beyond the observation ═══════════════════════════
+  {
+    const observation = 'This enquiry, from someone with a property to sell, received no contact on any channel across the full four-day window.';
+    // Both verbatim from the historical run.
+    assert.strictEqual(
+      hookFailureAgainstObservation('A potential seller went completely unengaged, meaning no valuation conversation ever had the chance to start.', observation),
+      'no_quantification', 'a hook that only redescribes the observation is rejected');
+    assert.strictEqual(
+      hookFailureAgainstObservation('A self-declared seller not yet on the market is a live valuation lead, and it went completely unacknowledged alongside the viewing chase.', observation),
+      'no_quantification');
+    assert.strictEqual(hookFailureAgainstObservation(`${observation} Really.`, observation), 'restates_observation');
+    for (const good of [
+      "That's 2 commercial opportunities from 1 enquiry, with neither fully progressed.",
+      'So even with 3 contact attempts, half the commercial opportunity inside the enquiry was never worked.',
+      "That's 2 live opportunities from 1 enquiry, with 0 conversations created.",
+      'So 1 of the 2 commercial opportunities in that enquiry was effectively invisible to the process.',
+    ]) assert.strictEqual(hookFailureAgainstObservation(good, observation), null, `accepted: ${good}`);
+    // "no valuation conversation" is a description of an absence, not a count.
+    assert.strictEqual(quantifiesOpportunityShape('no valuation conversation ever started'), false);
+    ok('12. the hook must state the shape, not paraphrase the observation — both historical bad hooks are rejected, all four target hooks pass');
+  }
+  {
+    const { row, calls } = await run({
+      findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
+      reply: (call) => (call === 1
+        ? answer({ email_commercial_hook: 'A potential seller went completely unengaged, so no valuation conversation started.' })
+        : { email_commercial_hook: "That's 2 commercial opportunities from 1 enquiry, with neither fully progressed." }),
+    });
+    assert.strictEqual(calls, 2);
+    assert.match(row.email_commercial_hook, /2 commercial opportunities/);
+    ok('12b. a paraphrasing hook is repaired end to end inside the two-call budget');
+  }
+
+  // ══ 13: the hook cannot introduce an unselected finding ═══════════════════
+  {
+    const all = ordered(F.positive, F.noFollowUp, F.sellerMissed, F.qualification);
+    const selected = [F.noFollowUp, F.sellerMissed, F.positive];
+    const leaked = 'Buyer qualification was weak and incomplete across 2 opportunities.';
+    assert.strictEqual(introducesUnselectedFinding(leaked, selected, all), true);
+    const { row, calls } = await run({
+      findings: all,
+      reply: (call) => (call === 1 ? answer({ email_commercial_hook: leaked }) : { email_commercial_hook: answer().email_commercial_hook }),
+    });
+    assert.strictEqual(calls, 2);
+    assert.doesNotMatch(row.email_commercial_hook, /qualification/i);
+    assert.strictEqual(row.narrative_finding_indexes, '1,2,4', 'and the scoped repair did not disturb the selection');
+    ok('13. the hook cannot introduce an unselected finding, and repairing it leaves the selection untouched');
+  }
+
+  // ══ 14: Email 1 never refers to the enquirer in the third person ══════════
+  {
+    // Verbatim from prb_hist_0010 and prb_hist_0006.
+    for (const bad of [
+      "Your initial email correctly personalised Joe's enquiry by name and property.",
+      'Joe explicitly flagged an off-market property to sell.',
+      'That means a declared seller lead went unpursued and the buyer enquiry never progressed to a viewing.',
+      'no acknowledgement of the property he wants to sell',
+      'The enquirer declared an unlisted property to sell.',
+    ]) assert.strictEqual(readsAsThirdPersonProspect(bad), true, `third person: ${bad}`);
+    for (const fine of [
+      "Terry's callback was well personalised, using my name and the exact property details.",
+      'The declared property to sell was never acknowledged in any contact.',
+      "You handled the viewing side well, but nobody picked up that I'd also said I had a property to sell.",
+    ]) assert.strictEqual(readsAsThirdPersonProspect(fine), false, `must stay valid: ${fine}`);
+
+    const { row, calls } = await run({
+      findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
+      reply: (call) => (call === 1
+        ? answer({ email_observation: "Your initial email correctly personalised Joe's enquiry, but nobody picked up the property he wants to sell." })
+        : { email_observation: answer().email_observation }),
+    });
+    assert.strictEqual(calls, 2);
+    assert.doesNotMatch(row.email_observation, /\bJoe\b/);
+    assert.strictEqual(readsAsThirdPersonProspect(row.email_observation), false);
+    // The demo fields keep their own voice: "the buyer has little reason to
+    // call back" is legitimate copy in an agency-facing demo.
+    assert.strictEqual(readsAsThirdPersonProspect('the buyer has little reason or means to call back'), true);
+    const demoRow = await run({
+      findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
+      reply: () => answer({ commercial_consequence: 'the buyer has little reason or means to call back.' }),
+    });
+    assert.ok(has(demoRow.row.commercial_consequence), 'the Email-1-only rule does not touch demo prose');
+    ok('14. Email 1 is always first person; the rule is scoped to the two Instantly variables');
+  }
+
+  // ══ 15: no structured-output / tool markup can persist ════════════════════
+  {
+    const tool = _internal.TOOL;
+    // Verbatim from prb_hist_0001 / 0009 / 0011 / 0013.
+    const leaked = normaliseToolInput({
+      ...answer(),
+      primary_narrative: 'This enquiry received zero human contact across four days.</primary_narrative>\n<parameter name="supporting_findings">Finding 3 notes the response was templated.',
+      supporting_findings: '',
+    }, tool, { requireComplete: true });
+    assert.strictEqual(leaked.primary_narrative, 'This enquiry received zero human contact across four days.');
+    assert.strictEqual(leaked.supporting_findings, 'Finding 3 notes the response was templated.',
+      'the swallowed parameter is RECOVERED into its own key, not just stripped');
+    assert.strictEqual(containsToolMarkup(leaked.primary_narrative, Object.keys(tool.input_schema.properties)), false);
+
+    const { head, recovered } = splitLeakedValue('primary_narrative',
+      'A.</primary_narrative><parameter name="fair_observation">b.</parameter>', ['primary_narrative', 'fair_observation']);
+    assert.strictEqual(head, 'A.');
+    assert.strictEqual(recovered.get('fair_observation'), 'b.');
+
+    // A truncated response is an error, never a half record.
+    assert.throws(() => normaliseToolInput(answer(), tool, { truncated: true }), AiStructuredOutputError);
+    // prb_hist_0005's exact shape: everything after supporting_findings lost.
+    assert.throws(() => normaliseToolInput({
+      story_reasoning: 'x', positive_finding_index: 4, main_finding_index: 1, wider_finding_index: 2,
+      primary_narrative: 'A narrative.', supporting_findings: 'Some support.',
+    }, tool, { requireComplete: true }), /missing required fields/);
+
+    // End to end: markup in, nothing markup-ish out, on every persisted field.
+    const { row } = await run({
+      findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
+      reply: () => ({
+        ...answer(),
+        primary_narrative: 'The buying side moved and the selling side never did.</primary_narrative>\n<parameter name="supporting_findings">',
+      }),
+    });
+    for (const [field, value] of Object.entries(row)) {
+      assert.strictEqual(containsToolMarkup(value, Object.keys(tool.input_schema.properties)), false,
+        `${field} carries no tool markup`);
+    }
+    ok('15. leaked tool markup is recovered into the right key, scrubbed everywhere, and a truncated result is an error rather than a half record');
+  }
+  {
+    // The truncation is spent on the remaining attempt, not on the probe.
+    let calls = 0;
+    __setAiCallerForTests(async ({ tool }) => {
+      calls += 1;
+      if (calls === 1) throw new AiStructuredOutputError('Model response hit max_tokens', { truncated: true });
+      return tool.name === 'record_probe_personalisation' ? answer() : {};
+    });
+    const row = await personaliseProbe(PROBE, INTEL,
+      { diagnosis_summary: 'final', novus_opportunity: 'Core (front desk)' },
+      ordered(F.positive, F.noFollowUp, F.sellerMissed), { agency_name: 'Example Estates' });
+    assert.strictEqual(calls, 2);
+    assert.ok(has(row.email_observation) && has(row.fair_observation));
+    ok('15b. a truncated first call is retried inside the same two-call budget instead of persisting prb_hist_0005 all over again');
+  }
+
+  // ══ the £450,000.00 bug that deleted grounded sentences ═══════════════════
+  {
+    assert.strictEqual(normalizeCurrencyFigure('£450,000.00'), normalizeCurrencyFigure('£450,000'),
+      'a trailing .00 is the same figure, not a hundred times it');
+    const { row } = await run({
+      findings: ordered(F.positive, F.sellerMissed),
+      reply: () => answer({
+        main_finding_index: 2, wider_finding_index: null,
+        commercial_consequence: 'a £450,000 property to sell was never valued or even mentioned.',
+      }),
+    });
+    assert.match(row.commercial_consequence, /£450,000/,
+      "the probe's own property value survives the currency allow-list");
+    ok('the currency allow-list recognises the probe\'s own price in its persisted "£450,000.00" form');
+  }
+
+  // ══ the counts the hook is built from ═════════════════════════════════════
+  {
+    const shape = buildOpportunityShape(PROBE, { ...INTEL, contact_attempts: 3, follow_ups: 2, viewing_progression: 'booked', seller_recognition: 'none', response_hours: 14.5 });
+    assert.match(shape, /Commercial opportunities inside this one enquiry: 2/);
+    assert.match(shape, /concrete next step: 1 of 2/);
+    assert.match(shape, /Contact attempts: 3/);
+    assert.match(shape, /First human response: 14\.5 hours/);
+    const buyerOnly = buildOpportunityShape(BUYER_ONLY_PROBE, INTEL);
+    assert.match(buyerOnly, /enquiry: 1 /, 'a buyer-only enquiry is one opportunity, not two');
+    assert.doesNotMatch(buyerOnly, /Seller \/ valuation side/);
+    const silent = buildOpportunityShape(PROBE, { human_contact: 'none' });
+    assert.match(silent, /Conversations genuinely created: 0/);
+    ok('the opportunity shape is code-computed from this enquiry alone, and never invents a seller side');
+  }
+
+  // ══ 16-18: the 14 historical probes ══════════════════════════════════════
+  {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const probes = JSON.parse(fs.readFileSync(path.join(here, 'fixtures', 'historical-probes.json'), 'utf8'));
+    assert.strictEqual(probes.length, 14);
+
+    let unexplained = 0;
+    let notReady = 0;
+    let maxCalls = 0;
+    for (const fixture of probes) {
+      let calls = 0;
+      __setAiCallerForTests(async ({ tool }) => {
+        calls += 1;
+        if (tool.name === 'record_probe_personalisation') return fixture.recorded_model_output;
+        // A compliant correction: the shape counts, from the same selection.
+        const counts = buildOpportunityShape(fixture.probe, fixture.intelligence);
+        const opportunities = Number(counts.match(/enquiry: (\d+)/)[1]);
+        return Object.fromEntries(tool.input_schema.required.map((field) => [field,
+          field === 'email_commercial_hook'
+            ? `That's ${opportunities} commercial opportunities from 1 enquiry, with neither fully progressed.`
+            : field === 'email_observation'
+              ? "You came back to me, but nobody picked up that I'd also said I had a property to sell."
+              : 'you picked the enquiry up and came back with the right property details.']));
+      });
+      const row = await personaliseProbe(fixture.probe, fixture.intelligence, fixture.diagnosis,
+        fixture.findings, { agency_name: fixture.agency_name });
+      maxCalls = Math.max(maxCalls, calls);
+
+      const noContact = String(fixture.intelligence.human_contact) === 'none';
+      const positive = fixture.selection.positive_finding_index;
+      const main = fixture.selection.main_finding_index;
+
+      // 10-11 across every real probe.
+      assert.ok(has(row.email_observation), `${fixture.probe_id}: email_observation`);
+      assert.ok(has(row.email_commercial_hook), `${fixture.probe_id}: email_commercial_hook`);
+      // 9 across every real probe: a blank must have an evidence reason.
+      if (positive !== null && !has(row.fair_observation)) unexplained += 1;
+      if (main !== null && !noContact && !has(row.main_finding)) unexplained += 1;
+      if (main !== null && !has(row.commercial_consequence)) unexplained += 1;
+      // 15 across every real probe.
+      for (const value of Object.values(row)) {
+        assert.strictEqual(containsToolMarkup(value, Object.keys(_internal.TOOL.input_schema.properties)), false,
+          `${fixture.probe_id}: no tool markup persists`);
+      }
+      // 14 across every real probe.
+      assert.strictEqual(readsAsThirdPersonProspect(row.email_observation), false, `${fixture.probe_id}: first-person observation`);
+      assert.strictEqual(readsAsThirdPersonProspect(row.email_commercial_hook), false, `${fixture.probe_id}: first-person hook`);
+
+      // 17-18: the demo compiles, and compiles READY wherever the evidence
+      // supports every beat.
+      const compiled = buildDemoRow({
+        probe: fixture.probe, agency: { agency_name: fixture.agency_name },
+        intelligence: fixture.intelligence, findings: fixture.findings,
+        personalisation: { personalisation_id: `psn_${fixture.probe_id}`, ...row },
+        communications: [], now: '2026-08-25T12:00:00.000Z',
+      });
+      assert.ok(compiled.row.hero_journey, `${fixture.probe_id}: the demo compiles`);
+      if (compiled.status !== 'ready') { notReady += 1; console.log(`     ${fixture.probe_id}: ${compiled.reasons.join(' · ')}`); }
+    }
+    assert.strictEqual(unexplained, 0, 'no mandatory field is blank without an evidence reason');
+    assert.ok(maxCalls <= 2, 'no historical probe exceeds two AI calls');
+    ok('16. all 14 historical probes reach a valid state — mandatory fields present, no markup, first-person email, <= 2 AI calls');
+    assert.strictEqual(notReady, 0, 'every historical demo with sufficient evidence compiles ready');
+    ok('17-18. every one of the 14 historical demos compiles, and all 14 compile ready (was 6 of 14)');
+  }
+
+  // ══ the demo gate no longer demands praise the evidence cannot support ════
+  {
+    const noPositive = { agency_name: 'A', property_address: 'B', commercial_consequence: 'c',
+      human_contact: 'yes', positive_observation: '',
+      novus_detected_json: '[{"label":"x"}]', observed_events_json: '[{"label":"a"},{"label":"b"}]' };
+    assert.deepStrictEqual(reviewReasonsFor(noPositive, { positiveAvailable: false }), [],
+      'a probe whose findings hold no positive is a legitimately credit-free demo');
+    assert.deepStrictEqual(reviewReasonsFor(noPositive, { positiveAvailable: true }).length, 1,
+      'but a probe that DID have a positive to credit still flags when it is missing');
+    ok('the demo review gate asks the findings whether a positive was ever available');
+  }
+
+  console.log(`\n${passed} checks passed.`);
+}
+
+main().catch((error) => { console.error(error); process.exit(1); });
