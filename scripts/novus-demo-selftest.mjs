@@ -40,7 +40,8 @@ import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import demoHandler from '../api/demo.js';
 import {
   ANALYTICS_COLUMNS, DEMOS_HEADER, buildDemoRow, buildDemoSlug, buildObservedEvents, stripUnsafeSellerValue,
-  formatResponseTime, formatChannels, reviewReasonsFor, selectCommunicationEvidence,
+  formatResponseTime, formatChannels, normaliseDashes, reviewReasonsFor,
+  selectCommunicationEvidence, sellerDeclarationSummary,
   sentenceCase, statusFromReasons, toRenderReady,
 } from '../lib/demos.mjs';
 import { compileDemos, compileDecision } from '../lib/demo-compile.mjs';
@@ -68,6 +69,9 @@ const INTELLIGENCE_HEADER = [
 const COMMUNICATIONS_HEADER = [
   'communication_id', 'agency_id', 'probe_id', 'occurred_at', 'channel', 'direction',
   'source_identifier_normalized', 'subject', 'body_text', 'transcript', 'raw_content',
+  // Live-shaped: the demo's FIRST RESPONSE beat reads this to tell an
+  // unanswered call from an answered one, so the fixture has to carry it.
+  'voicemail_present',
   'match_status', 'automated_or_human', 'manual_override', 'created_at', 'updated_at',
 ];
 const DIAGNOSIS_HEADER = [
@@ -479,11 +483,22 @@ async function run() {
     // derived from this probe's own INTELLIGENCE ordinals.
     assert.strictEqual(
       built.demo_hook,
-      'Your team followed up and progressed the viewing. But the potential vendor declared in the same enquiry was never qualified.',
+      'A buyer enquiry - and a potential seller your process could have identified and progressed.',
     );
     assert.ok(!/missed instruction/i.test(built.demo_hook), 'a declared vendor is never a definite missed instruction');
     assert.strictEqual(built.demo_reveal, "The buyer was worked. The potential vendor wasn't.");
-    ok('the opening names what the team did and what was never qualified, from this probe\'s own data');
+    ok('the opening names both opportunities inside the one enquiry');
+
+    // HOUSE STYLE: no em or en dash reaches the page, from authored copy or
+    // from PERSONALISATION's own sentences.
+    const prospectCopy = [
+      built.demo_hook, built.positive_observation, built.demo_reveal, built.main_finding,
+      built.commercial_consequence, built.systemic_bridge, built.cta_headline,
+      built.observed_events_json, built.novus_detected_json, built.novus_decisions_json,
+      built.novus_actions_json,
+    ].join(' ');
+    assert.ok(!/[\u2014\u2013]/.test(prospectCopy), 'no em or en dashes anywhere in the compiled copy');
+    ok('every prospect-facing string on the row uses the small hyphen only');
 
     // Prospect-facing copy comes from PERSONALISATION, raised to a sentence —
     // never rewritten.
@@ -510,13 +525,28 @@ async function run() {
 
     // THE MINIMUM REAL PROOF — the declaration as submitted, and ONE actual
     // message. Two more quotes proved nothing the first did not.
-    assert.strictEqual(artefacts.length, 2, `beat 2 shows the minimum proof, got ${artefacts.length} artefacts`);
-    assert.strictEqual(artefacts[0].label, 'Declared inside the enquiry itself');
-    assert.strictEqual(artefacts[0].detail, 'Declared: has a property to sell — it is not yet on the market');
-    assert.strictEqual(artefacts[1].label, 'First response — phone');
-    assert.strictEqual(artefacts[1].detail, "\"Hi, it's Rosa from Ensum Brown, calling about Barn Field. Give us a call back.\"");
+    assert.strictEqual(artefacts.length, 3, `beat 2 tells the story in three beats, got ${artefacts.length}`);
+    assert.deepStrictEqual(artefacts.map((a) => a.label), [
+      'Enquiry sent about this property',
+      'First response',
+      'Other contact attempts',
+    ]);
+    // What the buyer declared, INCLUDING that the property was pre-market.
+    assert.strictEqual(
+      artefacts[0].detail,
+      'Buyer declared they also had a property to sell, and that it was not yet on the market.',
+    );
+    // The first touch was an unanswered call, so that is all it says.
+    assert.strictEqual(artefacts[1].detail, 'Voicemail left.');
+    // Everything after it, summarised from the real attempts and the two
+    // INTELLIGENCE ordinals — never a second and third quote.
+    assert.strictEqual(
+      artefacts[2].detail,
+      '2 further contact attempts were made by email and phone, focused on progressing the viewing.'
+      + ' The seller position was asked about once and never taken any further.',
+    );
     assert.ok(!events.some((e) => e.label === 'Enquiry submitted'), 'the enquiry timestamp is on the property card, not repeated as a row');
-    ok('one real message carries the proof, alongside the declaration exactly as it was submitted');
+    ok('beat 2 reads as a chronology: what was declared, what came back, what followed');
 
     const detected = JSON.parse(built.novus_detected_json);
     const decisions = JSON.parse(built.novus_decisions_json);
@@ -524,14 +554,14 @@ async function run() {
     // UNDERSTAND -> DECIDE -> ACT stays the visual signature; the operating
     // manual around it does not. Two lines per stage, and no stage carries a
     // sentence longer than the label it explains.
-    assert.deepStrictEqual(detected.map((d) => d.label), ['Buyer + declared vendor', 'Seller position still unknown']);
+    assert.deepStrictEqual(detected.map((d) => d.label), ['Both opportunities in one enquiry', 'Seller position still unknown']);
     assert.deepStrictEqual(decisions.map((d) => d.label), [
       'Progress both opportunities',
       'Qualify the seller position while the enquiry is still live',
     ]);
     assert.deepStrictEqual(actions.map((a) => a.label), [
-      'Qualifies · follows up · books',
-      'Or routes the right opportunity to your team',
+      'Progresses the viewing and qualifies the seller',
+      'Takes the opportunity that needs a person',
     ]);
     const longest = [...detected, ...decisions, ...actions].reduce((n, i) => Math.max(n, (i.detail || '').length), 0);
     assert.ok(longest <= 60, `beat 3 details must stay glanceable, longest was ${longest} chars`);
@@ -1135,70 +1165,113 @@ async function run() {
   }
   {
     // Exactly one human touch, no follow-up: the "absence" case the brief
-    // names explicitly.
+    // names explicitly. The story is always the same two beats — what came
+    // back first, and what the remaining attempts were (here, none).
     const oneTouch = [{
       communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:05:00.000Z',
-      channel: 'email', automated_or_human: 'human', body_text: 'Hi, yes it is still available for a viewing.',
+      channel: 'email', automated_or_human: 'human',
+      body_text: 'Hi Sam, thanks very much for your enquiry. Is Saturday or Sunday any good for a viewing?',
     }];
-    const events = selectCommunicationEvidence({ communications: oneTouch });
-    assert.strictEqual(events.length, 2);
-    assert.deepStrictEqual(events[0], {
-      label: 'First response — email', detail: '"Hi, yes it is still available for a viewing."', tone: 'good',
+    const events = selectCommunicationEvidence({
+      communications: oneTouch, intelligence: { seller_recognition: 'none' }, sellerDeclared: true,
     });
-    assert.strictEqual(events[1].label, 'No follow-up after the first reply');
-    assert.strictEqual(events[1].tone, 'gap');
+    assert.strictEqual(events.length, 2);
+    assert.strictEqual(events[0].label, 'First response');
+    // THE MOST USEFUL SENTENCE, not the first few words: the greeting and the
+    // thanks are scored down, the sentence that shows what they actually did
+    // is the one shown — and it is a literal extract, never a rewrite.
     // 09:05 UTC is 10:05 in Europe/London during BST (August).
-    assert.ok(events[1].detail.includes('email') && events[1].detail.includes('10:05'));
-    ok('a single touch with nothing after it yields First response + the explicit no-follow-up gap');
+    assert.strictEqual(events[0].detail, '"Is Saturday or Sunday any good for a viewing?" (email, 10:05)');
+    assert.strictEqual(events[1].label, 'Other contact attempts');
+    assert.strictEqual(events[1].detail, 'No further contact attempts were made. The seller opportunity was still never explored.');
+    assert.strictEqual(events[1].tone, 'gap');
+    ok('a single touch yields the useful sentence of the first response and an explicit "no further attempts"');
   }
   {
-    // First contact (email) + a DISTINCT later voicemail + a follow-up attempt
-    // (>30 minutes after the follow-up attempt's own start) -> all three
-    // example events from the brief, capped at 3.
+    // First contact (email) + a later voicemail + a further attempt the next
+    // day. The remaining attempts are SUMMARISED, not quoted one by one.
     const touches = [
-      { communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:00:00.000Z', channel: 'email', automated_or_human: 'human', subject: 'Re: enquiry', body_text: 'Thanks for your enquiry — happy to arrange a viewing.' },
-      { communication_id: 'c2', probe_id: 'p', occurred_at: '2026-08-01T09:10:00.000Z', channel: 'voice', automated_or_human: 'human', voicemail_present: 'TRUE', transcript: 'Hi, just calling about the property, give me a ring back.' },
-      { communication_id: 'c3', probe_id: 'p', occurred_at: '2026-08-02T10:00:00.000Z', channel: 'sms', automated_or_human: 'human', body_text: 'Following up — are you still interested in viewing this weekend?' },
+      { communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:00:00.000Z', channel: 'email', automated_or_human: 'human', subject: 'Re: enquiry', body_text: 'Thanks for your enquiry. Happy to arrange a viewing whenever suits you.' },
+      { communication_id: 'c2', probe_id: 'p', occurred_at: '2026-08-01T10:10:00.000Z', channel: 'voice', automated_or_human: 'human', voicemail_present: 'TRUE', transcript: 'Hi, just calling about the property, give me a ring back.' },
+      { communication_id: 'c3', probe_id: 'p', occurred_at: '2026-08-02T10:00:00.000Z', channel: 'sms', automated_or_human: 'human', body_text: 'Following up. Are you still interested in viewing this weekend?' },
     ];
-    const events = selectCommunicationEvidence({ communications: touches });
-    assert.strictEqual(events.length, 3);
-    assert.strictEqual(events[0].label, 'First response — email');
-    assert.strictEqual(events[1].label, 'Voicemail left — 10:10'); // 09:10 UTC = 10:10 BST
-    assert.strictEqual(events[1].detail, '"Hi, just calling about the property, give me a ring back."');
-    assert.strictEqual(events[2].label, 'Follow-up — SMS');
-    assert.ok(events[2].detail.includes('Following up'));
-    ok('first contact, a distinct voicemail and the follow-up all appear — capped at 3');
+    const events = selectCommunicationEvidence({
+      communications: touches,
+      intelligence: { viewing_progression: 'slot_offered', seller_recognition: 'acknowledged' },
+      sellerDeclared: true,
+    });
+    assert.strictEqual(events.length, 2, 'the story is always exactly two communication beats');
+    assert.strictEqual(events[0].label, 'First response');
+    assert.ok(events[0].detail.startsWith('"Happy to arrange a viewing whenever suits you."'));
+    assert.strictEqual(
+      events[1].detail,
+      '2 further contact attempts were made by phone and SMS, focused on progressing the viewing.'
+      + ' The seller position was acknowledged and never qualified.',
+    );
+    ok('the remaining attempts are summarised by count, channel and what they were for');
 
-    // The voicemail branch must be SKIPPED, not duplicated, when the first
-    // contact IS the voicemail (this is exactly seedWeakSeller's own fixture
-    // — see Part B).
+    // An unanswered call as the FIRST touch is stated as exactly that —
+    // no transcript excerpt, no attribution tag.
     const firstIsVoicemail = [
       { communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:00:00.000Z', channel: 'voice', automated_or_human: 'human', voicemail_present: 'TRUE', transcript: 'Hi, calling about the enquiry.' },
       { communication_id: 'c2', probe_id: 'p', occurred_at: '2026-08-01T09:05:00.000Z', channel: 'email', automated_or_human: 'human', body_text: 'Following up my call by email.' },
     ];
     const events2 = selectCommunicationEvidence({ communications: firstIsVoicemail });
-    assert.strictEqual(events2.length, 2, 'no separate voicemail event when the FIRST contact is itself the voicemail');
-    assert.ok(!events2.some((e) => e.label.startsWith('Voicemail left')));
-    ok('a voicemail that IS the first contact is not shown twice');
+    assert.strictEqual(events2[0].detail, 'Voicemail left.');
+    ok('an unanswered first call reads simply as "Voicemail left."');
   }
   {
-    // Deterministic truncation, never a rewrite: long text is cut at a fixed
-    // length with an ellipsis; short text is shown verbatim, in full.
-    const longTranscript = 'A'.repeat(50) + ' this part must be cut off because the whole thing is much too long to show in full on the demo';
-    const long = selectCommunicationEvidence({
-      communications: [{ communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:00:00.000Z', channel: 'voice', automated_or_human: 'human', transcript: longTranscript }],
+    // A seller position that DID reach a valuation gets no gap sentence at
+    // all — there was no gap to name.
+    const touches = [
+      { communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:00:00.000Z', channel: 'email', automated_or_human: 'human', body_text: 'Happy to book a viewing, and we can offer a free valuation on your own place.' },
+      { communication_id: 'c2', probe_id: 'p', occurred_at: '2026-08-02T09:00:00.000Z', channel: 'email', automated_or_human: 'human', body_text: 'Just checking back about the valuation appointment.' },
+    ];
+    const events = selectCommunicationEvidence({
+      communications: touches,
+      intelligence: { viewing_progression: 'booked', seller_recognition: 'valuation_offered' },
+      sellerDeclared: true,
     });
-    const longDetail = long[0].detail.replace(/^"|"$/g, '');
+    assert.strictEqual(events[1].detail, '1 further contact attempt was made by email, focused on progressing the viewing.');
+    assert.strictEqual(events[1].tone, 'good');
+    ok('no seller-gap sentence is invented where the valuation was actually offered');
+  }
+  {
+    // Deterministic extraction, never a rewrite: the shown sentence is always
+    // a literal substring of the stored text, and a single over-long sentence
+    // is cut with an ellipsis rather than reworded.
+    const longSentence = 'We can arrange a viewing for you ' + 'at any time that suits '.repeat(9) + 'this week';
+    const long = selectCommunicationEvidence({
+      communications: [{ communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:00:00.000Z', channel: 'voice', automated_or_human: 'human', transcript: longSentence }],
+    });
+    const longDetail = long[0].detail.replace(/^"|" \(.*\)$/g, '');
     assert.ok(longDetail.endsWith('…'), 'a long excerpt is marked as truncated');
-    assert.ok(longDetail.length <= 91, `truncated excerpt must be short, got ${longDetail.length} chars`);
-    assert.ok(longTranscript.startsWith(longDetail.slice(0, -1)), 'the excerpt is a literal prefix of the original text — never reworded');
+    assert.ok(longDetail.length <= 171, `truncated excerpt must stay short, got ${longDetail.length} chars`);
+    assert.ok(longSentence.startsWith(longDetail.slice(0, -1)), 'the excerpt is a literal prefix of the original text - never reworded');
 
     const shortTranscript = 'Hi, still interested in the viewing this weekend?';
     const short = selectCommunicationEvidence({
       communications: [{ communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-01T09:00:00.000Z', channel: 'voice', automated_or_human: 'human', transcript: shortTranscript }],
     });
-    assert.strictEqual(short[0].detail, `"${shortTranscript}"`, 'short text is shown whole, verbatim — no rewriting');
-    ok('long text is mechanically truncated with an ellipsis; short text is shown verbatim in full');
+    assert.ok(short[0].detail.startsWith(`"${shortTranscript}"`), 'short text is shown whole, verbatim - no rewriting');
+    ok('a chosen sentence is always a literal extract; an over-long one is mechanically truncated');
+  }
+  {
+    // The declaration summary is derived from the probe's OWN clause, and says
+    // whether that property was already on the market — never guessed.
+    assert.strictEqual(
+      sellerDeclarationSummary('Declared: has a property to sell, yes, it is not yet on the market'),
+      'Buyer declared they also had a property to sell, and that it was not yet on the market.',
+    );
+    assert.strictEqual(
+      sellerDeclarationSummary('Declared: has a property to sell, already on the market'),
+      'Buyer declared they also had a property to sell, and that it was already on the market.',
+    );
+    assert.strictEqual(
+      sellerDeclarationSummary('Declared: has a property to sell'),
+      'Buyer declared they also had a property to sell.',
+    );
+    ok('the enquiry line states the declared market position from the probe\'s own words, or omits it');
   }
   {
     // buildObservedEvents(): the metric strip is built from INTELLIGENCE alone,
