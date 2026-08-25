@@ -3,6 +3,7 @@
 //   GET  /api/demo?slug=<demo_slug>                        PUBLIC — render
 //   POST /api/demo {action:'cta_click'|'meeting_booked'}    PUBLIC — telemetry
 //   POST /api/demo {action:'build'|'archive'|'restore'}     AUTHED — recovery
+//   POST /api/demo {action:'audit'}                         AUTHED — every link
 //
 // THE GET PATH READS ONE ROW AND NOTHING ELSE. It resolves the slug in DEMOS,
 // loads that row, and returns it. No AI call, no join against PROBES /
@@ -36,11 +37,11 @@
 
 import { getRepo } from '../lib/sheets.mjs';
 import { requireAuth } from './novus/_auth.mjs';
-import { compileDemoForProbe } from '../lib/demo-compile.mjs';
+import { compileDemoForProbe, compileDemos, isPersonalised } from '../lib/demo-compile.mjs';
 import {
   DEMOS_TAB, DEMOS_HEADER,
-  demosTabExists, findDemoBySlug, findDemoByProbe,
-  loadDemosTable, toRenderReady, writeDemoRow,
+  demoRecords, demosTabExists, effectiveDemoStatus, findDemoBySlug, findDemoByProbe,
+  loadDemosTable, resolveDemoBySlug, toRenderReady, writeDemoRow,
 } from '../lib/demos.mjs';
 
 // Long enough for the build action's six tab reads plus one listing fetch.
@@ -75,14 +76,6 @@ async function handleGet(req, res) {
 
   const repo = getRepo();
   const table = await loadDemosTable(repo);            // ← the only tab read
-  if (!demosTabExists(table)) {
-    return res.status(404).json({ error: 'No DEMOS tab in the workbook yet' });
-  }
-
-  const record = findDemoBySlug(table, slug);
-  if (!record) return res.status(404).json({ error: 'No demo found for this link' });
-
-  const status = text(record.obj.demo_status) || 'needs_review';
 
   // ?preview=1 is the INTERNAL viewing mechanism — how a demo is checked
   // before it is sent, and how we open our own demo without inflating the
@@ -92,18 +85,15 @@ async function handleGet(req, res) {
   // one that isn't.
   const preview = text(req.query?.preview) === '1';
 
-  // An archived demo is deliberately retired — gone, preview or not.
-  if (status === 'archived') return res.status(404).json({ error: 'This demo is no longer available' });
+  // ONE RESOLUTION RULE, SHARED WITH THE AUDIT. lib/demos.mjs owns slug
+  // normalisation (stray spaces, a pasted trailing slash, case), the
+  // archived/needs_review gate, and the self-heal for a hand-blanked
+  // demo_status — so `audit` and a real prospect request can never disagree
+  // about whether a link works.
+  const resolved = resolveDemoBySlug(table, slug, { preview });
+  if (!resolved.ok) return res.status(resolved.httpStatus).json({ error: resolved.error });
 
-  // A needs_review demo is an unfinished prospect experience: something on
-  // it is missing or unreviewed (see review_reasons). A normal request must
-  // see exactly what an unknown slug sees — the same status, the same
-  // message — so the outside world cannot tell "not ready yet" apart from
-  // "never existed". Only ?preview=1 is allowed to look at it, so it can be
-  // checked before the link is ever sent.
-  if (status !== 'ready' && !preview) {
-    return res.status(404).json({ error: 'No demo found for this link' });
-  }
+  const { record, status } = resolved;
 
   if (!preview) {
     await recordView(repo, table, record).catch((err) => {
@@ -197,6 +187,116 @@ async function handleBuild(body, res) {
   return res.status(200).json({ ok: true, created: summary.demos_created > 0, ...summary.result });
 }
 
+// ── audit: does every demo link actually resolve? ────────────────────────────
+//
+// A demo that 404s is invisible from the inside: the DEMOS row still says
+// `ready`, the slug still looks right, and the only way anyone finds out is a
+// prospect clicking a dead link in an email we sent them. This action answers
+// the question in one call, for every row at once, by putting each slug
+// through resolveDemoBySlug() — THE SAME function the prospect's own GET goes
+// through, so a demo cannot pass the audit and fail in the wild.
+//
+// It also reports the demos that were never written: a probe PERSONALISATION
+// finished but that has no DEMOS row at all is a link that would 404 with no
+// row to explain why, and it is the one failure mode a per-row check cannot
+// see.
+//
+// WITH `fix: true` it repairs rather than reports, and only through the
+// pipeline's own compiler — never by editing a URL. Every row that does not
+// resolve, plus every personalised probe with no row, is recompiled by
+// lib/demo-compile.mjs exactly as the automatic pass would have compiled it;
+// then the whole set is re-resolved so the returned counts are what is true
+// AFTER the repair. A demo that still cannot resolve is reported, with the
+// review_reasons that say why — it is never left silently campaign-ready.
+async function handleAudit(body, res) {
+  const fix = body?.fix === true;
+  const repo = getRepo();
+
+  let table = await loadDemosTable(repo);
+  if (!demosTabExists(table)) {
+    return res.status(409).json({
+      error: `The workbook has no DEMOS tab yet. Create a "${DEMOS_TAB}" tab whose row 1 is exactly: ${DEMOS_HEADER.join(', ')}`,
+    });
+  }
+
+  // Personalised probes with no demo row of their own — "the record was never
+  // written", which no amount of checking slugs can reveal.
+  const missingRows = async () => {
+    const personalisation = await repo.getTable('PERSONALISATION').catch(() => ({ header: [], rows: [] }));
+    const probeIdx = (personalisation.header || []).indexOf('probe_id');
+    if (probeIdx === -1) return [];
+    const withRow = new Set(demoRecords(table).map(({ obj }) => text(obj.probe_id)).filter(Boolean));
+    const out = [];
+    const seen = new Set();
+    (personalisation.rows || []).forEach((row) => {
+      const probeId = String(row[probeIdx] ?? '').trim();
+      if (!probeId || probeId === 'SCHEMA NOTE' || seen.has(probeId)) return;
+      seen.add(probeId);
+      const obj = {};
+      (personalisation.header || []).forEach((key, i) => { obj[key] = row[i] ?? ''; });
+      if (!isPersonalised(obj) || withRow.has(probeId)) return;
+      out.push(probeId);
+    });
+    return out;
+  };
+
+  const auditRows = () => demoRecords(table).map(({ obj }) => {
+    const resolved = resolveDemoBySlug(table, obj.demo_slug, { preview: false });
+    const stored = text(obj.demo_status);
+    return {
+      demo_slug: obj.demo_slug,
+      demo_url: `/demo/${obj.demo_slug}`,
+      probe_id: text(obj.probe_id),
+      agency_name: text(obj.agency_name),
+      hero_journey: text(obj.hero_journey),
+      demo_status: stored,
+      effective_status: effectiveDemoStatus(obj),
+      demo_version: text(obj.demo_version),
+      resolves: resolved.ok,
+      // Why a prospect would not see this demo, in the terms the row itself
+      // can explain: retired, unfinished (with the reasons), or a slug that
+      // does not survive the round trip.
+      reason: resolved.ok ? '' : (text(obj.review_reasons) || resolved.error),
+      review_reasons: text(obj.review_reasons),
+    };
+  });
+
+  let missing = await missingRows();
+  let rows = auditRows();
+  const fixed = { recompiled: 0, repaired: 0, still_broken: 0, problems: [] };
+
+  if (fix) {
+    const probeIds = [
+      ...new Set([...rows.filter((r) => !r.resolves).map((r) => r.probe_id).filter(Boolean), ...missing]),
+    ];
+    if (probeIds.length > 0) {
+      // The pipeline's own compiler, forced onto exactly these probes. Nothing
+      // here writes a slug, a status or a line of copy by hand.
+      const summary = await compileDemos(repo, { probeIds, force: true, compiledBy: 'audit' });
+      fixed.recompiled = summary.demos_compiled;
+      fixed.problems = summary.problems;
+      table = await loadDemosTable(repo);
+      const before = new Set(rows.filter((r) => !r.resolves).map((r) => r.demo_slug));
+      rows = auditRows();
+      missing = await missingRows();
+      fixed.repaired = rows.filter((r) => r.resolves && before.has(r.demo_slug)).length;
+    }
+    fixed.still_broken = rows.filter((r) => !r.resolves).length + missing.length;
+  }
+
+  const working = rows.filter((r) => r.resolves);
+  const broken = rows.filter((r) => !r.resolves);
+  return res.status(200).json({
+    ok: true,
+    tested: rows.length,
+    working: working.length,
+    broken: broken.length,
+    missing_demo_rows: missing,
+    demos: rows,
+    ...(fix ? { fixed } : {}),
+  });
+}
+
 // Retire a demo link, or bring it back. `archived` is sticky across
 // recompiles — see lib/demos.mjs — so this is the only way in or out of it.
 async function handleArchive(body, res, archive) {
@@ -241,6 +341,7 @@ export default async function handler(req, res) {
       // credential as the rest of NOVUS.
       if (!requireAuth(req, res)) return undefined;
       if (action === 'build') return await handleBuild(body, res);
+      if (action === 'audit') return await handleAudit(body, res);
       if (action === 'archive') return await handleArchive(body, res, true);
       if (action === 'restore') return await handleArchive(body, res, false);
       return res.status(400).json({ error: `Unknown action "${action}"` });

@@ -49,12 +49,13 @@ import {
   formatResponseTime, formatChannels, normaliseDashes, reviewReasonsFor,
   selectCommunicationEvidence, sellerDeclarationSummary,
   sentenceCase, statusFromReasons, toRenderReady,
+  demoRecords, effectiveDemoStatus, normaliseSlug, resolveDemoBySlug,
 } from '../lib/demos.mjs';
 import { compileDemos, compileDecision } from '../lib/demo-compile.mjs';
 import { runRebuildPass } from '../lib/rebuild-pass.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import { extractPropertyImageUrl, fetchPropertyImageUrl, isUsablePropertyImage } from '../lib/property-image.mjs';
-import { journeySupport, SUPPORTED_HERO_JOURNEYS } from '../lib/demo-journeys.mjs';
+import { journeySupport, SUPPORTED_HERO_JOURNEYS, commercialPriority, heroTitle } from '../lib/demo-journeys.mjs';
 
 // ── live-shaped headers ──────────────────────────────────────────────────────
 const PROBES_HEADER = [
@@ -492,7 +493,17 @@ async function run() {
       'A buyer enquiry - and a potential seller your process could have identified and progressed.',
     );
     assert.ok(!/missed instruction/i.test(built.demo_hook), 'a declared vendor is never a definite missed instruction');
-    assert.strictEqual(built.demo_reveal, "The buyer was worked. The potential vendor wasn't.");
+    // THE HERO IS THE FINDING, NOT THE JOURNEY NAME. This probe's seller
+    // position WAS asked about, so the title says spotted-and-dropped rather
+    // than never-raised, and never repeats the shell's old global headline.
+    assert.strictEqual(built.demo_headline, 'The seller opportunity was spotted. It still went nowhere.');
+    assert.ok(
+      !/More than one opportunity/i.test(built.demo_headline),
+      'the hero is derived from the findings, never the shell default',
+    );
+    // The reveal says what the finding COST. It never restates the title.
+    assert.strictEqual(built.demo_reveal, 'The seller question was asked once, and nothing was built on the answer.');
+    assert.notStrictEqual(built.demo_reveal, built.demo_headline);
     ok('the opening names both opportunities inside the one enquiry');
 
     // HOUSE STYLE: no em or en dash reaches the page, from authored copy or
@@ -579,30 +590,34 @@ async function run() {
     // commercial context, chooses, and then executes - not that it sends
     // messages. A second bullet per stage reads as a feature list and pulls the
     // section back towards "chatbot".
-    assert.deepStrictEqual(detected.map((d) => d.label), ['Recognises both sides of the enquiry']);
-    assert.deepStrictEqual(decisions.map((d) => d.label), ['Chooses the right next action for each opportunity']);
-    assert.deepStrictEqual(actions.map((a) => a.label), ['Carries out the next step - or brings your team in']);
+    assert.deepStrictEqual(detected.map((d) => d.label), ['Sees the full opportunity']);
+    assert.deepStrictEqual(decisions.map((d) => d.label), ['Chooses the right next steps']);
+    assert.deepStrictEqual(actions.map((a) => a.label), ['Moves the opportunities forward']);
     ok('UNDERSTANDS / DECIDES / ACTS is one claim per stage, not a feature list');
 
-    // UNDERSTANDS names both opportunities AND the gap - comprehension, not
-    // detection. The seller half is only asserted because this probe declared one.
+    // SCANNABLE, NOT EXPLANATORY. One short line per stage - the section has to
+    // land "understands context -> decides -> acts" at a glance, and every extra
+    // clause pulls it back towards a description of a chatbot.
     assert.strictEqual(
       detected[0].detail,
-      'Understands the buyer opportunity, the declared seller opportunity, and what information is still missing.',
+      'Buyer enquiry, potential seller, and what still needs to be established.',
     );
-    // DECIDES has to show a CHOICE being made across a wider set of actions than
-    // this one enquiry needed, or it reads as "always books a viewing".
-    ['viewing progression', 'seller qualification', 'valuation', 'follow-up', 'escalation'].forEach((option) => {
-      assert.ok(decisions[0].detail.includes(option), `DECIDES must show ${option} as one of the options weighed`);
-    });
+    assert.strictEqual(
+      decisions[0].detail,
+      'Progress the viewing. Qualify the seller. Escalate anything that needs the team.',
+    );
+    assert.strictEqual(
+      actions[0].detail,
+      'NOVUS takes the appropriate action automatically and hands the team the conversations that need a person.',
+    );
+    for (const stage of [detected, decisions, actions]) {
+      assert.strictEqual(stage.length, 1, 'each stage is exactly one line');
+      assert.ok(stage[0].detail.length <= 120, `beat 3 stays short: "${stage[0].detail}"`);
+    }
     // ACTS is execution AND routing in one line, so it carries no owner chip:
     // choosing between the two is the capability being described.
     assert.ok(actions.every((a) => !a.owner), 'ACTS is one line covering both paths, so no stage is labelled NOVUS or Your team');
-    assert.ok(
-      actions[0].detail.includes('automatically') && actions[0].detail.includes('routes the opportunity to the team'),
-      'ACTS must say NOVUS executes where it should and routes where a person is needed',
-    );
-    ok('beat 3 reads as understands commercial context -> decides -> executes or routes');
+    ok('beat 3 reads as understands commercial context -> decides -> acts, in three short lines');
 
     assert.strictEqual(
       built.cta_headline,
@@ -1578,8 +1593,18 @@ async function run() {
     assert.ok(rows.complete_miss.scale_line.startsWith("The value isn't rescuing one missed enquiry."));
     assert.strictEqual(rows.weak_seller_qualification.novus_transition, '');
     assert.strictEqual(rows.weak_seller_qualification.scale_line, '');
-    assert.strictEqual(rows.weak_seller_qualification.demo_headline, '');
     ok('each new journey carries its own NOVUS transition and scale line; the reference journey keeps the shell defaults');
+
+    // EVERY JOURNEY WRITES ITS OWN HERO. Nothing falls through to the shell's
+    // old global headline, and no two of these four stories open the same way.
+    const headlines = Object.values(rows).map((r) => r.demo_headline);
+    assert.ok(headlines.every((h) => h), 'every journey writes a hero title onto the row');
+    assert.strictEqual(new Set(headlines).size, headlines.length, 'no two journeys share a hero title');
+    assert.ok(
+      !headlines.some((h) => /More than one opportunity/i.test(h)),
+      'the hard-coded global headline is never what a compiled demo shows',
+    );
+    ok('the hero title is written per demo, from the findings, on all four journeys');
   }
 
   {
@@ -1590,9 +1615,12 @@ async function run() {
       heroJourney: 'slow_response_gap', sellerRecognition: 'none',
       viewingProgression: 'invited', responseHours: '17.85',
     });
-    assert.strictEqual(withSeller.demo_headline, 'The enquiry waited. The seller opportunity went nowhere.');
-    assert.ok(withSeller.demo_hook.includes('17.9 hours'), 'the hero states the MEASURED delay');
-    assert.ok(withSeller.demo_hook.includes('never meaningfully progressed'));
+    // The buyer side genuinely moved, so it is credited - and the finding the
+    // agency should read first is the vendor, not the 17.9-hour delay.
+    assert.strictEqual(withSeller.demo_headline, "The buyer enquiry was handled. The seller opportunity wasn't.");
+    assert.ok(withSeller.demo_hook.includes('17.9 hours'), 'the measured delay is still stated, as evidence');
+    assert.ok(!/17\.9 hours/.test(withSeller.demo_headline), 'the delay is not the hero when a vendor went unworked');
+    assert.ok(withSeller.demo_hook.includes('never progressed'));
     assert.strictEqual(withSeller.demo_reveal, 'The buyer waited - and the potential vendor was never meaningfully progressed.');
 
     // Same journey, same delay — but the vendor WAS recognised. The conclusion
@@ -1603,7 +1631,7 @@ async function run() {
     });
     assert.strictEqual(
       recognised.demo_reveal,
-      'The enquiry waited, and although the seller opportunity was recognised, it never reached a meaningful seller-side next step.',
+      'The seller opportunity was recognised, and it still never reached a meaningful seller-side next step.',
     );
 
     // Same journey again, with the vendor genuinely converted: a pure
@@ -1611,6 +1639,7 @@ async function run() {
     const noSellerGap = journeyRow({
       heroJourney: 'slow_response_gap', sellerRecognition: 'valuation_offered',
       viewingProgression: 'slot_offered', responseHours: '17.85',
+      contactAttempts: '3', followUps: '2',
     });
     assert.strictEqual(noSellerGap.demo_headline, 'The enquiry was live. The response came later.');
     assert.strictEqual(noSellerGap.demo_reveal, 'The opportunity was worked. Just later than it needed to be.');
@@ -1647,13 +1676,14 @@ async function run() {
     assert.ok(!/vendor|seller/i.test(buyerOnly.demo_hook + buyerOnly.demo_reveal + buyerOnly.demo_headline));
     ok('fast_response_stalled_follow_up credits the buyer progression, then contrasts it against the vendor');
 
-    // "No genuine follow-up" is said clearly, and a real follow-up count is
-    // reported rather than glossed over.
-    const detectedNone = JSON.parse(neither.novus_detected_json);
-    assert.ok(detectedNone.some((d) => d.detail === 'No genuine follow-up after the first contact.'));
-    const detectedSome = JSON.parse(contrast.novus_detected_json);
-    assert.ok(detectedSome.some((d) => d.detail.startsWith('1 follow-up,')));
-    ok('the stalled journey reports the real follow-up count, and says plainly when there was none');
+    // The follow-up evidence lives in beat 2, where the rest of the evidence
+    // is - beat 3 is the product claim and stays three short lines. A single
+    // unanswered touch and a real second attempt read differently.
+    const eventsNone = JSON.parse(neither.observed_events_json).filter((e) => e.kind === 'metric');
+    assert.ok(eventsNone.some((e) => e.label === '1 contact attempt'));
+    const eventsSome = JSON.parse(contrast.observed_events_json).filter((e) => e.kind === 'metric');
+    assert.ok(eventsSome.some((e) => e.label === '2 contact attempts'));
+    ok('the real contact-attempt count is reported in the evidence, not glossed over');
   }
 
   {
@@ -1734,6 +1764,302 @@ async function run() {
       );
     }
     ok('a missing or invalid hero_journey fails safely instead of silently showing the wrong journey');
+  }
+
+
+  // ══ Part R — the hero is the strongest FINDING, not the journey name ══════
+  //
+  // hero_journey is an operational label picked upstream from human_contact
+  // and the grading engine's own response bands. What the agency should read
+  // FIRST is a commercial question, and these checks are the whole of the
+  // answer: the title changes with the evidence, and a modest delay never
+  // outranks an unworked vendor or an unfinished opportunity.
+  console.log('\nPart R — hero titles come from the findings, in commercial priority order');
+
+  {
+    // ── 1. THE MATRIX ──
+    // One case per shape the four journeys can actually produce. Every title
+    // is different, and every one of them is true of that probe's ordinals.
+    const cases = [
+      ['weak_seller_qualification, seller never raised',
+        { heroJourney: 'weak_seller_qualification', sellerRecognition: 'none', viewingProgression: 'slot_offered' },
+        "The buyer was worked. The potential vendor wasn't."],
+      ['weak_seller_qualification, seller position asked about',
+        { heroJourney: 'weak_seller_qualification', sellerRecognition: 'asked_position', viewingProgression: 'slot_offered' },
+        'The seller opportunity was spotted. It still went nowhere.'],
+      ['fast response, vendor left unworked',
+        { heroJourney: 'fast_response_stalled_follow_up', sellerRecognition: 'none', viewingProgression: 'invited' },
+        'A fast response. Two opportunities left unfinished.'],
+      ['fast response, no vendor in the enquiry',
+        { heroJourney: 'fast_response_stalled_follow_up', sellerDeclared: false, viewingProgression: 'invited' },
+        'A fast response. An unfinished opportunity.'],
+      ['slow response, buyer handled, vendor not',
+        { heroJourney: 'slow_response_gap', sellerRecognition: 'none', viewingProgression: 'slot_offered', responseHours: '17.85' },
+        "The buyer enquiry was handled. The seller opportunity wasn't."],
+      ['slow response, neither side progressed',
+        { heroJourney: 'slow_response_gap', sellerRecognition: 'none', viewingProgression: 'none', responseHours: '16.1' },
+        'A buyer and a potential seller. Neither opportunity progressed.'],
+      ['a genuinely severe delay, well handled after it',
+        { heroJourney: 'slow_response_gap', sellerDeclared: false, viewingProgression: 'booked', responseHours: '52', contactAttempts: '3', followUps: '2' },
+        'The enquiry was live. The response came much later.'],
+      ['complete miss, two opportunities',
+        { heroJourney: 'complete_miss', humanContact: 'none', responseHours: '', contactAttempts: '0' },
+        'One enquiry. Two opportunities. Neither progressed.'],
+      ['complete miss, buyer only',
+        { heroJourney: 'complete_miss', sellerDeclared: false, humanContact: 'none', responseHours: '', contactAttempts: '0' },
+        'One enquiry. No conversation.'],
+    ];
+    const seen = new Set();
+    for (const [name, evidence, expected] of cases) {
+      const built = journeyRow(evidence);
+      assert.strictEqual(built.demo_headline, expected, `hero title for ${name}`);
+      seen.add(built.demo_headline);
+    }
+    assert.strictEqual(seen.size, cases.length, 'every distinct set of findings gets its own hero title');
+    ok(`${cases.length} different sets of findings produce ${seen.size} different hero titles`);
+
+    // The old hard-coded global headline is gone from every one of them.
+    for (const [, evidence] of cases) {
+      const built = journeyRow(evidence);
+      assert.ok(
+        !/More than one opportunity/i.test(built.demo_headline),
+        'no demo falls back to the shell\'s global headline',
+      );
+    }
+    ok('no compiled demo shows "One enquiry. More than one opportunity." any more');
+  }
+
+  {
+    // ── 2. COMMERCIAL PRIORITY ──
+    // The brief's own example: replied after 16.1 hours, one voicemail, no
+    // follow-up, no viewing progression, a declared vendor nobody touched.
+    // The 16.1 hours is NOT the story. Two opportunities that went nowhere is.
+    const evidence = {
+      heroJourney: 'slow_response_gap', sellerRecognition: 'none',
+      viewingProgression: 'none', responseHours: '16.1', contactAttempts: '1', followUps: '0',
+      // The one touch the brief's example describes: a single voicemail.
+      communications: [{
+        communication_id: 'c1', probe_id: 'p', occurred_at: '2026-08-18T14:40:41.000Z',
+        channel: 'voice', direction: 'outbound', automated_or_human: 'human',
+        voicemail_present: 'TRUE', transcript: 'Hi, calling about your enquiry. Give us a call back.',
+      }],
+    };
+    const built = journeyRow(evidence);
+    const ctx = {
+      sellerDeclared: true,
+      intelligence: {
+        human_contact: 'yes', response_hours: '16.1', contact_attempts: '1',
+        follow_ups: '0', viewing_progression: 'none', seller_recognition: 'none',
+      },
+    };
+    assert.strictEqual(commercialPriority('slow_response_gap', ctx), 'seller_unprogressed');
+    assert.strictEqual(built.demo_headline, 'A buyer and a potential seller. Neither opportunity progressed.');
+    assert.ok(!/16\.1|hour/i.test(built.demo_headline), 'the measured delay is not the hero here');
+    ok('a 16.1-hour reply with an unworked vendor leads on the two opportunities, not on the delay');
+
+    // AND THE DELAY IS STILL THERE. It moves into the evidence - the hook and
+    // the observed events - rather than disappearing.
+    assert.ok(built.demo_hook.includes('16.1 hours'), 'the hook still states the measured delay');
+    const firstResponse = JSON.parse(built.observed_events_json)
+      .find((e) => /response/i.test(e.label) && e.kind === 'evidence');
+    assert.ok(firstResponse.detail.includes('16.1 hours'), `the evidence still carries the measured delay: ${firstResponse.detail}`);
+    assert.ok(firstResponse.detail.includes('Voicemail left.'));
+    assert.strictEqual(built.response_time, '16.1 hours');
+    ok('the delay and the single voicemail still appear in the hook and the observed events');
+
+    // A MODEST DELAY NEVER OUTRANKS AN UNFINISHED OPPORTUNITY. 17.85 hours is
+    // over the grading engine's internal 16-hour Fast/Slow line - which is
+    // exactly the threshold a prospect has no reason to care about.
+    const modest = journeyRow({
+      heroJourney: 'slow_response_gap', sellerDeclared: false,
+      viewingProgression: 'slot_offered', responseHours: '17.85', contactAttempts: '1', followUps: '0',
+    });
+    assert.strictEqual(modest.demo_headline, 'The enquiry was answered. The opportunity was never finished.');
+    assert.ok(modest.demo_hook.includes('17.9 hours'), 'the delay is still evidence on this one too');
+    ok('a modest delay just past the internal 16-hour line does not take the hero from a stalled opportunity');
+
+    // The delay leads only when it is severe on its own terms AND nothing
+    // above it in the priority order is true.
+    const severe = journeyRow({
+      heroJourney: 'slow_response_gap', sellerDeclared: false,
+      viewingProgression: 'booked', responseHours: '52', contactAttempts: '3', followUps: '2',
+    });
+    assert.strictEqual(severe.demo_headline, 'The enquiry was live. The response came much later.');
+    ok('a genuinely severe delay, with nothing bigger alongside it, still leads the demo');
+
+    // The full ladder, one probe at a time: each stronger finding takes the
+    // hero from the one below it.
+    const base = { heroJourney: 'slow_response_gap', responseHours: '52', contactAttempts: '3', followUps: '2', viewingProgression: 'booked' };
+    const ladder = [
+      [{ ...base, sellerDeclared: false }, 'slow_response'],
+      [{ ...base, sellerDeclared: false, viewingProgression: 'none' }, 'slow_response'],
+      [{ ...base, sellerRecognition: 'none' }, 'seller_unprogressed'],
+      [{ ...base, sellerRecognition: 'none', humanContact: 'none' }, 'complete_miss'],
+    ];
+    for (const [evidenceRow, expectedPriority] of ladder) {
+      const ctxRow = {
+        sellerDeclared: evidenceRow.sellerDeclared !== false,
+        intelligence: {
+          human_contact: evidenceRow.humanContact || 'yes',
+          response_hours: evidenceRow.responseHours,
+          contact_attempts: evidenceRow.contactAttempts,
+          follow_ups: evidenceRow.followUps,
+          viewing_progression: evidenceRow.viewingProgression,
+          seller_recognition: evidenceRow.sellerDeclared === false ? '' : (evidenceRow.sellerRecognition || 'none'),
+        },
+      };
+      assert.strictEqual(commercialPriority(evidenceRow.heroJourney, ctxRow), expectedPriority);
+      assert.strictEqual(heroTitle(evidenceRow.heroJourney, ctxRow), journeyRow(evidenceRow).demo_headline);
+    }
+    ok('complete miss > unprogressed seller > stalled progression > slow response, on the same probe');
+  }
+
+  // ══ Part S — every campaign-ready link actually resolves ══════════════════
+  //
+  // A demo that 404s is invisible from the inside: the row still says `ready`
+  // and the slug still looks right. These checks cover the three ways that
+  // happens - the slug does not survive the round trip, the row's own status
+  // gate refuses it, or the row was never written at all - and the audit that
+  // finds all three in one call.
+  console.log('\nPart S — auditing every demo slug through the real route');
+
+  {
+    // ── 1. THE SLUG SURVIVES THE ROUND TRIP ──
+    // Everything a slug picks up between a sheet cell and a path segment.
+    assert.strictEqual(normaliseSlug('  Ensum-Brown-RM-0042  '), 'ensum-brown-rm-0042');
+    assert.strictEqual(normaliseSlug('/demo-slug/'), 'demo-slug');
+    assert.strictEqual(normaliseSlug('ensum brown'), 'ensumbrown');
+    assert.strictEqual(normaliseSlug('slug​'), 'slug');
+    assert.strictEqual(normaliseSlug(''), '');
+    ok('a slug with stray whitespace, a pasted trailing slash or a different case resolves to the same demo');
+
+    // ── 2. THE STATUS GATE CANNOT SILENTLY RETIRE A GOOD LINK ──
+    const table = {
+      header: ['demo_slug', 'demo_status', 'review_reasons'],
+      rows: [
+        ['ready-demo', 'ready', ''],
+        ['blank-status-demo', '', ''],
+        ['typo-status-demo', 'Ready ', ''],
+        ['unfinished-demo', '', 'commercial_consequence is blank'],
+        ['retired-demo', 'archived', ''],
+      ],
+    };
+    assert.strictEqual(effectiveDemoStatus({ demo_status: '', review_reasons: '' }), 'ready');
+    assert.strictEqual(effectiveDemoStatus({ demo_status: '', review_reasons: 'x' }), 'needs_review');
+    assert.strictEqual(resolveDemoBySlug(table, 'blank-status-demo').ok, true);
+    assert.strictEqual(resolveDemoBySlug(table, 'typo-status-demo').ok, true);
+    assert.strictEqual(resolveDemoBySlug(table, 'unfinished-demo').ok, false);
+    assert.strictEqual(resolveDemoBySlug(table, 'unfinished-demo', { preview: true }).ok, true);
+    assert.strictEqual(resolveDemoBySlug(table, 'retired-demo', { preview: true }).ok, false);
+    assert.strictEqual(resolveDemoBySlug(table, 'nothing-here').ok, false);
+    ok('a hand-blanked or mistyped demo_status re-derives from the row rather than 404ing the link');
+  }
+
+  {
+    // ── 3. THE AUDIT, OVER A WHOLE WORKBOOK ──
+    // Four demos in the shapes that actually occur: one sendable, one whose
+    // slug carries a stray space, one held at needs_review, one archived —
+    // plus a personalised probe whose demo row was never written.
+    const { store, repo } = makeWorkbook();
+    seedWeakSeller(store, { propertyUrl: '' });
+    seedWeakSeller(store, {
+      probeId: 'prb_demo_002', probeReference: 'RM-0043',
+      agencyId: 'agc_two', agencyName: 'Second Agency', propertyUrl: '',
+    });
+    seedWeakSeller(store, {
+      probeId: 'prb_demo_003', probeReference: 'RM-0044',
+      agencyId: 'agc_three', agencyName: 'Third Agency', propertyUrl: '',
+    });
+    seedWeakSeller(store, {
+      probeId: 'prb_demo_004', probeReference: 'RM-0045',
+      agencyId: 'agc_four', agencyName: 'Fourth Agency', propertyUrl: '',
+    });
+    // prb_demo_005 is personalised and has no DEMOS row at all — the failure
+    // a per-slug check can never see, because there is no slug to check.
+    seedWeakSeller(store, {
+      probeId: 'prb_demo_005', probeReference: 'RM-0046',
+      agencyId: 'agc_five', agencyName: 'Fifth Agency', propertyUrl: '',
+    });
+    // The third demo never got its payoff sentence, so it compiles to
+    // needs_review and 404s for a prospect.
+    store.PERSONALISATION[3][PERSONALISATION_HEADER.indexOf('commercial_consequence')] = '';
+    __setRepoForTests(repo);
+
+    await compileDemos(repo, {
+      probeIds: ['prb_demo_001', 'prb_demo_002', 'prb_demo_003', 'prb_demo_004'],
+      force: true,
+      resolveImageUrl: noImage,
+    });
+    assert.strictEqual(demoRowsOf(store).length, 4);
+
+    // A slug that picked up a trailing space on its way into the sheet.
+    const slugIdx = DEMOS_HEADER.indexOf('demo_slug');
+    const spaced = store.DEMOS.find((r) => r[slugIdx] === 'second-agency-rm-0043');
+    spaced[slugIdx] = 'second-agency-rm-0043 ';
+    // And one whose status cell was cleared by hand.
+    store.DEMOS.find((r) => r[slugIdx] === 'fourth-agency-rm-0045')[DEMOS_HEADER.indexOf('demo_status')] = '';
+    // The fourth is deliberately retired.
+    await demoHandler(mockReq({ body: { action: 'archive', probe_id: 'prb_demo_001' } }), mockRes());
+
+    const auditRes = mockRes();
+    await demoHandler(mockReq({ body: { action: 'audit' } }), auditRes);
+    assert.strictEqual(auditRes.statusCode, 200, JSON.stringify(auditRes.body));
+    const audit = auditRes.body;
+    assert.strictEqual(audit.tested, 4);
+    assert.strictEqual(audit.working, 2, JSON.stringify(audit.demos, null, 2));
+    assert.strictEqual(audit.broken, 2);
+    assert.deepStrictEqual(audit.missing_demo_rows, ['prb_demo_005']);
+    ok('the audit tests every slug in DEMOS and names the personalised probe that has no row at all');
+
+    // A slug with a stray space still resolves — it is the same demo.
+    assert.ok(audit.demos.find((d) => d.demo_slug.trim() === 'second-agency-rm-0043').resolves);
+    // A row whose status cell was blanked resolves on its own review_reasons.
+    const healed = audit.demos.find((d) => d.demo_slug === 'fourth-agency-rm-0045');
+    assert.strictEqual(healed.demo_status, '');
+    assert.strictEqual(healed.effective_status, 'ready');
+    assert.ok(healed.resolves);
+    ok('a stray space in the cell and a blanked status cell are both resolved, not reported as dead links');
+
+    // THE AUDIT CANNOT DISAGREE WITH THE ROUTE. Every verdict is checked
+    // against a real anonymous GET of that slug.
+    for (const demo of audit.demos) {
+      const res = mockRes();
+      await demoHandler(mockReq({ method: 'GET', query: { slug: demo.demo_slug }, auth: false }), res);
+      assert.strictEqual(
+        res.statusCode === 200, demo.resolves,
+        `${demo.demo_slug}: audit says ${demo.resolves}, the route says ${res.statusCode}`,
+      );
+    }
+    ok('every audit verdict matches what a real prospect request to that slug returns');
+
+    // A BROKEN DEMO IS NEVER SILENTLY CAMPAIGN-READY. Each one says why.
+    for (const demo of audit.demos.filter((d) => !d.resolves)) {
+      assert.ok(demo.reason, `${demo.demo_slug} must say why it does not resolve`);
+    }
+    const unfinished = audit.demos.find((d) => d.demo_slug === 'third-agency-rm-0044');
+    assert.ok(unfinished.reason.includes('commercial_consequence'));
+    ok('every broken demo carries the reason it cannot be sent');
+
+    // ── 4. --fix REPAIRS THROUGH THE COMPILER, NEVER BY PATCHING A URL ──
+    // The missing row is compiled; the archived one stays archived (retiring
+    // is deliberate); the unfinished one is still unfinished and says so.
+    const fixRes = mockRes();
+    await demoHandler(mockReq({ body: { action: 'audit', fix: true } }), fixRes);
+    const fixed = fixRes.body;
+    assert.strictEqual(fixed.tested, 5, 'the missing demo row was written by the compiler');
+    assert.deepStrictEqual(fixed.missing_demo_rows, []);
+    assert.ok(fixed.working >= 3, JSON.stringify(fixed.demos.map((d) => [d.demo_slug, d.resolves])));
+    assert.strictEqual(
+      fixed.demos.find((d) => d.demo_slug === 'ensum-brown-rm-0042').effective_status, 'archived',
+      'a deliberately retired demo is not resurrected by the fix',
+    );
+    assert.ok(!fixed.demos.find((d) => d.demo_slug === 'third-agency-rm-0044').resolves);
+    assert.ok(fixed.fixed.still_broken >= 1);
+    ok('--fix compiles the missing rows, leaves archived links retired, and still reports what it could not fix');
+
+    const fifth = fixed.demos.find((d) => d.probe_id === 'prb_demo_005');
+    assert.ok(fifth && fifth.resolves, 'the probe that never had a demo row now has a working link');
+    ok('a personalised probe whose demo was never generated is compiled and resolves');
   }
 
   __setRepoForTests(null);

@@ -30,6 +30,7 @@
 //                                     [--browser] [--image <url>] [--refresh-image]
 //   node scripts/novus-demo.mjs backfill-images <probe_id> [probe_id ...]
 //   node scripts/novus-demo.mjs archive <probe_id> | restore <probe_id>
+//   node scripts/novus-demo.mjs audit [--fix]
 //
 // Env (or flags):
 //   NOVUS_DEMO_BASE_URL   https://your-deployment            (--base)
@@ -163,6 +164,74 @@ async function cmdArchive(args, archive) {
   console.log(`${cfg.base}/demo/${result.demo_slug}\n`);
 }
 
+
+// ── audit ────────────────────────────────────────────────────────────────────
+//
+// EVERY demo link, checked the way a prospect checks it. The server-side
+// `audit` action puts each slug through the same resolver the public GET uses;
+// this then OPENS each one over HTTP as an anonymous request, so what is
+// reported is the real answer including the deployment, the rewrite and the
+// route — not just what the workbook believes.
+//
+// --fix recompiles the broken ones through the pipeline's own compiler and
+// re-reports. It never rewrites a URL: a link that cannot be made to resolve
+// is listed, with the reason, so it can stop being treated as campaign-ready.
+async function cmdAudit(args) {
+  const cfg = config(args.flags);
+  const fix = args.flags.fix === true;
+
+  console.log(`\nAuditing every demo slug against ${cfg.base}${fix ? ' (with --fix)' : ''}…`);
+  const result = await post(cfg, { action: 'audit', fix });
+
+  // The second, independent check: a real anonymous request per slug. The
+  // workbook can say `ready` and the link can still be dead.
+  const live = [];
+  for (const demo of result.demos) {
+    const url = `${cfg.base}/api/demo?slug=${encodeURIComponent(demo.demo_slug)}`;
+    let status = 0;
+    let error = '';
+    try {
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      status = res.status;
+      if (!res.ok) error = (await res.json().catch(() => ({}))).error || `HTTP ${res.status}`;
+    } catch (err) {
+      error = err?.message || String(err);
+    }
+    live.push({ ...demo, http_status: status, http_error: error, live_ok: status === 200 });
+  }
+
+  const working = live.filter((d) => d.live_ok);
+  const broken = live.filter((d) => !d.live_ok);
+
+  console.log(`\n  total tested   ${live.length}`);
+  console.log(`  working        ${working.length}`);
+  console.log(`  broken         ${broken.length}`);
+  if (result.missing_demo_rows.length > 0) {
+    console.log(`  no demo row    ${result.missing_demo_rows.length} personalised probe(s) with no DEMOS row: ${result.missing_demo_rows.join(', ')}`);
+  }
+  if (result.fixed) {
+    console.log(`\n  recompiled     ${result.fixed.recompiled}`);
+    console.log(`  repaired       ${result.fixed.repaired}`);
+    console.log(`  still broken   ${result.fixed.still_broken}`);
+    for (const problem of result.fixed.problems || []) {
+      console.log(`  ⚠  ${problem.probe_id}: ${problem.error}`);
+    }
+  }
+
+  if (broken.length > 0) {
+    console.log('\nBroken links — NOT campaign-ready:');
+    for (const demo of broken) {
+      console.log(`\n  ${cfg.base}/demo/${demo.demo_slug}`);
+      console.log(`    probe    ${demo.probe_id || '(none)'} · ${demo.agency_name || '(no agency)'}`);
+      console.log(`    status   ${demo.demo_status || '(blank)'} -> resolves as ${demo.effective_status}`);
+      console.log(`    http     ${demo.http_status} ${demo.http_error}`);
+      if (demo.reason) console.log(`    why      ${demo.reason}`);
+    }
+  }
+  console.log('');
+  return { working: working.length, broken: broken.length, tested: live.length };
+}
+
 function report(cfg, result) {
   console.log(`  slug     ${result.demo_slug}`);
   console.log(`  status   ${result.demo_status}`);
@@ -174,6 +243,7 @@ function report(cfg, result) {
 
 const COMMANDS = {
   image: cmdImage,
+  audit: cmdAudit,
   build: cmdBuild,
   'backfill-images': cmdBackfillImages,
   archive: (args) => cmdArchive(args, true),
@@ -192,12 +262,14 @@ needed in the normal acquisition workflow.
   build <probe_id> [--browser]               force a recompile of one DEMOS row
   backfill-images <probe_id> [probe_id ...]  fill in missing property images
   archive <probe_id> / restore <probe_id>    retire or restore a demo link
+  audit [--fix]                              check every demo slug resolves
 
   --base   deployment URL      (or NOVUS_DEMO_BASE_URL)
   --user   / --pass            (or NOVUS_BASIC_AUTH_USER / NOVUS_BASIC_AUTH_PASS)
   --slug   override the generated slug
   --image  supply a property image URL by hand
   --refresh-image  re-resolve an image the row already has
+  --fix    audit only: recompile every demo that does not resolve
 `);
   process.exit(args._[0] ? 1 : 0);
 }
