@@ -73,14 +73,11 @@ const DIAGNOSIS_HEADER = [
 ];
 const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding_type', 'finding', 'evidence', 'significance_note'];
 const PERSONALISATION_HEADER = [
-  'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
-  'primary_narrative', 'narrative_finding_indexes',
-  'positive_finding_index', 'main_finding_index', 'wider_finding_index',
-  'supporting_findings', 'evidence',
-  'novus_counterfactual',
-  'enquiry_date', 'property_address', 'email_variant',
-  'fair_observation', 'main_finding', 'commercial_consequence', 'wider_observation', 'wider_consequence',
-  'additional_findings_hook', 'email_body',
+  'personalisation_id', 'agency_id', 'probe_id', 'hero_journey', 'primary_narrative',
+  'narrative_finding_indexes', 'positive_finding_index', 'main_finding_index',
+  'wider_finding_index', 'supporting_findings', 'evidence', 'novus_counterfactual',
+  'fair_observation', 'main_finding', 'commercial_consequence',
+  'property_reference', 'email_observation', 'email_commercial_hook',
   'created_at', 'updated_at',
 ];
 const AGENCIES_HEADER = ['agency_id', 'agency_name'];
@@ -232,7 +229,8 @@ function installAi(findingsByTag) {
         fair_observation: 'you did reply the same day.',
         main_finding: 'that nobody asked anything about my position before inviting me to view.',
         commercial_consequence: 'a viewing slot went to someone nobody had checked could actually buy.',
-        wider_observation: '', wider_consequence: '',
+        email_observation: 'You replied the same day, but nobody asked anything about my position before inviting me to view.',
+        email_commercial_hook: 'So the buyer opportunity reached a viewing invitation without being qualified.',
         novus_counterfactual: 'NOVUS would have asked budget and timescale on the first call.',
       };
     }

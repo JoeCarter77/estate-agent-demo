@@ -83,12 +83,11 @@ const DIAGNOSIS_HEADER = [
   'diagnosis_summary', 'created_at', 'updated_at',
 ];
 const PERSONALISATION_HEADER = [
-  'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
-  'primary_narrative', 'narrative_finding_indexes', 'supporting_findings', 'evidence',
-  'novus_counterfactual',
-  'enquiry_date', 'property_address', 'email_variant',
-  'fair_observation', 'main_finding', 'commercial_consequence', 'wider_observation', 'wider_consequence',
-  'additional_findings_hook', 'email_body',
+  'personalisation_id', 'agency_id', 'probe_id', 'hero_journey', 'primary_narrative',
+  'narrative_finding_indexes', 'positive_finding_index', 'main_finding_index',
+  'wider_finding_index', 'supporting_findings', 'evidence', 'novus_counterfactual',
+  'fair_observation', 'main_finding', 'commercial_consequence',
+  'property_reference', 'email_observation', 'email_commercial_hook',
   'created_at', 'updated_at',
 ];
 const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding', 'evidence', 'significance_note'];
@@ -168,19 +167,16 @@ function installAiStub() {
     if (tool?.name === 'record_probe_personalisation') {
       personaliseCallCount += 1;
       return {
+        story_reasoning: 'Finding 1 is the selected story.',
         primary_narrative: 'stub narrative',
-        narrative_finding_indexes: [1],
+        positive_finding_index: null, main_finding_index: 1, wider_finding_index: null,
         supporting_findings: '',
-        evidence_quotes: [],
         fair_observation: '',
         novus_counterfactual: 'stub counterfactual',
         main_finding: 'stub main finding.',
         commercial_consequence: 'stub consequence.',
-        wider_consequence: '',
-        // additional_findings_hook is deliberately absent: it is never
-        // AI-authored (see lib/email-assembly.mjs's
-        // ADDITIONAL_FINDINGS_HOOK_LINE) — a fixture returning one here
-        // would be ignored anyway.
+        email_observation: 'This enquiry did not reach a complete next step.',
+        email_commercial_hook: 'So the selected opportunity remained unprogressed.',
       };
     }
     if (tool?.name === 'record_probe_diagnosis') {

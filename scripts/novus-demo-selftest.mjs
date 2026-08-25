@@ -90,9 +90,9 @@ const PERSONALISATION_HEADER = [
   'personalisation_id', 'agency_id', 'probe_id', 'hero_journey', 'primary_narrative',
   'narrative_finding_indexes', 'positive_finding_index', 'main_finding_index',
   'wider_finding_index', 'supporting_findings', 'evidence', 'novus_counterfactual',
-  'enquiry_date', 'property_address', 'email_variant', 'fair_observation', 'main_finding',
-  'commercial_consequence', 'wider_observation', 'wider_consequence',
-  'additional_findings_hook', 'email_body', 'created_at', 'updated_at',
+  'fair_observation', 'main_finding', 'commercial_consequence',
+  'property_reference', 'email_observation', 'email_commercial_hook',
+  'created_at', 'updated_at',
 ];
 
 const SELLER_DECLARATION =
@@ -269,13 +269,12 @@ function seedWeakSeller(store, {
     hero_journey: heroJourney,
     primary_narrative: 'Fast, capable handling of the viewing; the declared sale never became a valuation.',
     novus_counterfactual: 'NOVUS would have answered the viewing and offered a market appraisal in the same reply.',
-    enquiry_date: '17 August',
-    property_address: 'Barn Field, Chevington',
-    email_variant: 'normal',
     fair_observation: 'you came back inside 23 minutes and followed up twice more across phone and email.',
     main_finding: 'the property I said I had to sell was asked about once and never taken any further.',
     commercial_consequence: 'a valuation that was already inside the enquiry was never booked, and the instruction behind it never entered your pipeline.',
-    email_body: 'Hi {{first_name}}, ...',
+    property_reference: 'Barn Field, Chevington on 17 August at 21:33',
+    email_observation: 'You came back inside 23 minutes, but the declared property to sell was never progressed into a valuation.',
+    email_commercial_hook: 'So the buyer side moved while the seller opportunity remained unprogressed.',
   }));
 }
 
@@ -386,8 +385,8 @@ async function fakePersonalisationAi({ tool }) {
     fair_observation: 'you replied within half an hour and put a viewing slot on the table.',
     main_finding: 'the property I said I had to sell was asked about once and never taken any further.',
     commercial_consequence: 'a valuation that was already inside the enquiry was never booked, and the instruction behind it never reached your pipeline.',
-    wider_observation: '',
-    wider_consequence: '',
+    email_observation: 'You replied within half an hour and progressed the viewing, but the property I said I had to sell was never taken any further.',
+    email_commercial_hook: 'So 1 of the 2 commercial opportunities in the enquiry was left unprogressed.',
     novus_counterfactual: 'NOVUS would have answered the viewing and offered a market appraisal in the same reply.',
   };
 }
@@ -1282,6 +1281,47 @@ async function run() {
     assert.strictEqual(slow[0].label, 'First meaningful response');
     assert.ok(slow[0].detail.startsWith('17.9 hours after the enquiry.'));
     ok('a lag over an hour is labelled plainly, with the delay stated first');
+
+    // An automated acknowledgement before that human touch belongs in the
+    // same first-response evidence. It is credited without being mistaken for
+    // the meaningful response measured by response_hours.
+    const acknowledged = selectCommunicationEvidence({
+      communications: [
+        {
+          communication_id: 'a1', probe_id: 'p', occurred_at: '2026-08-01T09:01:00.000Z',
+          channel: 'email', automated_or_human: 'automated',
+          communication_classification: 'auto_acknowledgement',
+          body_text: 'Thanks for your enquiry. A member of the team will get back to you.',
+        },
+        { ...oneTouch[0], occurred_at: '2026-08-04T09:00:00.000Z' },
+      ],
+      enquiryAt: '2026-08-01T09:00:00.000Z', responseTime: '3 days', responseHours: '72',
+    });
+    assert.strictEqual(acknowledged[0].label, 'First meaningful response');
+    assert.ok(acknowledged[0].detail.startsWith('An automated email was sent straight away saying'));
+    assert.ok(acknowledged[0].detail.includes('"Thanks for your enquiry. A member of the team will get back to you."'));
+    assert.ok(acknowledged[0].detail.includes('The first meaningful human response came 3 days after the enquiry.'));
+    ok('a preceding automated acknowledgement is credited inside the first-response evidence');
+
+    const multipleAcknowledgements = selectCommunicationEvidence({
+      communications: [
+        {
+          communication_id: 'a1', probe_id: 'p', occurred_at: '2026-08-01T09:01:00.000Z',
+          channel: 'email', automated_or_human: 'automated', body_text: 'We have received your enquiry.',
+        },
+        {
+          communication_id: 'a2', probe_id: 'p', occurred_at: '2026-08-01T09:03:00.000Z',
+          channel: 'sms', automated_or_human: 'automated', body_text: 'The team will get back to you.',
+        },
+        { ...oneTouch[0], occurred_at: '2026-08-04T09:00:00.000Z' },
+      ],
+      responseTime: '3 days', responseHours: '72',
+    });
+    assert.ok(multipleAcknowledgements[0].detail.startsWith(
+      'Automated messages by email and SMS acknowledged the enquiry. The first meaningful human response came 3 days after the enquiry.',
+    ));
+    assert.ok(!multipleAcknowledgements[0].detail.includes('We have received your enquiry'));
+    ok('multiple automated messages are summarised rather than listed');
   }
   {
     // First contact (email) + a later voicemail + a further attempt the next
