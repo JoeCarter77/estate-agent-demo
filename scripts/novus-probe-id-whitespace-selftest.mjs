@@ -55,14 +55,11 @@ const DIAGNOSIS_HEADER = [
 ];
 const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding_type', 'finding', 'evidence', 'significance_note'];
 const PERSONALISATION_HEADER = [
-  'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
-  'primary_narrative', 'narrative_finding_indexes',
-  'positive_finding_index', 'main_finding_index', 'wider_finding_index',
-  'supporting_findings', 'evidence',
-  'novus_counterfactual',
-  'enquiry_date', 'property_address', 'email_variant',
-  'fair_observation', 'main_finding', 'commercial_consequence', 'wider_observation', 'wider_consequence',
-  'additional_findings_hook', 'email_body',
+  'personalisation_id', 'agency_id', 'probe_id', 'hero_journey', 'primary_narrative',
+  'narrative_finding_indexes', 'positive_finding_index', 'main_finding_index',
+  'wider_finding_index', 'supporting_findings', 'evidence', 'novus_counterfactual',
+  'fair_observation', 'main_finding', 'commercial_consequence',
+  'property_reference', 'email_observation', 'email_commercial_hook',
   'created_at', 'updated_at',
 ];
 const AGENCIES_HEADER = ['agency_id', 'agency_name'];
@@ -172,28 +169,29 @@ async function run() {
     evidence: 'Buyer qualification recorded as none.',
     significance_note: 'The viewing slot is committed to an unqualified buyer.',
   }));
-  // And an earlier, INCOMPLETE PERSONALISATION row (e.g. from before the
-  // internal-reasoning regex fix — see the sibling selftest for that bug):
-  // primary_narrative is blank, so needsPersonalisation() correctly wants to
-  // regenerate it. The question this test asks is whether regeneration
-  // UPDATES this row or DUPLICATES it.
+  // And a legacy PERSONALISATION row whose old narrative is complete but whose
+  // new Instantly variables do not exist yet. needsPersonalisation() must
+  // backfill it once. The question this test also asks is whether regeneration
+  // UPDATES this whitespace-tainted row or DUPLICATES it.
   store.PERSONALISATION.push(row(PERSONALISATION_HEADER, {
     personalisation_id: 'psn_existing', agency_id: 'agc_1', probe_id: WHITESPACE_PROBE_ID,
     hero_journey: 'fast_response_stalled_follow_up',
-    primary_narrative: '', // blank — exactly what needs regenerating
+    primary_narrative: 'Legacy narrative from the previous email schema.',
     created_at: '2020-01-06T00:00:00.000Z', updated_at: '2020-01-06T00:00:00.000Z',
   }));
 
   __setAiCallerForTests(async ({ tool }) => {
     if (tool.name === 'record_probe_personalisation') {
       return {
+        story_reasoning: 'Finding 1 is the selected story.',
         primary_narrative: 'You replied the same day but never asked a single qualifying question.',
         positive_finding_index: null, main_finding_index: 1, wider_finding_index: null,
         supporting_findings: '',
         fair_observation: 'You did reply the same day.',
         main_finding: 'There is no qualifying question asked before inviting you to view.',
         commercial_consequence: 'a viewing slot went to someone nobody had checked could buy.',
-        wider_consequence: '',
+        email_observation: 'You replied the same day, but no qualifying question was asked before the viewing invitation.',
+        email_commercial_hook: 'So the buyer opportunity reached a viewing invitation without being qualified.',
         novus_counterfactual: 'NOVUS would have asked budget and timescale on the first call.',
       };
     }
@@ -209,7 +207,7 @@ async function run() {
   const summary = await runRebuildPass(repo, { maxAiCalls: 10 });
 
   assert.strictEqual(summary.diagnosis.ai_diagnoses_run, 0, 'DIAGNOSIS is already finalised (frozen) — no AI call, whitespace or not');
-  assert.strictEqual(summary.personalisation.ai_personalisations_run, 1, 'PERSONALISATION regenerates once, since its primary_narrative was blank');
+  assert.strictEqual(summary.personalisation.ai_personalisations_run, 1, 'PERSONALISATION regenerates once to backfill its missing Instantly variables');
   assert.strictEqual(summary.personalisation.personalisation_created, 0, 'THE FIX: this is an UPDATE to the existing row...');
   assert.strictEqual(summary.personalisation.personalisation_updated, 1, '...not the creation of a new one');
 
@@ -223,7 +221,9 @@ async function run() {
   assert.strictEqual(personRow.personalisation_id, 'psn_existing', 'the SAME row was updated, not replaced with a new id');
   assert.ok(personRow.primary_narrative, 'primary_narrative is now populated');
   assert.ok(personRow.main_finding, 'main_finding is populated');
-  assert.ok(personRow.email_body, 'and a real, sendable email is assembled');
+  assert.ok(personRow.property_reference, 'the deterministic property reference is populated');
+  assert.ok(personRow.email_observation, 'the Instantly observation variable is populated');
+  assert.ok(personRow.email_commercial_hook, 'the Instantly commercial hook is populated');
   ok('the existing row is fully populated after the fix — not left blank, not duplicated alongside a second, complete row');
 
   console.log(`\n${passed} checks passed.`);

@@ -63,14 +63,11 @@ const DIAGNOSIS_HEADER = [
 ];
 const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding_type', 'finding', 'evidence', 'significance_note'];
 const PERSONALISATION_HEADER = [
-  'personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
-  'primary_narrative', 'narrative_finding_indexes',
-  'positive_finding_index', 'main_finding_index', 'wider_finding_index',
-  'supporting_findings', 'evidence',
-  'novus_counterfactual',
-  'enquiry_date', 'property_address', 'email_variant',
-  'fair_observation', 'main_finding', 'commercial_consequence', 'wider_observation', 'wider_consequence',
-  'additional_findings_hook', 'email_body',
+  'personalisation_id', 'agency_id', 'probe_id', 'hero_journey', 'primary_narrative',
+  'narrative_finding_indexes', 'positive_finding_index', 'main_finding_index',
+  'wider_finding_index', 'supporting_findings', 'evidence', 'novus_counterfactual',
+  'fair_observation', 'main_finding', 'commercial_consequence',
+  'property_reference', 'email_observation', 'email_commercial_hook',
   'created_at', 'updated_at',
 ];
 const AGENCIES_HEADER = ['agency_id', 'agency_name'];
@@ -206,7 +203,9 @@ function installAiStub() {
         // Note: no "finding"/"evidence" wording inside the EMAIL fields — the
         // internal-reasoning guard blanks those, which would fail the contract.
         novus_counterfactual: 'Stub counterfactual.', main_finding: 'that nobody asked what we were looking for.',
-        commercial_consequence: 'stub consequence.', wider_observation: '', wider_consequence: '',
+        commercial_consequence: 'stub consequence.',
+        email_observation: 'You did come back to us, but nobody asked what we were looking for.',
+        email_commercial_hook: 'So the selected opportunity remained unqualified.',
       };
     }
     interpretCalls += 1;
