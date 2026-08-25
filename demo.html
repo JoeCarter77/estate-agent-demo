@@ -161,9 +161,9 @@
      understand the capability, not read an operating manual for it. */
   .uda{ width:100%; display:flex; flex-direction:column; align-items:center; gap:0; }
   .uda-stage{ width:100%; text-align:left; border:1px solid rgba(125,211,252,.26); background:linear-gradient(150deg, rgba(56,189,248,.09), rgba(30,58,138,.16)); border-radius:13px; padding:13px 15px; display:flex; flex-direction:column; gap:9px; }
-  .uda-head{ display:flex; align-items:center; gap:9px; }
+  .uda-head{ display:flex; align-items:flex-start; gap:9px; }
   .uda-num{ width:19px; height:19px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:.55rem; font-weight:800; color:var(--navy); background:var(--cyan); }
-  .uda-title{ font-size:.66rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#fff; }
+  .uda-title{ font-size:.66rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#fff; line-height:1.5; min-width:0; }
   .uda-items{ display:flex; flex-direction:column; gap:7px; }
   .uda-item{ display:flex; gap:9px; align-items:baseline; }
   .uda-dot{ width:4px; height:4px; border-radius:50%; background:var(--cyan); flex-shrink:0; transform:translateY(-2px); box-shadow:0 0 6px rgba(125,211,252,.8); }
@@ -368,27 +368,27 @@
     <!-- ══ ACT 3 — THE NOVUS DIFFERENCE ══ -->
     <section class="act" data-act="3">
       <div class="wrap">
-        <div class="eyebrow">The NOVUS difference</div>
-        <h2 class="headline" id="novus-transition">Same enquiry. NOVUS understands and acts on the opportunity behind it.</h2>
+        <div class="eyebrow">The intelligence your agency needs</div>
+        <h2 class="headline" id="novus-transition">Same enquiry. Here's what NOVUS would have done differently.</h2>
 
         <div class="uda">
           <div class="rv" style="width:100%">
             <div class="uda-stage">
-              <div class="uda-head"><span class="uda-num">1</span><span class="uda-title">Understands</span></div>
+              <div class="uda-head"><span class="uda-num">1</span><span class="uda-title">Understands the commercial opportunity</span></div>
               <div class="uda-items" id="novus-detected"></div>
             </div>
           </div>
           <div class="rv"><div class="uda-link"></div></div>
           <div class="rv" style="width:100%">
             <div class="uda-stage">
-              <div class="uda-head"><span class="uda-num">2</span><span class="uda-title">Decides</span></div>
+              <div class="uda-head"><span class="uda-num">2</span><span class="uda-title">Decides what should happen next</span></div>
               <div class="uda-items" id="novus-decisions"></div>
             </div>
           </div>
           <div class="rv"><div class="uda-link"></div></div>
           <div class="rv" style="width:100%">
             <div class="uda-stage">
-              <div class="uda-head"><span class="uda-num">3</span><span class="uda-title">Acts</span></div>
+              <div class="uda-head"><span class="uda-num">3</span><span class="uda-title">Acts or routes it</span></div>
               <div class="uda-items" id="novus-actions"></div>
             </div>
           </div>
