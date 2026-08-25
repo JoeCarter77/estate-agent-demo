@@ -719,7 +719,6 @@ async function run() {
       ['agency_name', { agency_name: '' }, 'agency_name'],
       ['property_address', { property_address: '' }, 'property_address'],
       ['commercial_consequence', { commercial_consequence: '' }, 'commercial_consequence'],
-      ['positive_observation (with human contact)', { positive_observation: '' }, 'positive_observation'],
       ['novus_detected', { novus_detected_json: '[]' }, 'novus_detected'],
       ['observed_events', { observed_events_json: JSON.stringify([{ label: 'a' }]) }, 'observed events'],
     ];
@@ -730,11 +729,15 @@ async function run() {
     }
     ok('each missing critical field is named as a review reason and forces needs_review');
 
-    // The one exception that stops every complete_miss demo being flagged for
-    // a positive that genuinely does not exist.
-    const noContact = { ...complete, positive_observation: '', human_contact: 'none' };
-    assert.deepStrictEqual(reviewReasonsFor(noContact), []);
-    ok('a blank positive observation is fine where nobody responded (human_contact=none)');
+    // A BLANK POSITIVE OBSERVATION IS NOT A REVIEW REASON ANY MORE. The
+    // standalone credit line was removed from beat 2, so the prospect never
+    // sees this sentence - holding the link at needs_review (which 404s it)
+    // over copy the page does not render would retire a complete demo.
+    for (const humanContact of ['yes', 'none']) {
+      const noPositive = { ...complete, positive_observation: '', human_contact: humanContact };
+      assert.deepStrictEqual(reviewReasonsFor(noPositive), [], `human_contact=${humanContact}`);
+    }
+    ok('a blank positive observation no longer holds a demo at needs_review, now the credit line is gone');
 
     // An unreviewed journey is a review reason on its own. No journey the
     // shell currently supports produces one, so the rule is exercised with the
@@ -2060,6 +2063,97 @@ async function run() {
     const fifth = fixed.demos.find((d) => d.probe_id === 'prb_demo_005');
     assert.ok(fifth && fifth.resolves, 'the probe that never had a demo row now has a working link');
     ok('a personalised probe whose demo was never generated is compiled and resolves');
+  }
+
+
+  // ══ Part T — the acknowledgement that arrived before anybody did ══════════
+  //
+  // An acknowledgement is not progression. But an owner who knows an
+  // auto-responder went out inside a minute reads "the first response came 3
+  // days later" as though we simply missed it, so the demo names it - as
+  // automated, immediately before the human response it is not.
+  console.log('\nPart T — automated acknowledgement before the first human response');
+
+  {
+    const ENQUIRY_AT = '2026-08-10T09:00:00.000Z';
+    const ack = (over = {}) => ({
+      communication_id: 'auto', probe_id: 'p', occurred_at: '2026-08-10T09:00:20.000Z',
+      channel: 'email', direction: 'inbound', automated_or_human: 'automated',
+      communication_classification: 'auto_acknowledgement',
+      body_text: 'Thank you for your enquiry. We have received it.', ...over,
+    });
+    const human = (over = {}) => ({
+      communication_id: 'human', probe_id: 'p', occurred_at: '2026-08-13T09:00:00.000Z',
+      channel: 'email', direction: 'outbound', automated_or_human: 'human',
+      body_text: 'Hi, are you still interested in viewing High Street? Let me know which days suit you.', ...over,
+    });
+    const firstResponseDetail = (communications, responseTime = '3 days') => {
+      const events = buildObservedEvents({
+        intelligence: {
+          human_contact: 'yes', response_hours: '72', contact_attempts: '1',
+          follow_ups: '0', channels_used: 'email', viewing_progression: 'mentioned', seller_recognition: 'none',
+        },
+        sellerDeclared: false, responseTime, communications,
+        propertyAddress: 'High Street', enquiryDate: '10 August', enquiryTime: '10:00',
+        enquiryAt: ENQUIRY_AT,
+      });
+      return events.find((e) => /response/i.test(e.label) && e.kind === 'evidence').detail;
+    };
+
+    // The two halves of the fact, in one line: the systems answered instantly,
+    // the people did not.
+    const promised = firstResponseDetail([ack({ body_text: 'Thanks for your enquiry - a member of the team will be in touch shortly.' }), human()]);
+    assert.ok(promised.startsWith('An automated email was sent immediately saying someone would be in touch.'), promised);
+    assert.ok(promised.includes('The first meaningful human response came 3 days later.'), promised);
+    ok('an instant auto-reply that promised contact is named, then the human lag is stated straight after it');
+
+    // What the acknowledgement claimed comes from its own text - a bare
+    // receipt is never described as a promise to come back.
+    const receipt = firstResponseDetail([ack(), human()]);
+    assert.ok(receipt.startsWith('An automated email was sent immediately confirming the enquiry had been received.'), receipt);
+    ok('an acknowledgement that only confirmed receipt is not described as promising anything');
+
+    // "Immediately" is a measured claim, not a decoration.
+    const late = firstResponseDetail([ack({ occurred_at: '2026-08-10T15:00:00.000Z' }), human()]);
+    assert.ok(late.startsWith('An automated email was sent confirming the enquiry had been received.'), late);
+    assert.ok(!/immediately/.test(late), 'an acknowledgement six hours later is never called immediate');
+    ok('the timing claim is dropped where the acknowledgement was not actually immediate');
+
+    // MULTIPLE ACKNOWLEDGEMENTS ARE ONE FACT, NOT THREE. Summarised, never
+    // listed out.
+    const many = firstResponseDetail([
+      ack(),
+      ack({ communication_id: 'auto2', occurred_at: '2026-08-11T09:00:00.000Z', body_text: 'Reminder: we have your enquiry.' }),
+      human(),
+    ]);
+    assert.strictEqual(
+      many.split('"')[0].trim(),
+      'Automated messages acknowledged the enquiry straight away, but no meaningful human response followed for 3 days.',
+    );
+    assert.ok(!/An automated email/.test(many), 'several acknowledgements are summarised, not listed');
+    ok('several automated messages are summarised into one line');
+
+    // NO ACKNOWLEDGEMENT: the existing wording is untouched.
+    const none = firstResponseDetail([human()]);
+    assert.ok(none.startsWith('3 days after the enquiry.'), none);
+    assert.ok(!/automated/i.test(none));
+    ok('a probe with no automated acknowledgement keeps the existing first-response wording');
+
+    // An auto-reply that arrived AFTER a person did says nothing about how
+    // long the enquiry waited, so it is not part of this line.
+    const afterwards = firstResponseDetail([human(), ack({ occurred_at: '2026-08-14T09:00:00.000Z' })]);
+    assert.ok(afterwards.startsWith('3 days after the enquiry.'), afterwards);
+    ok('an acknowledgement sent after the first human response is not pulled into it');
+
+    // The measured lag is never stated twice.
+    assert.strictEqual((promised.match(/3 days/g) || []).length, 1);
+    ok('the delay is stated once, in whichever sentence is carrying it');
+
+    // And the copy stays house-style: no em or en dashes anywhere in it.
+    for (const detail of [promised, receipt, late, many, none, afterwards]) {
+      assert.ok(!/[—–]/.test(detail), `no em or en dash in: ${detail}`);
+    }
+    ok('every acknowledgement sentence uses the small hyphen only');
   }
 
   __setRepoForTests(null);
