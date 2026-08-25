@@ -386,7 +386,7 @@ async function fakePersonalisationAi({ tool }) {
     main_finding: 'the property I said I had to sell was asked about once and never taken any further.',
     commercial_consequence: 'a valuation that was already inside the enquiry was never booked, and the instruction behind it never reached your pipeline.',
     email_observation: 'You replied within half an hour and progressed the viewing, but the property I said I had to sell was never taken any further.',
-    email_commercial_hook: 'So 1 of the 2 commercial opportunities in the enquiry was left unprogressed.',
+    email_commercial_hook: 'So the buyer side moved forward, while the potential seller was missed entirely.',
     novus_counterfactual: 'NOVUS would have answered the viewing and offered a market appraisal in the same reply.',
   };
 }

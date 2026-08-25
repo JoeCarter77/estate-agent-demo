@@ -178,14 +178,14 @@ function installAiStub() {
         email_observation: 'This enquiry did not reach a complete next step.',
         // States the SHAPE, not the observation again: the hook guard now
         // requires a count drawn from the code-computed opportunity shape.
-        email_commercial_hook: 'That is 2 commercial opportunities from 1 enquiry, with 0 progressed.',
+        email_commercial_hook: "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.",
       };
     }
     // The bounded, field-scoped correction call.
     if (tool?.name === 'correct_probe_personalisation_fields') {
       personaliseCallCount += 1;
       return Object.fromEntries(tool.input_schema.required
-        .map((field) => [field, 'That is 2 commercial opportunities from 1 enquiry, with 0 progressed.']));
+        .map((field) => [field, "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed."]));
     }
     if (tool?.name === 'record_probe_diagnosis') {
       diagnoseCallCount += 1;

@@ -208,7 +208,7 @@ function installAiStub() {
         // States the SHAPE. A hook that only reworded the observation would
         // be sent back for a scoped repair, costing a second call and turning
         // this suite into a measurement of the contract gate.
-        email_commercial_hook: 'That is 2 commercial opportunities from 1 enquiry, with 0 progressed.',
+        email_commercial_hook: "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.",
       };
     }
     interpretCalls += 1;

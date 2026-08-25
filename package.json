@@ -33,7 +33,8 @@
     "novus:occurred-at-fallback-selftest": "node scripts/novus-occurred-at-fallback-selftest.mjs",
     "novus:demo-selftest": "node scripts/novus-demo-selftest.mjs",
     "novus:demo": "node scripts/novus-demo.mjs",
-    "novus:historical-replay": "node scripts/novus-historical-replay.mjs"
+    "novus:historical-replay": "node scripts/novus-historical-replay.mjs",
+    "novus:probe-rerun": "node scripts/novus-probe-rerun.mjs"
   },
   "dependencies": {
     "@vercel/oidc": "^3.8.4",
