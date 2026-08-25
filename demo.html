@@ -127,31 +127,47 @@
   .provenance{ font-size:.63rem; line-height:1.5; color:rgba(255,255,255,.62); max-width:470px; }
 
   /* ═══ ACT 2 — THE PROOF ═══
-     A quantified strip the owner reads in three seconds, then the small number
-     of real artefacts behind it. */
-  .metrics{ width:100%; display:flex; flex-wrap:wrap; justify-content:center; gap:7px; }
-  .metric{ flex:1 1 150px; max-width:230px; display:flex; flex-direction:column; align-items:center; gap:2px; padding:11px 10px; border-radius:11px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.04); }
-  .metric-label{ font-size:.78rem; font-weight:800; color:#fff; line-height:1.25; letter-spacing:-.01em; }
-  .metric-detail{ font-size:.6rem; color:rgba(255,255,255,.62); line-height:1.35; }
-  .metric.good{ border-color:rgba(34,197,94,.32); background:rgba(34,197,94,.08); }
-  .metric.good .metric-label{ color:#BBF7D0; }
-  .metric.gap{ border-color:rgba(239,68,68,.36); background:rgba(239,68,68,.09); }
-  .metric.gap .metric-label{ color:#FCA5A5; }
+     A forensic walkthrough of one enquiry, not a dashboard. Three facts that
+     read as a verdict, the sequence underneath them in ONE container, and the
+     strongest gap as its closing panel. The only saturated colour on the whole
+     section is reserved for that gap - everything the agency actually did is
+     stated in white and blue, because most of it is not a failure. */
 
-  .proof{ width:100%; display:flex; flex-direction:column; gap:5px; }
-  .artefact{ display:flex; align-items:baseline; gap:10px; text-align:left; padding:9px 12px; border-radius:9px; border:1px solid rgba(255,255,255,.11); background:rgba(255,255,255,.035); }
-  .artefact-mark{ font-size:.72rem; line-height:1.4; flex-shrink:0; width:12px; color:rgba(255,255,255,.4); }
-  .artefact.good .artefact-mark{ color:#86EFAC; }
-  .artefact.gap{ border-color:rgba(239,68,68,.3); background:rgba(239,68,68,.07); }
-  .artefact.gap .artefact-mark{ color:#FCA5A5; }
-  .artefact-text{ display:flex; flex-direction:column; gap:2px; min-width:0; }
-  .artefact-label{ font-size:.68rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:rgba(255,255,255,.66); }
-  .artefact-detail{ font-size:.79rem; color:#fff; line-height:1.45; }
+  /* The three-fact diagnosis. Serif figures, hairline dividers, and a single
+     2px rule above each one carrying the only tone signal in the strip. */
+  .diagnosis{ width:100%; max-width:640px; display:grid; grid-template-columns:repeat(var(--facts,3), minmax(0,1fr)); gap:0; align-items:start; }
+  .fact{ display:flex; flex-direction:column; align-items:center; gap:6px; padding:2px 12px 4px; min-width:0; }
+  .fact + .fact{ border-left:1px solid rgba(255,255,255,.1); }
+  .fact-rule{ width:20px; height:2px; border-radius:2px; background:rgba(255,255,255,.22); }
+  .fact.positive .fact-rule{ background:var(--cyan); }
+  .fact.negative .fact-rule{ background:rgba(248,113,113,.85); }
+  .fact-label{ font-family:var(--serif); font-size:clamp(.98rem,2.1vw,1.28rem); font-weight:600; line-height:1.22; letter-spacing:-.01em; color:#fff; }
+  .fact-detail{ font-size:.63rem; letter-spacing:.02em; line-height:1.45; color:rgba(255,255,255,.55); }
 
-  .reveal-line{ font-family:var(--serif); font-size:clamp(1.15rem,2.5vw,1.6rem); font-weight:600; line-height:1.28; color:#fff; max-width:520px; margin-top:4px; }
-  /* PERSONALISATION's own sentence — the single most specific line on the
-     page, so it sits directly under the reveal and nothing follows it. */
-  .so-what{ font-size:.85rem; line-height:1.55; color:rgba(255,255,255,.72); max-width:490px; }
+  /* ONE container for the whole sequence. */
+  .walkthrough{ width:100%; max-width:640px; text-align:left; border:1px solid rgba(255,255,255,.11); border-radius:17px; overflow:hidden;
+    background:linear-gradient(168deg, rgba(255,255,255,.05), rgba(255,255,255,.012) 62%); box-shadow:0 18px 44px rgba(0,0,0,.22); }
+  .timeline{ padding:25px 26px 4px; display:flex; flex-direction:column; }
+  .step{ display:grid; grid-template-columns:13px minmax(0,1fr); column-gap:16px; position:relative; padding-bottom:21px; }
+  /* The rail, drawn per step so the last one simply has none. */
+  .step::before{ content:''; position:absolute; left:6px; top:15px; bottom:0; width:1px; background:rgba(255,255,255,.13); }
+  .step:last-child::before{ display:none; }
+  .step-mark{ width:13px; height:13px; border-radius:50%; margin-top:2px; position:relative; z-index:1; flex-shrink:0;
+    border:1px solid rgba(125,211,252,.55); background:rgba(56,189,248,.2); box-shadow:0 0 0 4px rgba(11,27,63,.9); }
+  /* An absence is a hollow marker, not a red cross. */
+  .step.gap .step-mark{ border-color:rgba(255,255,255,.3); background:transparent; }
+  .step-body{ min-width:0; }
+  .step-label{ display:block; font-size:.58rem; font-weight:800; letter-spacing:.19em; text-transform:uppercase; color:rgba(190,227,248,.7); line-height:1.4; }
+  .step-detail{ display:block; font-size:.83rem; line-height:1.55; color:rgba(255,255,255,.85); margin-top:5px; }
+
+  /* The closing verdict: the one place on the page that carries a warning
+     accent, and the only reason it earns one is that it is the finding. */
+  .verdict{ padding:19px 26px 21px; border-top:1px solid rgba(255,255,255,.1); display:flex; flex-direction:column; gap:8px;
+    background:linear-gradient(180deg, rgba(248,113,113,.09), rgba(248,113,113,.02)); }
+  .verdict-label{ font-size:.6rem; font-weight:800; letter-spacing:.19em; text-transform:uppercase; color:#FCA5A5; display:flex; align-items:center; gap:9px; }
+  .verdict-label::before{ content:''; width:18px; height:1px; background:currentColor; flex-shrink:0; }
+  .verdict-line{ font-family:var(--serif); font-size:clamp(1.05rem,2.2vw,1.4rem); font-weight:600; line-height:1.3; color:#fff; }
+  .verdict-note{ font-size:.79rem; line-height:1.55; color:rgba(255,255,255,.68); }
 
   /* ═══ ACT 3 — CONTEXT → INTELLIGENCE → EXECUTION ═══
      Three stages, each read as one product idea rather than a paragraph: an
@@ -287,7 +303,13 @@
     .property-price-tag{ font-size:1rem; }
     .property-visual{ aspect-ratio:16/8.4; }
     .calendly-inline-widget{ height:520px; }
-    .metric{ flex:1 1 132px; }
+    /* Three narrow columns cannot hold a finding's own wording, so the strip
+       becomes a stack and the dividers turn with it. */
+    .diagnosis{ grid-template-columns:minmax(0,1fr); }
+    .fact{ padding:9px 4px; }
+    .fact + .fact{ border-left:none; border-top:1px solid rgba(255,255,255,.1); }
+    .timeline{ padding:20px 17px 3px; }
+    .verdict{ padding:17px 17px 19px; }
     .uda{ --uda-rail:34px; --uda-pad:13px; }
     .uda-label{ font-size:.88rem; }
     /* Stacked sources: the converging pair would point at nothing, so the
@@ -371,10 +393,18 @@
     <section class="act" data-act="2">
       <div class="wrap">
         <div class="eyebrow">What actually happened</div>
-        <div class="metrics rv" id="metrics"></div>
-        <div class="proof rv" id="proof"></div>
-        <p class="reveal-line rv" id="demo-reveal"></p>
-        <p class="so-what rv hidden" id="commercial-consequence"></p>
+        <!-- Three facts, one container, one verdict. Every string inside them
+             is written by /api/demo from this agency's own probe — the shell
+             fixes the structure and nothing else. -->
+        <div class="diagnosis rv" id="diagnosis"></div>
+        <div class="walkthrough rv" id="walkthrough">
+          <div class="timeline" id="timeline"></div>
+          <div class="verdict hidden" id="verdict">
+            <div class="verdict-label" id="verdict-label"></div>
+            <p class="verdict-line" id="demo-reveal"></p>
+            <p class="verdict-note hidden" id="commercial-consequence"></p>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -691,57 +721,70 @@
     return written;
   }
 
-  const TONE_MARK = { good: '✓', gap: '✕', neutral: '•' };
   function toneOf(item) {
     const tone = txt(item && item.tone);
     return ['good', 'gap', 'neutral'].includes(tone) ? tone : 'neutral';
   }
 
-  // ONE stored collection, two presentations. `kind: 'metric'` entries are the
-  // quantified summary; everything else is a real artefact behind it. A row
-  // compiled before `kind` existed carries none, and renders as an artefact —
-  // which is exactly what those entries were.
-  function renderEvidence(events) {
-    const list = Array.isArray(events) ? events : [];
-    const metricsEl = document.getElementById('metrics');
-    const proofEl = document.getElementById('proof');
-    metricsEl.innerHTML = '';
-    proofEl.innerHTML = '';
-    let metrics = 0;
-    let artefacts = 0;
+  // ── ACT 2: three facts, one sequence, one verdict ──
+  //
+  // NOTHING HERE IS AUTHORED IN THE SHELL. summary_facts is /api/demo's own
+  // three-fact reading of this probe, and the timeline is the stored
+  // observed_events in the order they happened. This function fixes the
+  // STRUCTURE - which is identical on every demo - and writes only what the
+  // row carries, so a probe with two events renders two steps rather than a
+  // gap where an invented one would go.
 
+  function renderDiagnosis(facts) {
+    const el = document.getElementById('diagnosis');
+    const list = Array.isArray(facts) ? facts : [];
+    el.innerHTML = '';
+    let written = 0;
+    for (const fact of list) {
+      const label = copy(fact && fact.label);
+      if (!label) continue;
+      const detail = copy(fact && fact.detail);
+      const tone = ['positive', 'negative'].includes(txt(fact && fact.tone)) ? txt(fact.tone) : 'neutral';
+      const cell = document.createElement('div');
+      cell.className = 'fact ' + tone;
+      cell.innerHTML =
+        '<span class="fact-rule"></span>' +
+        '<span class="fact-label">' + esc(label) + '</span>' +
+        (detail ? '<span class="fact-detail">' + esc(detail) + '</span>' : '');
+      el.appendChild(cell);
+      written += 1;
+    }
+    // Two facts share the row rather than leaving a hole where a third would be.
+    el.style.setProperty('--facts', String(Math.max(written, 1)));
+    el.classList.toggle('hidden', written === 0);
+    return written;
+  }
+
+  // The sequence. `kind: 'metric'` entries are the row's own quantified
+  // summary, which summary_facts now reads and selects from — they are not
+  // steps in the story, so they never appear here. A row compiled before
+  // `kind` existed carries none, and every one of its events is a step.
+  function renderTimeline(events) {
+    const el = document.getElementById('timeline');
+    const list = Array.isArray(events) ? events : [];
+    el.innerHTML = '';
+    let written = 0;
     for (const event of list) {
       const label = copy(event && event.label);
-      if (!label) continue;
+      if (!label || txt(event && event.kind) === 'metric') continue;
       const detail = copy(event && event.detail);
-      const tone = toneOf(event);
-
-      if (txt(event && event.kind) === 'metric') {
-        const cell = document.createElement('div');
-        cell.className = 'metric ' + tone;
-        cell.innerHTML =
-          '<span class="metric-label">' + esc(label) + '</span>' +
-          (detail ? '<span class="metric-detail">' + esc(detail) + '</span>' : '');
-        metricsEl.appendChild(cell);
-        metrics += 1;
-        continue;
-      }
-
-      const row = document.createElement('div');
-      row.className = 'artefact ' + tone;
-      row.innerHTML =
-        '<span class="artefact-mark">' + TONE_MARK[tone] + '</span>' +
-        '<span class="artefact-text">' +
-          '<span class="artefact-label">' + esc(label) + '</span>' +
-          (detail ? '<span class="artefact-detail">' + esc(detail) + '</span>' : '') +
+      const step = document.createElement('div');
+      step.className = 'step ' + toneOf(event);
+      step.innerHTML =
+        '<span class="step-mark"></span>' +
+        '<span class="step-body">' +
+          '<span class="step-label">' + esc(label) + '</span>' +
+          (detail ? '<span class="step-detail">' + esc(detail) + '</span>' : '') +
         '</span>';
-      proofEl.appendChild(row);
-      artefacts += 1;
+      el.appendChild(step);
+      written += 1;
     }
-
-    metricsEl.classList.toggle('hidden', metrics === 0);
-    proofEl.classList.toggle('hidden', artefacts === 0);
-    return metrics + artefacts;
+    return written;
   }
 
   function renderProperty(demo) {
@@ -802,7 +845,12 @@
     setField('provenance', provenance.join(' ') + '. Everything below is what actually happened.', { hideWhenEmpty: false });
 
     // ── ACT 2 ──
-    renderEvidence(demo.observed_events);
+    renderDiagnosis(demo.summary_facts);
+    const timelineSteps = renderTimeline(demo.observed_events);
+    // The verdict names the finding it is about — the label is chosen from the
+    // same commercial priority as the hero, by /api/demo, from this probe's
+    // ordinals.
+    setField('verdict-label', demo.verdict_label);
     setField('demo-reveal', demo.demo_reveal);
     // The consequence is the "so what". main_finding stands in only where
     // PERSONALISATION never produced one — showing both says the same thing
@@ -813,6 +861,10 @@
       'commercial-consequence',
       txt(demo.commercial_consequence) || txt(demo.main_finding) || demo.demo_reveal_support,
     );
+    // No conclusion to draw and no sequence to show means no container at all,
+    // rather than an empty panel with a border round it.
+    show('verdict', !!txt(demo.demo_reveal));
+    show('walkthrough', timelineSteps > 0 || !!txt(demo.demo_reveal));
 
     // ── ACT 3 ──
     const detected = renderList('novus-detected', demo.novus_detected);

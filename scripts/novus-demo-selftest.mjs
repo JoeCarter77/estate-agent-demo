@@ -50,6 +50,7 @@ import {
   selectCommunicationEvidence, sellerDeclarationSummary,
   sentenceCase, statusFromReasons, toRenderReady,
   demoRecords, effectiveDemoStatus, normaliseSlug, resolveDemoBySlug,
+  summaryFacts, verdictLabelForRow,
 } from '../lib/demos.mjs';
 import { compileDemos, compileDecision } from '../lib/demo-compile.mjs';
 import { runRebuildPass } from '../lib/rebuild-pass.mjs';
@@ -549,7 +550,7 @@ async function run() {
     assert.deepStrictEqual(artefacts.map((a) => a.label), [
       'Enquiry sent',
       'Fast first response',
-      'Buyer / viewing progression',
+      'Progression',
       'What happened next',
       'Seller opportunity',
     ]);
@@ -806,6 +807,138 @@ async function run() {
     const missed = toRenderReady({ ...builtRow, demo_headline: '', human_contact: 'none' });
     assert.strictEqual(missed.demo_headline, HERO_TITLES.complete_miss);
     ok('a row with no stored hero headline is served the one its own findings select');
+  }
+
+  // ══ Part F2 — the three-fact diagnosis ════════════════════════════════════
+  //
+  // The top of beat 2 is a VERDICT, not the three biggest numbers: what came
+  // in, the best thing the agency did, the worst. Every fact is selected from
+  // the row's own ordinals, so the same three slots carry different facts on
+  // every agency and none of them is authored here.
+  console.log('\nPart F2 — the three facts that open the walkthrough');
+  {
+    const facts = (row) => summaryFacts({
+      hero_journey: 'slow_response_gap', seller_declared: 'yes', human_contact: 'yes',
+      response_hours: '0.38', response_time: '23 minutes', contact_attempts: '3', follow_ups: '2',
+      channels_used: 'voice,email', viewing_progression: 'booked', seller_recognition: 'valuation_booked',
+      ...row,
+    });
+    const labels = (row) => facts(row).map((f) => f.label);
+    const tones = (row) => facts(row).map((f) => f.tone);
+
+    // ── the default reading: what came in, the best, the worst ──
+    const balanced = facts({ seller_recognition: 'asked_position' });
+    assert.strictEqual(balanced.length, 3);
+    assert.deepStrictEqual(balanced.map((f) => f.tone), ['neutral', 'positive', 'negative']);
+    assert.strictEqual(balanced[0].label, '2 opportunities');
+    assert.strictEqual(balanced[0].detail, 'In one enquiry');
+    assert.strictEqual(balanced[1].label, '23 minutes', 'the strongest positive is this probe\'s own measured speed');
+    assert.strictEqual(balanced[2].label, 'No valuation progression');
+    ok('the default three are what came in, the strongest positive and the strongest gap');
+
+    // ── two commercially important gaps: the opening fact gives up its slot ──
+    const twoGaps = facts({ seller_recognition: 'none', contact_attempts: '1', follow_ups: '0' });
+    assert.deepStrictEqual(twoGaps.map((f) => f.tone), ['positive', 'negative', 'negative']);
+    assert.deepStrictEqual(twoGaps.map((f) => f.label), ['23 minutes', 'Seller position never raised', 'No follow-up']);
+    assert.ok(!twoGaps.some((f) => /opportunities/.test(f.label)), 'the scope fact makes way for the second gap');
+    ok('two commercially important gaps push out the opening fact, keeping one positive');
+
+    // ── nothing genuinely creditable: three findings, no invented balance ──
+    const nothingToCredit = facts({
+      human_contact: 'none', response_hours: '', response_time: '', contact_attempts: '0',
+      follow_ups: '0', viewing_progression: 'none', seller_recognition: 'none',
+    });
+    assert.ok(!nothingToCredit.some((f) => f.tone === 'positive'), 'a probe nobody answered is credited with nothing');
+    assert.deepStrictEqual(nothingToCredit.map((f) => f.label), [
+      'No meaningful response', 'Seller position never raised', 'Viewing never progressed',
+    ]);
+    ok('with no meaningful positive behaviour, the three strongest findings are shown instead');
+
+    // ── ONE SLOT PER FINDING. A seller position never raised and a valuation
+    //    that never happened are the same gap; only one of them may appear.
+    for (const row of [
+      { seller_recognition: 'none', contact_attempts: '1', follow_ups: '0' },
+      { seller_recognition: 'acknowledged', contact_attempts: '1', follow_ups: '0' },
+    ]) {
+      const seen = labels(row);
+      assert.strictEqual(new Set(seen).size, seen.length);
+      assert.ok(
+        seen.filter((l) => /seller|valuation/i.test(l)).length <= 1,
+        `the seller gap takes one slot, not two: ${seen.join(' / ')}`,
+      );
+    }
+    ok('one finding can never occupy two of the three slots');
+
+    // ── NOTHING THE EVIDENCE DOES NOT ESTABLISH ──
+    // No declared vendor: no seller fact of either sign, and the opening fact
+    // counts one opportunity rather than two.
+    const buyerOnly = facts({ seller_declared: 'no', seller_recognition: '' });
+    assert.ok(!buyerOnly.some((f) => /seller|valuation|vendor/i.test(f.label + f.detail)));
+    assert.strictEqual(buyerOnly[0].label, 'One opportunity');
+    // A well-handled probe is not handed a gap it does not have.
+    assert.ok(!tones({ seller_recognition: 'valuation_booked' }).includes('negative'));
+    ok('a probe with no declared vendor and no gaps is never given either');
+
+    // ── THE FACTS FOLLOW THE ORDINALS, not the shell ──
+    // Same slots, different evidence, different facts - which is the whole
+    // point of deriving them.
+    assert.deepStrictEqual(
+      labels({ response_hours: '52', response_time: '2 days', seller_recognition: 'valuation_booked' }),
+      ['2 opportunities', 'Valuation booked', '2 days'],
+    );
+    assert.deepStrictEqual(
+      labels({ contact_attempts: '2', follow_ups: '1', channels_used: 'voice', response_hours: '30', response_time: '1 day', seller_recognition: 'valuation_offered' }),
+      ['2 opportunities', 'Valuation offered', '1 day'],
+    );
+    assert.strictEqual(
+      facts({ contact_attempts: '2', follow_ups: '1', channels_used: 'voice', response_hours: '', response_time: '', viewing_progression: 'mentioned', seller_recognition: 'valuation_offered' })
+        .find((f) => f.label === '2 contact attempts').detail,
+      'Both by phone',
+      'the supporting line is written from the channels this agency actually used',
+    );
+    ok('the same three slots carry different facts as the underlying ordinals change');
+
+    // Each item stays one short bold line and one short supporting line.
+    for (const row of [{}, { seller_recognition: 'none' }, { human_contact: 'none', response_time: '', contact_attempts: '0' }]) {
+      for (const fact of facts(row)) {
+        assert.ok(fact.label.length <= 34, `too long to read at a glance: ${fact.label}`);
+        assert.ok(fact.detail.length <= 44, `supporting line is one short line: ${fact.detail}`);
+        assert.ok(!/[.]$/.test(fact.detail), 'the supporting line is a label, not a sentence');
+      }
+    }
+    ok('every fact is one short headline and one short supporting line');
+
+    // ── THE CLOSING VERDICT NAMES ITS OWN FINDING ──
+    assert.strictEqual(verdictLabelForRow({ hero_journey: 'complete_miss', human_contact: 'none' }), 'What was missed');
+    assert.strictEqual(
+      verdictLabelForRow({ hero_journey: 'slow_response_gap', human_contact: 'yes', seller_declared: 'yes', seller_recognition: 'none' }),
+      'The missed opportunity',
+    );
+    assert.strictEqual(
+      verdictLabelForRow({
+        hero_journey: 'fast_response_stalled_follow_up', human_contact: 'yes', seller_declared: 'no',
+        viewing_progression: 'invited', contact_attempts: '1', follow_ups: '0',
+      }),
+      'Where it stopped',
+    );
+    assert.strictEqual(
+      verdictLabelForRow({
+        hero_journey: 'slow_response_gap', human_contact: 'yes', seller_declared: 'no',
+        viewing_progression: 'booked', contact_attempts: '3', follow_ups: '2', response_hours: '52',
+      }),
+      'The time it took',
+    );
+    ok('the closing block is labelled with the finding it is about, from the same priority as the hero');
+
+    // ── AND THE BROWSER ACTUALLY RECEIVES THEM ──
+    const served = toRenderReady(builtRow);
+    assert.strictEqual(served.summary_facts.length, 3);
+    assert.ok(served.verdict_label);
+    // The timeline is the evidence events only: the stored metric entries are
+    // what summary_facts selects from, not steps in the story.
+    const stepLabels = served.observed_events.filter((e) => e.kind !== 'metric').map((e) => e.label);
+    assert.ok(stepLabels.includes('Enquiry sent') && stepLabels.includes('Progression'));
+    ok('the three facts, the verdict label and the sequence all reach the browser');
   }
 
   // ══ Part G/H/I/J — the route, end to end ══════════════════════════════════
@@ -1480,13 +1613,13 @@ async function run() {
     });
     assert.deepStrictEqual(
       full.filter((e) => e.kind === 'evidence').map((e) => e.label),
-      ['Enquiry sent', 'First meaningful response', 'Buyer / viewing progression', 'What happened next', 'Seller opportunity'],
+      ['Enquiry sent', 'First meaningful response', 'Progression', 'What happened next', 'Seller opportunity'],
     );
     assert.ok(full.find((e) => e.label === 'Enquiry sent').detail
       .startsWith('Barn Field, Chevington, 17 August at 23:34.'));
     // CREDIT WHERE IT IS DUE, THEN THE CONTRAST: the buyer side is stated as a
     // good outcome, the recognised-but-unprogressed vendor as the gap.
-    const viewing = full.find((e) => e.label === 'Buyer / viewing progression');
+    const viewing = full.find((e) => e.label === 'Progression');
     assert.strictEqual(viewing.detail, 'A specific viewing slot was offered.');
     assert.strictEqual(viewing.tone, 'good');
     const seller = full.find((e) => e.label === 'Seller opportunity');
@@ -1782,7 +1915,7 @@ async function run() {
     const labels = missEvents.filter((e) => e.kind === 'evidence').map((e) => e.label);
     assert.deepStrictEqual(labels, [
       'Enquiry sent', 'Automated acknowledgement', 'No meaningful human response',
-      'Buyer / viewing progression', 'Seller opportunity',
+      'Progression', 'Seller opportunity',
     ]);
     assert.ok(!labels.some((l) => l.includes('First meaningful response')));
     assert.ok(missEvents.find((e) => e.label === 'No meaningful human response').detail
