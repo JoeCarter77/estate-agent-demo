@@ -124,7 +124,7 @@
 
   /* Said EARLY, not buried at the end: it is the line that turns "marketing
      page" into "that is genuinely our enquiry". */
-  .provenance{ font-size:.63rem; line-height:1.5; color:rgba(255,255,255,.34); max-width:470px; }
+  .provenance{ font-size:.63rem; line-height:1.5; color:rgba(255,255,255,.62); max-width:470px; }
 
   /* ═══ ACT 2 — THE PROOF ═══
      A quantified strip the owner reads in three seconds, then the small number
@@ -132,7 +132,7 @@
   .metrics{ width:100%; display:flex; flex-wrap:wrap; justify-content:center; gap:7px; }
   .metric{ flex:1 1 150px; max-width:230px; display:flex; flex-direction:column; align-items:center; gap:2px; padding:11px 10px; border-radius:11px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.04); }
   .metric-label{ font-size:.78rem; font-weight:800; color:#fff; line-height:1.25; letter-spacing:-.01em; }
-  .metric-detail{ font-size:.6rem; color:rgba(255,255,255,.45); line-height:1.35; }
+  .metric-detail{ font-size:.6rem; color:rgba(255,255,255,.62); line-height:1.35; }
   .metric.good{ border-color:rgba(34,197,94,.32); background:rgba(34,197,94,.08); }
   .metric.good .metric-label{ color:#BBF7D0; }
   .metric.gap{ border-color:rgba(239,68,68,.36); background:rgba(239,68,68,.09); }
@@ -145,11 +145,8 @@
   .artefact.gap{ border-color:rgba(239,68,68,.3); background:rgba(239,68,68,.07); }
   .artefact.gap .artefact-mark{ color:#FCA5A5; }
   .artefact-text{ display:flex; flex-direction:column; gap:2px; min-width:0; }
-  .artefact-label{ font-size:.68rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:rgba(255,255,255,.5); }
+  .artefact-label{ font-size:.68rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:rgba(255,255,255,.66); }
   .artefact-detail{ font-size:.79rem; color:#fff; line-height:1.45; }
-
-  .credit-line{ font-size:.73rem; line-height:1.5; color:rgba(255,255,255,.55); max-width:490px; }
-  .credit-line::before{ content:'✓ '; color:#86EFAC; font-weight:800; }
 
   .reveal-line{ font-family:var(--serif); font-size:clamp(1.15rem,2.5vw,1.6rem); font-weight:600; line-height:1.28; color:#fff; max-width:520px; margin-top:4px; }
   /* PERSONALISATION's own sentence — the single most specific line on the
@@ -160,16 +157,16 @@
      The visual signature, kept. What was cut is the prose: the prospect has to
      understand the capability, not read an operating manual for it. */
   .uda{ width:100%; display:flex; flex-direction:column; align-items:center; gap:0; }
-  .uda-stage{ width:100%; text-align:left; border:1px solid rgba(125,211,252,.26); background:linear-gradient(150deg, rgba(56,189,248,.09), rgba(30,58,138,.16)); border-radius:13px; padding:13px 15px; display:flex; flex-direction:column; gap:9px; }
-  .uda-head{ display:flex; align-items:flex-start; gap:9px; }
+  .uda-stage{ width:100%; text-align:center; border:1px solid rgba(125,211,252,.26); background:linear-gradient(150deg, rgba(56,189,248,.09), rgba(30,58,138,.16)); border-radius:13px; padding:13px 15px; display:flex; flex-direction:column; align-items:center; gap:9px; }
+  .uda-head{ display:flex; align-items:center; justify-content:center; gap:9px; }
   .uda-num{ width:19px; height:19px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:.55rem; font-weight:800; color:var(--navy); background:var(--cyan); }
   .uda-title{ font-size:.66rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#fff; line-height:1.5; min-width:0; }
-  .uda-items{ display:flex; flex-direction:column; gap:7px; }
-  .uda-item{ display:flex; gap:9px; align-items:baseline; }
+  .uda-items{ width:100%; display:flex; flex-direction:column; align-items:center; gap:7px; }
+  .uda-item{ display:grid; grid-template-columns:4px minmax(0,auto); justify-content:center; gap:9px; align-items:center; width:fit-content; max-width:100%; }
   .uda-dot{ width:4px; height:4px; border-radius:50%; background:var(--cyan); flex-shrink:0; transform:translateY(-2px); box-shadow:0 0 6px rgba(125,211,252,.8); }
-  .uda-item-text{ display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .uda-item-text{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:1px; min-width:0; }
   .uda-label{ font-size:.8rem; font-weight:700; color:#fff; line-height:1.4; }
-  .uda-detail{ font-size:.66rem; color:rgba(255,255,255,.5); line-height:1.45; }
+  .uda-detail{ font-size:.66rem; color:rgba(255,255,255,.66); line-height:1.45; }
   .uda-owner{ font-size:.5rem; font-weight:800; letter-spacing:.09em; text-transform:uppercase; padding:2px 7px; border-radius:100px; margin-right:7px; white-space:nowrap; vertical-align:middle; }
   .uda-owner.novus{ color:var(--cyan); background:rgba(56,189,248,.14); border:1px solid rgba(125,211,252,.4); }
   .uda-owner.team{ color:#FDBA74; background:rgba(253,186,116,.12); border:1px solid rgba(253,186,116,.38); }
@@ -186,7 +183,7 @@
      has flowing in, one intelligence layer, a decision/action layer where
      NOVUS and the team both act, and what comes out the other end. */
   .machine{ width:100%; max-width:660px; margin:0 auto; display:flex; flex-direction:column; align-items:center; gap:4px; }
-  .machine-cap{ font-size:.54rem; font-weight:800; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.34); }
+  .machine-cap{ font-size:.54rem; font-weight:800; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.6); }
   .flow-row{ display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:wrap; width:100%; }
   .flow-pill{ font-size:.62rem; font-weight:600; padding:5px 11px; border-radius:100px; border:1px solid; line-height:1.3; white-space:nowrap; color:rgba(255,255,255,.66); border-color:rgba(255,255,255,.16); background:rgba(255,255,255,.04); }
 
@@ -196,7 +193,7 @@
      asymmetric row here throws the whole composition off the global axis. */
   .sources{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); column-gap:20px; row-gap:9px; width:100%; max-width:660px; margin-top:6px; }
   .source-col{ display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; }
-  .source-cap{ font-size:.53rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:rgba(255,255,255,.46); }
+  .source-cap{ font-size:.53rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:rgba(255,255,255,.66); }
   .source-col .flow-row{ max-width:250px; }
 
   .flow-connector{ width:70%; max-width:165px; height:25px; display:block; flex-shrink:0; }
@@ -216,7 +213,7 @@
   @keyframes core-breathe{ 0%,100%{ transform:scale(1); opacity:.5; } 50%{ transform:scale(1.09); opacity:.12; } }
   .core-t1{ font-size:.68rem; font-weight:800; letter-spacing:.15em; color:#fff; line-height:1; }
   .core-t2{ font-size:.49rem; font-weight:700; letter-spacing:.09em; color:rgba(190,227,248,.9); line-height:1; }
-  .core-note{ font-size:.68rem; color:rgba(255,255,255,.56); line-height:1.45; max-width:390px; text-align:center; margin-top:7px; }
+  .core-note{ font-size:.68rem; color:rgba(255,255,255,.68); line-height:1.45; max-width:390px; text-align:center; margin-top:7px; }
 
   /* The decision/action layer: one panel, two actors inside it. Both act — the
      point is that NOVUS does not replace the team, it decides which of them
@@ -228,12 +225,12 @@
   .actor.novus{ border-color:rgba(125,211,252,.45); background:rgba(56,189,248,.12); }
   .actor.team{ border-color:rgba(253,186,116,.45); background:rgba(253,186,116,.1); }
   .actor-name{ font-size:.63rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#fff; }
-  .actor-does{ font-size:.66rem; line-height:1.4; color:rgba(255,255,255,.62); }
+  .actor-does{ font-size:.66rem; line-height:1.4; color:rgba(255,255,255,.7); }
   .actor-swap{ color:rgba(255,255,255,.4); font-size:1rem; line-height:1; }
 
   .outcome{ font-family:var(--serif); font-size:clamp(1rem,2vw,1.22rem); font-weight:600; line-height:1.35; color:#fff; max-width:520px; }
   .outcome-sub{ display:block; font-family:'Inter',sans-serif; font-size:.8rem; font-weight:700; letter-spacing:.02em; color:var(--cyan); margin-top:7px; }
-  .bridge{ font-size:.72rem; line-height:1.55; color:rgba(255,255,255,.5); max-width:460px; border-top:1px solid rgba(255,255,255,.11); padding-top:13px; margin-top:6px; }
+  .bridge{ font-size:.72rem; line-height:1.55; color:rgba(255,255,255,.65); max-width:460px; border-top:1px solid rgba(255,255,255,.11); padding-top:13px; margin-top:6px; }
 
   /* ── CTA ── */
   .cta-block{ width:100%; display:flex; flex-direction:column; align-items:center; gap:11px; padding-top:6px; }
@@ -242,8 +239,8 @@
   .cta-btn:hover{ transform:translateY(-2px); box-shadow:0 14px 32px rgba(0,0,0,.36); }
   .cta-btn:active{ transform:translateY(0) scale(.98); }
   .cta-btn svg{ width:12px; height:12px; }
-  .cta-support{ font-size:.78rem; line-height:1.5; color:rgba(255,255,255,.62); max-width:470px; }
-  .cta-phone{ font-size:.74rem; color:rgba(255,255,255,.45); }
+  .cta-support{ font-size:.78rem; line-height:1.5; color:rgba(255,255,255,.72); max-width:470px; }
+  .cta-phone{ font-size:.74rem; color:rgba(255,255,255,.6); }
   .cta-phone a{ color:#93C5FD; font-weight:700; text-decoration:none; }
   .cta-phone a:hover{ text-decoration:underline; }
   .calendly-wrap{ width:100%; max-width:600px; margin-top:3px; display:none; }
@@ -359,7 +356,6 @@
         <div class="eyebrow">What actually happened</div>
         <div class="metrics rv" id="metrics"></div>
         <div class="proof rv" id="proof"></div>
-        <p class="credit-line rv hidden" id="positive-observation"></p>
         <p class="reveal-line rv" id="demo-reveal"></p>
         <p class="so-what rv hidden" id="commercial-consequence"></p>
       </div>
@@ -789,8 +785,6 @@
 
     // ── ACT 2 ──
     renderEvidence(demo.observed_events);
-    const hasPositive = setField('positive-observation', demo.positive_observation);
-    show('positive-observation', hasPositive);
     setField('demo-reveal', demo.demo_reveal);
     // The consequence is the "so what". main_finding stands in only where
     // PERSONALISATION never produced one — showing both says the same thing

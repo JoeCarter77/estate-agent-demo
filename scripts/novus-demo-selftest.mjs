@@ -1282,6 +1282,47 @@ async function run() {
     assert.strictEqual(slow[0].label, 'First meaningful response');
     assert.ok(slow[0].detail.startsWith('17.9 hours after the enquiry.'));
     ok('a lag over an hour is labelled plainly, with the delay stated first');
+
+    // An automated acknowledgement before that human touch belongs in the
+    // same first-response evidence. It is credited without being mistaken for
+    // the meaningful response measured by response_hours.
+    const acknowledged = selectCommunicationEvidence({
+      communications: [
+        {
+          communication_id: 'a1', probe_id: 'p', occurred_at: '2026-08-01T09:01:00.000Z',
+          channel: 'email', automated_or_human: 'automated',
+          communication_classification: 'auto_acknowledgement',
+          body_text: 'Thanks for your enquiry. A member of the team will get back to you.',
+        },
+        { ...oneTouch[0], occurred_at: '2026-08-04T09:00:00.000Z' },
+      ],
+      enquiryAt: '2026-08-01T09:00:00.000Z', responseTime: '3 days', responseHours: '72',
+    });
+    assert.strictEqual(acknowledged[0].label, 'First meaningful response');
+    assert.ok(acknowledged[0].detail.startsWith('An automated email was sent straight away saying'));
+    assert.ok(acknowledged[0].detail.includes('"Thanks for your enquiry. A member of the team will get back to you."'));
+    assert.ok(acknowledged[0].detail.includes('The first meaningful human response came 3 days after the enquiry.'));
+    ok('a preceding automated acknowledgement is credited inside the first-response evidence');
+
+    const multipleAcknowledgements = selectCommunicationEvidence({
+      communications: [
+        {
+          communication_id: 'a1', probe_id: 'p', occurred_at: '2026-08-01T09:01:00.000Z',
+          channel: 'email', automated_or_human: 'automated', body_text: 'We have received your enquiry.',
+        },
+        {
+          communication_id: 'a2', probe_id: 'p', occurred_at: '2026-08-01T09:03:00.000Z',
+          channel: 'sms', automated_or_human: 'automated', body_text: 'The team will get back to you.',
+        },
+        { ...oneTouch[0], occurred_at: '2026-08-04T09:00:00.000Z' },
+      ],
+      responseTime: '3 days', responseHours: '72',
+    });
+    assert.ok(multipleAcknowledgements[0].detail.startsWith(
+      'Automated messages by email and SMS acknowledged the enquiry. The first meaningful human response came 3 days after the enquiry.',
+    ));
+    assert.ok(!multipleAcknowledgements[0].detail.includes('We have received your enquiry'));
+    ok('multiple automated messages are summarised rather than listed');
   }
   {
     // First contact (email) + a later voicemail + a further attempt the next
