@@ -584,39 +584,40 @@ async function run() {
     const detected = JSON.parse(built.novus_detected_json);
     const decisions = JSON.parse(built.novus_decisions_json);
     const actions = JSON.parse(built.novus_actions_json);
-    // UNDERSTAND -> DECIDE -> ACT stays the visual signature. Each stage is now
-    // ONE line, because the claim being made is that NOVUS comprehends the
-    // commercial context, chooses, and then executes - not that it sends
+    // CONTEXT -> INTELLIGENCE -> EXECUTION stays the visual signature. Each
+    // stage is ONE line, because the claim being made is that NOVUS comprehends
+    // the commercial context, chooses, and then executes - not that it sends
     // messages. A second bullet per stage reads as a feature list and pulls the
     // section back towards "chatbot".
-    assert.deepStrictEqual(detected.map((d) => d.label), ['Sees the full opportunity']);
-    assert.deepStrictEqual(decisions.map((d) => d.label), ['Chooses the right next steps']);
-    assert.deepStrictEqual(actions.map((a) => a.label), ['Moves the opportunities forward']);
-    ok('UNDERSTANDS / DECIDES / ACTS is one claim per stage, not a feature list');
+    assert.deepStrictEqual(detected.map((d) => d.label), ['Understands the full situation']);
+    assert.deepStrictEqual(decisions.map((d) => d.label), ['Knows the right next move']);
+    assert.deepStrictEqual(actions.map((a) => a.label), ['Makes it happen']);
+    ok('CONTEXT / INTELLIGENCE / EXECUTION is one claim per stage, not a feature list');
 
     // SCANNABLE, NOT EXPLANATORY. One short line per stage - the section has to
     // land "understands context -> decides -> acts" at a glance, and every extra
     // clause pulls it back towards a description of a chatbot.
     assert.strictEqual(
       detected[0].detail,
-      'Buyer enquiry, potential seller, and what still needs to be established.',
+      'Who they are, what they want, the property, their position and what still needs to be established.',
     );
     assert.strictEqual(
       decisions[0].detail,
-      'Progress the viewing. Qualify the seller. Escalate anything that needs the team.',
+      'Decides what should happen next, what can be handled automatically and what needs the team.',
     );
     assert.strictEqual(
       actions[0].detail,
-      'NOVUS takes the appropriate action automatically and hands the team the conversations that need a person.',
+      // Authored with an em dash; normaliseDashes() renders it in house style.
+      'Takes the next action - qualifying, following up, booking, updating, routing and escalating as needed.',
     );
     for (const stage of [detected, decisions, actions]) {
       assert.strictEqual(stage.length, 1, 'each stage is exactly one line');
       assert.ok(stage[0].detail.length <= 120, `beat 3 stays short: "${stage[0].detail}"`);
     }
-    // ACTS is execution AND routing in one line, so it carries no owner chip:
+    // EXECUTION is action AND routing in one line, so it carries no owner chip:
     // choosing between the two is the capability being described.
-    assert.ok(actions.every((a) => !a.owner), 'ACTS is one line covering both paths, so no stage is labelled NOVUS or Your team');
-    ok('beat 3 reads as understands commercial context -> decides -> acts, in three short lines');
+    assert.ok(actions.every((a) => !a.owner), 'EXECUTION is one line covering both paths, so no stage is labelled NOVUS or Your team');
+    ok('beat 3 reads as context -> intelligence -> execution, in three short lines');
 
     assert.strictEqual(
       built.cta_headline,
