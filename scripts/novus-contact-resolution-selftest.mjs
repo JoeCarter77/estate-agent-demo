@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRepo } from '../lib/sheets.mjs';
+import { createRepo, fetchSheetsJson } from '../lib/sheets.mjs';
 import {
   resolveAgencyContact,
   listResolutionBacklog,
@@ -81,37 +81,50 @@ function makeFakeSheet() {
     return m ? m[1] : null;
   };
   const colIndex = (letters) => letters.split('').reduce((acc, ch) => acc * 26 + (ch.charCodeAt(0) - 64), 0) - 1;
+  const calls = { get: [], append: [], update: [], batchUpdate: [] };
+
+  const applyUpdate = (range, rows) => {
+    const tab = tabOf(range);
+    const start = startRowOf(range);
+    const col = colIndex(colOf(range));
+    store[tab] = store[tab] || [];
+    rows.forEach((r, i) => {
+      const rowIdx = start - 1 + i;
+      if (col === 0 && r.length > 1) {
+        store[tab][rowIdx] = r.slice(); // full-row write
+      } else {
+        const existing = store[tab][rowIdx] || [];
+        while (existing.length <= col) existing.push('');
+        existing[col] = r[0];           // single-cell write
+        store[tab][rowIdx] = existing;
+      }
+    });
+  };
 
   const valuesApi = {
     async get(range) {
+      calls.get.push(range);
       return (store[tabOf(range)] || []).map((r) => r.slice());
     },
     async append(range, rows) {
+      calls.append.push(range);
       const tab = tabOf(range);
       store[tab] = store[tab] || [];
       for (const r of rows) store[tab].push(r.slice());
       return { updates: { updatedRows: rows.length } };
     },
     async update(range, rows) {
-      const tab = tabOf(range);
-      const start = startRowOf(range);
-      const col = colIndex(colOf(range));
-      store[tab] = store[tab] || [];
-      rows.forEach((r, i) => {
-        const rowIdx = start - 1 + i;
-        if (col === 0 && r.length > 1) {
-          store[tab][rowIdx] = r.slice(); // full-row write (updateById)
-        } else {
-          const existing = store[tab][rowIdx] || [];
-          while (existing.length <= col) existing.push('');
-          existing[col] = r[0];           // single-cell write (updateCell)
-          store[tab][rowIdx] = existing;
-        }
-      });
+      calls.update.push(range);
+      applyUpdate(range, rows);
       return { updatedRows: rows.length };
     },
+    async batchUpdate(data) {
+      calls.batchUpdate.push(data.map((item) => item.range));
+      for (const item of data) applyUpdate(item.range, item.values);
+      return { totalUpdatedRanges: data.length };
+    },
   };
-  return { store, valuesApi };
+  return { store, valuesApi, calls };
 }
 
 function rowsAsObjects(store, tab, header) {
@@ -1128,6 +1141,70 @@ await test('a missing outreach column is reported, not swallowed', async () => {
     'a workbook missing the columns must say so rather than look like a success',
   );
   assert.ok(valuesApi);
+});
+
+// ── Read quota: one request-scoped snapshot, no reads during processing ─────
+await test('one agency resolution reads AGENCIES, COMMUNICATIONS and CONTACTS exactly once each', async () => {
+  const { store, valuesApi, calls } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_reads', agency_name: 'Read Count Estates', domain: 'reads.co.uk',
+    owner_md: 'Rita Reads', primary_contact_email: 'rita.reads@reads.co.uk',
+    other_known_emails: 'info@reads.co.uk',
+  });
+  await resolveAgencyContact(repo, 'ag_reads', baseOptions({
+    verifyEmailImpl: makeVerifier({ 'rita.reads@reads.co.uk': 'VALID' }),
+  }));
+
+  assert.equal(calls.get.length, 3, `expected 3 reads, got ${calls.get.length}: ${calls.get.join(', ')}`);
+  assert.deepEqual([...calls.get].sort(), ['AGENCIES', 'COMMUNICATIONS', 'CONTACTS']);
+  assert.equal(calls.append.length, 0, 'new CONTACTS rows are included in the prepared batch');
+  assert.equal(calls.update.length, 0, 'AGENCIES cells are included in the prepared batch');
+  assert.equal(calls.batchUpdate.length, 2, 'CONTACTS rows and AGENCIES cells are each written in one batch');
+});
+
+await test('processing many candidates does not trigger repeated sheet reads', async () => {
+  const { store, valuesApi, calls } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_many', agency_name: 'Many Candidates', domain: 'many.co.uk',
+    owner_md: 'Maya Many', primary_contact_email: 'maya.many@many.co.uk',
+    other_known_emails: 'm.many@many.co.uk, team.member@many.co.uk, info@many.co.uk',
+  });
+  seedCommunication(store, {
+    communication_id: 'com_many', agency_id: 'ag_many', channel: 'email', direction: 'inbound',
+    source_identifier_normalized: 'reply.person@many.co.uk', display_name: 'Reply Person',
+    automated_or_human: 'human',
+  });
+  const verifier = makeVerifier({ 'info@many.co.uk': 'VALID' }, { defaultStatus: 'INVALID' });
+  const result = await resolveAgencyContact(repo, 'ag_many', baseOptions({ verifyEmailImpl: verifier }));
+
+  assert.ok(result.candidates_verified.length >= 4, 'the waterfall must actually process several candidates');
+  assert.equal(calls.get.length, 3, 'candidate count must not affect Sheets read count');
+  assert.deepEqual([...new Set(calls.get)].sort(), ['AGENCIES', 'COMMUNICATIONS', 'CONTACTS']);
+});
+
+await test('Sheets 429 responses use two short backoff retries and then succeed', async () => {
+  let fetchCalls = 0;
+  const delays = [];
+  const result = await fetchSheetsJson('https://sheets.googleapis.test/values/AGENCIES', {}, {
+    getAccessTokenImpl: async () => 'test-token',
+    sleepImpl: async (ms) => { delays.push(ms); },
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      if (fetchCalls < 3) {
+        return {
+          ok: false, status: 429,
+          headers: { get: () => null },
+          text: async () => 'RESOURCE_EXHAUSTED',
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({ values: [['ok']] }) };
+    },
+  });
+  assert.deepEqual(result, { values: [['ok']] });
+  assert.equal(fetchCalls, 3, 'one request plus at most two retries');
+  assert.deepEqual(delays, [500, 1500], 'backoff is short, bounded and non-aggressive');
 });
 
 // ── Backlog preparation is inert ────────────────────────────────────────────
