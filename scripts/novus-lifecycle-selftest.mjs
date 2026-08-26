@@ -88,6 +88,7 @@ const PERSONALISATION_HEADER = [
   'wider_finding_index', 'supporting_findings', 'evidence', 'novus_counterfactual',
   'fair_observation', 'main_finding', 'commercial_consequence',
   'property_reference', 'email_observation', 'email_commercial_hook',
+  'email_commercial_hook_email_2',
   'created_at', 'updated_at',
 ];
 const DIAGNOSIS_FINDINGS_HEADER = ['probe_id', 'finding_index', 'finding', 'evidence', 'significance_note'];
@@ -175,17 +176,18 @@ function installAiStub() {
         novus_counterfactual: 'stub counterfactual',
         main_finding: 'stub main finding.',
         commercial_consequence: 'stub consequence.',
-        email_observation: 'This enquiry did not reach a complete next step.',
-        // States the SHAPE, not the observation again: the hook guard now
-        // requires a count drawn from the code-computed opportunity shape.
-        email_commercial_hook: "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.",
+        email_observation: 'Nobody came back to the enquiry with a viewing or a next step of any kind.',
+        // WHY it matters, not the observation again — and never an outcome
+        // that needed a reply this probe deliberately never sends.
+        email_commercial_hook: 'So a buyer already in front of you stayed a name in the inbox rather than someone you knew anything about.',
+        email_commercial_hook_email_2: 'The part worth a second look is that the enquiry told you more about me than anything you did with it.',
       };
     }
     // The bounded, field-scoped correction call.
     if (tool?.name === 'correct_probe_personalisation_fields') {
       personaliseCallCount += 1;
       return Object.fromEntries(tool.input_schema.required
-        .map((field) => [field, "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed."]));
+        .map((field) => [field, 'So a buyer already in front of you stayed a name in the inbox rather than someone you knew anything about.']));
     }
     if (tool?.name === 'record_probe_diagnosis') {
       diagnoseCallCount += 1;

@@ -63,16 +63,40 @@ function shapeCounts(fixture) {
   };
 }
 
+// WHY THE OBSERVED BEHAVIOUR MATTERS — never an outcome that needed a reply
+// the probe deliberately never sends. On a probe where a real person did come
+// back, "neither side progressed" and "it never became a conversation" are
+// criticisms of OUR silence, so the stand-in never writes them; on a probe
+// that got no genuine response at all they are simply what happened, and it
+// does.
 function simulatedHook(fixture) {
   const c = shapeCounts(fixture);
   const twoSided = c.opportunities === 2;
-  if (!twoSided) return `That's 1 buyer enquiry that never reached a next step, with ${c.attempts || 0} contact attempts behind it.`;
-  if (c.noContact) return "That's 1 buyer enquiry and 1 potential seller, with neither ever becoming a conversation.";
-  if (c.progressed === 0 && c.attempts > 1) {
-    return `So even after ${c.attempts} contact attempts, the buyer enquiry and the potential seller were both left where they started.`;
+  if (c.noContact) {
+    return twoSided
+      ? "That's 1 buyer enquiry and 1 potential seller, with neither ever becoming a conversation."
+      : "That's 1 buyer enquiry that never reached a single person at your branch.";
   }
-  if (c.progressed === 0) return "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.";
-  return 'So the buyer side moved forward, while the potential seller was missed entirely.';
+  if (!twoSided) return 'So a buyer already in front of you stayed a name in the inbox rather than someone you knew anything about.';
+  if (c.progressed > 0) return 'So the buyer side moved forward, while the potential seller was missed entirely.';
+  return 'That vendor was not a name on a cold list — they were already talking to you as a buyer.';
+}
+
+// EMAIL 2 — the one extra thing neither Email 1 line said. Same rule: it
+// reframes, it never invents a second failure and never blames us for our own
+// silence.
+function simulatedSecondHook(fixture) {
+  const c = shapeCounts(fixture);
+  if (c.noContact) {
+    return 'The issue here was not qualification or follow-up quality — the enquiry never got a genuine human response at all.';
+  }
+  if (c.attempts > 1) {
+    return `${c.attempts} contact attempts shows real persistence; the gap is that every one of them worked the same side of the enquiry.`;
+  }
+  if (c.progressed > 0) {
+    return 'You handled the buying side well; the part worth a look is that the same message had already given you a second reason to call.';
+  }
+  return 'The speed was fine — what got lost was the second reason that person was worth ringing back.';
 }
 
 // A first-person rewrite of the recorded observation, used only when the
@@ -142,9 +166,10 @@ async function replay(fixture) {
     const patch = {};
     for (const field of fields) {
       patch[field] = field === 'email_commercial_hook' ? simulatedHook(fixture)
-        : field === 'email_observation'
-          ? simulatedObservation(fixture, fixture.recorded_model_output.email_observation)
-          : simulatedDemoLine(field, fixture, fixture.recorded_model_output);
+        : field === 'email_commercial_hook_email_2' ? simulatedSecondHook(fixture)
+          : field === 'email_observation'
+            ? simulatedObservation(fixture, fixture.recorded_model_output.email_observation)
+            : simulatedDemoLine(field, fixture, fixture.recorded_model_output);
     }
     return patch;
   });
@@ -183,7 +208,7 @@ function blankReason(field, fixture, row) {
 }
 
 const FIELDS = ['fair_observation', 'main_finding', 'commercial_consequence',
-  'email_observation', 'email_commercial_hook'];
+  'email_observation', 'email_commercial_hook', 'email_commercial_hook_email_2'];
 
 const MARKUP = /<\/?[a-z_]+>|<\s*\/?\s*(?:antml:)?parameter\b|<function_calls>|<invoke\b/i;
 
@@ -206,6 +231,7 @@ async function main() {
       commercial_consequence: row.commercial_consequence,
       email_observation: row.email_observation,
       email_commercial_hook: row.email_commercial_hook,
+      email_commercial_hook_email_2: row.email_commercial_hook_email_2,
       primary_narrative: row.primary_narrative,
     }));
   }
@@ -252,7 +278,7 @@ async function main() {
       const value = text(row[f]);
       const wasBlank = !text(fixture.recorded_persisted[f]);
       const mark = value ? (wasBlank ? '+' : ' ') : '-';
-      console.log(`   ${mark} ${f.padEnd(23)}${value || `(blank) ${blankReason(f, fixture, row)}`}`);
+      console.log(`   ${mark} ${f.padEnd(31)}${value || `(blank) ${blankReason(f, fixture, row)}`}`);
     }
     console.log(`   demo           ${fixture.recorded_demo.demo_status} -> ${compiled.status}${compiled.reasons.length ? `  [${compiled.reasons.join(' · ')}]` : ''}`);
     if (unexplained.length) console.log(`   !! UNEXPLAINED BLANKS: ${unexplained.join(', ')}`);
@@ -261,9 +287,9 @@ async function main() {
 
   console.log('='.repeat(96));
   console.log('BEFORE -> AFTER');
-  for (const f of FIELDS) console.log(`  ${f.padEnd(24)} blank in ${String(before.blanks[f]).padStart(2)} -> ${String(after.blanks[f]).padStart(2)} of 14`);
-  console.log(`  ${'primary_narrative markup'.padEnd(24)}       ${String(before.markup).padStart(2)} -> ${String(after.markup).padStart(2)} of 14`);
-  console.log(`  ${'demos needs_review'.padEnd(24)}       ${String(before.needsReview).padStart(2)} -> ${String(after.needsReview).padStart(2)} of 14`);
+  for (const f of FIELDS) console.log(`  ${f.padEnd(31)} blank in ${String(before.blanks[f]).padStart(2)} -> ${String(after.blanks[f]).padStart(2)} of 14`);
+  console.log(`  ${'primary_narrative markup'.padEnd(31)}       ${String(before.markup).padStart(2)} -> ${String(after.markup).padStart(2)} of 14`);
+  console.log(`  ${'demos needs_review'.padEnd(31)}       ${String(before.needsReview).padStart(2)} -> ${String(after.needsReview).padStart(2)} of 14`);
   const totalCalls = rows.reduce((n, r) => n + r.calls, 0);
   const steadyCalls = steady.reduce((n, r) => n + r.calls, 0);
   console.log(`  AI calls replaying the recorded regression as call 1: ${totalCalls} for ${rows.length} probes (${(totalCalls / rows.length).toFixed(2)}/probe, cap 2)`);

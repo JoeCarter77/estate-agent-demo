@@ -24,9 +24,11 @@ import {
   personaliseProbe, buildOpportunityShape, hookFailureAgainstObservation,
   quantifiesOpportunityShape, readsAsThirdPersonProspect, normalizeCurrencyFigure,
   readsAsConsultantSpeak, claimsUnaskedQuestions, namesConcreteOutcome,
-  introducesUnselectedFinding, _internal,
+  introducesUnselectedFinding, readsAsUnfairOutcomeCriticism,
+  agencyMadeNextStepAttempt, secondHookFailure, isDistinctText, _internal,
 } from '../lib/probe-personalisation.mjs';
 import { buildDemoRow, reviewReasonsFor } from '../lib/demos.mjs';
+import { needsPersonalisation } from '../lib/personalisation-rebuild.mjs';
 
 let passed = 0;
 const ok = (m) => { passed += 1; console.log(`  ✓ ${m}`); };
@@ -66,8 +68,12 @@ function answer(overrides = {}) {
     fair_observation: 'you replied quickly and progressed the viewing.',
     main_finding: 'no follow-up was sent and the seller side was never raised.',
     commercial_consequence: 'a declared valuation opportunity was never opened at all.',
+    // WHAT HAPPENED / WHY IT MATTERS COMMERCIALLY / THE EXTRA THING THAT
+    // CHANGES HOW THE ENQUIRY READS — three different jobs, and the guards
+    // below exist to keep them that way.
     email_observation: "You got back to me almost instantly, but no follow-ups were sent and nobody picked up that I'd also said I had a property to sell.",
-    email_commercial_hook: "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.",
+    email_commercial_hook: "That seller wasn't a cold database record — they were already engaging with your branch as a buyer.",
+    email_commercial_hook_email_2: 'You handled the buying side quickly; the part worth a look is that the same message had already given you a second reason to call.',
     novus_counterfactual: 'NOVUS would have opened both threads in the same conversation.',
     ...overrides,
   };
@@ -112,12 +118,15 @@ async function main() {
           commercial_consequence: 'no buyer or seller conversation was ever created.',
           email_observation: "We didn't receive a response during the four-day observation period, and nobody picked up that I'd also said I had a property to sell.",
           email_commercial_hook: "That's 2 live opportunities from 1 enquiry, with 0 conversations created.",
+          email_commercial_hook_email_2: 'The issue here was not qualification or follow-up quality — the enquiry never got a genuine human response in the first place.',
         }),
         expect: (row) => {
           assert.strictEqual(row.fair_observation, '', 'no fake positive on a no-response probe');
           assert.strictEqual(row.positive_finding_index, '');
           assert.ok(has(row.commercial_consequence) && has(row.email_observation) && has(row.email_commercial_hook));
-          assert.match(row.email_commercial_hook, /0 conversations/);
+          assert.match(row.email_commercial_hook, /0 conversations/,
+            'nobody came back at all, so an outcome criticism here is simply accurate');
+          assert.ok(has(row.email_commercial_hook_email_2));
         },
       },
       {
@@ -127,6 +136,7 @@ async function main() {
           wider_finding_index: null,
           email_observation: 'You got back to me almost instantly, but nothing followed that first reply.',
           email_commercial_hook: 'So 1 enquiry got a fast first reply and 0 follow-ups after it.',
+          email_commercial_hook_email_2: 'Speed was never the issue here; the gap is that one fast reply and a worked enquiry are two different things.',
         }),
         expect: (row) => {
           assert.strictEqual(row.narrative_finding_indexes, '1,4');
@@ -153,6 +163,7 @@ async function main() {
           main_finding_index: 2, wider_finding_index: null,
           email_observation: "You handled the viewing side well, but nobody picked up that I'd also said I had a property to sell.",
           email_commercial_hook: 'So the buyer side moved forward, while the potential seller was missed entirely.',
+          email_commercial_hook_email_2: 'The interesting part is that the buying side worked exactly as it should — the vendor had already volunteered themselves in the same message.',
         }),
         expect: (row) => { assert.match(row.email_commercial_hook, /potential seller was missed/); },
       },
@@ -164,6 +175,7 @@ async function main() {
           main_finding_index: 5, wider_finding_index: null,
           email_observation: 'You did ask whether my place was on the market, but nothing came back about actually valuing it.',
           email_commercial_hook: 'So the seller opportunity was seen, and 0 seller next steps came out of it.',
+          email_commercial_hook_email_2: 'Spotting a vendor and offering to value their place are two different things, and only the first of them happened here.',
         }),
         expect: (row) => { assert.strictEqual(row.main_finding_index, 5); assert.ok(has(row.email_commercial_hook)); },
       },
@@ -175,10 +187,12 @@ async function main() {
           wider_finding_index: null,
           email_observation: 'You came back to me quickly, but nothing followed that first reply.',
           email_commercial_hook: 'So 1 enquiry received 1 reply and 0 follow-ups.',
+          email_commercial_hook_email_2: 'One reply is not the same as a worked enquiry, and the difference between them is where a buyer like me gets lost.',
         }),
         expect: (row) => {
-          assert.doesNotMatch(`${row.email_observation} ${row.email_commercial_hook}`, /property to sell|valuation/i,
-            'a buyer-only enquiry never grows a seller beat');
+          assert.doesNotMatch(
+            `${row.email_observation} ${row.email_commercial_hook} ${row.email_commercial_hook_email_2}`,
+            /property to sell|valuation/i, 'a buyer-only enquiry never grows a seller beat');
         },
       },
       {
@@ -190,6 +204,7 @@ async function main() {
           main_finding: '', commercial_consequence: '',
           email_observation: 'You came back within minutes, booked the viewing and picked up that I had a place to sell too.',
           email_commercial_hook: 'So both the viewing and the valuation came out of that one enquiry.',
+          email_commercial_hook_email_2: 'Worth knowing how rare that is: most branches work the buying side of a message like mine and never notice the second half.',
         }),
         expect: (row) => {
           assert.strictEqual(row.main_finding_index, '', 'no problem finding exists, so none is selected');
@@ -313,9 +328,15 @@ async function main() {
 
   // ══ 10-11: the two Instantly variables are never blank where findings exist
   {
+    const NUMBERED = {
+      email_observation: '10',
+      email_commercial_hook: '11',
+      email_commercial_hook_email_2: '11b',
+    };
     for (const [field, broken] of [
       ['email_observation', { email_observation: '' }],
       ['email_commercial_hook', { email_commercial_hook: '' }],
+      ['email_commercial_hook_email_2', { email_commercial_hook_email_2: '' }],
     ]) {
       const good = answer();
       const { row, calls } = await run({
@@ -324,7 +345,7 @@ async function main() {
       });
       assert.strictEqual(calls, 2);
       assert.ok(has(row[field]), `${field} is recovered rather than persisted blank`);
-      ok(`${field === 'email_observation' ? '10' : '11'}. ${field} is never blank where valid selected findings exist`);
+      ok(`${NUMBERED[field]}. ${field} is never blank where valid selected findings exist`);
     }
   }
 
@@ -371,8 +392,10 @@ async function main() {
     assert.strictEqual(
       hookFailureAgainstObservation('A potential seller went completely unengaged, meaning no valuation conversation ever had the chance to start.', observation),
       null, 'a well-formed but flat hook is the prompt\'s job, not the guard\'s');
-    assert.ok(_internal.SYSTEM_PROMPT.includes("That's 1 buyer enquiry and 1 potential seller"),
+    assert.ok(_internal.SYSTEM_PROMPT.includes("That seller wasn't a cold database record"),
       'so the prompt must carry the target hooks');
+    assert.ok(_internal.SYSTEM_PROMPT.includes('FLAT:'),
+      'and the flat hook that shows what "adds nothing" looks like');
     assert.ok(_internal.SYSTEM_PROMPT.includes('TOO SOFT:'),
       'and the observation pair that shows what soft looks like');
     ok('12. the hook lands in the agency\'s own words — all five target hooks pass, deck language is rejected, and the semantic judgement is left to the prompt on purpose');
@@ -382,10 +405,10 @@ async function main() {
       findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
       reply: (call) => (call === 1
         ? answer({ email_commercial_hook: "That's 2 commercial opportunities from 1 enquiry, with neither fully progressed." })
-        : { email_commercial_hook: "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed." }),
+        : { email_commercial_hook: 'So the vendor you never asked about was already in the building, talking to you as a buyer.' }),
     });
     assert.strictEqual(calls, 2);
-    assert.match(row.email_commercial_hook, /1 buyer enquiry and 1 potential seller/);
+    assert.match(row.email_commercial_hook, /already in the building/);
     assert.doesNotMatch(row.email_commercial_hook, /commercial opportunit/i);
     ok('12b. a deck-language hook is repaired into the agency\'s own words inside the two-call budget');
   }
@@ -446,6 +469,156 @@ async function main() {
     });
     assert.ok(has(demoRow.row.commercial_consequence), 'the Email-1-only rule does not touch demo prose');
     ok('14. Email 1 is always first person; the rule is scoped to the two Instantly variables');
+  }
+
+  // ══ 19: THE PROBE RULE — we never reply, so nothing that needed our reply
+  //        is the agency's failure ══════════════════════════════════════════
+  {
+    // Verbatim from the brief's list of invalid criticism.
+    for (const unfair of [
+      'the viewing never got booked',
+      'the buyer side never progressed',
+      'neither opportunity became a conversation',
+      'the viewing was left hanging',
+      'the enquiry never moved forward',
+      "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.",
+      "That's 1 buyer enquiry and 1 potential seller, with neither ever becoming a conversation.",
+    ]) assert.strictEqual(readsAsUnfairOutcomeCriticism(unfair), true, `needs my reply: ${unfair}`);
+
+    // Everything the agency could have done alone, on the day, stays sayable.
+    for (const fair of [
+      "You handled the viewing side well, but nobody picked up that I'd also said I had a property to sell.",
+      'No follow-up was ever sent after that first reply.',
+      'It took nearly 19 hours to get back to the enquiry.',
+      'So the buyer side moved forward, while the potential seller was missed entirely.',
+      'So the seller lead was spotted, but it still never became a valuation conversation.',
+      'The enquiry never got a genuine human response in the first place.',
+      "That seller wasn't a cold database record — they were already engaging with your branch as a buyer.",
+    ]) assert.strictEqual(readsAsUnfairOutcomeCriticism(fair), false, `theirs alone to do: ${fair}`);
+
+    // Which case a probe is in is INTELLIGENCE.human_contact, nothing else.
+    assert.strictEqual(agencyMadeNextStepAttempt({ human_contact: 'yes' }), true);
+    assert.strictEqual(agencyMadeNextStepAttempt({ human_contact: 'automated_only' }), false);
+    assert.strictEqual(agencyMadeNextStepAttempt({ human_contact: 'none' }), false);
+
+    // End to end, on a probe where a real person DID come back: the line is
+    // rejected, and because it is not true it is never banked either — a
+    // repair that repeats it leaves the field blank rather than sending it.
+    const { row, calls } = await run({
+      findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
+      reply: () => answer({ email_commercial_hook: "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed." }),
+    });
+    assert.strictEqual(calls, 2, 'the repair is attempted');
+    assert.strictEqual(row.email_commercial_hook, '',
+      'blaming us for our own silence is never persisted, repaired or not');
+    ok('19. a line that blames the agency for an outcome needing my reply is rejected and never persisted');
+  }
+  {
+    // And it is repairable inside the normal budget.
+    const { row, calls } = await run({
+      findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
+      reply: (call) => (call === 1
+        ? answer({ email_observation: 'You called me back the same morning, but the viewing never got booked and the enquiry never moved forward.' })
+        : { email_observation: answer().email_observation }),
+    });
+    assert.strictEqual(calls, 2);
+    assert.ok(has(row.email_observation));
+    assert.strictEqual(readsAsUnfairOutcomeCriticism(row.email_observation), false);
+    ok('19b. and one bounded correction turns it into something the agency could actually have done');
+  }
+  {
+    // THE OTHER HALF OF THE RULE. On a probe where nobody ever came back, the
+    // same sentence is simply what happened, and it must survive untouched.
+    const { row, calls } = await run({
+      findings: ordered(F.sellerMissed, F.noResponse),
+      intelligence: { human_contact: 'none', response_hours: '', contact_attempts: 0, follow_ups: 0, viewing_progression: 'none' },
+      reply: () => answer({
+        positive_finding_index: null, main_finding_index: 6, wider_finding_index: 2,
+        fair_observation: '', main_finding: '',
+        email_observation: "We didn't hear anything back at all in four days, and nobody picked up that I'd also said I had a property to sell.",
+        email_commercial_hook: "That's 1 buyer enquiry and 1 potential seller, with neither ever becoming a conversation.",
+        email_commercial_hook_email_2: 'The part worth knowing is that the message you never answered had already told you why I was worth calling twice.',
+      }),
+    });
+    assert.strictEqual(calls, 1, 'nothing to repair — nobody put the ball back in my court');
+    assert.match(row.email_commercial_hook, /neither ever becoming a conversation/);
+    ok('19c. the same sentence stays valid on a probe that got no genuine response at all');
+  }
+
+  // ══ 20: EMAIL 2 adds the thing Email 1 did not say ════════════════════════
+  {
+    const observation = "You replied within 10 hours and pushed straight for a viewing, but nobody acknowledged that I'd also said I had a property to sell.";
+    const hook = "That seller wasn't a cold database record — they were already actively engaging with your agency as a buyer.";
+
+    // The brief's own Email 2 hooks, verbatim.
+    for (const good of [
+      "The interesting part is that speed wasn't the problem here — the missed value was sitting inside the same enquiry you already responded to.",
+      "You handled the viewing side well; the part worth looking at is that the same person had already given you a second reason to engage.",
+      'Five follow-ups shows good persistence; the gap is that every touch was still working the same side of an enquiry that contained two opportunities.',
+      'The speed was fine — what got lost was the actual context of the enquiry and the second reason that person was worth speaking to.',
+      "In this case the issue wasn't qualification or follow-up quality — the enquiry never got a genuine human response in the first place.",
+      "The buyer side worked exactly as you'd expect; the overlooked value was that the buyer had already volunteered seller intent in the same message.",
+    ]) assert.strictEqual(secondHookFailure(good, observation, hook), null, `must pass: ${good}`);
+
+    assert.strictEqual(secondHookFailure('', observation, hook), 'blank');
+    assert.strictEqual(secondHookFailure(observation, observation, hook), 'restates_observation');
+    assert.strictEqual(secondHookFailure(hook, observation, hook), 'restates_hook');
+    assert.strictEqual(
+      secondHookFailure('That is the kind of lead leakage a branch never sees in its funnel.', observation, hook),
+      'consultant_speak');
+    assert.strictEqual(
+      secondHookFailure(`${'a real point about the enquiry '.repeat(6)}and one more clause on top of it.`, observation, hook),
+      'too_long');
+    // Same honesty boundary as the first hook: whether a well-formed second
+    // line genuinely REFRAMES anything is the prompt's job, not a heuristic.
+    assert.ok(_internal.SYSTEM_PROMPT.includes('email_commercial_hook_email_2'),
+      'so the prompt must carry the Email 2 rule');
+    assert.ok(_internal.SYSTEM_PROMPT.includes("The issue wasn't X — it was Y."),
+      'and the shapes that make it land');
+    ok('20. the Email 2 hook must add something both Email 1 lines did not say');
+  }
+  {
+    // End to end: an Email 2 that is the first hook again is repaired, and the
+    // three persisted lines end up genuinely different from each other.
+    const good = answer();
+    const { row, calls } = await run({
+      findings: ordered(F.positive, F.noFollowUp, F.sellerMissed),
+      reply: (call) => (call === 1
+        ? answer({ email_commercial_hook_email_2: good.email_commercial_hook })
+        : { email_commercial_hook_email_2: good.email_commercial_hook_email_2 }),
+    });
+    assert.strictEqual(calls, 2);
+    assert.ok(has(row.email_commercial_hook_email_2));
+    assert.notStrictEqual(row.email_commercial_hook_email_2, row.email_commercial_hook);
+    for (const [a, b] of [
+      [row.email_observation, row.email_commercial_hook],
+      [row.email_observation, row.email_commercial_hook_email_2],
+      [row.email_commercial_hook, row.email_commercial_hook_email_2],
+    ]) assert.strictEqual(isDistinctText(a, b), true, 'the three email fields do not repeat each other');
+    ok('20b. a repeated Email 2 hook is repaired, and the three persisted lines stay three different jobs');
+  }
+
+  // ══ 21: regenerating the existing rows onto the three-field contract ══════
+  {
+    const complete = {
+      primary_narrative: 'n', email_observation: 'o', email_commercial_hook: 'h',
+      email_commercial_hook_email_2: 'h2',
+    };
+    const { email_commercial_hook_email_2: _dropped, ...legacy } = complete;
+    const withColumn = new Set([...Object.keys(complete), 'probe_id']);
+    const withoutColumn = new Set([...Object.keys(legacy), 'probe_id']);
+
+    assert.strictEqual(needsPersonalisation({ obj: legacy }, withColumn), true,
+      'a row written before Email 2 existed is regenerated, on the pass after the column is added');
+    assert.strictEqual(needsPersonalisation({ obj: complete }, withColumn), false,
+      'and once it carries all three lines it is frozen again — no second regeneration');
+    // THE LOOP THIS PREVENTS: with no column on the sheet, the value written
+    // for it goes nowhere, so it would read back blank on every subsequent
+    // pass and re-personalise every probe for ever.
+    assert.strictEqual(needsPersonalisation({ obj: legacy }, withoutColumn), false,
+      'a workbook that has not had the column added yet behaves exactly as it did before the field existed');
+    assert.strictEqual(needsPersonalisation(null, withColumn), true, 'a probe with no row at all is always personalised');
+    ok('21. existing rows regenerate once onto the three-field contract, and a workbook missing the column never loops');
   }
 
   // ══ 15: no structured-output / tool markup can persist ════════════════════
@@ -539,6 +712,10 @@ async function main() {
     assert.doesNotMatch(buyerOnly, /Seller \/ valuation side/);
     const silent = buildOpportunityShape(PROBE, { human_contact: 'none' });
     assert.match(silent, /Conversations created: 0/);
+    // And it states which side of the probe rule this enquiry sits on, which
+    // is what stops the model criticising us for our own deliberate silence.
+    assert.match(shape, /ball back in my court\? YES/);
+    assert.match(silent, /ball back in my court\? NO/);
     ok('the counts block is code-computed from this enquiry alone, speaks in buyer/seller terms, and never invents a seller side');
   }
 
@@ -561,10 +738,14 @@ async function main() {
         const opportunities = Number(counts.match(/enquiry: (\d+)/)[1]);
         return Object.fromEntries(tool.input_schema.required.map((field) => [field,
           field === 'email_commercial_hook'
-            ? `That's ${opportunities} commercial opportunities from 1 enquiry, with neither fully progressed.`
-            : field === 'email_observation'
-              ? "You came back to me, but nobody picked up that I'd also said I had a property to sell."
-              : 'you picked the enquiry up and came back with the right property details.']));
+            ? (opportunities === 2
+              ? 'That seller was not a name on a cold list — they were already talking to you as a buyer.'
+              : 'So a buyer already in front of you stayed a name in the inbox rather than someone you knew anything about.')
+            : field === 'email_commercial_hook_email_2'
+              ? 'Worth a second look: the part that went unworked was sitting inside a message you had already opened.'
+              : field === 'email_observation'
+                ? "You came back to me, but nobody picked up that I'd also said I had a property to sell."
+                : 'you picked the enquiry up and came back with the right property details.']));
       });
       const row = await personaliseProbe(fixture.probe, fixture.intelligence, fixture.diagnosis,
         fixture.findings, { agency_name: fixture.agency_name });
@@ -577,6 +758,7 @@ async function main() {
       // 10-11 across every real probe.
       assert.ok(has(row.email_observation), `${fixture.probe_id}: email_observation`);
       assert.ok(has(row.email_commercial_hook), `${fixture.probe_id}: email_commercial_hook`);
+      assert.ok(has(row.email_commercial_hook_email_2), `${fixture.probe_id}: email_commercial_hook_email_2`);
       // 9 across every real probe: a blank must have an evidence reason.
       if (positive !== null && !has(row.fair_observation)) unexplained += 1;
       if (main !== null && !noContact && !has(row.main_finding)) unexplained += 1;
@@ -589,6 +771,15 @@ async function main() {
       // 14 across every real probe.
       assert.strictEqual(readsAsThirdPersonProspect(row.email_observation), false, `${fixture.probe_id}: first-person observation`);
       assert.strictEqual(readsAsThirdPersonProspect(row.email_commercial_hook), false, `${fixture.probe_id}: first-person hook`);
+      assert.strictEqual(readsAsThirdPersonProspect(row.email_commercial_hook_email_2), false, `${fixture.probe_id}: first-person Email 2 hook`);
+      // THE PROBE RULE across every real probe: no persisted line blames the
+      // agency for an outcome that needed a reply we deliberately withheld.
+      if (agencyMadeNextStepAttempt(fixture.intelligence)) {
+        for (const field of ['email_observation', 'email_commercial_hook', 'email_commercial_hook_email_2']) {
+          assert.strictEqual(readsAsUnfairOutcomeCriticism(row[field]), false,
+            `${fixture.probe_id}: ${field} criticises an outcome that needed my reply`);
+        }
+      }
 
       // 17-18: the demo compiles, and compiles READY wherever the evidence
       // supports every beat.

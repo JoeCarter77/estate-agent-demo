@@ -41,15 +41,30 @@ function standIn(fixture) {
         ? "You handled the viewing side well, but nobody picked up that I'd also said I had a property to sell."
         : "You got back to the enquiry, but nobody picked up that I'd also said I had a property to sell.";
 
-  const hook = !twoSided
-    ? `That's 1 buyer enquiry that never reached a next step, after ${attempts} contact attempt${attempts === 1 ? '' : 's'}.`
-    : noReply
+  // WHY IT MATTERS COMMERCIALLY. On a probe where a real person came back, an
+  // outcome that needed my reply is off limits — I deliberately never sent one
+  // — so those phrasings appear only in the no-reply branch, where they are
+  // simply what happened.
+  const hook = noReply
+    ? (twoSided
       ? "That's 1 buyer enquiry and 1 potential seller, with neither ever becoming a conversation."
-      : worked > 0
-        ? 'So the buyer side moved forward, while the potential seller was missed entirely.'
-        : "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.";
+      : "That's 1 buyer enquiry that never reached a single person at your branch.")
+    : !twoSided
+        ? 'So a buyer already in front of you stayed a name in the inbox rather than someone you knew anything about.'
+        : worked > 0
+          ? 'So the buyer side moved forward, while the potential seller was missed entirely.'
+          : 'That vendor was not a name on a cold list — they were already talking to you as a buyer.';
 
-  return { observation, hook, twoSided, worked };
+  // EMAIL 2 — the extra thing neither line above said.
+  const hook2 = noReply
+    ? 'The issue here was not qualification or follow-up quality — the enquiry never got a genuine human response at all.'
+    : attempts > 1
+      ? `${attempts} contact attempts shows real persistence; the gap is that every one of them worked the same side of the enquiry.`
+      : worked > 0
+        ? 'You handled the buying side well; the part worth a look is that the same message had already given you a second reason to call.'
+        : 'The speed was fine — what got lost was the second reason that person was worth ringing back.';
+
+  return { observation, hook, hook2, twoSided, worked };
 }
 
 function blankReason(field, fixture, row) {
@@ -69,7 +84,7 @@ function blankReason(field, fixture, row) {
   return 'UNEXPLAINED';
 }
 
-const FIELDS = ['email_observation', 'email_commercial_hook',
+const FIELDS = ['email_observation', 'email_commercial_hook', 'email_commercial_hook_email_2',
   'fair_observation', 'main_finding', 'commercial_consequence'];
 
 async function main() {
@@ -88,12 +103,18 @@ async function main() {
       __setAiCallerForTests(async ({ tool }) => {
         calls += 1;
         if (tool.name === 'record_probe_personalisation') {
-          return { ...fixture.recorded_model_output, email_observation: sim.observation, email_commercial_hook: sim.hook };
+          return {
+            ...fixture.recorded_model_output,
+            email_observation: sim.observation,
+            email_commercial_hook: sim.hook,
+            email_commercial_hook_email_2: sim.hook2,
+          };
         }
         repaired.push(...tool.input_schema.required);
         return Object.fromEntries(tool.input_schema.required.map((f) => [f,
           f === 'email_commercial_hook' ? sim.hook
-            : f === 'email_observation' ? sim.observation
+            : f === 'email_commercial_hook_email_2' ? sim.hook2
+              : f === 'email_observation' ? sim.observation
               : f === 'commercial_consequence'
                 ? (sim.twoSided ? 'the potential seller in that same enquiry was never taken to a valuation conversation.'
                   : 'the buyer enquiry itself never reached a next step.')
@@ -117,7 +138,7 @@ async function main() {
     for (const field of FIELDS) {
       const value = text(row[field]);
       const reason = blankReason(field, fixture, row);
-      console.log(`   ${field.padEnd(23)}${value || `(blank — ${reason})`}`);
+      console.log(`   ${field.padEnd(31)}${value || `(blank — ${reason})`}`);
     }
     console.log(`   demo status            ${compiled.status}${compiled.reasons.length ? `  [${compiled.reasons.join(' · ')}]` : ''}`);
     console.log(`   AI calls used          ${row.ai_calls_used ?? calls}${repaired.length ? `  (scoped repair: ${[...new Set(repaired)].join(', ')})` : ''}`);

@@ -78,6 +78,7 @@ const PERSONALISATION_HEADER = [
   'wider_finding_index', 'supporting_findings', 'evidence', 'novus_counterfactual',
   'fair_observation', 'main_finding', 'commercial_consequence',
   'property_reference', 'email_observation', 'email_commercial_hook',
+  'email_commercial_hook_email_2',
   'created_at', 'updated_at',
 ];
 const AGENCIES_HEADER = ['agency_id', 'agency_name'];
@@ -231,6 +232,7 @@ function installAi(findingsByTag) {
         commercial_consequence: 'a viewing slot went to someone nobody had checked could actually buy.',
         email_observation: 'You replied the same day, but nobody asked anything about my position before inviting me to view.',
         email_commercial_hook: 'So the buyer opportunity reached a viewing invitation without being qualified.',
+        email_commercial_hook_email_2: 'The invitation itself was fine — the gap is that you still know nothing about whether I could buy it.',
         novus_counterfactual: 'NOVUS would have asked budget and timescale on the first call.',
       };
     }

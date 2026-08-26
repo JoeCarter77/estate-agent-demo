@@ -27,7 +27,7 @@ const F = {
 
 const ordered = (...items) => items.sort((a, b) => a.finding_index - b.finding_index);
 
-function answer({ positive = 4, main = 1, second = 2, observation, hook, overrides = {} } = {}) {
+function answer({ positive = 4, main = 1, second = 2, observation, hook, hook2, overrides = {} } = {}) {
   return {
     story_reasoning: `1. ${positive ?? 'none'}. 2. ${main ?? 'none'}. 3. ${second ?? 'none'}. Same selected story.`,
     positive_finding_index: positive,
@@ -39,7 +39,11 @@ function answer({ positive = 4, main = 1, second = 2, observation, hook, overrid
     main_finding: main == null ? '' : 'the enquiry did not receive the next step it needed.',
     commercial_consequence: main == null ? '' : 'the declared seller side of the enquiry was never worked at all.',
     email_observation: observation || 'You replied quickly and progressed the viewing, but no follow-up was sent and nobody picked up that I also had a property to sell.',
-    email_commercial_hook: hook || "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.",
+    // WHY it matters commercially — not the observation again, and not an
+    // outcome that needed a reply I deliberately never sent.
+    email_commercial_hook: hook || "That seller wasn't a cold database record — they were already engaging with your branch as a buyer.",
+    // EMAIL 2: the extra thing that changes how the same enquiry reads.
+    email_commercial_hook_email_2: hook2 || 'You handled the viewing side well; the part worth looking at is that the same person had already given you a second reason to engage.',
     novus_counterfactual: 'NOVUS would have progressed both sides in the same conversation.',
     ...overrides,
   };
@@ -78,6 +82,7 @@ async function main() {
     });
     assert.strictEqual(calls, 1);
     assert.strictEqual(row.narrative_finding_indexes, '1,4');
+    assert.ok(row.email_commercial_hook_email_2, 'Email 2 gets its own hook from the same selection');
     assert.ok(row.email_observation.includes('replied quickly'));
     assert.ok(row.email_observation.includes('no follow-up'));
     ok('positive + one problem uses one traceable selection');
@@ -93,7 +98,7 @@ async function main() {
     assert.strictEqual(row.narrative_finding_indexes, '1,2,4');
     assert.match(row.email_observation, /no follow-up/i);
     assert.match(row.email_observation, /property to sell/i);
-    assert.match(row.email_commercial_hook, /1 buyer enquiry and 1 potential seller/i);
+    assert.match(row.email_commercial_hook, /already engaging with your branch as a buyer/i);
     assert.doesNotMatch(row.evidence, /qualification/i);
     ok('positive + two connected problems, including no follow-up + seller missed, share the same selected findings');
   }
@@ -103,6 +108,7 @@ async function main() {
       positive: null, main: 6, second: 2,
       observation: 'We did not receive a response at all during the four-day observation period, and the property I had said I needed to sell was never picked up.',
       hook: 'That is 2 live opportunities from 1 enquiry, with 0 conversations created.',
+      hook2: 'In this case the issue was not qualification or follow-up quality — the enquiry never got a genuine human response at all.',
       overrides: { fair_observation: '', main_finding: '', commercial_consequence: 'no buyer or seller conversation was created.' },
     });
     const { row } = await runPersonalisation({
@@ -119,7 +125,12 @@ async function main() {
   {
     const { row } = await runPersonalisation({
       findings: ordered(F.sellerUnprogressed, F.positive),
-      result: answer({ main: 5, second: null, observation: 'You replied quickly and recognised that I had a property to sell, but no valuation or seller next step followed.', hook: 'So the seller opportunity was visible, but 0 seller actions were created from it.' }),
+      result: answer({
+        main: 5, second: null,
+        observation: 'You replied quickly and recognised that I had a property to sell, but no valuation or seller next step followed.',
+        hook: 'So the seller opportunity was visible, but 0 seller actions were created from it.',
+        hook2: 'The speed was fine — what got lost was that spotting a vendor and actually offering to value their place are two different things.',
+      }),
       intelligence: { seller_recognition: 'weak', viewing_progression: 'invited' },
     });
     assert.strictEqual(row.main_finding_index, 5);
@@ -131,7 +142,12 @@ async function main() {
   {
     const { row } = await runPersonalisation({
       findings: ordered(F.sellerMissed, F.positive),
-      result: answer({ main: 2, second: null, observation: 'You handled the viewing side quickly, but nobody picked up that I had also said I had a property to sell.', hook: 'So the buyer side moved forward, while the potential seller was missed entirely.' }),
+      result: answer({
+        main: 2, second: null,
+        observation: 'You handled the viewing side quickly, but nobody picked up that I had also said I had a property to sell.',
+        hook: 'So the buyer side moved forward, while the potential seller was missed entirely.',
+        hook2: 'The interesting part is that speed was never the problem — the missed value was sitting inside the same enquiry you already answered.',
+      }),
       intelligence: { viewing_progression: 'booked' },
     });
     assert.match(row.email_observation, /viewing side/i);
@@ -155,8 +171,9 @@ async function main() {
     assert.ok(!(deleted in coherentRow), `${deleted} must not be generated`);
   }
   assert.deepStrictEqual(
-    ['property_reference', 'email_observation', 'email_commercial_hook'].filter((field) => field in coherentRow),
-    ['property_reference', 'email_observation', 'email_commercial_hook'],
+    ['property_reference', 'email_observation', 'email_commercial_hook', 'email_commercial_hook_email_2']
+      .filter((field) => field in coherentRow),
+    ['property_reference', 'email_observation', 'email_commercial_hook', 'email_commercial_hook_email_2'],
   );
   assert.strictEqual(_internal.MAX_PERSONALISATION_ATTEMPTS, 2);
   assert.ok(!('CONSEQUENCE_TOOL' in _internal));
