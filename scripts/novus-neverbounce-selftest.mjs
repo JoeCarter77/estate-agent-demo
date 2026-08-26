@@ -27,8 +27,15 @@ process.env.NOVUS_BASIC_AUTH_PASS = 'password-test';
 try {
   assert.equal(normalizeNeverBounceResult('valid'), 'VALID');
   assert.equal(normalizeNeverBounceResult('invalid'), 'INVALID');
-  assert.equal(normalizeNeverBounceResult('disposable'), 'INVALID');
-  assert.equal(normalizeNeverBounceResult('catchall'), 'RISKY');
+  // DISPOSABLE is its own verdict, not folded into INVALID: both are hard
+  // fails for outreach selection, but they are different facts and the
+  // contact resolver's caution rules read them separately.
+  assert.equal(normalizeNeverBounceResult('disposable'), 'DISPOSABLE');
+  // Accept-all/catchall, in every spelling NeverBounce uses, is RISKY — an
+  // unconfirmable mailbox on an accept-everything server, never a hard fail.
+  for (const spelling of ['catchall', 'catch_all', 'catch-all', 'accept_all', 'accept-all', 'accepts_all']) {
+    assert.equal(normalizeNeverBounceResult(spelling), 'RISKY', spelling);
+  }
   assert.equal(normalizeNeverBounceResult('unknown'), 'UNKNOWN');
   assert.equal(normalizeNeverBounceResult('unexpected'), 'UNKNOWN');
 

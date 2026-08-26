@@ -25,8 +25,11 @@ import {
   isGenericEmail,
   isAutomatedSender,
   nameMatchesLocalPart,
+  verdictForCandidate,
+  HUNTER_HIGH_CONFIDENCE_SCORE,
   PRIORITY,
 } from '../lib/contact-resolution.mjs';
+import { normalizeNeverBounceResult, HARD_FAIL_STATUSES, INCONCLUSIVE_STATUSES } from '../lib/neverbounce.mjs';
 
 const AGENCIES_HEADER = [
   'agency_id','agency_name','website','domain','location','branch_count','main_phone',
@@ -578,6 +581,237 @@ await test('researched owner is saved with evidence and feeds the Hunter step', 
   assert.match(agency.notes, /Existing note\./);
   assert.match(agency.notes, /Helen Kestrel/);
   assert.match(agency.notes, /kestrelco\.co\.uk\/about/);
+});
+
+// ── NeverBounce verdict vocabulary ──────────────────────────────────────────
+await test('NeverBounce results map to five distinct statuses', () => {
+  assert.equal(normalizeNeverBounceResult('valid'), 'VALID');
+  assert.equal(normalizeNeverBounceResult('invalid'), 'INVALID');
+  // DISPOSABLE is its own verdict now, no longer flattened into INVALID.
+  assert.equal(normalizeNeverBounceResult('disposable'), 'DISPOSABLE');
+  assert.equal(normalizeNeverBounceResult('unknown'), 'UNKNOWN');
+  // Accept-all/catchall in every spelling is RISKY — never a hard failure.
+  for (const spelling of ['catchall', 'catch_all', 'catch-all', 'accept_all', 'accept-all', 'accepts_all']) {
+    assert.equal(normalizeNeverBounceResult(spelling), 'RISKY', spelling);
+  }
+  assert.ok(!HARD_FAIL_STATUSES.has('RISKY'), 'accept-all must never be a hard failure');
+  assert.ok(!HARD_FAIL_STATUSES.has('UNKNOWN'));
+  assert.deepEqual([...HARD_FAIL_STATUSES].sort(), ['DISPOSABLE', 'INVALID']);
+  assert.deepEqual([...INCONCLUSIVE_STATUSES].sort(), ['RISKY', 'UNKNOWN']);
+});
+
+await test('verdictForCandidate: caution rule softens only inconclusive verdicts', () => {
+  const strong = { high_confidence_owner: true, hunter_score: 95 };
+  const ordinary = { high_confidence_owner: false, hunter_score: 60 };
+  assert.equal(verdictForCandidate(strong, 'VALID'), 'SELECT');
+  assert.equal(verdictForCandidate(strong, 'UNKNOWN'), 'SELECT');
+  assert.equal(verdictForCandidate(strong, 'RISKY'), 'SELECT');
+  assert.equal(verdictForCandidate(strong, 'INVALID'), 'REJECT');
+  assert.equal(verdictForCandidate(strong, 'DISPOSABLE'), 'REJECT');
+  assert.equal(verdictForCandidate(ordinary, 'VALID'), 'SELECT');
+  assert.equal(verdictForCandidate(ordinary, 'UNKNOWN'), 'CONTINUE');
+  assert.equal(verdictForCandidate(ordinary, 'RISKY'), 'CONTINUE');
+  assert.equal(verdictForCandidate(ordinary, 'INVALID'), 'REJECT');
+});
+
+// ── High-confidence owner/MD caution rule, end to end ───────────────────────
+//
+// The real-world shape reported from production: owner known, Hunter finds a
+// direct address with a 95 score, and the agency's mail server answers
+// UNKNOWN or accept-all for everything. Weaker contacts on that SAME server
+// would answer the same way, so no further credits may be spent.
+function seedStantonHockett(store, { agency_id = 'ag_sh' } = {}) {
+  seedAgency(store, {
+    agency_id, agency_name: 'Stanton Hockett', domain: 'stantonhockett.co.uk', probe_sent: 'YES',
+    owner_md: 'Bradley Stanton', primary_contact_email: 'hello@stantonhockett.co.uk',
+  });
+  seedCommunication(store, {
+    communication_id: `com_${agency_id}`, agency_id, channel: 'email', direction: 'inbound',
+    source_identifier_normalized: 'terry@stantonhockett.co.uk', display_name: 'Terry Hockett',
+    automated_or_human: 'human', occurred_at: '2026-08-02T09:00:00.000Z',
+  });
+}
+
+// score 95 -> the address Hunter proposes for Bradley Stanton. Note "brad@" is
+// a diminutive that no name-matching rule would connect to "Bradley": the
+// attribution comes from Hunter having been ASKED for that person.
+const stantonHunter = () => makeHunter({ email: 'brad@stantonhockett.co.uk', score: 95, position: 'Managing Director' });
+
+for (const [status, expectedCaution] of [['VALID', false], ['UNKNOWN', true], ['RISKY', true]]) {
+  await test(`high-confidence owner + ${status} -> selected on one NeverBounce call`, async () => {
+    const { store, valuesApi } = makeFakeSheet();
+    const repo = createRepo(valuesApi);
+    seedStantonHockett(store);
+    const verifier = makeVerifier({ 'brad@stantonhockett.co.uk': status });
+    const hunter = stantonHunter();
+    const result = await resolveAgencyContact(repo, 'ag_sh', baseOptions({
+      verifyEmailImpl: verifier, findEmailImpl: hunter,
+    }));
+
+    assert.equal(result.hunter.high_confidence, true);
+    assert.equal(result.hunter.caution_rule_applies, true);
+    // EXACTLY one credit spent, and it was the owner's address.
+    assert.deepEqual(verifier.calls, ['brad@stantonhockett.co.uk']);
+    assert.equal(result.neverbounce.calls_made, 1);
+    // The weaker contacts on the same server are never checked.
+    assert.ok(result.neverbounce.not_verified_after_winner.includes('terry@stantonhockett.co.uk'));
+    assert.ok(result.neverbounce.not_verified_after_winner.includes('hello@stantonhockett.co.uk'));
+
+    assert.equal(result.selected_contact.email, 'brad@stantonhockett.co.uk');
+    assert.equal(result.selected_contact.contact_name, 'Bradley Stanton');
+    assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
+    // The REAL status is preserved — never upgraded to VALID.
+    assert.equal(result.selected_contact.verification_status, status);
+    assert.equal(result.selected_contact.selected_on_caution, expectedCaution);
+    assert.equal(result.selected_contact.fully_verified, status === 'VALID');
+
+    const agency = rowsAsObjects(store, 'AGENCIES', AGENCIES_HEADER)[0];
+    assert.equal(agency.outreach_contact_name, 'Bradley Stanton');
+    assert.equal(agency.outreach_contact_email, 'brad@stantonhockett.co.uk');
+    assert.equal(agency.email_verification_status, status, 'AGENCIES must carry the real status');
+    assert.equal(agency.contact_resolution_status, 'RESOLVED_DIRECT');
+
+    const selected = rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER)
+      .find((c) => c.is_selected_for_outreach === 'TRUE');
+    assert.equal(selected.email, 'brad@stantonhockett.co.uk');
+    assert.equal(selected.verification_status, status, 'CONTACTS must carry the real status');
+    if (expectedCaution) {
+      assert.match(selected.notes, /NOT fully verified/);
+      assert.match(selected.notes, /Hunter score 95/);
+    } else {
+      assert.ok(!/NOT fully verified/.test(selected.notes));
+    }
+  });
+}
+
+for (const status of ['INVALID', 'DISPOSABLE']) {
+  await test(`high-confidence owner + ${status} is rejected and the waterfall continues`, async () => {
+    const { store, valuesApi } = makeFakeSheet();
+    const repo = createRepo(valuesApi);
+    seedStantonHockett(store);
+    const verifier = makeVerifier({
+      'brad@stantonhockett.co.uk': status,
+      'terry@stantonhockett.co.uk': 'VALID',
+    });
+    const result = await resolveAgencyContact(repo, 'ag_sh', baseOptions({
+      verifyEmailImpl: verifier, findEmailImpl: stantonHunter(),
+    }));
+
+    // A hard fail is never softened by confidence.
+    assert.deepEqual(verifier.calls, ['brad@stantonhockett.co.uk', 'terry@stantonhockett.co.uk']);
+    assert.equal(result.selected_contact.email, 'terry@stantonhockett.co.uk');
+    assert.equal(result.selected_contact.verification_status, 'VALID');
+    assert.equal(result.selected_contact.selected_on_caution, false);
+    const contacts = rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER);
+    const rejected = contacts.find((c) => c.email === 'brad@stantonhockett.co.uk');
+    assert.equal(rejected.verification_status, status);
+    assert.equal(rejected.is_selected_for_outreach, 'FALSE');
+  });
+}
+
+await test('low-confidence Hunter owner + UNKNOWN keeps the ordinary waterfall', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedStantonHockett(store);
+  // Below the threshold: a pattern guess, not an observed address.
+  const hunter = makeHunter({ email: 'brad@stantonhockett.co.uk', score: 62, position: '' });
+  const verifier = makeVerifier({
+    'brad@stantonhockett.co.uk': 'UNKNOWN',
+    'terry@stantonhockett.co.uk': 'UNKNOWN',
+    'hello@stantonhockett.co.uk': 'VALID',
+  });
+  const result = await resolveAgencyContact(repo, 'ag_sh', baseOptions({
+    verifyEmailImpl: verifier, findEmailImpl: hunter,
+  }));
+
+  assert.equal(result.hunter.high_confidence, false);
+  assert.equal(result.hunter.caution_rule_applies, false);
+  // UNKNOWN did NOT stop the waterfall: every candidate was tried in order.
+  assert.deepEqual(verifier.calls, [
+    'brad@stantonhockett.co.uk', 'terry@stantonhockett.co.uk', 'hello@stantonhockett.co.uk',
+  ]);
+  assert.equal(result.selected_contact.email, 'hello@stantonhockett.co.uk');
+  assert.equal(result.contact_resolution_status, 'RESOLVED_GENERIC');
+});
+
+await test('the high-confidence threshold is an explicit, overridable boundary', async () => {
+  assert.equal(HUNTER_HIGH_CONFIDENCE_SCORE, 90);
+
+  const runAtScore = async (score, overrides = {}) => {
+    const { store, valuesApi } = makeFakeSheet();
+    const repo = createRepo(valuesApi);
+    seedStantonHockett(store);
+    return resolveAgencyContact(repo, 'ag_sh', baseOptions({
+      verifyEmailImpl: makeVerifier({
+        'brad@stantonhockett.co.uk': 'UNKNOWN',
+        'terry@stantonhockett.co.uk': 'UNKNOWN',
+        'hello@stantonhockett.co.uk': 'UNKNOWN',
+      }),
+      findEmailImpl: makeHunter({ email: 'brad@stantonhockett.co.uk', score }),
+      ...overrides,
+    }));
+  };
+
+  // Exactly at the threshold qualifies; one below does not.
+  assert.equal((await runAtScore(90)).selected_contact?.email, 'brad@stantonhockett.co.uk');
+  assert.equal((await runAtScore(89)).selected_contact, null);
+  // A missing score is never high confidence.
+  assert.equal((await runAtScore(null)).selected_contact, null);
+  // ...and the boundary can be retuned per call without a code change.
+  const retuned = await runAtScore(80, { hunterHighConfidenceScore: 75 });
+  assert.equal(retuned.hunter.high_confidence_threshold, 75);
+  assert.equal(retuned.selected_contact.email, 'brad@stantonhockett.co.uk');
+});
+
+await test('a non-owner Hunter hit does not get the caution rule', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_dir', agency_name: 'Partner Estates', domain: 'partnerestates.co.uk',
+    primary_contact_email: 'hello@partnerestates.co.uk',
+  });
+  // Research identifies a DIRECTOR, not the owner/MD.
+  const research = async () => ({
+    found: true, person_name: 'Dana Reeve', role: 'DIRECTOR', role_title: 'Director',
+    evidence: 'Listed as a director at Companies House.',
+    source_url: 'https://find-and-update.company-information.service.gov.uk/x',
+    source_type: 'COMPANIES_HOUSE', confidence: 'HIGH',
+  });
+  const verifier = makeVerifier({
+    'dana.reeve@partnerestates.co.uk': 'UNKNOWN',
+    'hello@partnerestates.co.uk': 'VALID',
+  });
+  const result = await resolveAgencyContact(repo, 'ag_dir', baseOptions({
+    verifyEmailImpl: verifier,
+    findEmailImpl: makeHunter({ email: 'dana.reeve@partnerestates.co.uk', score: 98 }),
+    researchOwnerImpl: research,
+  }));
+
+  assert.equal(result.hunter.high_confidence, true, 'the score itself is high');
+  assert.equal(result.hunter.caution_rule_applies, false, 'but a director is not the owner/MD tier');
+  assert.equal(result.selected_contact.email, 'hello@partnerestates.co.uk');
+});
+
+await test('a cached inconclusive result selects a high-confidence owner with no new call', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedStantonHockett(store);
+  seedContact(store, {
+    contact_id: 'cnt_cached', agency_id: 'ag_sh', email: 'brad@stantonhockett.co.uk',
+    contact_name: 'Bradley Stanton', email_source: 'HUNTER', contact_type: 'DIRECT',
+    verification_status: 'RISKY', verified_at: '2026-08-20T09:00:00.000Z',
+    is_selected_for_outreach: 'FALSE', created_at: '2026-08-20T09:00:00.000Z',
+  });
+  const verifier = makeVerifier({});
+  const result = await resolveAgencyContact(repo, 'ag_sh', baseOptions({
+    verifyEmailImpl: verifier, findEmailImpl: stantonHunter(),
+  }));
+
+  assert.equal(verifier.calls.length, 0, 'no credit spent at all');
+  assert.equal(result.selected_contact.email, 'brad@stantonhockett.co.uk');
+  assert.equal(result.selected_contact.verification_status, 'RISKY');
+  assert.equal(result.selected_contact.selected_on_caution, true);
+  assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
 });
 
 // ── Backlog preparation is inert ────────────────────────────────────────────
