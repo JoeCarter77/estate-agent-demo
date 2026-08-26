@@ -209,72 +209,96 @@
   .scale-line{ font-size:.85rem; line-height:1.55; color:rgba(255,255,255,.72); max-width:520px; margin-top:14px; }
   .scale-line b{ color:#fff; font-weight:700; }
 
-  /* ═══ ACT 4 — THE MACHINE ACROSS THE AGENCY ═══
-     Not a feature grid. An operating machine: everything the agency already
-     has flowing in, one intelligence layer, a decision/action layer where
-     NOVUS and the team both act, and what comes out the other end. */
-  .machine{ width:100%; max-width:660px; margin:0 auto; display:flex; flex-direction:column; align-items:center; gap:4px; }
-  .machine-cap{ font-size:.54rem; font-weight:800; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.6); }
-  .flow-row{ display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:wrap; width:100%; }
-  .flow-pill{ font-size:.62rem; font-weight:600; padding:5px 11px; border-radius:100px; border:1px solid; line-height:1.3; white-space:nowrap; color:rgba(255,255,255,.66); border-color:rgba(255,255,255,.16); background:rgba(255,255,255,.04); }
+  /* ═══ ACT 4 — ONE LAYER ACROSS THE AGENCY ═══
+     The zoom-out, not a second explanation of NOVUS. Act 3 has already said
+     context -> intelligence -> execution at the level of one enquiry; this
+     section only has to land one shape, in about two seconds: every source of
+     opportunity the agency already has -> ONE NOVUS layer -> more of it gets
+     progressed. Everything is hairlines and negative space. The only
+     saturated colour is the blue on the layer itself and the green on the
+     commercial outcome, because those are the two things that must be read. */
+  /* One word carries the meaning in each of these two lines; it is the only
+     place colour is used inside a headline anywhere on the page. */
+  .hl{ color:#93C5FD; }
+  .act[data-act="4"] .headline{ text-wrap:balance; }
+  .lift{ color:#4ADE80; }
+  .agency-map{ --sgap:14px; width:100%; max-width:940px; margin:20px auto 0; display:flex; flex-direction:column; align-items:center; }
 
-  /* Two symmetric halves of ONE grid, not two flex items of unequal width —
-     the left column's centre must land on 25% and the right column's on 75%,
-     because that is exactly where the converging connector below starts. An
-     asymmetric row here throws the whole composition off the global axis. */
-  .sources{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); column-gap:20px; row-gap:9px; width:100%; max-width:660px; margin-top:6px; }
-  .source-col{ display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; }
-  .source-cap{ font-size:.53rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:rgba(255,255,255,.66); }
-  .source-col .flow-row{ max-width:250px; }
+  /* SOURCES — one row, no categories. Seven tiles that read as one set. */
+  .src-grid{ width:100%; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); column-gap:var(--sgap); row-gap:20px; }
+  .src{ display:flex; flex-direction:column; align-items:center; gap:10px; min-width:0; }
+  .src-tile{ width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; color:#93C5FD;
+    border:1px solid rgba(147,197,253,.26);
+    background:linear-gradient(160deg, rgba(147,197,253,.12), rgba(147,197,253,.03));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06); }
+  .src-tile svg{ width:23px; height:23px; }
+  .src-label{ font-size:.55rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; line-height:1.5; color:rgba(255,255,255,.7); text-align:center; }
 
-  .flow-connector{ width:70%; max-width:165px; height:25px; display:block; flex-shrink:0; }
-  /* Exactly as wide as .sources, so the curves start on the two column centres. */
-  .flow-connector.inputs{ width:100%; max-width:660px; height:31px; margin-bottom:-8px; }
-  .flow-connector.stem{ width:2px; max-width:2px; height:26px; }
-  .flow-connector.stem .fc-line{ stroke:rgba(125,211,252,.32); }
-  .fc-line{ fill:none; stroke:rgba(125,211,252,.14); stroke-width:1; vector-effect:non-scaling-stroke; }
-  .fc-glow{ fill:none; stroke:rgba(125,211,252,.85); stroke-width:1.5; stroke-linecap:round; stroke-dasharray:9 200; vector-effect:non-scaling-stroke; opacity:.85; animation:flow-travel 2.8s linear infinite; filter:drop-shadow(0 0 2px rgba(125,211,252,.75)); }
-  @keyframes flow-travel{ to{ stroke-dashoffset:-209; } }
+  /* FEED — drawn in the SAME grid as the tiles, so each drop line lands on a
+     tile's centre at any width, and the rail is inset by exactly half a
+     column (margin % resolves against the grid area, i.e. the row's width).
+     No SVG, so nothing distorts when the row is stretched or squeezed. */
+  .feed{ width:100%; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); column-gap:var(--sgap); margin-top:16px; }
+  .feed-drop{ width:1px; height:22px; margin:0 auto; background:linear-gradient(180deg, rgba(147,197,253,0), rgba(147,197,253,.34)); }
+  .feed-rail{ grid-column:1 / -1; height:1px; margin:0 calc((100% - 6 * var(--sgap)) / 14); background:rgba(147,197,253,.28); }
+  .feed-stem{ position:relative; width:1px; height:34px; margin:0 auto; background:linear-gradient(180deg, rgba(147,197,253,.3), rgba(147,197,253,.55)); }
+  .feed-stem::before{ content:''; position:absolute; top:-3px; left:50%; transform:translateX(-50%); width:6px; height:6px; border-radius:50%; background:var(--cyan); box-shadow:0 0 10px rgba(125,211,252,.85); }
+  .feed-stem::after{ content:''; position:absolute; left:0; top:0; width:1px; height:10px; background:var(--cyan); box-shadow:0 0 7px rgba(125,211,252,.9); animation:feed-travel 2.6s linear infinite; }
+  @keyframes feed-travel{ 0%{ transform:translateY(-10px); opacity:0; } 20%{ opacity:1; } 80%{ opacity:1; } 100%{ transform:translateY(34px); opacity:0; } }
 
-  .core-ring{ position:relative; width:104px; height:104px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; flex-shrink:0;
-    background:radial-gradient(circle at 50% 32%, rgba(56,189,248,.4), rgba(13,26,61,.96) 72%);
-    border:1px solid rgba(125,211,252,.6);
-    box-shadow:0 0 0 7px rgba(11,27,63,1), 0 0 0 8px rgba(125,211,252,.16), 0 0 32px rgba(56,189,248,.4); }
-  .core-ring::after{ content:''; position:absolute; inset:-7px; border-radius:50%; border:1px solid rgba(125,211,252,.2); animation:core-breathe 4.5s ease-in-out infinite; }
-  @keyframes core-breathe{ 0%,100%{ transform:scale(1); opacity:.5; } 50%{ transform:scale(1.09); opacity:.12; } }
-  .core-t1{ font-size:.68rem; font-weight:800; letter-spacing:.15em; color:#fff; line-height:1; }
-  .core-t2{ font-size:.49rem; font-weight:700; letter-spacing:.09em; color:rgba(190,227,248,.9); line-height:1; }
-  .core-note{ font-size:.68rem; color:rgba(255,255,255,.68); line-height:1.45; max-width:390px; text-align:center; margin-top:7px; }
+  /* THE LAYER — one panel, sitting across everything above it. The three
+     capability marks are labels, not cards: act 3 already explained them. */
+  .layer-band{ width:100%; max-width:840px; display:flex; align-items:center; gap:34px; padding:24px 30px; border-radius:20px;
+    border:1px solid rgba(125,211,252,.28);
+    background:linear-gradient(150deg, rgba(56,189,248,.11), rgba(11,27,63,.34) 62%);
+    box-shadow:0 0 46px rgba(56,189,248,.10), inset 0 1px 0 rgba(255,255,255,.05); }
+  .core{ position:relative; width:130px; height:130px; flex-shrink:0; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; text-align:center;
+    background:radial-gradient(circle at 50% 34%, rgba(56,189,248,.3), rgba(9,22,52,.96) 70%);
+    border:1px solid rgba(125,211,252,.55);
+    box-shadow:0 0 34px rgba(56,189,248,.26), inset 0 0 26px rgba(56,189,248,.13); }
+  .core::after{ content:''; position:absolute; inset:-8px; border-radius:50%; border:1px solid rgba(125,211,252,.2); animation:core-breathe 5s ease-in-out infinite; }
+  @keyframes core-breathe{ 0%,100%{ transform:scale(1); opacity:.5; } 50%{ transform:scale(1.08); opacity:.12; } }
+  .core-name{ font-size:.84rem; font-weight:800; letter-spacing:.16em; color:#fff; line-height:1; }
+  .core-role{ font-size:.46rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; line-height:1.6; color:rgba(190,227,248,.85); max-width:92px; }
+  .facets{ flex:1; min-width:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .facet{ display:flex; align-items:center; justify-content:center; gap:9px; padding:6px 14px; min-width:0; }
+  .facet + .facet{ border-left:1px solid rgba(147,197,253,.16); }
+  .facet svg{ width:15px; height:15px; color:var(--cyan); flex-shrink:0; }
+  .facet span{ font-size:.6rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:rgba(255,255,255,.82); white-space:nowrap; }
 
-  /* The decision/action layer: one panel, two actors inside it. Both act — the
-     point is that NOVUS does not replace the team, it decides which of them
-     the opportunity belongs to. */
-  .layer{ width:100%; max-width:600px; border:1px solid rgba(125,211,252,.3); background:rgba(56,189,248,.07); border-radius:15px; padding:11px 13px 13px; display:flex; flex-direction:column; gap:9px; }
-  .layer-cap{ font-size:.54rem; font-weight:800; letter-spacing:.15em; text-transform:uppercase; color:rgba(190,227,248,.75); }
-  .layer-body{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; }
-  .actor{ display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 11px; border-radius:11px; border:1px solid; min-width:0; }
-  .actor.novus{ border-color:rgba(125,211,252,.45); background:rgba(56,189,248,.12); }
-  .actor.team{ border-color:rgba(253,186,116,.45); background:rgba(253,186,116,.1); }
-  .actor-name{ font-size:.63rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#fff; }
-  .actor-does{ font-size:.66rem; line-height:1.4; color:rgba(255,255,255,.7); }
-  .actor-swap{ color:rgba(255,255,255,.4); font-size:1rem; line-height:1; }
+  /* THE COMMERCIAL PAYOFF — what comes out of the layer. */
+  .out-stem{ width:1px; height:30px; margin:0 auto; background:linear-gradient(180deg, rgba(125,211,252,.5), rgba(34,197,94,.45)); }
+  .out-node{ width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#4ADE80; border:1px solid rgba(34,197,94,.5); background:rgba(34,197,94,.1); box-shadow:0 0 20px rgba(34,197,94,.18); }
+  .out-node svg{ width:14px; height:14px; }
+  .outcome{ font-family:var(--serif); font-size:clamp(1.15rem,2.6vw,1.6rem); font-weight:600; line-height:1.32; letter-spacing:-.01em; color:#fff; max-width:560px; margin-top:24px; text-wrap:balance; }
+  .out-metrics{ display:flex; align-items:center; justify-content:center; flex-wrap:wrap; margin-top:22px; }
+  .metric{ display:flex; align-items:center; gap:11px; padding:4px 28px; }
+  .metric + .metric{ border-left:1px solid rgba(255,255,255,.12); }
+  .metric svg{ width:21px; height:21px; color:#4ADE80; flex-shrink:0; }
+  .metric-text{ text-align:left; font-size:.82rem; line-height:1.35; color:rgba(255,255,255,.72); }
+  .metric-text b{ display:block; font-weight:700; color:#fff; }
 
-  .outcome{ font-family:var(--serif); font-size:clamp(1rem,2vw,1.22rem); font-weight:600; line-height:1.35; color:#fff; max-width:520px; }
-  .outcome-sub{ display:block; font-family:'Inter',sans-serif; font-size:.8rem; font-weight:700; letter-spacing:.02em; color:var(--cyan); margin-top:7px; }
-  .bridge{ font-size:.72rem; line-height:1.55; color:rgba(255,255,255,.65); max-width:460px; border-top:1px solid rgba(255,255,255,.11); padding-top:13px; margin-top:6px; }
+  .bridge{ font-size:.72rem; line-height:1.55; color:rgba(255,255,255,.5); max-width:460px; margin-top:26px; }
 
-  /* ── CTA ── */
-  .cta-block{ width:100%; display:flex; flex-direction:column; align-items:center; gap:11px; padding-top:6px; }
-  .cta-headline{ font-family:var(--serif); font-size:clamp(1.1rem,2.3vw,1.45rem); font-weight:600; line-height:1.3; color:#fff; max-width:640px; }
-  .cta-btn{ display:inline-flex; align-items:center; gap:9px; background:#fff; color:var(--navy-2); border:none; border-radius:100px; padding:13px 24px; font-family:'Inter',sans-serif; font-size:.86rem; font-weight:800; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,.3); transition:transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s; }
-  .cta-btn:hover{ transform:translateY(-2px); box-shadow:0 14px 32px rgba(0,0,0,.36); }
+  /* ── CTA — its own closing moment ──
+     Deliberately separated from the diagram by a lot of empty space and given
+     its own panel: one eyebrow, one line, one button. Nothing competes with
+     it, which is why the direct-dial line is not here. */
+  .cta-panel{ width:100%; max-width:880px; margin:76px auto 0; padding:62px 40px 54px; border-radius:24px;
+    border:1px solid rgba(147,197,253,.2);
+    background:linear-gradient(180deg, rgba(23,45,103,.5), rgba(11,27,63,.28));
+    box-shadow:0 30px 80px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.05);
+    display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; }
+  .cta-eyebrow{ font-size:.62rem; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:#93C5FD; }
+  /* The agency's name is the variable in this line and can be long, so the
+     line is balanced rather than left to break wherever it runs out. */
+  .cta-headline{ font-family:var(--serif); font-size:clamp(1.3rem,2.9vw,1.95rem); font-weight:600; line-height:1.26; letter-spacing:-.01em; color:#fff; max-width:660px; text-wrap:balance; }
+  .cta-btn{ display:inline-flex; align-items:center; gap:11px; margin-top:14px; background:#fff; color:var(--navy-2); border:none; border-radius:100px; padding:17px 32px; font-family:'Inter',sans-serif; font-size:.92rem; font-weight:800; cursor:pointer; box-shadow:0 12px 34px rgba(0,0,0,.32); transition:transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s; }
+  .cta-btn:hover{ transform:translateY(-2px); box-shadow:0 18px 42px rgba(0,0,0,.38); }
   .cta-btn:active{ transform:translateY(0) scale(.98); }
-  .cta-btn svg{ width:12px; height:12px; }
-  .cta-support{ font-size:.78rem; line-height:1.5; color:rgba(255,255,255,.72); max-width:470px; }
-  .cta-phone{ font-size:.74rem; color:rgba(255,255,255,.6); }
-  .cta-phone a{ color:#93C5FD; font-weight:700; text-decoration:none; }
-  .cta-phone a:hover{ text-decoration:underline; }
-  .calendly-wrap{ width:100%; max-width:600px; margin-top:3px; display:none; }
+  .cta-btn svg{ width:13px; height:13px; }
+  .cta-support{ font-size:.8rem; line-height:1.6; color:rgba(255,255,255,.6); max-width:440px; margin-top:4px; }
+  .calendly-wrap{ width:100%; max-width:600px; margin-top:14px; display:none; }
   .calendly-wrap.show{ display:block; }
   .calendly-inline-widget{ min-width:280px; height:560px; border-radius:13px; overflow:hidden; border:1px solid rgba(255,255,255,.15); background:#fff; }
 
@@ -291,6 +315,23 @@
   /* ── RESPONSIVE ── */
   @media (max-width:900px){
     .dots{ right:10px; }
+  }
+  /* Below the width where seven tiles can sit on one line, the rail would be
+     pointing at tiles that have moved: the feed narrows to the single stem,
+     which is centred at every width. */
+  @media (max-width:1000px){
+    .agency-map{ --sgap:12px; }
+    /* Four per row, and the row of three that follows is centred rather than
+       left with a hole where a fourth column would be. */
+    .src-grid{ display:flex; flex-wrap:wrap; justify-content:center; column-gap:0; max-width:560px; margin:0 auto; }
+    .src{ width:25%; padding:0 6px; }
+    .feed{ display:none; }
+    .feed-stem{ margin-top:20px; }
+  }
+  @media (max-width:820px){
+    .layer-band{ flex-direction:column; gap:20px; padding:24px 20px; }
+    .facets{ width:100%; }
+    .cta-panel{ padding:52px 28px 46px; margin-top:60px; }
   }
   @media (max-width:860px){
     .chrome-agency{ display:none; }
@@ -312,22 +353,36 @@
     .verdict{ padding:17px 17px 19px; }
     .uda{ --uda-rail:34px; --uda-pad:13px; }
     .uda-label{ font-size:.88rem; }
-    /* Stacked sources: the converging pair would point at nothing, so the
-       connector narrows to a single stem into the node. */
-    .sources{ grid-template-columns:minmax(0,1fr); row-gap:11px; }
-    .flow-connector.inputs{ max-width:2px; }
-    .flow-connector.inputs .fc-line, .flow-connector.inputs .fc-glow{ display:none; }
-    .flow-connector.inputs{ background:linear-gradient(180deg, rgba(125,211,252,.32), rgba(125,211,252,.32)); }
-    .layer-body{ grid-template-columns:minmax(0,1fr); }
-    .actor-swap{ transform:rotate(90deg); }
+    /* ACT 4 on a phone: four columns still divide seven tiles into 4 + 3
+       rather than leaving an orphan, and the three capability marks stay on
+       one line by dropping their icons instead of stacking. */
+    .agency-map{ --sgap:10px; }
+    .src-grid{ row-gap:16px; }
+    .src-tile{ width:44px; height:44px; border-radius:12px; }
+    .src-tile svg{ width:20px; height:20px; }
+    .src-label{ font-size:.5rem; letter-spacing:.08em; }
+    .layer-band{ padding:20px 16px; gap:18px; }
+    .core{ width:112px; height:112px; }
+    .facet{ padding:4px 6px; gap:6px; }
+    .facet svg{ display:none; }
+    .facet span{ font-size:.52rem; letter-spacing:.09em; }
+    /* Three metrics side by side would be three cramped columns, so the
+       dividers turn with the stack. */
+    /* Stacked, but on one left edge: three rows each centring themselves
+       would leave the icons ragged. */
+    .out-metrics{ flex-direction:column; margin-top:16px; }
+    .metric{ width:min(212px,100%); justify-content:flex-start; padding:11px 0; }
+    .metric + .metric{ border-left:none; border-top:1px solid rgba(255,255,255,.12); }
+    .cta-panel{ margin-top:48px; padding:40px 20px 36px; border-radius:20px; }
+    .cta-btn{ padding:15px 22px; font-size:.81rem; gap:9px; }
     /* The dots become a horizontal strip at the foot of the screen, where a
        thumb is, rather than a column under it. */
     .dots{ right:auto; left:50%; top:auto; bottom:12px; transform:translateX(-50%); flex-direction:row; gap:9px; padding:6px 10px; border-radius:100px; background:rgba(11,27,63,.6); backdrop-filter:blur(4px); }
   }
   @media (prefers-reduced-motion: reduce){
     html{ scroll-behavior:auto; }
-    .core-ring::after, .fc-glow, .uda-link::after{ animation:none; }
-    .fc-glow{ opacity:0; }
+    .core::after, .feed-stem::after, .uda-link::after{ animation:none; }
+    .feed-stem::after{ opacity:0; }
     .rv{ transition:none; opacity:1; transform:none; }
   }
 </style>
@@ -453,84 +508,101 @@
       </div>
     </section>
 
-    <!-- ══ ACT 4 — ACROSS THE AGENCY + CTA ══ -->
+    <!-- ══ ACT 4 — ONE LAYER ACROSS THE AGENCY + CTA ══
+         The camera pulls back. Act 3 explained NOVUS on one enquiry, so this
+         section does NOT explain it again: it only shows the same capability
+         sitting across every source of opportunity the agency already has,
+         and what that is worth. Then it gets out of the way of the CTA. -->
     <section class="act" data-act="4">
       <div class="wrap wide">
-        <div class="eyebrow">Across the agency</div>
-        <h2 class="headline">That was one enquiry. The same machine runs across all of them.</h2>
+        <div class="eyebrow">Across your entire agency</div>
+        <h2 class="headline">One combined intelligence and execution layer <span class="hl">across your agency.</span></h2>
+        <p class="lede">NOVUS continuously identifies what needs progressing, decides what should happen next, and either acts - or brings your team in when they're needed.</p>
 
-        <div class="machine rv">
-          <span class="machine-cap">All opportunity across the agency</span>
-
-          <div class="sources">
-            <div class="source-col">
-              <span class="source-cap">New opportunities</span>
-              <div class="flow-row">
-                <span class="flow-pill">Portal</span><span class="flow-pill">Website</span><span class="flow-pill">Calls</span>
-              </div>
+        <div class="agency-map rv">
+          <div class="src-grid">
+            <div class="src">
+              <span class="src-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="19" height="12.5" rx="2"/><path d="M9 20.5h6"/><path d="M12 16.5v4"/><path d="M8.5 12.5 12 9l2.2 2.2L17 8"/></svg></span>
+              <span class="src-label">Portal<br/>enquiries</span>
             </div>
-            <div class="source-col">
-              <span class="source-cap">Existing opportunities</span>
-              <div class="flow-row">
-                <span class="flow-pill">Applicants</span><span class="flow-pill">Past vendors</span><span class="flow-pill">Previous valuations</span><span class="flow-pill">Database</span>
-              </div>
+            <div class="src">
+              <span class="src-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.2 9.5h17.6"/><path d="M3.2 14.5h17.6"/><path d="M12 3a15 15 0 0 1 0 18"/><path d="M12 3a15 15 0 0 0 0 18"/></svg></span>
+              <span class="src-label">Website<br/>leads</span>
             </div>
-          </div>
-
-          <!-- Two inputs, converging on the node from the centre of each column. -->
-          <svg class="flow-connector inputs" viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true">
-            <path class="fc-line" d="M25,0 Q25,20 50,30" />
-            <path class="fc-line" d="M75,0 Q75,20 50,30" />
-            <path class="fc-glow" d="M25,0 Q25,20 50,30" style="animation-delay:0s" />
-            <path class="fc-glow" d="M75,0 Q75,20 50,30" style="animation-delay:.7s" />
-            <path class="fc-line" d="M46,25 L50,32 L54,25" />
-          </svg>
-
-          <div class="core-ring">
-            <span class="core-t1">NOVUS</span>
-            <span class="core-t2">INTELLIGENCE</span>
-          </div>
-          <p class="core-note">Continuously finds commercial opportunities sitting unprogressed, decides what should happen next, and takes the appropriate action.</p>
-
-          <svg class="flow-connector stem" viewBox="0 0 10 24" preserveAspectRatio="none" aria-hidden="true">
-            <path class="fc-line" d="M5,0 L5,24" />
-            <path class="fc-glow" d="M5,0 L5,24" />
-          </svg>
-
-          <div class="layer">
-            <span class="layer-cap">Decision / action layer</span>
-            <div class="layer-body">
-              <div class="actor novus">
-                <span class="actor-name">NOVUS acts</span>
-                <span class="actor-does">Responds · qualifies · follows up · books · re-engages</span>
-              </div>
-              <span class="actor-swap">↔</span>
-              <div class="actor team">
-                <span class="actor-name">Your team acts</span>
-                <span class="actor-does">NOVUS routes and escalates the opportunities that need a human</span>
-              </div>
+            <div class="src">
+              <span class="src-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.5h3l1.5 4-2 1.5a12 12 0 0 0 6 6l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7 2 2 0 0 1 6.5 3.5Z"/></svg></span>
+              <span class="src-label">Calls</span>
+            </div>
+            <div class="src">
+              <span class="src-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M16.2 6.2a3.2 3.2 0 0 1 0 5.6"/><path d="M17.5 14.2A5.5 5.5 0 0 1 20.5 19"/></svg></span>
+              <span class="src-label">Applicants</span>
+            </div>
+            <div class="src">
+              <span class="src-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 19.5a7 7 0 0 1 14 0"/></svg></span>
+              <span class="src-label">Past<br/>vendors</span>
+            </div>
+            <div class="src">
+              <span class="src-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 10.5 12 4l8.5 6.5"/><path d="M5.5 12v7.5h13V12"/><path d="M10 19.5v-4.5h4v4.5"/></svg></span>
+              <span class="src-label">Previous<br/>valuations</span>
+            </div>
+            <div class="src">
+              <span class="src-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3"/></svg></span>
+              <span class="src-label">Database</span>
             </div>
           </div>
 
-          <svg class="flow-connector stem" viewBox="0 0 10 24" preserveAspectRatio="none" aria-hidden="true">
-            <path class="fc-line" d="M5,0 L5,24" />
-            <path class="fc-glow" d="M5,0 L5,24" style="animation-delay:.8s" />
-          </svg>
+          <!-- Seven drops onto one rail, then one stem into the layer. Same
+               grid as the tiles above, so the geometry cannot drift. -->
+          <div class="feed" aria-hidden="true">
+            <span class="feed-drop"></span><span class="feed-drop"></span><span class="feed-drop"></span><span class="feed-drop"></span><span class="feed-drop"></span><span class="feed-drop"></span><span class="feed-drop"></span>
+            <span class="feed-rail"></span>
+          </div>
+          <div class="feed-stem" aria-hidden="true"></div>
 
-          <p class="outcome">More of the opportunity already in your business gets progressed.
-            <span class="outcome-sub">More appointments. More valuations. More instructions.</span>
-          </p>
+          <div class="layer-band">
+            <div class="core">
+              <span class="core-name">NOVUS</span>
+              <span class="core-role">Intelligence &amp; execution layer</span>
+            </div>
+            <!-- Labels, not cards. Act 3 already explained all three. -->
+            <div class="facets">
+              <div class="facet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 13.5 8 18 9.5 13.5 11 12 15.5 10.5 11 6 9.5 10.5 8Z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z"/></svg><span>Intelligence</span></div>
+              <div class="facet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="12" r="2"/><circle cx="18" cy="6.5" r="2"/><circle cx="18" cy="17.5" r="2"/><path d="M7.4 11.2 16.1 7.3"/><path d="M7.4 12.8l8.7 3.9"/></svg><span>Decision</span></div>
+              <div class="facet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2.5 5 13.5h5.5L11 21.5 19 10.5h-5.5Z"/></svg><span>Execution</span></div>
+            </div>
+          </div>
+
+          <div class="out-stem" aria-hidden="true"></div>
+          <span class="out-node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12.5 10 17.5 19 7"/></svg></span>
+
+          <p class="outcome">More of the opportunity already in your business <span class="lift">gets progressed</span>.</p>
+
+          <div class="out-metrics">
+            <div class="metric">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17"/><path d="M8 3.5v3"/><path d="M16 3.5v3"/><path d="M8.5 13.5h3"/></svg>
+              <span class="metric-text"><b>More</b>appointments</span>
+            </div>
+            <div class="metric">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 10.5 12 4l8.5 6.5"/><path d="M5.5 12v7.5h13V12"/><path d="M10 19.5v-4.5h4v4.5"/></svg>
+              <span class="metric-text"><b>More</b>valuations</span>
+            </div>
+            <div class="metric">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="14" r="4"/><path d="M11 11.5 19 4"/><path d="M16.5 6.5 18.5 8.5"/><path d="M14.5 8.5 16.5 10.5"/></svg>
+              <span class="metric-text"><b>More</b>instructions</span>
+            </div>
+          </div>
+
+          <p class="bridge" id="systemic-bridge"></p>
         </div>
 
-        <p class="bridge rv" id="systemic-bridge"></p>
-
-        <div class="cta-block rv">
+        <!-- ONE obvious next action, in its own space. -->
+        <div class="cta-panel rv">
+          <span class="cta-eyebrow">We found this from one enquiry.</span>
           <p class="cta-headline" id="cta-headline"></p>
           <button class="cta-btn" onclick="revealCalendly()">See how NOVUS would fit your agency
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </button>
-          <p class="cta-support">15 minutes. We'll map this against your actual enquiry flow and show you exactly where NOVUS would sit.</p>
-          <p class="cta-phone">or call direct: <a href="tel:07455506761">07455 506761</a></p>
+          <p class="cta-support">15 minutes. We'll map NOVUS against your actual enquiry flow and show you exactly where it would sit.</p>
 
           <div class="calendly-wrap" id="calendly-wrap">
             <div class="calendly-inline-widget" data-url="https://calendly.com/joe-getnovus/10min?hide_gdpr_banner=1"></div>
@@ -895,13 +967,15 @@
     if (txt(demo.scale_line)) setField('scale-line', demo.scale_line);
 
     // ── ACT 4 ──
+    // The closing line is composed here rather than printed from the row: the
+    // section now carries "we found this from one enquiry" as its own eyebrow,
+    // so the headline is the ask alone, with the agency's name as the one
+    // coloured word in it. The row's own cta_headline says the same thing in
+    // one sentence and is left unused by the shell rather than printed twice.
     setField('systemic-bridge', demo.systemic_bridge);
-    setField(
-      'cta-headline',
-      demo.cta_headline
-        || 'We found this from one enquiry. See where NOVUS could be finding more opportunity across your agency.',
-      { hideWhenEmpty: false },
-    );
+    const ctaEl = document.getElementById('cta-headline');
+    ctaEl.innerHTML = 'See what NOVUS could be finding across <span class="hl">' +
+      esc(agency || 'your agency') + '</span>.';
 
     document.getElementById('boot').classList.add('hide');
     document.getElementById('stage').classList.remove('hidden');
