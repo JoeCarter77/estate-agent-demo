@@ -3,17 +3,11 @@
 // GET  /api/novus/probe?probe_id=...        (was probe-get.js)
 // GET  /api/novus/probe?agency_id=...        (was probe-get.js)
 // GET  /api/novus/probe?next_after=<agency_id>  (was probe-get.js)
-// POST /api/novus/probe  { action: "create", url, agency_id? }     (was probe-create.js)
+// POST /api/novus/probe  { action: "create", url, agency_id }      (was probe-create.js)
 // POST /api/novus/probe  { action: "mark-sent", probe_id }         (was probe-mark-sent.js)
 //
 // Consolidated from three separate files into one Serverless Function to
-// stay within Vercel Hobby's 12-function limit — no behaviour change, no new
-// logic. Every handler body below is byte-for-byte the previous file's
-// handler, just dispatched to from one entry point instead of three routes.
-// Callers: novus/probe.html only (updated alongside this file) — this route
-// has never been externally referenced (no third-party webhook/config points
-// at these URLs), so renaming/merging it carries none of the live-production
-// risk the /api/novus/webhooks/* routes do.
+// stay within Vercel Hobby's 12-function limit.
 
 import { getRepo } from '../../lib/sheets.mjs';
 import { newProbeId, newProbeReference } from '../../lib/ids.mjs';
@@ -24,10 +18,6 @@ export const maxDuration = 20;
 
 // ── GET (was probe-get.js) ──────────────────────────────────────────────────
 
-// An agency is probe-eligible when it has a usable Rightmove sales branch page
-// to work from and has not been suppressed. Rows marked REVIEW or
-// "DELETE - NON-SALES/LETTINGS" carry no branch URL, so the URL check already
-// excludes them — this never invents eligibility the sheet doesn't state.
 function isProbeEligible(agency) {
   const url = String(agency.rightmove_sales_branch_url ?? '').trim();
   if (!/^https?:\/\//i.test(url)) return false;
@@ -46,8 +36,6 @@ async function handleGet(req, res) {
   try {
     const repo = getRepo();
 
-    // Next eligible agency, in the sheet's own row order. getRecords preserves
-    // that order, so "next" is simply the first eligible row after this one.
     if (nextAfter) {
       const agencies = await repo.getRecords('AGENCIES', 'agency_id');
       const from = agencies.findIndex((r) => r.obj.agency_id === nextAfter);
@@ -74,18 +62,18 @@ async function handleGet(req, res) {
 
 // ── POST action=create (was probe-create.js) ───────────────────────────────
 
-// Every genuine Rightmove probe enquiry is submitted the same way: "I have
-// a property to sell" -> "Yes, it is not yet on the market" — the vendor-
-// opportunity branch. Recording that declaration on the PROBES row itself
-// (reusing enquiry_text, no new column) is what lets the Intelligence
-// pipeline later check whether the agency's replies actually noticed it.
-// Matches the exact wording already present on historical imported probes.
 const VENDOR_DECLARATION = 'Declared: has a property to sell, yes, it is not yet on the market';
 
 async function handleCreate(body, res) {
   const url = (body.url || '').trim();
   const agencyId = (body.agency_id || '').trim();
+
   if (!url) return res.status(400).json({ error: 'Missing url' });
+  if (!agencyId) {
+    return res.status(400).json({
+      error: 'Missing agency_id — probe creation is blocked because every NOVUS probe must belong to an agency',
+    });
+  }
   if (!/^https?:\/\/|^www\./i.test(url) && !url.includes('.')) {
     return res.status(400).json({ error: 'That does not look like a valid URL' });
   }
@@ -98,18 +86,12 @@ async function handleCreate(body, res) {
   try {
     const repo = getRepo();
 
-    // If an agency_id was supplied (e.g. from the agency-launched probe
-    // flow), it must correspond to a real AGENCIES row — never guessed,
-    // never silently dropped.
-    if (agencyId) {
-      const agencyRecord = await repo.findById('AGENCIES', 'agency_id', agencyId);
-      if (!agencyRecord) return res.status(400).json({ error: 'Unknown agency_id' });
-    }
+    // Agency identity is a hard relational invariant. Never create an orphan
+    // PROBES row and never guess an agency from listing metadata.
+    const agencyRecord = await repo.findById('AGENCIES', 'agency_id', agencyId);
+    if (!agencyRecord) return res.status(400).json({ error: 'Unknown agency_id' });
 
-    // Best-effort metadata — never blocks probe creation.
     const meta = await fetchListingMeta(url).catch(() => ({ address: '', price: '', status: '', title: '' }));
-
-    // Human-readable sequence from existing probe count.
     const sequence = await repo.count('PROBES', 'probe_id').catch(() => 0);
 
     const now = new Date().toISOString();
@@ -122,8 +104,6 @@ async function handleCreate(body, res) {
       property_url: url,
       property_price: meta.price || '',
       property_status: meta.status || '',
-      // Preserve any other enquiry detail passed in (none exists today — this
-      // is forward-compatible), appended after the standing vendor declaration.
       enquiry_text: portal === 'rightmove'
         ? [VENDOR_DECLARATION, (body.enquiry_text || '').trim()].filter(Boolean).join(' — ')
         : (body.enquiry_text || '').trim(),
@@ -163,11 +143,21 @@ async function handleMarkSent(body, res) {
     const record = await repo.findById('PROBES', 'probe_id', probeId);
     if (!record) return res.status(404).json({ error: 'Probe not found' });
 
-    // Already sent → return as-is (do not reset the window). Covers both
-    // 'observing' (mid-window) and 'closed' (finalised, frozen) — anything
-    // other than 'draft' means this probe was already sent once and must
-    // never have its probe_timestamp/observation_deadline reset, including
-    // a closed probe that must stay frozen, never re-armed.
+    // Second guard: even a legacy/bad draft row cannot be moved into the live
+    // observation pipeline without a canonical agency relationship.
+    if (!String(record.obj.agency_id || '').trim()) {
+      return res.status(409).json({
+        error: 'Probe has no agency_id — Mark as Sent blocked. Re-link this probe to its AGENCIES row before sending.',
+      });
+    }
+
+    const agencyRecord = await repo.findById('AGENCIES', 'agency_id', String(record.obj.agency_id).trim());
+    if (!agencyRecord) {
+      return res.status(409).json({
+        error: 'Probe agency_id does not resolve to AGENCIES — Mark as Sent blocked to protect probe identity.',
+      });
+    }
+
     if (record.obj.probe_status && record.obj.probe_status !== 'draft' && record.obj.probe_timestamp) {
       return res.status(200).json({ probe: record.obj, already_sent: true });
     }
@@ -183,17 +173,10 @@ async function handleMarkSent(body, res) {
     });
     if (!updated) return res.status(404).json({ error: 'Probe not found' });
 
-    // Flag the originating agency as probed. The cell is located by the
-    // "probe_sent" HEADER NAME, so moving the column in the sheet keeps this
-    // working. Best-effort: a failure here (or no probe_sent column yet) is
-    // logged, never surfaced — the observation window is the outcome that
-    // matters, and it has already been recorded above.
-    if (record.obj.agency_id) {
-      try {
-        await repo.updateCell('AGENCIES', 'agency_id', record.obj.agency_id, 'probe_sent', 'YES');
-      } catch (err) {
-        console.error('probe (mark-sent): could not set AGENCIES.probe_sent:', err);
-      }
+    try {
+      await repo.updateCell('AGENCIES', 'agency_id', record.obj.agency_id, 'probe_sent', 'YES');
+    } catch (err) {
+      console.error('probe (mark-sent): could not set AGENCIES.probe_sent:', err);
     }
 
     return res.status(200).json({ probe: updated, already_sent: false });
@@ -203,7 +186,7 @@ async function handleMarkSent(body, res) {
   }
 }
 
-// ── Entry point ──────────────────────────────────────────────────────────
+// ── Entry point ──────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
