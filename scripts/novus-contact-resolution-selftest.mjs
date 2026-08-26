@@ -26,6 +26,7 @@ import {
   isAutomatedSender,
   nameMatchesLocalPart,
   verdictForCandidate,
+  resolveHeaderName,
   HUNTER_HIGH_CONFIDENCE_SCORE,
   PRIORITY,
 } from '../lib/contact-resolution.mjs';
@@ -812,6 +813,208 @@ await test('a cached inconclusive result selects a high-confidence owner with no
   assert.equal(result.selected_contact.verification_status, 'RISKY');
   assert.equal(result.selected_contact.selected_on_caution, true);
   assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
+});
+
+// ── AGENCIES writeback reconciles a standing CONTACTS selection ─────────────
+//
+// REGRESSION (ag_hist_stantonhockett): CONTACTS held the selected Bradley
+// Stanton row from an earlier run, but AGENCIES stayed blank. CONTACTS was not
+// a discovery source, so on a rerun the Hunter-found brad@ address was not
+// even a candidate — it is not derivable from AGENCIES or COMMUNICATIONS —
+// so the run found no winner and wrote blanks over the agency's four outreach
+// columns.
+await test('a standing CONTACTS selection is reconciled into AGENCIES on rerun', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_hist_stantonhockett', agency_name: 'Stanton Hockett',
+    domain: 'stantonhockett.co.uk', probe_sent: 'YES',
+    owner_md: 'Bradley Stanton', primary_contact_email: 'hello@stantonhockett.co.uk',
+    // The four outreach columns start blank — the reported symptom.
+    outreach_contact_name: '', outreach_contact_email: '',
+    email_verification_status: '', contact_resolution_status: '',
+  });
+  seedContact(store, {
+    contact_id: 'cnt_brad', agency_id: 'ag_hist_stantonhockett',
+    contact_name: 'Bradley Stanton', contact_role: 'Managing Director',
+    email: 'brad@stantonhockett.co.uk', email_source: 'HUNTER', contact_type: 'DIRECT',
+    verification_status: 'UNKNOWN', verified_at: '2026-08-25T09:00:00.000Z',
+    is_selected_for_outreach: 'TRUE', created_at: '2026-08-25T09:00:00.000Z',
+  });
+
+  const verifier = makeVerifier({});
+  const hunter = makeHunter(null);
+  const result = await resolveAgencyContact(repo, 'ag_hist_stantonhockett', baseOptions({
+    verifyEmailImpl: verifier,
+    findEmailImpl: hunter,
+    // A plain rerun: Hunter is not consulted again, so brad@ can ONLY come
+    // back from CONTACTS.
+    hunterConfigured: () => false,
+  }));
+
+  assert.ok(
+    result.candidates_considered.some((c) => c.email === 'brad@stantonhockett.co.uk'),
+    'the stored contact must be rediscovered from CONTACTS',
+  );
+  assert.equal(result.selected_contact.email, 'brad@stantonhockett.co.uk');
+  assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
+  assert.equal(hunter.calls.length, 0);
+  assert.equal(verifier.calls.length, 0, 'reconciling a standing decision spends no credit');
+  assert.equal(result.neverbounce.calls_made, 0);
+  assert.equal(result.candidates_verified[0].reconciled, true);
+
+  // The four AGENCIES columns, exactly as expected.
+  const agency = rowsAsObjects(store, 'AGENCIES', AGENCIES_HEADER)[0];
+  assert.equal(agency.outreach_contact_name, 'Bradley Stanton');
+  assert.equal(agency.outreach_contact_email, 'brad@stantonhockett.co.uk');
+  assert.equal(agency.email_verification_status, 'UNKNOWN');
+  assert.equal(agency.contact_resolution_status, 'RESOLVED_DIRECT');
+  assert.deepEqual(result.agency_writeback_missing_columns, []);
+
+  // No duplicate rows, and the stored provenance survives the rerun.
+  const contacts = rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER);
+  assert.equal(contacts.filter((c) => c.email === 'brad@stantonhockett.co.uk').length, 1);
+  const brad = contacts.find((c) => c.email === 'brad@stantonhockett.co.uk');
+  assert.equal(brad.contact_id, 'cnt_brad', 'the existing row is updated, never replaced');
+  assert.equal(brad.email_source, 'HUNTER', 'original provenance is not rewritten');
+  assert.equal(brad.verification_status, 'UNKNOWN', 'the real status is preserved, not upgraded');
+  assert.equal(brad.is_selected_for_outreach, 'TRUE');
+});
+
+await test('reconciling twice more stays stable and adds no rows or credits', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_rr', agency_name: 'Rerun Estates', domain: 'rerun.co.uk',
+    owner_md: 'Bradley Stanton', primary_contact_email: 'hello@rerun.co.uk',
+  });
+  seedContact(store, {
+    contact_id: 'cnt_rr', agency_id: 'ag_rr', contact_name: 'Bradley Stanton',
+    contact_role: 'Managing Director', email: 'brad@rerun.co.uk', email_source: 'HUNTER',
+    contact_type: 'DIRECT', verification_status: 'RISKY', verified_at: '2026-08-25T09:00:00.000Z',
+    is_selected_for_outreach: 'TRUE', created_at: '2026-08-25T09:00:00.000Z',
+  });
+  const verifier = makeVerifier({});
+  const run = () => resolveAgencyContact(repo, 'ag_rr', baseOptions({
+    verifyEmailImpl: verifier, hunterConfigured: () => false,
+  }));
+  await run(); await run(); await run();
+
+  assert.equal(verifier.calls.length, 0);
+  const contacts = rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER);
+  assert.equal(contacts.length, 2, 'brad@ plus the generic inbox, once each');
+  assert.equal(contacts.filter((c) => c.is_selected_for_outreach === 'TRUE').length, 1);
+  const agency = rowsAsObjects(store, 'AGENCIES', AGENCIES_HEADER)[0];
+  assert.equal(agency.email_verification_status, 'RISKY');
+  assert.equal(agency.contact_resolution_status, 'RESOLVED_DIRECT');
+});
+
+await test('a stale standing selection is reconciled without re-verifying', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_stale', agency_name: 'Stale Estates', domain: 'stale.co.uk',
+    owner_md: 'Bradley Stanton',
+  });
+  seedContact(store, {
+    contact_id: 'cnt_stale', agency_id: 'ag_stale', contact_name: 'Bradley Stanton',
+    contact_role: 'Managing Director', email: 'brad@stale.co.uk', email_source: 'HUNTER',
+    contact_type: 'DIRECT', verification_status: 'UNKNOWN',
+    // Well outside the 30-day verification cache TTL.
+    verified_at: '2025-01-01T00:00:00.000Z',
+    is_selected_for_outreach: 'TRUE', created_at: '2025-01-01T00:00:00.000Z',
+  });
+  const verifier = makeVerifier({});
+  const result = await resolveAgencyContact(repo, 'ag_stale', baseOptions({
+    verifyEmailImpl: verifier, hunterConfigured: () => false,
+  }));
+  assert.equal(verifier.calls.length, 0, 'a standing decision is reconciled, not re-decided');
+  assert.equal(result.selected_contact.email, 'brad@stale.co.uk');
+  assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
+});
+
+await test('a standing selection never overrides a hard fail or a better contact', async () => {
+  // A stored INVALID is not a selection worth reconciling.
+  const hardFail = makeFakeSheet();
+  const hardFailRepo = createRepo(hardFail.valuesApi);
+  seedAgency(hardFail.store, {
+    agency_id: 'ag_hf', agency_name: 'Hard Fail', domain: 'hardfail.co.uk',
+    owner_md: 'Bradley Stanton', primary_contact_email: 'hello@hardfail.co.uk',
+  });
+  seedContact(hardFail.store, {
+    contact_id: 'cnt_hf', agency_id: 'ag_hf', contact_name: 'Bradley Stanton',
+    email: 'brad@hardfail.co.uk', email_source: 'HUNTER', contact_type: 'DIRECT',
+    verification_status: 'INVALID', verified_at: '2026-08-25T09:00:00.000Z',
+    is_selected_for_outreach: 'TRUE', created_at: '2026-08-25T09:00:00.000Z',
+  });
+  const hfResult = await resolveAgencyContact(hardFailRepo, 'ag_hf', baseOptions({
+    verifyEmailImpl: makeVerifier({ 'hello@hardfail.co.uk': 'VALID' }),
+    hunterConfigured: () => false,
+  }));
+  assert.equal(hfResult.selected_contact.email, 'hello@hardfail.co.uk');
+  assert.equal(hfResult.contact_resolution_status, 'RESOLVED_GENERIC');
+  const hfBrad = rowsAsObjects(hardFail.store, 'CONTACTS', CONTACTS_HEADER)
+    .find((c) => c.email === 'brad@hardfail.co.uk');
+  assert.equal(hfBrad.is_selected_for_outreach, 'FALSE', 'an INVALID incumbent is stood down');
+
+  // A standing GENERIC selection must not block a better owner contact found
+  // since — higher priority still goes first.
+  const upgrade = makeFakeSheet();
+  const upgradeRepo = createRepo(upgrade.valuesApi);
+  seedAgency(upgrade.store, {
+    agency_id: 'ag_up', agency_name: 'Upgrade Estates', domain: 'upgrade.co.uk',
+    owner_md: 'Nina Upgrade', primary_contact_email: 'hello@upgrade.co.uk',
+  });
+  seedContact(upgrade.store, {
+    contact_id: 'cnt_up', agency_id: 'ag_up', email: 'hello@upgrade.co.uk',
+    email_source: 'AGENCIES.primary_contact_email', contact_type: 'GENERIC',
+    verification_status: 'RISKY', verified_at: '2026-08-25T09:00:00.000Z',
+    is_selected_for_outreach: 'TRUE', created_at: '2026-08-25T09:00:00.000Z',
+  });
+  const upResult = await resolveAgencyContact(upgradeRepo, 'ag_up', baseOptions({
+    verifyEmailImpl: makeVerifier({ 'nina.upgrade@upgrade.co.uk': 'VALID' }),
+    findEmailImpl: makeHunter({ email: 'nina.upgrade@upgrade.co.uk', score: 96 }),
+  }));
+  assert.equal(upResult.selected_contact.email, 'nina.upgrade@upgrade.co.uk');
+  assert.equal(upResult.selected_contact.verification_status, 'VALID');
+  const upGeneric = rowsAsObjects(upgrade.store, 'CONTACTS', CONTACTS_HEADER)
+    .find((c) => c.email === 'hello@upgrade.co.uk');
+  assert.equal(upGeneric.is_selected_for_outreach, 'FALSE');
+});
+
+await test('writeback survives header drift and reports genuinely missing columns', () => {
+  const header = ['agency_id', 'Outreach Contact Name ', 'outreach_contact_email', 'AGENCY_NAME'];
+  assert.equal(resolveHeaderName(header, 'outreach_contact_name'), 'Outreach Contact Name ');
+  assert.equal(resolveHeaderName(header, 'outreach_contact_email'), 'outreach_contact_email');
+  assert.equal(resolveHeaderName(header, 'agency_name'), 'AGENCY_NAME');
+  assert.equal(resolveHeaderName(header, 'contact_resolution_status'), null);
+});
+
+await test('a missing outreach column is reported, not swallowed', async () => {
+  // A workbook whose AGENCIES tab never got the four outreach columns.
+  const store = {
+    AGENCIES: [
+      ['agency_id', 'agency_name', 'domain', 'owner_md', 'primary_contact_email', 'notes', 'updated_at'],
+      ['SCHEMA NOTE', 'Stable identity only.'],
+      ['ag_nocols', 'No Columns', 'nocols.co.uk', '', 'hello@nocols.co.uk', '', ''],
+    ],
+    COMMUNICATIONS: [COMMUNICATIONS_HEADER.slice(), ['SCHEMA NOTE', '']],
+    CONTACTS: [CONTACTS_HEADER.slice(), ['SCHEMA NOTE', '']],
+  };
+  const { valuesApi } = makeFakeSheet();
+  const backing = makeFakeSheet();
+  backing.store.AGENCIES = store.AGENCIES;
+  const result = await resolveAgencyContact(createRepo(backing.valuesApi), 'ag_nocols', baseOptions({
+    verifyEmailImpl: makeVerifier({ 'hello@nocols.co.uk': 'VALID' }),
+    researchOwnerImpl: noResearch,
+  }));
+  assert.equal(result.selected_contact.email, 'hello@nocols.co.uk');
+  assert.deepEqual(
+    result.agency_writeback_missing_columns.sort(),
+    ['contact_resolution_status', 'email_verification_status', 'outreach_contact_email', 'outreach_contact_name'],
+    'a workbook missing the columns must say so rather than look like a success',
+  );
+  assert.ok(valuesApi);
 });
 
 // ── Backlog preparation is inert ────────────────────────────────────────────
