@@ -5,6 +5,7 @@
     { "source": "/demo/:demo_slug", "destination": "/demo.html" },
     { "source": "/novus", "destination": "/novus/probe.html" },
     { "source": "/novus/probe", "destination": "/novus/probe.html" },
+    { "source": "/api/novus/contacts/verify", "destination": "/api/novus/personalisation?novus_operation=verify-contact" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/d/(.*)", "destination": "/index.html" }
   ],

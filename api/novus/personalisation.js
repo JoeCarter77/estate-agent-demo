@@ -1,5 +1,6 @@
 // api/novus/personalisation.js — GET /api/novus/personalisation?probe_id=...
 //                                 GET /api/novus/personalisation?agency_id=...
+//                                 POST /api/novus/contacts/verify (via rewrite)
 //
 // Read-only lookup for the PERSONALISATION row lib/personalisation-rebuild.mjs
 // writes (via the existing /api/novus/intelligence/rebuild-all + cron finalize
@@ -16,12 +17,37 @@
 // Same NOVUS_BASIC_AUTH guard as the rest of /api/novus/*.
 
 import { getRepo } from '../../lib/sheets.mjs';
+import { NeverBounceError, verifyEmail } from '../../lib/neverbounce.mjs';
 import { requireAuth } from './_auth.mjs';
 
 export const maxDuration = 20;
 
+// Vercel rewrites the internal contact-verification URL here with the marker
+// below. Keeping this in an existing protected function avoids consuming a
+// thirteenth Hobby-plan Serverless Function; this path never calls getRepo()
+// and therefore does not read from or write to Google Sheets.
+async function handleContactVerification(req, res) {
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+  if (!email) return res.status(400).json({ error: 'Missing email' });
+
+  try {
+    const verification = await verifyEmail(email);
+    return res.status(200).json({ email, ...verification });
+  } catch (err) {
+    if (err instanceof NeverBounceError) {
+      return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    }
+    console.error('contacts/verify error:', err);
+    return res.status(500).json({ error: 'Unable to verify email' });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method === 'POST' && req.query?.novus_operation === 'verify-contact') {
+    if (!requireAuth(req, res)) return;
+    return handleContactVerification(req, res);
+  }
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   if (!requireAuth(req, res)) return;
 

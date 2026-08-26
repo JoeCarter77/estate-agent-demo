@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { NeverBounceError, normalizeNeverBounceResult, verifyEmail } from '../lib/neverbounce.mjs';
-import verifyHandler from '../api/novus/contacts/verify.js';
+import verifyHandler from '../api/novus/personalisation.js';
 
 const originalApiKey = process.env.NEVERBOUNCE_API_KEY;
 const originalAuthUser = process.env.NOVUS_BASIC_AUTH_USER;
@@ -84,6 +84,7 @@ try {
   await verifyHandler({
     method: 'POST',
     headers: { authorization: `Basic ${credentials}` },
+    query: { novus_operation: 'verify-contact' },
     body: { email: 'person@example.com' },
   }, response);
   assert.equal(response.statusCode, 200);
@@ -94,7 +95,12 @@ try {
   });
 
   const missingEmailResponse = mockResponse();
-  await verifyHandler({ method: 'POST', headers: { authorization: `Basic ${credentials}` }, body: {} }, missingEmailResponse);
+  await verifyHandler({
+    method: 'POST',
+    headers: { authorization: `Basic ${credentials}` },
+    query: { novus_operation: 'verify-contact' },
+    body: {},
+  }, missingEmailResponse);
   assert.equal(missingEmailResponse.statusCode, 400);
   assert.deepEqual(missingEmailResponse.body, { error: 'Missing email' });
 } finally {
