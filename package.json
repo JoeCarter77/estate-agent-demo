@@ -18,6 +18,7 @@
     "novus:phone-selftest": "node scripts/novus-phone-selftest.mjs",
     "novus:communication-quality-selftest": "node scripts/novus-communication-quality-selftest.mjs",
     "novus:neverbounce-selftest": "node scripts/novus-neverbounce-selftest.mjs",
+    "novus:contact-resolution-selftest": "node scripts/novus-contact-resolution-selftest.mjs",
     "novus:smoke": "node scripts/novus-sheets-smoke.mjs",
     "novus:pipeline-regression": "node scripts/novus-pipeline-regression.mjs",
     "novus:probe-interpretation-selftest": "node scripts/novus-probe-interpretation-selftest.mjs",
