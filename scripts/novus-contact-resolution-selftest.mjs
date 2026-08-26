@@ -390,7 +390,7 @@ await test('generic inbox is used only after every direct candidate fails', asyn
 });
 
 // ── Flow 5: UNKNOWN / RISKY move on ─────────────────────────────────────────
-await test('UNKNOWN and RISKY results move to the next candidate', async () => {
+await test('UNKNOWN moves to the next candidate; a RISKY owner-direct then outranks a VALID generic fallback', async () => {
   const { store, valuesApi } = makeFakeSheet();
   const repo = createRepo(valuesApi);
   seedAgency(store, {
@@ -405,13 +405,18 @@ await test('UNKNOWN and RISKY results move to the next candidate', async () => {
   });
   const result = await resolveAgencyContact(repo, 'ag_5', baseOptions({ verifyEmailImpl: verifier }));
 
-  assert.deepEqual(verifier.calls, [
-    'tom.ridge@ridgevale.co.uk', 't.ridge@ridgevale.co.uk', 'office@ridgevale.co.uk',
-  ]);
-  assert.equal(result.contact_resolution_status, 'RESOLVED_GENERIC');
+  // UNKNOWN on #1 moves on to #2. #2 is an owner-direct contact (t.ridge@
+  // matches "Tom Ridge"), so its RISKY result now wins outright — ranking
+  // policy: RISKY owner/senior direct outranks a VALID generic inbox, so the
+  // generic office@ (#3) is never even checked.
+  assert.deepEqual(verifier.calls, ['tom.ridge@ridgevale.co.uk', 't.ridge@ridgevale.co.uk']);
+  assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
+  assert.equal(result.selected_contact.email, 't.ridge@ridgevale.co.uk');
+  assert.equal(result.selected_contact.verification_status, 'RISKY');
   const statuses = Object.fromEntries(result.candidates_verified.map((v) => [v.email, v.verification_status]));
   assert.equal(statuses['tom.ridge@ridgevale.co.uk'], 'UNKNOWN');
   assert.equal(statuses['t.ridge@ridgevale.co.uk'], 'RISKY');
+  assert.ok(result.hunter_verifier.not_verified_after_winner.includes('office@ridgevale.co.uk'));
 });
 
 // ── Flow 6: everything fails ────────────────────────────────────────────────
@@ -743,8 +748,10 @@ await test('Hunter Finder exposes its embedded verdict and Email Verifier normal
 });
 
 await test('verdictForCandidate: caution rule softens only inconclusive verdicts', () => {
-  const strong = { type: 'DIRECT', clearly_senior_direct: true, hunter_score: 95 };
-  const ordinary = { type: 'DIRECT', clearly_senior_direct: false, hunter_score: 60 };
+  // Hunter-Finder-sourced candidates are gated on Finder's own attribution
+  // score: strong and senior earns the accept-all; ordinary/weak does not.
+  const strong = { type: 'DIRECT', source: 'HUNTER', clearly_senior_direct: true, hunter_score: 95 };
+  const ordinary = { type: 'DIRECT', source: 'HUNTER', clearly_senior_direct: false, hunter_score: 60 };
   const generic = { type: 'GENERIC', clearly_senior_direct: false };
   assert.equal(verdictForCandidate(strong, 'VALID'), 'SELECT');
   assert.equal(verdictForCandidate(strong, 'UNKNOWN'), 'CONTINUE');
@@ -757,6 +764,20 @@ await test('verdictForCandidate: caution rule softens only inconclusive verdicts
   assert.equal(verdictForCandidate(ordinary, 'INVALID'), 'REJECT');
   assert.equal(verdictForCandidate(generic, 'RISKY'), 'SELECT');
   assert.equal(verdictForCandidate(generic, 'UNKNOWN'), 'CONTINUE');
+
+  // A Hunter Finder hit with no score at all is never high confidence.
+  const unscored = { type: 'DIRECT', source: 'HUNTER', clearly_senior_direct: true, hunter_score: null };
+  assert.equal(verdictForCandidate(unscored, 'RISKY'), 'CONTINUE');
+
+  // Discovered directly (AGENCIES/COMMUNICATIONS/CONTACTS), not by Hunter
+  // Finder: no attribution score to weigh, so any identified, non-generic
+  // contact (owner/senior/branch-manager down through named-human) is
+  // selectable on RISKY without a further gate — ranking policy tier 2/4.
+  const identifiedSenior = { type: 'DIRECT', source: 'AGENCIES.primary_contact_email', priority: PRIORITY.SENIOR_DIRECT, hunter_score: null };
+  const identifiedNamed = { type: 'DIRECT', source: 'COMMUNICATIONS', priority: PRIORITY.NAMED_HUMAN, hunter_score: null };
+  assert.equal(verdictForCandidate(identifiedSenior, 'RISKY'), 'SELECT');
+  assert.equal(verdictForCandidate(identifiedNamed, 'RISKY'), 'SELECT');
+  assert.equal(verdictForCandidate(identifiedSenior, 'UNKNOWN'), 'CONTINUE');
 });
 
 await test('generic Accept All is selected as RISKY only at the fallback tier', async () => {
@@ -1371,6 +1392,150 @@ await test('past the cap, an unproven standing selection is reconciled, not blan
     .find((c) => c.email === 'info@capreconcile.co.uk');
   assert.equal(row.verification_status, 'RISKY');
   assert.ok(!/hunter_verifier:/.test(row.notes));
+});
+
+// ── Commercial-seniority ranking policy ─────────────────────────────────────
+//
+// Final winner selection: 1. VALID owner/senior direct, 2. RISKY owner/senior
+// direct, 3. VALID named/probe-responder, 4. RISKY named/probe-responder,
+// 5. VALID generic, 6. RISKY generic. Reported examples below.
+
+await test('Ashton White: a senior direct RISKY contact beats a generic RISKY inbox', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_ashton', agency_name: 'Ashton White', domain: 'ashtonwhite.co.uk', probe_sent: 'YES',
+    primary_contact_email: 'admin@ashtonwhite.co.uk',
+  });
+  // Chris White, Sales Director, responded to the probe — a senior direct
+  // contact discovered from COMMUNICATIONS, not Hunter Finder.
+  seedCommunication(store, {
+    communication_id: 'com_ashton', agency_id: 'ag_ashton', channel: 'email', direction: 'inbound',
+    source_identifier_normalized: 'chris.white@ashtonwhite.co.uk', display_name: 'Chris White, Sales Director',
+    automated_or_human: 'human', occurred_at: '2026-08-02T09:00:00.000Z',
+  });
+  const verifier = makeVerifier({
+    'chris.white@ashtonwhite.co.uk': 'RISKY',
+    'admin@ashtonwhite.co.uk': 'RISKY',
+  });
+  const result = await resolveAgencyContact(repo, 'ag_ashton', baseOptions({ verifyEmailImpl: verifier }));
+
+  // Chris White is verified first (senior direct outranks generic in the
+  // existing priority order) and wins outright — admin@ is never checked.
+  assert.deepEqual(verifier.calls, ['chris.white@ashtonwhite.co.uk']);
+  assert.equal(result.selected_contact.email, 'chris.white@ashtonwhite.co.uk');
+  assert.equal(result.selected_contact.contact_name, 'Chris White, Sales Director');
+  assert.equal(result.selected_contact.verification_status, 'RISKY');
+  assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
+  assert.ok(result.hunter_verifier.not_verified_after_winner.includes('admin@ashtonwhite.co.uk'));
+});
+
+await test('Carter Remy: a strong senior direct RISKY contact beats a VALID junior/generic contact', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_carter', agency_name: 'Carter Remy', domain: 'carterremy.co.uk', probe_sent: 'YES',
+    owner_md: 'Carter Remy', primary_contact_email: 'info@carterremy.co.uk',
+  });
+  // A junior/unattributed contact responded too, and would verify VALID —
+  // but the strong (score >= 80) senior owner match found by Hunter still
+  // wins, because it is verified first in priority order.
+  seedCommunication(store, {
+    communication_id: 'com_carter', agency_id: 'ag_carter', channel: 'email', direction: 'inbound',
+    source_identifier_normalized: 'junior@carterremy.co.uk', display_name: 'Junior Assistant',
+    automated_or_human: 'human', occurred_at: '2026-08-02T09:00:00.000Z',
+  });
+  const verifier = makeVerifier({
+    'carter.remy@carterremy.co.uk': 'RISKY',
+    'junior@carterremy.co.uk': 'VALID',
+  });
+  const hunter = makeHunter({ email: 'carter.remy@carterremy.co.uk', score: 92, position: 'Managing Director' });
+  const result = await resolveAgencyContact(repo, 'ag_carter', baseOptions({
+    verifyEmailImpl: verifier, findEmailImpl: hunter,
+  }));
+
+  assert.deepEqual(verifier.calls, ['carter.remy@carterremy.co.uk']);
+  assert.equal(result.selected_contact.email, 'carter.remy@carterremy.co.uk');
+  assert.equal(result.selected_contact.verification_status, 'RISKY');
+  assert.equal(result.selected_contact.selected_on_caution, true);
+  assert.ok(result.hunter_verifier.not_verified_after_winner.includes('junior@carterremy.co.uk'));
+
+  // ...but a WEAK senior attribution (score below threshold) does NOT beat a
+  // VALID lower-priority contact: the waterfall moves on and the junior wins.
+  const { store: weakStore, valuesApi: weakValuesApi } = makeFakeSheet();
+  const weakRepo = createRepo(weakValuesApi);
+  seedAgency(weakStore, {
+    agency_id: 'ag_carter_weak', agency_name: 'Carter Remy Weak', domain: 'weak.carterremy.co.uk', probe_sent: 'YES',
+    owner_md: 'Carter Remy', primary_contact_email: 'info@weak.carterremy.co.uk',
+  });
+  seedCommunication(weakStore, {
+    communication_id: 'com_carter_weak', agency_id: 'ag_carter_weak', channel: 'email', direction: 'inbound',
+    source_identifier_normalized: 'junior@weak.carterremy.co.uk', display_name: 'Junior Assistant',
+    automated_or_human: 'human', occurred_at: '2026-08-02T09:00:00.000Z',
+  });
+  const weakVerifier = makeVerifier({
+    'carter.remy@weak.carterremy.co.uk': 'RISKY',
+    'junior@weak.carterremy.co.uk': 'VALID',
+  });
+  const weakHunter = makeHunter({ email: 'carter.remy@weak.carterremy.co.uk', score: 55, position: 'Managing Director' });
+  const weakResult = await resolveAgencyContact(weakRepo, 'ag_carter_weak', baseOptions({
+    verifyEmailImpl: weakVerifier, findEmailImpl: weakHunter,
+  }));
+  assert.deepEqual(weakVerifier.calls, [
+    'carter.remy@weak.carterremy.co.uk', 'junior@weak.carterremy.co.uk',
+  ]);
+  assert.equal(weakResult.selected_contact.email, 'junior@weak.carterremy.co.uk');
+  assert.equal(weakResult.selected_contact.verification_status, 'VALID');
+});
+
+await test('VALID always wins outright, before any RISKY tier is even considered', async () => {
+  // Sanity check on the tier table's own ordering: tier 3 (VALID named human)
+  // is reached and selected before tier 4/5/6 are ever considered, because
+  // VALID always selects immediately regardless of tier.
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_tier3', agency_name: 'Tier Three Homes', domain: 'tierthree.co.uk', probe_sent: 'YES',
+    primary_contact_email: 'info@tierthree.co.uk',
+  });
+  seedCommunication(store, {
+    communication_id: 'com_tier3', agency_id: 'ag_tier3', channel: 'email', direction: 'inbound',
+    source_identifier_normalized: 'nadia@tierthree.co.uk', display_name: 'Nadia Kelly',
+    automated_or_human: 'human', occurred_at: '2026-08-02T09:00:00.000Z',
+  });
+  const verifier = makeVerifier({
+    'nadia@tierthree.co.uk': 'VALID',
+    'info@tierthree.co.uk': 'RISKY',
+  });
+  const result = await resolveAgencyContact(repo, 'ag_tier3', baseOptions({ verifyEmailImpl: verifier }));
+  assert.deepEqual(verifier.calls, ['nadia@tierthree.co.uk']);
+  assert.equal(result.selected_contact.email, 'nadia@tierthree.co.uk');
+  assert.equal(result.selected_contact.verification_status, 'VALID');
+});
+
+await test('a RISKY named human / probe responder beats a VALID generic inbox (tier 4 over tier 5)', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_tier4', agency_name: 'Tier Four Homes', domain: 'tierfour.co.uk', probe_sent: 'YES',
+    primary_contact_email: 'info@tierfour.co.uk',
+  });
+  // No senior-role wording and no owner match, so this is priority NAMED_HUMAN
+  // rather than SENIOR_DIRECT/BRANCH_MANAGER — still outranks generic.
+  seedCommunication(store, {
+    communication_id: 'com_tier4', agency_id: 'ag_tier4', channel: 'email', direction: 'inbound',
+    source_identifier_normalized: 'priya@tierfour.co.uk', display_name: 'Priya Shah',
+    automated_or_human: 'human', occurred_at: '2026-08-02T09:00:00.000Z',
+  });
+  const verifier = makeVerifier({
+    'priya@tierfour.co.uk': 'RISKY',
+    'info@tierfour.co.uk': 'VALID',
+  });
+  const result = await resolveAgencyContact(repo, 'ag_tier4', baseOptions({ verifyEmailImpl: verifier }));
+  assert.deepEqual(verifier.calls, ['priya@tierfour.co.uk']);
+  assert.equal(result.selected_contact.email, 'priya@tierfour.co.uk');
+  assert.equal(result.selected_contact.verification_status, 'RISKY');
+  assert.ok(result.hunter_verifier.not_verified_after_winner.includes('info@tierfour.co.uk'));
 });
 
 await test('writeback survives header drift and reports genuinely missing columns', () => {
