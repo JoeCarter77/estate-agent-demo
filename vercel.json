@@ -5,6 +5,9 @@
     { "source": "/demo/:demo_slug", "destination": "/demo.html" },
     { "source": "/novus", "destination": "/novus/probe.html" },
     { "source": "/novus/probe", "destination": "/novus/probe.html" },
+    { "source": "/api/novus/contacts/verify", "destination": "/api/novus/personalisation?novus_operation=verify-contact" },
+    { "source": "/api/novus/contacts/resolve", "destination": "/api/novus/personalisation?novus_operation=resolve-contact" },
+    { "source": "/api/novus/contacts/resolution-backlog", "destination": "/api/novus/personalisation?novus_operation=resolution-backlog" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/d/(.*)", "destination": "/index.html" }
   ],
