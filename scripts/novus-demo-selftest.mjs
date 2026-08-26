@@ -1268,6 +1268,37 @@ async function run() {
     __setAiCallerForTests(null);
   }
   {
+    // SELF-HEALING: agency_id is copied from PROBES on every compile. If the
+    // DEMOS row and its own PROBES row ever disagree — a hand edit, or the
+    // row was compiled before the probe carried an agency_id at all — the
+    // very next pass corrects it from PROBES, with no manual sheet edit and
+    // no AI call.
+    const { store, repo } = makeWorkbook({ DIAGNOSIS: [DIAGNOSIS_HEADER.slice()] });
+    seedWeakSeller(store);
+    __setRepoForTests(repo);
+    __setAiCallerForTests(async () => { throw new Error('no AI call should be needed'); });
+
+    await runRebuildPass(repo, { maxAiCalls: 10 });
+    const before = demoRowsOf(store)[0];
+    assert.strictEqual(before.agency_id, 'agc_demo', 'sanity: agency_id came from PROBES on first compile');
+
+    // Hand-blank the DEMOS row's agency_id, as if it had been compiled before
+    // PROBES carried one, or edited by hand.
+    const demoHeader = store.DEMOS[0];
+    const agencyIdCol = demoHeader.indexOf('agency_id');
+    const demoRowIdx = store.DEMOS.findIndex((r, i) => i > 1 && r[demoHeader.indexOf('probe_id')] === before.probe_id);
+    store.DEMOS[demoRowIdx][agencyIdCol] = '';
+
+    const summary = await compileDemos(repo, { resolveImageUrl: noImage });
+    assert.strictEqual(summary.demos_compiled, 1);
+    assert.strictEqual(summary.results[0].reason, 'agency_id_mismatch');
+    const after = demoRowsOf(store)[0];
+    assert.strictEqual(after.agency_id, 'agc_demo', 'a blanked agency_id is refilled from PROBES on the next pass');
+    ok('a DEMOS row whose agency_id drifted from its PROBES row is self-healed on the next pass, with no AI call');
+
+    __setAiCallerForTests(null);
+  }
+  {
     // SELF-HEALING: the probe was personalised before the DEMOS tab existed.
     // This is the case that makes "never run a build command" true for the
     // demos that already exist, not just the ones from now on.
