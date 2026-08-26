@@ -25,7 +25,8 @@ import {
   quantifiesOpportunityShape, readsAsThirdPersonProspect, normalizeCurrencyFigure,
   readsAsConsultantSpeak, claimsUnaskedQuestions, namesConcreteOutcome,
   introducesUnselectedFinding, readsAsUnfairOutcomeCriticism,
-  agencyMadeNextStepAttempt, secondHookFailure, isDistinctText, _internal,
+  agencyMadeNextStepAttempt, secondHookFailure, isDistinctText,
+  hasUnreliableVoicemailEvidence, makesUnsupportedVoicemailClaim, _internal,
 } from '../lib/probe-personalisation.mjs';
 import { buildDemoRow, reviewReasonsFor } from '../lib/demos.mjs';
 import { needsPersonalisation } from '../lib/personalisation-rebuild.mjs';
@@ -496,9 +497,31 @@ async function main() {
       "That seller wasn't a cold database record — they were already engaging with your branch as a buyer.",
     ]) assert.strictEqual(readsAsUnfairOutcomeCriticism(fair), false, `theirs alone to do: ${fair}`);
 
-    // Which case a probe is in is INTELLIGENCE.human_contact, nothing else.
-    assert.strictEqual(agencyMadeNextStepAttempt({ human_contact: 'yes' }), true);
-    assert.strictEqual(agencyMadeNextStepAttempt({ human_contact: 'automated_only' }), false);
+    // human_contact = 'yes' is NECESSARY but not SUFFICIENT: a normal human
+    // reply or a brochure with nothing to act on must not, by itself, put the
+    // ball in my court.
+    assert.strictEqual(
+      agencyMadeNextStepAttempt({ human_contact: 'yes', viewing_progression: 'none', seller_recognition: 'none' }),
+      false, 'a human reply alone is not a next-step attempt');
+    assert.strictEqual(
+      agencyMadeNextStepAttempt({ human_contact: 'yes', viewing_progression: 'mentioned', seller_recognition: 'acknowledged' }),
+      false, 'a passive mention/acknowledgement is not a concrete ask either');
+    // Only a concrete ask that genuinely needed my answer activates it.
+    for (const genuine of [
+      { human_contact: 'yes', viewing_progression: 'invited' },
+      { human_contact: 'yes', viewing_progression: 'availability_requested' },
+      { human_contact: 'yes', viewing_progression: 'slot_offered' },
+      { human_contact: 'yes', viewing_progression: 'booked' },
+      { human_contact: 'yes', seller_recognition: 'asked_position' },
+      { human_contact: 'yes', seller_recognition: 'valuation_offered' },
+      { human_contact: 'yes', seller_recognition: 'valuation_booked' },
+      { human_contact: 'yes', buyer_questions_asked: 'budget; timescale' },
+    ]) assert.strictEqual(agencyMadeNextStepAttempt(genuine), true, `real progression attempt: ${JSON.stringify(genuine)}`);
+    // human_contact still gates everything: no genuine human contact means no
+    // next-step attempt however the rest of the row reads.
+    assert.strictEqual(
+      agencyMadeNextStepAttempt({ human_contact: 'automated_only', viewing_progression: 'invited' }),
+      false, 'an automated-only acknowledgement never counts, even if it happens to carry a viewing state');
     assert.strictEqual(agencyMadeNextStepAttempt({ human_contact: 'none' }), false);
 
     // End to end, on a probe where a real person DID come back: the line is
@@ -596,6 +619,100 @@ async function main() {
       [row.email_commercial_hook, row.email_commercial_hook_email_2],
     ]) assert.strictEqual(isDistinctText(a, b), true, 'the three email fields do not repeat each other');
     ok('20b. a repeated Email 2 hook is repaired, and the three persisted lines stay three different jobs');
+  }
+
+  // ══ 22: automated-only acknowledgements never count as a human reply,
+  //        genuine or otherwise — unchanged upstream behaviour, re-asserted
+  //        at the point PERSONALISATION consumes it ═══════════════════════
+  {
+    // "Thanks for your enquiry, someone will be in touch" is the canonical
+    // auto-ack. It is INTELLIGENCE's job to classify it as automated_only
+    // (lib/intelligence-fields.mjs — untouched here); this only proves
+    // Personalisation still treats that classification as "nobody genuine
+    // replied" rather than upgrading it to a next-step attempt.
+    assert.strictEqual(
+      agencyMadeNextStepAttempt({ human_contact: 'automated_only', viewing_progression: 'invited', seller_recognition: 'valuation_offered' }),
+      false, 'an automated-only acknowledgement is never a genuine human next-step attempt, however it reads');
+    // And the fairness guard is therefore inert on such a probe: criticism
+    // that would be unfair after a genuine human reply stays sayable here,
+    // because no human ever actually replied.
+    const { row, calls } = await run({
+      findings: ordered(F.sellerMissed, F.noResponse),
+      intelligence: {
+        human_contact: 'automated_only', response_hours: '', contact_attempts: 0, follow_ups: 0,
+        viewing_progression: 'none', seller_recognition: 'none',
+      },
+      reply: () => answer({
+        positive_finding_index: null, main_finding_index: 6, wider_finding_index: 2,
+        fair_observation: '',
+        main_finding: 'nobody genuine ever got back to me — the auto-reply was the only thing that came through.',
+        email_observation: 'Thanks for your enquiry, someone will be in touch was the only reply, and nobody picked up that I\'d also said I had a property to sell.',
+        email_commercial_hook: "That's 1 buyer enquiry and 1 potential seller, with neither ever becoming a conversation.",
+        email_commercial_hook_email_2: 'The auto-reply looked like an acknowledgement, but no person had actually seen the second half of the message yet.',
+      }),
+    });
+    assert.strictEqual(calls, 1, 'nothing here trips the fairness guard');
+    assert.match(row.email_commercial_hook, /neither ever becoming a conversation/);
+    ok('22. an automated "someone will be in touch" acknowledgement is never treated as a genuine reply or a next-step attempt');
+  }
+
+  // ══ 23: voicemail uncertainty — unknown content stays unknown ═════════════
+  {
+    const badVoicemail = { finding_index: 7, finding_type: 'problem', finding: 'The voicemail left for the buyer cut off mid-sentence with no availability request or callback instruction given.', evidence: 'Voicemail transcript: "Hi it\'s Terry, just calling about your enq—" (cuts off).', significance_note: 'Transcript is incomplete.' };
+    const cleanVoicemail = { finding_index: 7, finding_type: 'problem', finding: 'The voicemail never mentioned the property or offered a viewing.', evidence: 'Full transcript: "Hi, thanks for enquiring, give me a call back when you can." Nothing else was said.', significance_note: 'A complete, legible transcript.' };
+
+    assert.strictEqual(hasUnreliableVoicemailEvidence([badVoicemail]), true, 'a cut-off voicemail finding is flagged unreliable');
+    assert.strictEqual(hasUnreliableVoicemailEvidence([cleanVoicemail]), false, 'a complete, legible voicemail transcript is not');
+    assert.strictEqual(
+      makesUnsupportedVoicemailClaim('the voicemail cut off mid-sentence with no availability request or callback instruction given.'),
+      true);
+    assert.strictEqual(
+      makesUnsupportedVoicemailClaim('the voicemail never mentioned the property or offered a viewing.'), true);
+    assert.strictEqual(
+      makesUnsupportedVoicemailClaim('nobody ever called back after leaving that voicemail.'), false,
+      'a claim about what happened AFTER the voicemail, not about its content, is untouched');
+
+    // End to end: a finding whose OWN evidence shows the voicemail is
+    // unreliable cannot license copy that says what it didn't contain — the
+    // claim is rejected and, being ungroundable, never banked.
+    const { row, calls } = await run({
+      findings: ordered(F.positive, badVoicemail, F.sellerMissed),
+      reply: () => answer({
+        main_finding_index: 7,
+        main_finding: 'the voicemail left for the buyer cut off mid-sentence with no availability request or callback instruction given.',
+        email_observation: "You called within the hour, but the voicemail cut off mid-sentence with no availability request or callback instruction given, and nobody picked up that I'd also said I had a property to sell.",
+      }),
+    });
+    assert.strictEqual(calls, 2, 'the repair is attempted');
+    assert.strictEqual(row.main_finding, '', 'an unsupported claim about the voicemail\'s missing content is never persisted');
+    assert.strictEqual(row.email_observation, '', 'neither is the same claim in the Instantly observation');
+    ok('23. a bad voicemail transcript never creates unsupported claims about its content, and the claim is not bankable');
+  }
+
+  // ══ 24: seller-miss stays valid even when the only related evidence is an
+  //        unreliable voicemail, provided the FULL record shows no reliable
+  //        acknowledgement anywhere ═════════════════════════════════════════
+  {
+    const badVoicemail = { finding_index: 7, finding_type: 'opportunity', finding: 'The voicemail left for the buyer cut off mid-sentence, and no other contact ever acknowledged the declared property to sell.', evidence: 'Voicemail transcript: "Hi it\'s Terry, just calling about your enq—" (cuts off). No other communications exist.', significance_note: 'Seller side never acknowledged anywhere in the record.' };
+    assert.strictEqual(hasUnreliableVoicemailEvidence([badVoicemail]), true);
+    // The seller-miss claim itself makes no assertion about the voicemail's
+    // CONTENT — it says the declared property was never acknowledged ANYWHERE
+    // — so it is not a voicemail-content claim and must pass untouched.
+    assert.strictEqual(
+      makesUnsupportedVoicemailClaim("nobody picked up that I'd also said I had a property to sell."), false);
+    const { row, calls } = await run({
+      findings: ordered(F.positive, badVoicemail),
+      reply: () => answer({
+        main_finding_index: 7, wider_finding_index: null,
+        main_finding: 'the declared property to sell was never acknowledged anywhere in the record.',
+        email_observation: "You called within the hour, but nobody picked up that I'd also said I had a property to sell.",
+        email_commercial_hook: "That seller wasn't a cold database record — they were already actively engaging with your agency as a buyer.",
+      }),
+    });
+    assert.strictEqual(calls, 1, 'a seller-miss claim grounded in the full record costs nothing extra');
+    assert.ok(has(row.main_finding), 'seller-miss wording survives when no reliable acknowledgement exists anywhere');
+    assert.ok(has(row.email_observation));
+    ok('24. seller-missed wording remains valid when no reliable acknowledgement exists anywhere in the record, even alongside an unreliable voicemail');
   }
 
   // ══ 21: regenerating the existing rows onto the three-field contract ══════
