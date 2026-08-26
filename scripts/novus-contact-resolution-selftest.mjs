@@ -1,12 +1,12 @@
 // scripts/novus-contact-resolution-selftest.mjs — hermetic contact-resolution
-// tests (no network, no creds, no NeverBounce/Hunter/AI calls).
+// tests (no network, no creds, no Hunter/AI calls).
 //
 // Exercises the REAL code paths — lib/contact-resolution.mjs and the
 // /api/novus/contacts/resolve handler inside api/novus/personalisation.js —
 // against an in-memory fake of the Google Sheets values API in the live
 // workbook's shape (row 1 = header, row 2 = SCHEMA NOTE, row 3+ = data).
 //
-// NeverBounce, Hunter and owner research are all injected as fakes, so every
+// Hunter verification, Hunter finding and owner research are injected as fakes, so every
 // assertion here is about the waterfall/persistence logic, never about a
 // provider. The counters those fakes keep are load-bearing: several tests
 // assert on how many times a provider WOULD have been called.
@@ -16,6 +16,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createRepo } from '../lib/sheets.mjs';
 import {
   resolveAgencyContact,
@@ -28,9 +29,15 @@ import {
   verdictForCandidate,
   resolveHeaderName,
   HUNTER_HIGH_CONFIDENCE_SCORE,
+  HARD_FAIL_STATUSES,
+  INCONCLUSIVE_STATUSES,
   PRIORITY,
 } from '../lib/contact-resolution.mjs';
-import { normalizeNeverBounceResult, HARD_FAIL_STATUSES, INCONCLUSIVE_STATUSES } from '../lib/neverbounce.mjs';
+import {
+  normalizeHunterVerificationStatus,
+  findEmail as findHunterEmail,
+  verifyEmail as verifyHunterEmail,
+} from '../lib/hunter.mjs';
 
 const AGENCIES_HEADER = [
   'agency_id','agency_name','website','domain','location','branch_count','main_phone',
@@ -130,7 +137,14 @@ function makeVerifier(resultsByEmail, { defaultStatus = 'INVALID' } = {}) {
     calls.push(email);
     const configured = resultsByEmail[email];
     if (configured instanceof Error) throw configured;
-    return { verification_status: configured || defaultStatus, raw_result: { result: configured || defaultStatus } };
+    const status = typeof configured === 'object'
+      ? (configured.verification_status || configured.status || defaultStatus)
+      : (configured || defaultStatus);
+    return {
+      verification_status: status,
+      score: typeof configured === 'object' ? (configured.score ?? null) : null,
+      raw_result: { data: { status, score: typeof configured === 'object' ? (configured.score ?? null) : null } },
+    };
   };
   impl.calls = calls;
   return impl;
@@ -140,7 +154,13 @@ function makeHunter(result) {
   const impl = async (args) => {
     calls.push(args);
     if (result instanceof Error) throw result;
-    return result;
+    if (!result) return result;
+    return {
+      verification_status: 'VALID',
+      verification_date: '2026-08-26',
+      raw_result: { data: { verification: { status: result.verification_status || 'valid' } } },
+      ...result,
+    };
   };
   impl.calls = calls;
   return impl;
@@ -229,7 +249,7 @@ await test('valid owner direct email wins outright', async () => {
   assert.equal(result.hunter.used, false);
   // The generic inbox was a candidate but must never have been verified.
   assert.deepEqual(verifier.calls, ['james.hale@haleandco.co.uk']);
-  assert.ok(result.neverbounce.not_verified_after_winner.includes('info@haleandco.co.uk'));
+  assert.ok(result.hunter_verifier.not_verified_after_winner.includes('info@haleandco.co.uk'));
 
   const agency = rowsAsObjects(store, 'AGENCIES', AGENCIES_HEADER)[0];
   assert.equal(agency.outreach_contact_name, 'James Hale');
@@ -264,13 +284,14 @@ await test('known owner with only a generic email: Hunter finds the direct addre
   assert.deepEqual(hunter.calls[0], { name: 'Marie Bell', domain: 'bellestates.co.uk' });
   assert.equal(result.hunter.used, true);
   assert.equal(result.hunter.email, 'marie.bell@bellestates.co.uk');
-  // Hunter FOUND it; NeverBounce still decided it.
-  assert.ok(verifier.calls.includes('marie.bell@bellestates.co.uk'));
+  // Hunter Finder already returned VALID; do not verify the same address again.
+  assert.deepEqual(verifier.calls, []);
+  assert.equal(result.hunter_verifier.finder_result_reuses, 1);
   assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
   assert.equal(result.selected_contact.email, 'marie.bell@bellestates.co.uk');
   assert.equal(result.selected_contact.email_source, 'HUNTER');
   // The Hunter result outranks the generic inbox, so the inbox is never checked.
-  assert.deepEqual(verifier.calls, ['marie.bell@bellestates.co.uk']);
+  assert.deepEqual(verifier.calls, []);
 });
 
 await test('Hunter is skipped when we already hold a direct address for the owner', async () => {
@@ -397,8 +418,8 @@ await test('all candidates failing gives NO_VALID_EMAIL and no selected contact'
   assert.ok(contacts.every((c) => c.is_selected_for_outreach === 'FALSE'));
 });
 
-// ── Flow 7: cached verification avoids a repeat NeverBounce call ────────────
-await test('a recent stored verification is reused instead of calling NeverBounce', async () => {
+// ── Flow 7: cached verification avoids a repeat Hunter call ────────────────
+await test('a recent stored verification is reused instead of calling Hunter', async () => {
   const { store, valuesApi } = makeFakeSheet();
   const repo = createRepo(valuesApi);
   seedAgency(store, {
@@ -414,9 +435,9 @@ await test('a recent stored verification is reused instead of calling NeverBounc
   const verifier = makeVerifier({ 'ella.marsh@marshhomes.co.uk': 'VALID' });
   const result = await resolveAgencyContact(repo, 'ag_7', baseOptions({ verifyEmailImpl: verifier }));
 
-  assert.equal(verifier.calls.length, 0, 'NeverBounce must not be called again for a fresh result');
-  assert.equal(result.neverbounce.calls_made, 0);
-  assert.equal(result.neverbounce.cached_reuses, 1);
+  assert.equal(verifier.calls.length, 0, 'Hunter must not be called again for a fresh result');
+  assert.equal(result.hunter_verifier.calls_made, 0);
+  assert.equal(result.hunter_verifier.cached_reuses, 1);
   assert.equal(result.candidates_verified[0].cached, true);
   assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
 
@@ -584,16 +605,18 @@ await test('researched owner is saved with evidence and feeds the Hunter step', 
   assert.match(agency.notes, /kestrelco\.co\.uk\/about/);
 });
 
-// ── NeverBounce verdict vocabulary ──────────────────────────────────────────
-await test('NeverBounce results map to five distinct statuses', () => {
-  assert.equal(normalizeNeverBounceResult('valid'), 'VALID');
-  assert.equal(normalizeNeverBounceResult('invalid'), 'INVALID');
+// ── Hunter verdict vocabulary ───────────────────────────────────────────────
+await test('Hunter results map to five distinct NOVUS statuses', () => {
+  assert.equal(normalizeHunterVerificationStatus('valid'), 'VALID');
+  assert.equal(normalizeHunterVerificationStatus('webmail'), 'VALID');
+  assert.equal(normalizeHunterVerificationStatus('invalid'), 'INVALID');
   // DISPOSABLE is its own verdict now, no longer flattened into INVALID.
-  assert.equal(normalizeNeverBounceResult('disposable'), 'DISPOSABLE');
-  assert.equal(normalizeNeverBounceResult('unknown'), 'UNKNOWN');
+  assert.equal(normalizeHunterVerificationStatus('disposable'), 'DISPOSABLE');
+  assert.equal(normalizeHunterVerificationStatus('unknown'), 'UNKNOWN');
+  assert.equal(normalizeHunterVerificationStatus('blocked'), 'UNKNOWN');
   // Accept-all/catchall in every spelling is RISKY — never a hard failure.
   for (const spelling of ['catchall', 'catch_all', 'catch-all', 'accept_all', 'accept-all', 'accepts_all']) {
-    assert.equal(normalizeNeverBounceResult(spelling), 'RISKY', spelling);
+    assert.equal(normalizeHunterVerificationStatus(spelling), 'RISKY', spelling);
   }
   assert.ok(!HARD_FAIL_STATUSES.has('RISKY'), 'accept-all must never be a hard failure');
   assert.ok(!HARD_FAIL_STATUSES.has('UNKNOWN'));
@@ -601,11 +624,50 @@ await test('NeverBounce results map to five distinct statuses', () => {
   assert.deepEqual([...INCONCLUSIVE_STATUSES].sort(), ['RISKY', 'UNKNOWN']);
 });
 
+await test('Hunter Finder exposes its embedded verdict and Email Verifier normalises its own response', async () => {
+  const originalKey = process.env.HUNTER_API_KEY;
+  process.env.HUNTER_API_KEY = 'test-key';
+  try {
+    let finderUrl;
+    const found = await findHunterEmail({ name: 'Marie Bell', domain: 'bellestates.co.uk' }, {
+      fetchImpl: async (url) => {
+        finderUrl = url;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ data: {
+            email: 'marie.bell@bellestates.co.uk', score: 88, accept_all: true,
+            verification: { status: 'valid', date: '2026-08-25' },
+          } }),
+        };
+      },
+    });
+    assert.equal(finderUrl.pathname, '/v2/email-finder');
+    assert.equal(found.verification_status, 'RISKY', 'accept_all overrides a nominal valid mailbox result');
+    assert.equal(found.verification_date, '2026-08-25');
+
+    let verifierUrl;
+    const verified = await verifyHunterEmail('person@example.com', {
+      fetchImpl: async (url) => {
+        verifierUrl = url;
+        return { ok: true, status: 200, json: async () => ({ data: { status: 'accept_all', score: 82 } }) };
+      },
+    });
+    assert.equal(verifierUrl.pathname, '/v2/email-verifier');
+    assert.equal(verified.verification_status, 'RISKY');
+    assert.equal(verified.score, 82);
+  } finally {
+    if (originalKey === undefined) delete process.env.HUNTER_API_KEY;
+    else process.env.HUNTER_API_KEY = originalKey;
+  }
+});
+
 await test('verdictForCandidate: caution rule softens only inconclusive verdicts', () => {
-  const strong = { high_confidence_owner: true, hunter_score: 95 };
-  const ordinary = { high_confidence_owner: false, hunter_score: 60 };
+  const strong = { type: 'DIRECT', clearly_senior_direct: true, hunter_score: 95 };
+  const ordinary = { type: 'DIRECT', clearly_senior_direct: false, hunter_score: 60 };
+  const generic = { type: 'GENERIC', clearly_senior_direct: false };
   assert.equal(verdictForCandidate(strong, 'VALID'), 'SELECT');
-  assert.equal(verdictForCandidate(strong, 'UNKNOWN'), 'SELECT');
+  assert.equal(verdictForCandidate(strong, 'UNKNOWN'), 'CONTINUE');
   assert.equal(verdictForCandidate(strong, 'RISKY'), 'SELECT');
   assert.equal(verdictForCandidate(strong, 'INVALID'), 'REJECT');
   assert.equal(verdictForCandidate(strong, 'DISPOSABLE'), 'REJECT');
@@ -613,14 +675,54 @@ await test('verdictForCandidate: caution rule softens only inconclusive verdicts
   assert.equal(verdictForCandidate(ordinary, 'UNKNOWN'), 'CONTINUE');
   assert.equal(verdictForCandidate(ordinary, 'RISKY'), 'CONTINUE');
   assert.equal(verdictForCandidate(ordinary, 'INVALID'), 'REJECT');
+  assert.equal(verdictForCandidate(generic, 'RISKY'), 'SELECT');
+  assert.equal(verdictForCandidate(generic, 'UNKNOWN'), 'CONTINUE');
+});
+
+await test('generic Accept All is selected as RISKY only at the fallback tier', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_4b', agency_name: 'Fallback Homes', domain: 'fallback.co.uk',
+    owner_md: 'Pippa Fall', primary_contact_email: 'pippa.fall@fallback.co.uk',
+    other_known_emails: 'info@fallback.co.uk',
+  });
+  const verifier = makeVerifier({
+    'pippa.fall@fallback.co.uk': 'INVALID',
+    'info@fallback.co.uk': { status: 'RISKY', score: 25 },
+  });
+  const result = await resolveAgencyContact(repo, 'ag_4b', baseOptions({ verifyEmailImpl: verifier }));
+  assert.deepEqual(verifier.calls, ['pippa.fall@fallback.co.uk', 'info@fallback.co.uk']);
+  assert.equal(result.selected_contact.email, 'info@fallback.co.uk');
+  assert.equal(result.selected_contact.verification_status, 'RISKY');
+  assert.equal(result.contact_resolution_status, 'RESOLVED_GENERIC');
+});
+
+await test('Hunter Verifier Accept All score 80+ selects a clearly senior AGENCIES contact as RISKY', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_existing_risky', agency_name: 'Senior Homes', domain: 'seniorhomes.co.uk',
+    owner_md: 'Sara Senior', primary_contact_email: 'sara.senior@seniorhomes.co.uk',
+    other_known_emails: 'info@seniorhomes.co.uk',
+  });
+  const verifier = makeVerifier({
+    'sara.senior@seniorhomes.co.uk': { status: 'RISKY', score: 80 },
+  });
+  const result = await resolveAgencyContact(repo, 'ag_existing_risky', baseOptions({ verifyEmailImpl: verifier }));
+  assert.deepEqual(verifier.calls, ['sara.senior@seniorhomes.co.uk']);
+  assert.equal(result.selected_contact.email, 'sara.senior@seniorhomes.co.uk');
+  assert.equal(result.selected_contact.verification_status, 'RISKY');
+  assert.equal(result.hunter_verifier.calls_made, 1);
+  assert.ok(result.hunter_verifier.not_verified_after_winner.includes('info@seniorhomes.co.uk'));
 });
 
 // ── High-confidence owner/MD caution rule, end to end ───────────────────────
 //
 // The real-world shape reported from production: owner known, Hunter finds a
 // direct address with a 95 score, and the agency's mail server answers
-// UNKNOWN or accept-all for everything. Weaker contacts on that SAME server
-// would answer the same way, so no further credits may be spent.
+// Accept-all with score 95. Weaker contacts on that SAME server must not be
+// checked after this clearly senior direct winner.
 function seedStantonHockett(store, { agency_id = 'ag_sh' } = {}) {
   seedAgency(store, {
     agency_id, agency_name: 'Stanton Hockett', domain: 'stantonhockett.co.uk', probe_sent: 'YES',
@@ -636,27 +738,30 @@ function seedStantonHockett(store, { agency_id = 'ag_sh' } = {}) {
 // score 95 -> the address Hunter proposes for Bradley Stanton. Note "brad@" is
 // a diminutive that no name-matching rule would connect to "Bradley": the
 // attribution comes from Hunter having been ASKED for that person.
-const stantonHunter = () => makeHunter({ email: 'brad@stantonhockett.co.uk', score: 95, position: 'Managing Director' });
+const stantonHunter = (verificationStatus = 'VALID', score = 95) => makeHunter({
+  email: 'brad@stantonhockett.co.uk', score, position: 'Managing Director',
+  verification_status: verificationStatus,
+});
 
-for (const [status, expectedCaution] of [['VALID', false], ['UNKNOWN', true], ['RISKY', true]]) {
-  await test(`high-confidence owner + ${status} -> selected on one NeverBounce call`, async () => {
+for (const [status, expectedCaution] of [['VALID', false], ['RISKY', true]]) {
+  await test(`high-confidence owner + Finder ${status} -> selected with no verifier call`, async () => {
     const { store, valuesApi } = makeFakeSheet();
     const repo = createRepo(valuesApi);
     seedStantonHockett(store);
-    const verifier = makeVerifier({ 'brad@stantonhockett.co.uk': status });
-    const hunter = stantonHunter();
+    const verifier = makeVerifier({});
+    const hunter = stantonHunter(status);
     const result = await resolveAgencyContact(repo, 'ag_sh', baseOptions({
       verifyEmailImpl: verifier, findEmailImpl: hunter,
     }));
 
     assert.equal(result.hunter.high_confidence, true);
     assert.equal(result.hunter.caution_rule_applies, true);
-    // EXACTLY one credit spent, and it was the owner's address.
-    assert.deepEqual(verifier.calls, ['brad@stantonhockett.co.uk']);
-    assert.equal(result.neverbounce.calls_made, 1);
+    // Finder's embedded verdict is reused; no second verification credit.
+    assert.deepEqual(verifier.calls, []);
+    assert.equal(result.hunter_verifier.calls_made, 0);
     // The weaker contacts on the same server are never checked.
-    assert.ok(result.neverbounce.not_verified_after_winner.includes('terry@stantonhockett.co.uk'));
-    assert.ok(result.neverbounce.not_verified_after_winner.includes('hello@stantonhockett.co.uk'));
+    assert.ok(result.hunter_verifier.not_verified_after_winner.includes('terry@stantonhockett.co.uk'));
+    assert.ok(result.hunter_verifier.not_verified_after_winner.includes('hello@stantonhockett.co.uk'));
 
     assert.equal(result.selected_contact.email, 'brad@stantonhockett.co.uk');
     assert.equal(result.selected_contact.contact_name, 'Bradley Stanton');
@@ -685,6 +790,21 @@ for (const [status, expectedCaution] of [['VALID', false], ['UNKNOWN', true], ['
   });
 }
 
+await test('high-score Hunter UNKNOWN is not selected and the waterfall continues', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedStantonHockett(store);
+  const verifier = makeVerifier({ 'terry@stantonhockett.co.uk': 'VALID' });
+  const result = await resolveAgencyContact(repo, 'ag_sh', baseOptions({
+    verifyEmailImpl: verifier,
+    findEmailImpl: stantonHunter('UNKNOWN', 95),
+  }));
+  assert.equal(result.candidates_verified[0].verification_status, 'UNKNOWN');
+  assert.equal(result.candidates_verified[0].verification_provider, 'HUNTER_FINDER');
+  assert.deepEqual(verifier.calls, ['terry@stantonhockett.co.uk']);
+  assert.equal(result.selected_contact.email, 'terry@stantonhockett.co.uk');
+});
+
 for (const status of ['INVALID', 'DISPOSABLE']) {
   await test(`high-confidence owner + ${status} is rejected and the waterfall continues`, async () => {
     const { store, valuesApi } = makeFakeSheet();
@@ -695,11 +815,11 @@ for (const status of ['INVALID', 'DISPOSABLE']) {
       'terry@stantonhockett.co.uk': 'VALID',
     });
     const result = await resolveAgencyContact(repo, 'ag_sh', baseOptions({
-      verifyEmailImpl: verifier, findEmailImpl: stantonHunter(),
+      verifyEmailImpl: verifier, findEmailImpl: stantonHunter(status),
     }));
 
     // A hard fail is never softened by confidence.
-    assert.deepEqual(verifier.calls, ['brad@stantonhockett.co.uk', 'terry@stantonhockett.co.uk']);
+    assert.deepEqual(verifier.calls, ['terry@stantonhockett.co.uk']);
     assert.equal(result.selected_contact.email, 'terry@stantonhockett.co.uk');
     assert.equal(result.selected_contact.verification_status, 'VALID');
     assert.equal(result.selected_contact.selected_on_caution, false);
@@ -715,9 +835,8 @@ await test('low-confidence Hunter owner + UNKNOWN keeps the ordinary waterfall',
   const repo = createRepo(valuesApi);
   seedStantonHockett(store);
   // Below the threshold: a pattern guess, not an observed address.
-  const hunter = makeHunter({ email: 'brad@stantonhockett.co.uk', score: 62, position: '' });
+  const hunter = stantonHunter('UNKNOWN', 62);
   const verifier = makeVerifier({
-    'brad@stantonhockett.co.uk': 'UNKNOWN',
     'terry@stantonhockett.co.uk': 'UNKNOWN',
     'hello@stantonhockett.co.uk': 'VALID',
   });
@@ -729,42 +848,37 @@ await test('low-confidence Hunter owner + UNKNOWN keeps the ordinary waterfall',
   assert.equal(result.hunter.caution_rule_applies, false);
   // UNKNOWN did NOT stop the waterfall: every candidate was tried in order.
   assert.deepEqual(verifier.calls, [
-    'brad@stantonhockett.co.uk', 'terry@stantonhockett.co.uk', 'hello@stantonhockett.co.uk',
+    'terry@stantonhockett.co.uk', 'hello@stantonhockett.co.uk',
   ]);
   assert.equal(result.selected_contact.email, 'hello@stantonhockett.co.uk');
   assert.equal(result.contact_resolution_status, 'RESOLVED_GENERIC');
 });
 
-await test('the high-confidence threshold is an explicit, overridable boundary', async () => {
-  assert.equal(HUNTER_HIGH_CONFIDENCE_SCORE, 90);
+await test('the Accept All threshold is the explicit fixed score-80 boundary', async () => {
+  assert.equal(HUNTER_HIGH_CONFIDENCE_SCORE, 80);
 
-  const runAtScore = async (score, overrides = {}) => {
+  const runAtScore = async (score) => {
     const { store, valuesApi } = makeFakeSheet();
     const repo = createRepo(valuesApi);
     seedStantonHockett(store);
     return resolveAgencyContact(repo, 'ag_sh', baseOptions({
       verifyEmailImpl: makeVerifier({
-        'brad@stantonhockett.co.uk': 'UNKNOWN',
         'terry@stantonhockett.co.uk': 'UNKNOWN',
         'hello@stantonhockett.co.uk': 'UNKNOWN',
       }),
-      findEmailImpl: makeHunter({ email: 'brad@stantonhockett.co.uk', score }),
-      ...overrides,
+      findEmailImpl: stantonHunter('RISKY', score),
     }));
   };
 
   // Exactly at the threshold qualifies; one below does not.
-  assert.equal((await runAtScore(90)).selected_contact?.email, 'brad@stantonhockett.co.uk');
-  assert.equal((await runAtScore(89)).selected_contact, null);
+  assert.equal((await runAtScore(80)).selected_contact?.email, 'brad@stantonhockett.co.uk');
+  assert.equal((await runAtScore(79)).selected_contact, null);
   // A missing score is never high confidence.
   assert.equal((await runAtScore(null)).selected_contact, null);
-  // ...and the boundary can be retuned per call without a code change.
-  const retuned = await runAtScore(80, { hunterHighConfidenceScore: 75 });
-  assert.equal(retuned.hunter.high_confidence_threshold, 75);
-  assert.equal(retuned.selected_contact.email, 'brad@stantonhockett.co.uk');
+  assert.equal((await runAtScore(80)).hunter.high_confidence_threshold, 80);
 });
 
-await test('a non-owner Hunter hit does not get the caution rule', async () => {
+await test('a high-score senior director Accept All hit may be selected as RISKY', async () => {
   const { store, valuesApi } = makeFakeSheet();
   const repo = createRepo(valuesApi);
   seedAgency(store, {
@@ -778,19 +892,18 @@ await test('a non-owner Hunter hit does not get the caution rule', async () => {
     source_url: 'https://find-and-update.company-information.service.gov.uk/x',
     source_type: 'COMPANIES_HOUSE', confidence: 'HIGH',
   });
-  const verifier = makeVerifier({
-    'dana.reeve@partnerestates.co.uk': 'UNKNOWN',
-    'hello@partnerestates.co.uk': 'VALID',
-  });
+  const verifier = makeVerifier({ 'hello@partnerestates.co.uk': 'VALID' });
   const result = await resolveAgencyContact(repo, 'ag_dir', baseOptions({
     verifyEmailImpl: verifier,
-    findEmailImpl: makeHunter({ email: 'dana.reeve@partnerestates.co.uk', score: 98 }),
+    findEmailImpl: makeHunter({ email: 'dana.reeve@partnerestates.co.uk', score: 98, verification_status: 'RISKY' }),
     researchOwnerImpl: research,
   }));
 
   assert.equal(result.hunter.high_confidence, true, 'the score itself is high');
-  assert.equal(result.hunter.caution_rule_applies, false, 'but a director is not the owner/MD tier');
-  assert.equal(result.selected_contact.email, 'hello@partnerestates.co.uk');
+  assert.equal(result.hunter.caution_rule_applies, true, 'a researched director is clearly senior');
+  assert.equal(result.selected_contact.email, 'dana.reeve@partnerestates.co.uk');
+  assert.equal(result.selected_contact.verification_status, 'RISKY');
+  assert.deepEqual(verifier.calls, []);
 });
 
 await test('a cached inconclusive result selects a high-confidence owner with no new call', async () => {
@@ -860,7 +973,7 @@ await test('a standing CONTACTS selection is reconciled into AGENCIES on rerun',
   assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
   assert.equal(hunter.calls.length, 0);
   assert.equal(verifier.calls.length, 0, 'reconciling a standing decision spends no credit');
-  assert.equal(result.neverbounce.calls_made, 0);
+  assert.equal(result.hunter_verifier.calls_made, 0);
   assert.equal(result.candidates_verified[0].reconciled, true);
 
   // The four AGENCIES columns, exactly as expected.
@@ -1035,7 +1148,7 @@ await test('backlog listing covers probed-unresolved agencies only and resolves 
 
 // ── Serverless Function count must not increase ─────────────────────────────
 await test('Vercel Serverless Function count stays at 12 or fewer', () => {
-  const root = path.resolve(new URL('..', import.meta.url).pathname);
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const found = [];
   (function walk(dir) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -1070,7 +1183,6 @@ await test('POST /api/novus/contacts/resolve is protected and returns the full t
   });
   const sheets = await import('../lib/sheets.mjs');
   sheets.__setRepoForTests(createRepo(valuesApi));
-  const neverbounce = await import('../lib/neverbounce.mjs');
   const hunter = await import('../lib/hunter.mjs');
   const handler = (await import('../api/novus/personalisation.js')).default;
 
@@ -1095,17 +1207,21 @@ await test('POST /api/novus/contacts/resolve is protected and returns the full t
   assert.equal(bad.statusCode, 400);
 
   // Happy path — stub the real providers this handler reaches for.
-  const realVerify = neverbounce.verifyEmail;
+  const realVerify = hunter.verifyEmail;
   const realFind = hunter.findEmail;
   const originalFetch = globalThis.fetch;
-  process.env.NEVERBOUNCE_API_KEY = 'test-key';
-  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ status: 'success', result: 'valid' }) });
+  process.env.HUNTER_API_KEY = 'test-key';
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ data: { status: 'valid', score: 100 } }),
+  });
 
   const ok = mockRes();
   await handler({ method: 'POST', query: { novus_operation: 'resolve-contact' }, body: { agency_id: 'ag_api' }, headers: { authorization: authHeader } }, ok);
   assert.equal(ok.statusCode, 200);
   for (const key of ['agency', 'owner_md', 'candidates_considered', 'candidates_verified',
-    'neverbounce', 'hunter', 'selected_contact', 'contact_resolution_status']) {
+    'hunter_verifier', 'hunter', 'selected_contact', 'contact_resolution_status']) {
     assert.ok(key in ok.body, `response must include ${key}`);
   }
   assert.equal(ok.body.selected_contact.email, 'nina.api@apiestates.co.uk');
@@ -1124,7 +1240,7 @@ await test('POST /api/novus/contacts/resolve is protected and returns the full t
 
   globalThis.fetch = originalFetch;
   sheets.__setRepoForTests(null);
-  assert.equal(neverbounce.verifyEmail, realVerify);
+  assert.equal(hunter.verifyEmail, realVerify);
   assert.equal(hunter.findEmail, realFind);
 });
 

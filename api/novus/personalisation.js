@@ -22,8 +22,8 @@ import { NeverBounceError, verifyEmail } from '../../lib/neverbounce.mjs';
 import { resolveAgencyContact, listResolutionBacklog } from '../../lib/contact-resolution.mjs';
 import { requireAuth } from './_auth.mjs';
 
-// Contact resolution can run owner web research, a Hunter lookup and several
-// NeverBounce checks in one invocation; 20s was sized for the read-only
+// Contact resolution can run owner web research, a Hunter Finder lookup and
+// several Hunter Verifier checks in one invocation; 20s was sized for the read-only
 // Personalisation GET alone. This is a ceiling, not a reservation — the GET
 // path is unaffected.
 export const maxDuration = 60;
