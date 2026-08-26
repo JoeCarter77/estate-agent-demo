@@ -58,6 +58,7 @@ import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import { extractPropertyImageUrl, fetchPropertyImageUrl, isUsablePropertyImage } from '../lib/property-image.mjs';
 import {
   journeySupport, SUPPORTED_HERO_JOURNEYS, commercialPriority, heroTitle, HERO_TITLES,
+  executionDetail,
 } from '../lib/demo-journeys.mjs';
 
 // ── live-shaped headers ──────────────────────────────────────────────────────
@@ -593,30 +594,39 @@ async function run() {
     // the commercial context, chooses, and then executes - not that it sends
     // messages. A second bullet per stage reads as a feature list and pulls the
     // section back towards "chatbot".
-    assert.deepStrictEqual(detected.map((d) => d.label), ['Understands the full situation']);
+    assert.deepStrictEqual(detected.map((d) => d.label), ['Understands the full enquiry']);
     assert.deepStrictEqual(decisions.map((d) => d.label), ['Knows the right next move']);
     assert.deepStrictEqual(actions.map((a) => a.label), ['Makes it happen']);
     ok('CONTEXT / INTELLIGENCE / EXECUTION is one claim per stage, not a feature list');
 
-    // SCANNABLE, NOT EXPLANATORY. One short line per stage - the section has to
-    // land "understands context -> decides -> acts" at a glance, and every extra
-    // clause pulls it back towards a description of a chatbot.
+    // CONTEXT AND INTELLIGENCE DESCRIBE A CAPABILITY, so they are the same on
+    // every demo and say nothing about this probe.
     assert.strictEqual(
       detected[0].detail,
-      'Who they are, what they want, the property, their position and what still needs to be established.',
+      "Who they are, why they're enquiring, where they're selling, their current position, and what more needs establishing.",
     );
     assert.strictEqual(
       decisions[0].detail,
-      'Decides what should happen next, what can be handled automatically and what needs the team.',
+      'Uses the full context of the enquiry to decide what should happen next - what needs asking,'
+      + ' what opportunity should be progressed, and whether NOVUS should act or bring your team in.',
     );
+    // EXECUTION IS THE ONE STAGE THAT ADAPTS, and every clause in it is gated
+    // on this probe's own ordinals. This probe answered in 23 minutes, offered
+    // a viewing slot and followed up three times — so the sentence CREDITS the
+    // speed rather than promising to be faster, adds no booking clause because
+    // the buyer already reached a slot, and adds no follow-up clause because
+    // the conversation did not stall. The only gap it names is the recognised
+    // seller position that never reached a valuation, which is exactly what
+    // the evidence above establishes.
     assert.strictEqual(
       actions[0].detail,
-      // Authored with an em dash; normaliseDashes() renders it in house style.
-      'Takes the next action - qualifying, following up, booking, updating, routing and escalating as needed.',
+      'Keeps the speed your team already showed, picks up the seller position your team identified,'
+      + ' and keeps progressing it towards a valuation.',
     );
+    assert.ok(!/instantly/.test(actions[0].detail), 'a fast agency is never told NOVUS would respond faster');
     for (const stage of [detected, decisions, actions]) {
       assert.strictEqual(stage.length, 1, 'each stage is exactly one line');
-      assert.ok(stage[0].detail.length <= 120, `beat 3 stays short: "${stage[0].detail}"`);
+      assert.ok(stage[0].detail.length <= 240, `beat 3 stays one sentence: "${stage[0].detail}"`);
     }
     // EXECUTION is action AND routing in one line, so it carries no owner chip:
     // choosing between the two is the capability being described.
@@ -1970,6 +1980,147 @@ async function run() {
     ok('a missing or invalid hero_journey fails safely instead of silently showing the wrong journey');
   }
 
+
+  // ══ Part Q2 — EXECUTION adapts to the probe; nothing else in act 3 does ═══
+  //
+  // "What NOVUS would have done differently" is only meaningful against what
+  // actually happened, so the EXECUTION line is composed clause by clause from
+  // this probe's own ordinals. The rules it has to keep are commercial, not
+  // cosmetic: never invent a weakness, never contradict the evidence, and
+  // never criticise something the agency genuinely did well.
+  console.log('\nPart Q2 — the EXECUTION line is built from the evidence, clause by clause');
+
+  {
+    const ctx = ({
+      sellerDeclared = true, sellerRecognition = 'none', viewingProgression = 'none',
+      responseHours = '', contactAttempts = '1', followUps = '0', humanContact = 'yes',
+    }) => ({
+      sellerDeclared,
+      intelligence: {
+        human_contact: humanContact, response_hours: responseHours,
+        contact_attempts: contactAttempts, follow_ups: followUps,
+        viewing_progression: viewingProgression,
+        seller_recognition: sellerDeclared ? sellerRecognition : '',
+      },
+    });
+
+    // A SLOW REPLY AND AN UNWORKED VENDOR - the brief's own worked example.
+    assert.strictEqual(
+      executionDetail(ctx({ responseHours: '31.5', viewingProgression: 'mentioned' })),
+      'Responds instantly, asks the right questions across both the buyer and seller opportunity,'
+      + ' progresses the seller towards a valuation, and works towards booking the appropriate next'
+      + ' step directly into your calendar.',
+    );
+    ok('a slow reply with an unworked vendor produces: respond instantly, work both sides, progress the seller, book the next step');
+
+    // NOTHING CAME BACK AT ALL: the same lead clause, because the enquiry did
+    // wait — and no claim about a response that never happened.
+    assert.ok(executionDetail(ctx({ humanContact: 'none', contactAttempts: '0' }))
+      .startsWith('Responds instantly,'));
+    ok('a probe with no human contact still opens on responding instantly, and asserts nothing about a reply that never came');
+
+    // A FAST FIRST RESPONSE IS A STRENGTH, and is credited rather than
+    // overwritten. This is the rule that stops the section criticising
+    // something the agency did well.
+    for (const hours of ['0.05', '0.38', '0.9']) {
+      const line = executionDetail(ctx({ responseHours: hours }));
+      assert.ok(line.startsWith('Keeps the speed your team already showed'), `fast reply credited: ${line}`);
+      assert.ok(!/instantly/.test(line), `a fast agency is never promised a faster reply: ${line}`);
+    }
+    ok('a fast first response is preserved as a strength, never rewritten as a delay');
+
+    // SELLER RECOGNISED BUT NOT PROGRESSED reads as continuation, not as a
+    // miss: the team DID identify it, and the sentence says so before it says
+    // what happens next.
+    for (const recognition of ['asked_position', 'acknowledged']) {
+      const line = executionDetail(ctx({ responseHours: '9', sellerRecognition: recognition }));
+      assert.ok(line.includes('picks up the seller position your team identified'), line);
+      assert.ok(line.includes('keeps progressing it towards a valuation'), line);
+      assert.ok(!line.includes('asks the right questions across both'), line);
+    }
+    ok('a seller position the team DID raise is picked up and continued, never described as unseen');
+
+    // A VENDOR THAT REACHED A VALUATION IS NOT A GAP, and neither is an
+    // enquiry with no vendor in it: no seller clause is invented for either.
+    for (const c of [
+      ctx({ responseHours: '9', sellerRecognition: 'valuation_offered' }),
+      ctx({ responseHours: '9', sellerRecognition: 'valuation_booked' }),
+      ctx({ responseHours: '9', sellerDeclared: false }),
+    ]) {
+      const line = executionDetail(c);
+      assert.ok(!/seller/i.test(line), `no seller clause where there is no seller gap: ${line}`);
+    }
+    ok('no seller clause is invented where the vendor was progressed, or where none was declared');
+
+    // A BOOKED VIEWING IS NOT AN UNMADE BOOKING. Where the buyer already has a
+    // slot, the sentence talks about persistence instead - and where the
+    // conversation also kept going, it claims neither.
+    const booked = executionDetail(ctx({ responseHours: '9', viewingProgression: 'booked', sellerRecognition: 'valuation_booked', contactAttempts: '3', followUps: '2' }));
+    assert.ok(!/booking/.test(booked), booked);
+    assert.ok(!/following up/.test(booked), booked);
+    const slotThenSilence = executionDetail(ctx({ responseHours: '0.2', viewingProgression: 'slot_offered', sellerDeclared: false, contactAttempts: '1', followUps: '0' }));
+    assert.strictEqual(
+      slotThenSilence,
+      "Keeps the speed your team already showed, and keeps following up so the opportunity doesn't stop moving.",
+    );
+    ok('a buyer who already has a slot is never told NOVUS would book one; a stalled one is followed up instead');
+
+    // AN AGENCY THAT DID EVERYTHING gets a forward-looking sentence, not a
+    // manufactured shortcoming.
+    const clean = executionDetail(ctx({ responseHours: '0.2', viewingProgression: 'booked', sellerRecognition: 'valuation_booked', contactAttempts: '3', followUps: '2' }));
+    assert.strictEqual(
+      clean,
+      'Keeps the speed your team already showed, and carries the opportunity through to its next step'
+      + ' and keeps your team in the loop.',
+    );
+    ok('a probe with nothing left unprogressed produces no criticism at all');
+
+    // ALWAYS ONE SENTENCE, always readable in passing.
+    for (const c of [
+      ctx({ responseHours: '31.5' }),
+      ctx({ responseHours: '0.1', sellerRecognition: 'acknowledged' }),
+      ctx({ humanContact: 'none', contactAttempts: '0' }),
+      ctx({ responseHours: '9', viewingProgression: 'booked' }),
+    ]) {
+      const line = executionDetail(c);
+      assert.ok(/^[A-Z]/.test(line) && line.endsWith('.'), `one sentence: ${line}`);
+      assert.strictEqual(line.split('. ').length, 1, `one sentence only: ${line}`);
+      assert.ok(line.length <= 240, `stays concise: ${line}`);
+      assert.ok(!/[\u2014\u2013]/.test(line), `house style keeps the small hyphen: ${line}`);
+    }
+    ok('every EXECUTION line is one concise sentence in house style');
+  }
+
+  {
+    // CONTEXT AND INTELLIGENCE DO NOT MOVE. The capability is not per-probe,
+    // and a section that reworded itself per agency would read as generated.
+    const shapes = [
+      { heroJourney: 'weak_seller_qualification', responseHours: '31.5', sellerRecognition: 'none' },
+      { heroJourney: 'fast_response_stalled_follow_up', responseHours: '0.1', viewingProgression: 'booked' },
+      { heroJourney: 'complete_miss', humanContact: 'none', contactAttempts: '0' },
+      { heroJourney: 'slow_response_gap', responseHours: '40', sellerRecognition: 'acknowledged' },
+    ].map((shape) => journeyRow(shape));
+    for (const field of ['novus_detected_json', 'novus_decisions_json']) {
+      assert.strictEqual(new Set(shapes.map((r) => r[field])).size, 1, `${field} is identical on every demo`);
+    }
+    assert.strictEqual(new Set(shapes.map((r) => r.novus_actions_json)).size, shapes.length,
+      'EXECUTION differs on every one of these four probes');
+    ok('CONTEXT and INTELLIGENCE are fixed across demos; only EXECUTION moves with the evidence');
+
+    // AND IT IS DERIVED ON THE WAY OUT TOO, so a row compiled before this
+    // section existed in its current form still opens act 3 on its own
+    // evidence rather than on whatever wording was frozen that day.
+    const stale = {
+      ...shapes[0],
+      novus_detected_json: '[{"label":"Old copy","detail":"from an earlier build."}]',
+      novus_decisions_json: '[{"label":"Old copy","detail":"from an earlier build."}]',
+      novus_actions_json: '[{"label":"Old copy","detail":"from an earlier build."}]',
+    };
+    const served = toRenderReady(stale);
+    assert.strictEqual(served.novus_detected[0].label, 'Understands the full enquiry');
+    assert.strictEqual(served.novus_actions[0].detail, JSON.parse(shapes[0].novus_actions_json)[0].detail);
+    ok('a stale snapshot still serves the current three stages, derived from the ordinals the row carries');
+  }
 
   // ══ Part R — the hero is the strongest FINDING, not the journey name ══════
   //
