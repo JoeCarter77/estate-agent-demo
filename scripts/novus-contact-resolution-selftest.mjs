@@ -28,6 +28,8 @@ import {
   nameMatchesLocalPart,
   verdictForCandidate,
   resolveHeaderName,
+  verifierProofNote,
+  MAX_HUNTER_VERIFIER_CALLS_PER_AGENCY,
   HUNTER_HIGH_CONFIDENCE_SCORE,
   HARD_FAIL_STATUSES,
   INCONCLUSIVE_STATUSES,
@@ -297,14 +299,18 @@ await test('known owner with only a generic email: Hunter finds the direct addre
   assert.deepEqual(hunter.calls[0], { name: 'Marie Bell', domain: 'bellestates.co.uk' });
   assert.equal(result.hunter.used, true);
   assert.equal(result.hunter.email, 'marie.bell@bellestates.co.uk');
-  // Hunter Finder already returned VALID; do not verify the same address again.
-  assert.deepEqual(verifier.calls, []);
-  assert.equal(result.hunter_verifier.finder_result_reuses, 1);
+  // Finder found the address; the EMAIL VERIFIER is what decides it, and it is
+  // called on this best candidate explicitly before selection.
+  assert.deepEqual(verifier.calls, ['marie.bell@bellestates.co.uk']);
+  assert.equal(result.hunter_verifier.hunter_verifier_calls_made, 1);
+  assert.deepEqual(result.hunter_verifier.emails_verified, ['marie.bell@bellestates.co.uk']);
+  assert.equal(result.candidates_verified[0].verification_provider, 'HUNTER_VERIFIER');
+  assert.equal(result.candidates_verified[0].verifier_proof, true);
   assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
   assert.equal(result.selected_contact.email, 'marie.bell@bellestates.co.uk');
   assert.equal(result.selected_contact.email_source, 'HUNTER');
-  // The Hunter result outranks the generic inbox, so the inbox is never checked.
-  assert.deepEqual(verifier.calls, []);
+  // The winner outranks the generic inbox, so the inbox is never checked.
+  assert.ok(result.hunter_verifier.not_verified_after_winner.includes('info@bellestates.co.uk'));
 });
 
 await test('Hunter is skipped when we already hold a direct address for the owner', async () => {
@@ -431,8 +437,8 @@ await test('all candidates failing gives NO_VALID_EMAIL and no selected contact'
   assert.ok(contacts.every((c) => c.is_selected_for_outreach === 'FALSE'));
 });
 
-// ── Flow 7: cached verification avoids a repeat Hunter call ────────────────
-await test('a recent stored verification is reused instead of calling Hunter', async () => {
+// ── Flow 7: a PROVEN stored verification avoids a repeat Hunter call ───────
+await test('a recent stored verifier result is reused instead of calling Hunter', async () => {
   const { store, valuesApi } = makeFakeSheet();
   const repo = createRepo(valuesApi);
   seedAgency(store, {
@@ -443,6 +449,8 @@ await test('a recent stored verification is reused instead of calling Hunter', a
     contact_id: 'cnt_seed', agency_id: 'ag_7', email: 'ella.marsh@marshhomes.co.uk',
     contact_name: 'Ella Marsh', email_source: 'AGENCIES.primary_contact_email', contact_type: 'DIRECT',
     verification_status: 'VALID', verified_at: '2026-08-20T09:00:00.000Z',
+    // Proof that the Email Verifier itself produced that VALID.
+    notes: verifierProofNote('VALID', '2026-08-20T09:00:00.000Z'),
     is_selected_for_outreach: 'FALSE', created_at: '2026-08-20T09:00:00.000Z',
   });
   const verifier = makeVerifier({ 'ella.marsh@marshhomes.co.uk': 'VALID' });
@@ -452,14 +460,73 @@ await test('a recent stored verification is reused instead of calling Hunter', a
   assert.equal(result.hunter_verifier.calls_made, 0);
   assert.equal(result.hunter_verifier.cached_reuses, 1);
   assert.equal(result.candidates_verified[0].cached, true);
+  assert.equal(result.candidates_verified[0].verifier_proof, true);
   assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
 
   // ...and a stale result is NOT reused.
   const stale = buildVerificationCache(
-    [{ obj: { email: 'old@x.co.uk', verification_status: 'VALID', verified_at: '2020-01-01T00:00:00.000Z' } }],
+    [{ obj: { email: 'old@x.co.uk', verification_status: 'VALID',
+      verified_at: '2020-01-01T00:00:00.000Z', notes: verifierProofNote('VALID', '2020-01-01T00:00:00.000Z') } }],
     { now: Date.parse(clock()) },
   );
   assert.equal(stale.size, 0);
+
+  // ...nor is a recent result with no proof that the verifier produced it.
+  const unproven = buildVerificationCache(
+    [{ obj: { email: 'old@x.co.uk', verification_status: 'VALID', verified_at: '2026-08-20T09:00:00.000Z' } }],
+    { now: Date.parse(clock()) },
+  );
+  assert.equal(unproven.size, 0, 'an unproven stored status is not a verification');
+
+  // ...and an explicit provider column counts as proof if the workbook has one.
+  const byProvider = buildVerificationCache(
+    [{ obj: { email: 'old@x.co.uk', verification_status: 'VALID',
+      verified_at: '2026-08-20T09:00:00.000Z', verification_provider: 'HUNTER_VERIFIER' } }],
+    { now: Date.parse(clock()) },
+  );
+  assert.equal(byProvider.size, 1);
+});
+
+// ── Flow 7b: an UNPROVEN stored status is re-verified ──────────────────────
+//
+// THE REPORTED BUG: a CONTACTS row carrying VALID/RISKY/UNKNOWN that no Hunter
+// Email Verifier call ever produced. There is no proof, so the next run checks
+// it for real rather than inheriting the status.
+await test('a stored status with no verifier proof is re-verified on the next run', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_7b', agency_name: 'Unproven Homes', domain: 'unproven.co.uk', probe_sent: 'YES',
+    owner_md: 'Ida Unproven', primary_contact_email: 'ida.unproven@unproven.co.uk',
+  });
+  seedContact(store, {
+    contact_id: 'cnt_unproven', agency_id: 'ag_7b', email: 'ida.unproven@unproven.co.uk',
+    contact_name: 'Ida Unproven', email_source: 'HUNTER', contact_type: 'DIRECT',
+    // Written by an earlier run from Finder metadata — never verifier-checked.
+    verification_status: 'VALID', verified_at: '2026-08-20T09:00:00.000Z',
+    notes: 'Hunter email finder for Ida Unproven @ unproven.co.uk (score 94)',
+    is_selected_for_outreach: 'FALSE', created_at: '2026-08-20T09:00:00.000Z',
+  });
+  const verifier = makeVerifier({ 'ida.unproven@unproven.co.uk': 'INVALID' });
+  const result = await resolveAgencyContact(repo, 'ag_7b', baseOptions({
+    verifyEmailImpl: verifier, hunterConfigured: () => false,
+  }));
+
+  assert.deepEqual(verifier.calls, ['ida.unproven@unproven.co.uk']);
+  assert.equal(result.hunter_verifier.hunter_verifier_calls_made, 1);
+  // The real verdict replaces the unproven one, and the row now carries proof.
+  assert.equal(result.selected_contact, null);
+  const row = rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER)
+    .find((c) => c.email === 'ida.unproven@unproven.co.uk');
+  assert.equal(row.verification_status, 'INVALID');
+  assert.match(row.notes, /\[hunter_verifier:INVALID@/);
+
+  // A second run reuses that proven result instead of paying again.
+  const verifier2 = makeVerifier({ 'ida.unproven@unproven.co.uk': 'INVALID' });
+  await resolveAgencyContact(repo, 'ag_7b', baseOptions({
+    verifyEmailImpl: verifier2, hunterConfigured: () => false,
+  }));
+  assert.equal(verifier2.calls.length, 0, 'a proven result is reusable');
 });
 
 // ── Flow 8: rerun is idempotent ─────────────────────────────────────────────
@@ -757,11 +824,12 @@ const stantonHunter = (verificationStatus = 'VALID', score = 95) => makeHunter({
 });
 
 for (const [status, expectedCaution] of [['VALID', false], ['RISKY', true]]) {
-  await test(`high-confidence owner + Finder ${status} -> selected with no verifier call`, async () => {
+  await test(`high-confidence owner + Verifier ${status} -> selected after one verifier call`, async () => {
     const { store, valuesApi } = makeFakeSheet();
     const repo = createRepo(valuesApi);
     seedStantonHockett(store);
-    const verifier = makeVerifier({});
+    // The Finder result is only a candidate; the VERIFIER decides it.
+    const verifier = makeVerifier({ 'brad@stantonhockett.co.uk': status });
     const hunter = stantonHunter(status);
     const result = await resolveAgencyContact(repo, 'ag_sh', baseOptions({
       verifyEmailImpl: verifier, findEmailImpl: hunter,
@@ -769,9 +837,11 @@ for (const [status, expectedCaution] of [['VALID', false], ['RISKY', true]]) {
 
     assert.equal(result.hunter.high_confidence, true);
     assert.equal(result.hunter.caution_rule_applies, true);
-    // Finder's embedded verdict is reused; no second verification credit.
-    assert.deepEqual(verifier.calls, []);
-    assert.equal(result.hunter_verifier.calls_made, 0);
+    // The best candidate is explicitly verified before it can be selected.
+    assert.deepEqual(verifier.calls, ['brad@stantonhockett.co.uk']);
+    assert.equal(result.hunter_verifier.hunter_verifier_calls_made, 1);
+    assert.deepEqual(result.hunter_verifier.emails_verified, ['brad@stantonhockett.co.uk']);
+    assert.equal(result.candidates_verified[0].verification_provider, 'HUNTER_VERIFIER');
     // The weaker contacts on the same server are never checked.
     assert.ok(result.hunter_verifier.not_verified_after_winner.includes('terry@stantonhockett.co.uk'));
     assert.ok(result.hunter_verifier.not_verified_after_winner.includes('hello@stantonhockett.co.uk'));
@@ -807,14 +877,18 @@ await test('high-score Hunter UNKNOWN is not selected and the waterfall continue
   const { store, valuesApi } = makeFakeSheet();
   const repo = createRepo(valuesApi);
   seedStantonHockett(store);
-  const verifier = makeVerifier({ 'terry@stantonhockett.co.uk': 'VALID' });
+  const verifier = makeVerifier({
+    'brad@stantonhockett.co.uk': 'UNKNOWN',
+    'terry@stantonhockett.co.uk': 'VALID',
+  });
   const result = await resolveAgencyContact(repo, 'ag_sh', baseOptions({
     verifyEmailImpl: verifier,
     findEmailImpl: stantonHunter('UNKNOWN', 95),
   }));
   assert.equal(result.candidates_verified[0].verification_status, 'UNKNOWN');
-  assert.equal(result.candidates_verified[0].verification_provider, 'HUNTER_FINDER');
-  assert.deepEqual(verifier.calls, ['terry@stantonhockett.co.uk']);
+  assert.equal(result.candidates_verified[0].verification_provider, 'HUNTER_VERIFIER');
+  // #2 is only verified because #1 failed.
+  assert.deepEqual(verifier.calls, ['brad@stantonhockett.co.uk', 'terry@stantonhockett.co.uk']);
   assert.equal(result.selected_contact.email, 'terry@stantonhockett.co.uk');
 });
 
@@ -832,7 +906,7 @@ for (const status of ['INVALID', 'DISPOSABLE']) {
     }));
 
     // A hard fail is never softened by confidence.
-    assert.deepEqual(verifier.calls, ['terry@stantonhockett.co.uk']);
+    assert.deepEqual(verifier.calls, ['brad@stantonhockett.co.uk', 'terry@stantonhockett.co.uk']);
     assert.equal(result.selected_contact.email, 'terry@stantonhockett.co.uk');
     assert.equal(result.selected_contact.verification_status, 'VALID');
     assert.equal(result.selected_contact.selected_on_caution, false);
@@ -850,6 +924,7 @@ await test('low-confidence Hunter owner + UNKNOWN keeps the ordinary waterfall',
   // Below the threshold: a pattern guess, not an observed address.
   const hunter = stantonHunter('UNKNOWN', 62);
   const verifier = makeVerifier({
+    'brad@stantonhockett.co.uk': 'UNKNOWN',
     'terry@stantonhockett.co.uk': 'UNKNOWN',
     'hello@stantonhockett.co.uk': 'VALID',
   });
@@ -859,10 +934,12 @@ await test('low-confidence Hunter owner + UNKNOWN keeps the ordinary waterfall',
 
   assert.equal(result.hunter.high_confidence, false);
   assert.equal(result.hunter.caution_rule_applies, false);
-  // UNKNOWN did NOT stop the waterfall: every candidate was tried in order.
+  // UNKNOWN did NOT stop the waterfall: every candidate was tried in order,
+  // and exactly at the three-call cap.
   assert.deepEqual(verifier.calls, [
-    'terry@stantonhockett.co.uk', 'hello@stantonhockett.co.uk',
+    'brad@stantonhockett.co.uk', 'terry@stantonhockett.co.uk', 'hello@stantonhockett.co.uk',
   ]);
+  assert.equal(result.hunter_verifier.hunter_verifier_calls_made, 3);
   assert.equal(result.selected_contact.email, 'hello@stantonhockett.co.uk');
   assert.equal(result.contact_resolution_status, 'RESOLVED_GENERIC');
 });
@@ -876,6 +953,9 @@ await test('the Accept All threshold is the explicit fixed score-80 boundary', a
     seedStantonHockett(store);
     return resolveAgencyContact(repo, 'ag_sh', baseOptions({
       verifyEmailImpl: makeVerifier({
+        // The verifier says accept-all; Finder's score is what decides whether
+        // that accept-all is selectable for this senior direct contact.
+        'brad@stantonhockett.co.uk': 'RISKY',
         'terry@stantonhockett.co.uk': 'UNKNOWN',
         'hello@stantonhockett.co.uk': 'UNKNOWN',
       }),
@@ -905,7 +985,10 @@ await test('a high-score senior director Accept All hit may be selected as RISKY
     source_url: 'https://find-and-update.company-information.service.gov.uk/x',
     source_type: 'COMPANIES_HOUSE', confidence: 'HIGH',
   });
-  const verifier = makeVerifier({ 'hello@partnerestates.co.uk': 'VALID' });
+  const verifier = makeVerifier({
+    'dana.reeve@partnerestates.co.uk': 'RISKY',
+    'hello@partnerestates.co.uk': 'VALID',
+  });
   const result = await resolveAgencyContact(repo, 'ag_dir', baseOptions({
     verifyEmailImpl: verifier,
     findEmailImpl: makeHunter({ email: 'dana.reeve@partnerestates.co.uk', score: 98, verification_status: 'RISKY' }),
@@ -916,7 +999,8 @@ await test('a high-score senior director Accept All hit may be selected as RISKY
   assert.equal(result.hunter.caution_rule_applies, true, 'a researched director is clearly senior');
   assert.equal(result.selected_contact.email, 'dana.reeve@partnerestates.co.uk');
   assert.equal(result.selected_contact.verification_status, 'RISKY');
-  assert.deepEqual(verifier.calls, []);
+  // Verified explicitly before selection, and the generic inbox below it is not.
+  assert.deepEqual(verifier.calls, ['dana.reeve@partnerestates.co.uk']);
 });
 
 await test('a cached inconclusive result selects a high-confidence owner with no new call', async () => {
@@ -927,6 +1011,7 @@ await test('a cached inconclusive result selects a high-confidence owner with no
     contact_id: 'cnt_cached', agency_id: 'ag_sh', email: 'brad@stantonhockett.co.uk',
     contact_name: 'Bradley Stanton', email_source: 'HUNTER', contact_type: 'DIRECT',
     verification_status: 'RISKY', verified_at: '2026-08-20T09:00:00.000Z',
+    notes: verifierProofNote('RISKY', '2026-08-20T09:00:00.000Z'),
     is_selected_for_outreach: 'FALSE', created_at: '2026-08-20T09:00:00.000Z',
   });
   const verifier = makeVerifier({});
@@ -965,6 +1050,9 @@ await test('a standing CONTACTS selection is reconciled into AGENCIES on rerun',
     contact_name: 'Bradley Stanton', contact_role: 'Managing Director',
     email: 'brad@stantonhockett.co.uk', email_source: 'HUNTER', contact_type: 'DIRECT',
     verification_status: 'UNKNOWN', verified_at: '2026-08-25T09:00:00.000Z',
+    // A genuine verifier result, so the standing decision is reconciled, not
+    // re-litigated.
+    notes: verifierProofNote('UNKNOWN', '2026-08-25T09:00:00.000Z'),
     is_selected_for_outreach: 'TRUE', created_at: '2026-08-25T09:00:00.000Z',
   });
 
@@ -1018,6 +1106,7 @@ await test('reconciling twice more stays stable and adds no rows or credits', as
     contact_id: 'cnt_rr', agency_id: 'ag_rr', contact_name: 'Bradley Stanton',
     contact_role: 'Managing Director', email: 'brad@rerun.co.uk', email_source: 'HUNTER',
     contact_type: 'DIRECT', verification_status: 'RISKY', verified_at: '2026-08-25T09:00:00.000Z',
+    notes: verifierProofNote('RISKY', '2026-08-25T09:00:00.000Z'),
     is_selected_for_outreach: 'TRUE', created_at: '2026-08-25T09:00:00.000Z',
   });
   const verifier = makeVerifier({});
@@ -1046,8 +1135,10 @@ await test('a stale standing selection is reconciled without re-verifying', asyn
     contact_id: 'cnt_stale', agency_id: 'ag_stale', contact_name: 'Bradley Stanton',
     contact_role: 'Managing Director', email: 'brad@stale.co.uk', email_source: 'HUNTER',
     contact_type: 'DIRECT', verification_status: 'UNKNOWN',
-    // Well outside the 30-day verification cache TTL.
+    // Well outside the 30-day verification cache TTL, but a genuine verifier
+    // result all the same.
     verified_at: '2025-01-01T00:00:00.000Z',
+    notes: verifierProofNote('UNKNOWN', '2025-01-01T00:00:00.000Z'),
     is_selected_for_outreach: 'TRUE', created_at: '2025-01-01T00:00:00.000Z',
   });
   const verifier = makeVerifier({});
@@ -1106,6 +1197,180 @@ await test('a standing selection never overrides a hard fail or a better contact
   const upGeneric = rowsAsObjects(upgrade.store, 'CONTACTS', CONTACTS_HEADER)
     .find((c) => c.email === 'hello@upgrade.co.uk');
   assert.equal(upGeneric.is_selected_for_outreach, 'FALSE');
+});
+
+// ── Hunter Email Verifier discipline ───────────────────────────────────────
+//
+// The reported bug: contacts getting VALID/RISKY/UNKNOWN with no real Email
+// Verifier call behind them. These four tests pin the fixed contract.
+
+await test('the best candidate is verified explicitly before it can be selected', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_seq1', agency_name: 'Sequence Estates', domain: 'sequence.co.uk', probe_sent: 'YES',
+    owner_md: 'Owen Sequence', primary_contact_email: 'owen.sequence@sequence.co.uk',
+    other_known_emails: 'second@sequence.co.uk, info@sequence.co.uk',
+  });
+  const verifier = makeVerifier({ 'owen.sequence@sequence.co.uk': 'VALID' });
+  const result = await resolveAgencyContact(repo, 'ag_seq1', baseOptions({ verifyEmailImpl: verifier }));
+
+  // VALID on #1 -> select and stop. #2 and #3 are never verified.
+  assert.deepEqual(verifier.calls, ['owen.sequence@sequence.co.uk']);
+  assert.equal(result.hunter_verifier.hunter_verifier_calls_made, 1);
+  assert.deepEqual(result.hunter_verifier.emails_verified, ['owen.sequence@sequence.co.uk']);
+  assert.deepEqual(result.hunter_verifier.verifier_results, [{
+    email: 'owen.sequence@sequence.co.uk',
+    verification_status: 'VALID',
+    verification_score: null,
+    provider: 'HUNTER_VERIFIER',
+    hunter_verifier_called: true,
+    verifier_proof: true,
+    error: undefined,
+  }]);
+  assert.equal(result.selected_contact.email, 'owen.sequence@sequence.co.uk');
+  assert.equal(result.selected_contact.verification_status, 'VALID');
+});
+
+await test('candidate #2 is verified only after #1 fails, #3 only after #2 fails', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_seq2', agency_name: 'Ladder Estates', domain: 'ladder.co.uk', probe_sent: 'YES',
+    owner_md: 'Ola Ladder', primary_contact_email: 'ola.ladder@ladder.co.uk',
+    other_known_emails: 'second@ladder.co.uk, info@ladder.co.uk',
+  });
+  const verifier = makeVerifier({
+    'ola.ladder@ladder.co.uk': 'INVALID',      // #1 rejected
+    'second@ladder.co.uk': 'DISPOSABLE',       // #2 rejected
+    'info@ladder.co.uk': 'VALID',              // #3 wins
+  });
+  const result = await resolveAgencyContact(repo, 'ag_seq2', baseOptions({ verifyEmailImpl: verifier }));
+
+  assert.deepEqual(verifier.calls, [
+    'ola.ladder@ladder.co.uk', 'second@ladder.co.uk', 'info@ladder.co.uk',
+  ]);
+  assert.equal(result.hunter_verifier.hunter_verifier_calls_made, 3);
+  assert.equal(result.hunter_verifier.cap_reached, true);
+  assert.equal(result.selected_contact.email, 'info@ladder.co.uk');
+});
+
+await test('no more than three Hunter verifier calls are ever spent on one agency', async () => {
+  assert.equal(MAX_HUNTER_VERIFIER_CALLS_PER_AGENCY, 3);
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_cap', agency_name: 'Cap Estates', domain: 'cap.co.uk', probe_sent: 'YES',
+    owner_md: 'Cara Cap', primary_contact_email: 'cara.cap@cap.co.uk',
+    other_known_emails: 'a@cap.co.uk, b@cap.co.uk, c@cap.co.uk, d@cap.co.uk, info@cap.co.uk',
+  });
+  // Every address fails, so the waterfall would run to the end if uncapped.
+  const verifier = makeVerifier({}, { defaultStatus: 'INVALID' });
+  const result = await resolveAgencyContact(repo, 'ag_cap', baseOptions({ verifyEmailImpl: verifier }));
+
+  assert.equal(verifier.calls.length, 3, 'the hard cap holds');
+  assert.equal(result.hunter_verifier.hunter_verifier_calls_made, 3);
+  assert.equal(result.hunter_verifier.max_calls_per_agency, 3);
+  assert.equal(result.hunter_verifier.cap_reached, true);
+  assert.ok(result.hunter_verifier.not_verified_cap_reached.length > 0);
+  assert.equal(result.selected_contact, null);
+
+  // Candidates past the cap are recorded as unverified, and their stored rows
+  // carry neither an invented status nor verifier proof.
+  const capped = result.candidates_verified.filter((v) => v.verification_provider === 'NOT_VERIFIED_CAP_REACHED');
+  assert.ok(capped.length > 0);
+  assert.ok(capped.every((v) => v.hunter_verifier_called === false && v.verifier_proof === false));
+  const cappedRow = rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER)
+    .find((c) => c.email === capped[0].email);
+  assert.equal(cappedRow.verification_status, '', 'nothing was checked, so nothing is claimed');
+  assert.ok(!/hunter_verifier:/.test(cappedRow.notes));
+});
+
+await test('Hunter Finder metadata is never treated as verification', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_finder', agency_name: 'Finder Estates', domain: 'finder.co.uk', probe_sent: 'YES',
+    owner_md: 'Fay Finder', primary_contact_email: 'info@finder.co.uk',
+  });
+  // Finder says VALID; the verifier says INVALID. The verifier decides.
+  const verifier = makeVerifier({
+    'fay.finder@finder.co.uk': 'INVALID',
+    'info@finder.co.uk': 'VALID',
+  });
+  const result = await resolveAgencyContact(repo, 'ag_finder', baseOptions({
+    verifyEmailImpl: verifier,
+    findEmailImpl: makeHunter({ email: 'fay.finder@finder.co.uk', score: 99, verification_status: 'VALID' }),
+  }));
+
+  assert.deepEqual(verifier.calls, ['fay.finder@finder.co.uk', 'info@finder.co.uk']);
+  assert.equal(result.candidates_verified[0].verification_provider, 'HUNTER_VERIFIER');
+  assert.equal(result.candidates_verified[0].verification_status, 'INVALID');
+  assert.equal(result.selected_contact.email, 'info@finder.co.uk');
+  // The Finder hit is stored with the verifier's verdict, plus proof of it.
+  const finderRow = rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER)
+    .find((c) => c.email === 'fay.finder@finder.co.uk');
+  assert.equal(finderRow.verification_status, 'INVALID');
+  assert.match(finderRow.notes, /\[hunter_verifier:INVALID@/);
+});
+
+await test('a verifier error is not proof, so the address is re-verified next run', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_err', agency_name: 'Error Estates', domain: 'errorestates.co.uk', probe_sent: 'YES',
+    owner_md: 'Eli Error', primary_contact_email: 'eli.error@errorestates.co.uk',
+  });
+  const failing = makeVerifier({ 'eli.error@errorestates.co.uk': new Error('Hunter email verifier timed out') });
+  const first = await resolveAgencyContact(repo, 'ag_err', baseOptions({ verifyEmailImpl: failing }));
+  assert.equal(first.candidates_verified[0].verification_status, 'UNKNOWN');
+  assert.equal(first.candidates_verified[0].verifier_proof, false);
+  const row = rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER)
+    .find((c) => c.email === 'eli.error@errorestates.co.uk');
+  assert.ok(!/hunter_verifier:/.test(row.notes));
+
+  const retry = makeVerifier({ 'eli.error@errorestates.co.uk': 'VALID' });
+  const second = await resolveAgencyContact(repo, 'ag_err', baseOptions({ verifyEmailImpl: retry }));
+  assert.deepEqual(retry.calls, ['eli.error@errorestates.co.uk']);
+  assert.equal(second.selected_contact.verification_status, 'VALID');
+});
+
+await test('past the cap, an unproven standing selection is reconciled, not blanked', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_cap_rec', agency_name: 'Cap Reconcile', domain: 'capreconcile.co.uk', probe_sent: 'YES',
+    primary_contact_email: 'a@capreconcile.co.uk',
+    other_known_emails: 'b@capreconcile.co.uk, c@capreconcile.co.uk',
+  });
+  // The standing selection is the generic fallback tier, so it sits below the
+  // three failing direct candidates and the cap is spent before it is reached.
+  seedContact(store, {
+    contact_id: 'cnt_cap_rec', agency_id: 'ag_cap_rec', email: 'info@capreconcile.co.uk',
+    email_source: 'AGENCIES.other_known_emails', contact_type: 'GENERIC',
+    verification_status: 'RISKY', verified_at: '2026-08-25T09:00:00.000Z',
+    is_selected_for_outreach: 'TRUE', created_at: '2026-08-25T09:00:00.000Z',
+  });
+  const verifier = makeVerifier({}, { defaultStatus: 'INVALID' });
+  const result = await resolveAgencyContact(repo, 'ag_cap_rec', baseOptions({
+    verifyEmailImpl: verifier, hunterConfigured: () => false,
+  }));
+
+  assert.equal(verifier.calls.length, 3, 'the cap still holds');
+  assert.equal(result.selected_contact.email, 'info@capreconcile.co.uk');
+  assert.equal(result.selected_contact.verification_status, 'RISKY');
+  const capped = result.candidates_verified.find((v) => v.email === 'info@capreconcile.co.uk');
+  assert.equal(capped.verification_provider, 'NOT_VERIFIED_CAP_REACHED');
+  assert.equal(capped.verifier_proof, false, 'nothing was verified, so nothing is proven');
+
+  // AGENCIES and CONTACTS agree, and the row stays unproven for the next run.
+  const agency = rowsAsObjects(store, 'AGENCIES', AGENCIES_HEADER)[0];
+  assert.equal(agency.outreach_contact_email, 'info@capreconcile.co.uk');
+  assert.equal(agency.email_verification_status, 'RISKY');
+  const row = rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER)
+    .find((c) => c.email === 'info@capreconcile.co.uk');
+  assert.equal(row.verification_status, 'RISKY');
+  assert.ok(!/hunter_verifier:/.test(row.notes));
 });
 
 await test('writeback survives header drift and reports genuinely missing columns', () => {
