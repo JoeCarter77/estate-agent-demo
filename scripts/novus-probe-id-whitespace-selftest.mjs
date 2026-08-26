@@ -60,6 +60,7 @@ const PERSONALISATION_HEADER = [
   'wider_finding_index', 'supporting_findings', 'evidence', 'novus_counterfactual',
   'fair_observation', 'main_finding', 'commercial_consequence',
   'property_reference', 'email_observation', 'email_commercial_hook',
+  'email_commercial_hook_email_2',
   'created_at', 'updated_at',
 ];
 const AGENCIES_HEADER = ['agency_id', 'agency_name'];
@@ -194,6 +195,8 @@ async function run() {
         // States the SHAPE rather than rewording the observation, so this
         // suite costs exactly the one personalisation call it asserts on.
         email_commercial_hook: 'So the buyer side moved forward, while the potential seller was missed entirely.',
+        // Email 2's own job: the extra thing neither line above said.
+        email_commercial_hook_email_2: 'Worth a second look: you invited me in without ever finding out whether I could actually buy the place.',
         novus_counterfactual: 'NOVUS would have asked budget and timescale on the first call.',
       };
     }
@@ -226,6 +229,7 @@ async function run() {
   assert.ok(personRow.property_reference, 'the deterministic property reference is populated');
   assert.ok(personRow.email_observation, 'the Instantly observation variable is populated');
   assert.ok(personRow.email_commercial_hook, 'the Instantly commercial hook is populated');
+  assert.ok(personRow.email_commercial_hook_email_2, 'and so is the Email 2 hook the row was missing');
   ok('the existing row is fully populated after the fix — not left blank, not duplicated alongside a second, complete row');
 
   console.log(`\n${passed} checks passed.`);

@@ -68,6 +68,7 @@ const PERSONALISATION_HEADER = [
   'wider_finding_index', 'supporting_findings', 'evidence', 'novus_counterfactual',
   'fair_observation', 'main_finding', 'commercial_consequence',
   'property_reference', 'email_observation', 'email_commercial_hook',
+  'email_commercial_hook_email_2',
   'created_at', 'updated_at',
 ];
 const AGENCIES_HEADER = ['agency_id', 'agency_name'];
@@ -205,10 +206,13 @@ function installAiStub() {
         novus_counterfactual: 'Stub counterfactual.', main_finding: 'that nobody asked what we were looking for.',
         commercial_consequence: 'stub consequence.',
         email_observation: 'You did come back to us, but nobody asked what we were looking for.',
-        // States the SHAPE. A hook that only reworded the observation would
-        // be sent back for a scoped repair, costing a second call and turning
-        // this suite into a measurement of the contract gate.
-        email_commercial_hook: "That's 1 buyer enquiry and 1 potential seller, with neither properly progressed.",
+        // Says why the observed behaviour MATTERS, and the Email 2 line adds
+        // the thing neither of the others said. Copy that only reworded the
+        // observation — or blamed us for an outcome that needed our own reply
+        // — would be sent back for a scoped repair, costing a second call and
+        // turning this suite into a measurement of the contract gate.
+        email_commercial_hook: 'So a buyer already in front of you stayed a name in the inbox rather than someone you knew anything about.',
+        email_commercial_hook_email_2: 'The reply itself was fine — the part worth a look is that you still know nothing about what we were actually after.',
       };
     }
     interpretCalls += 1;

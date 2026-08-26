@@ -10,10 +10,13 @@
 // most recently created row, since an agency can have more than one probe.
 //
 // This is the single feed point for Instantly variables and the demo compiler.
-// Instantly owns the fixed template; NOVUS supplies property_reference,
-// email_observation and email_commercial_hook. Both email prose fields come
-// from the row's one traceable DIAGNOSIS_FINDINGS selection. This route does
-// not touch index.html/api/lead.js's separate legacy demo data source.
+// Instantly owns the fixed templates; NOVUS supplies property_reference,
+// email_observation and email_commercial_hook (Email 1) plus
+// email_commercial_hook_email_2 (Email 2). All three email prose fields come
+// from the row's one traceable DIAGNOSIS_FINDINGS selection, and each does a
+// different job: what happened, why it matters commercially, and the one
+// extra thing that changes how the enquiry reads. This route does not touch
+// index.html/api/lead.js's separate legacy demo data source.
 //
 // Same NOVUS_BASIC_AUTH guard as the rest of /api/novus/*.
 

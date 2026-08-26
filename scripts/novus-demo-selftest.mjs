@@ -96,6 +96,7 @@ const PERSONALISATION_HEADER = [
   'wider_finding_index', 'supporting_findings', 'evidence', 'novus_counterfactual',
   'fair_observation', 'main_finding', 'commercial_consequence',
   'property_reference', 'email_observation', 'email_commercial_hook',
+  'email_commercial_hook_email_2',
   'created_at', 'updated_at',
 ];
 
@@ -279,6 +280,7 @@ function seedWeakSeller(store, {
     property_reference: 'Barn Field, Chevington on 17 August at 21:33',
     email_observation: 'You came back inside 23 minutes, but the declared property to sell was never progressed into a valuation.',
     email_commercial_hook: 'So the buyer side moved while the seller opportunity remained unprogressed.',
+    email_commercial_hook_email_2: 'The interesting part is that the speed was never in question — the second reason to call was sitting in the same message.',
   }));
 }
 
@@ -391,6 +393,7 @@ async function fakePersonalisationAi({ tool }) {
     commercial_consequence: 'a valuation that was already inside the enquiry was never booked, and the instruction behind it never reached your pipeline.',
     email_observation: 'You replied within half an hour and progressed the viewing, but the property I said I had to sell was never taken any further.',
     email_commercial_hook: 'So the buyer side moved forward, while the potential seller was missed entirely.',
+    email_commercial_hook_email_2: 'You handled the buying side well; the part worth a look is that the same message had already given you a second reason to call.',
     novus_counterfactual: 'NOVUS would have answered the viewing and offered a market appraisal in the same reply.',
   };
 }

@@ -67,6 +67,7 @@ const PERSONALISATION_HEADER = [
   'wider_finding_index', 'supporting_findings', 'evidence', 'novus_counterfactual',
   'fair_observation', 'main_finding', 'commercial_consequence',
   'property_reference', 'email_observation', 'email_commercial_hook',
+  'email_commercial_hook_email_2',
   'created_at', 'updated_at',
 ];
 const AGENCIES_HEADER = ['agency_id', 'agency_name', 'branch_count', 'live_listing_count', 'primary_contact_name'];
@@ -379,10 +380,12 @@ function installAiStub() {
       const patch = {};
       for (const field of tool.input_schema.required) {
         patch[field] = field === 'email_commercial_hook'
-          ? `That's 1 buyer enquiry and 1 potential seller on ${scenario.address}, with only one side worked.`
-          : field === 'email_observation'
-            ? `You picked up my ${scenario.address} enquiry, but the second opportunity inside it was never worked.`
-            : `a concrete corrected line about ${scenario.address} for the demo.`;
+          ? `So the vendor behind my ${scenario.address} enquiry was already talking to you as a buyer.`
+          : field === 'email_commercial_hook_email_2'
+            ? `Worth a second look: the part of my ${scenario.address} enquiry that went unworked was in a message you had already opened.`
+            : field === 'email_observation'
+              ? `You picked up my ${scenario.address} enquiry, but the second opportunity inside it was never worked.`
+              : `a concrete corrected line about ${scenario.address} for the demo.`;
       }
       return patch;
     }
@@ -408,12 +411,14 @@ function installAiStub() {
         // shopping-list shape, so a fixture that concatenates three findings
         // is testing the cap rather than the flow.
         email_observation: selected.map((finding) => finding.finding).slice(0, 2).join(' '),
-        // A hook that STATES THE SHAPE rather than restating the observation,
-        // which is what the OPPORTUNITY SHAPE counts in the prompt now ask for
-        // — a fake that paraphrases would spend the bounded correction call on
-        // every probe and make the "one call per probe" assertion below
-        // measure the fixture's copy rather than the flow.
-        email_commercial_hook: `That's 1 buyer enquiry and 1 potential seller on ${scenario.address}, with neither properly progressed.`,
+        // A hook that says why the observed behaviour MATTERS, rather than
+        // restating the observation or blaming the agency for an outcome that
+        // needed a reply the probe never sends — a fake that did either would
+        // spend the bounded correction call on every probe and make the "one
+        // call per probe" assertion below measure the fixture's copy rather
+        // than the flow.
+        email_commercial_hook: `So the person enquiring about ${scenario.address} was warmer than the enquiry made them look.`,
+        email_commercial_hook_email_2: `The part worth a second look on ${scenario.address} is that one message held two reasons to pick the phone up.`,
       };
     }
     // Intelligence interpretation — deterministic fields are already seeded,
