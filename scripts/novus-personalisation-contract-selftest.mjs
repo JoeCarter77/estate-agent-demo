@@ -940,6 +940,132 @@ async function main() {
     ok('end to end: £450,000 enquiry + declared seller + unknown seller value => no seller-side price anywhere, all three mandatory fields populated');
   }
 
+  // ══ BUG 1: THERE IS NO SELLER VALUE, IN ANY FORM ═════════════════════════
+  //
+  // The clause-based guard was still a blacklist: it looked for a price token
+  // sitting beside a SELLER word. Every shape below carries the enquiry price
+  // into seller territory (or implies a value with no figure at all) without
+  // ever putting the two in one clause, and every one of them walked straight
+  // through. The rule is now an ALLOW-LIST — a figure survives only where its
+  // clause says it is the property I enquired about buying — so these fail
+  // closed instead.
+  {
+    const leaks = [
+      // no seller word in the price's clause at all
+      'I told you I am selling a £450,000 home.',
+      'You had a second £450,000 opportunity sitting in the same message.',
+      'My own home, worth £450,000, was never mentioned.',
+      'You never asked about the £450,000 I have on the other side of this.',
+      // a VALUE with no figure in it — a comparison is still an assertion
+      'I had a second property in the same value range to sell.',
+      'The same enquiry carried a property to sell in a similar price bracket.',
+      'My own property, likely worth about the same, never got a valuation offer.',
+      'A similarly priced instruction was sitting in the same message.',
+      'The valuation lead in that message was of comparable value.',
+    ];
+    for (const leak of leaks) {
+      assert.strictEqual(attributesEnquiryPriceToSeller(leak), true,
+        `seller value must be detected however it is phrased: "${leak}"`);
+      const cleaned = stripUnbackedCurrency(leak, '£450,000.00');
+      assert.strictEqual(/[£$€]\s?\d/.test(cleaned), false,
+        `no figure may survive: "${leak}" -> "${cleaned}"`);
+      assert.strictEqual(attributesEnquiryPriceToSeller(cleaned), false,
+        `no value implication may survive either: "${leak}" -> "${cleaned}"`);
+      assert.ok(cleaned.trim(), `sanitising must not empty the field: "${leak}"`);
+    }
+    ok('BUG 1: a seller-side value is impossible to state, infer, compare or imply — figure or no figure');
+  }
+
+  // The other half of the same rule: the buyer enquiry's own price still works.
+  {
+    const legitimate = [
+      'The £450,000 buyer enquiry was never followed up.',
+      'You had a £450,000 buyer enquiry in front of you without establishing whether I was ready to move.',
+      "You replied fast on the £450,000 property I asked about, but nobody picked up that I'd also said I had a property to sell.",
+      'You had a £450,000 buyer enquiry and never asked whether I was also a seller.',
+      'I enquired about a £450,000 property and never heard back.',
+    ];
+    for (const text of legitimate) {
+      assert.strictEqual(attributesEnquiryPriceToSeller(text), false,
+        `the buyer enquiry's own price is not a seller value: "${text}"`);
+      assert.strictEqual(stripUnbackedCurrency(text, '£450,000.00'), text,
+        `buyer-anchored copy must pass through byte-identical: "${text}"`);
+    }
+    ok('BUG 1: the buyer enquiry price still works normally, byte-identical, including beside a seller mention');
+  }
+
+  // ══ BUG 2: email_commercial_hook_email_2 CANNOT PERSIST BLANK ════════════
+  //
+  // prb_hist_0005 and prb_hist_0020 persisted a blank Email 2 hook repeatedly.
+  // Not because the model wrote nothing — because the SANITISERS emptied what
+  // it wrote. Each mandatory email line is ONE sentence, and three sanitisers
+  // are sentence-level (a figure that is not this probe's own, a fee or
+  // percentage, our own analytical vocabulary), so each of them empties the
+  // whole field. The gate then recorded the bare reason `blank`, whose repair
+  // note says only "this field is required" — so the correction call was never
+  // told what had destroyed the line, re-answered the same way, and the second
+  // miss persisted the blank. Email 2's hook has NO evidence reason to be
+  // blank, so that was a formatting blank on copy the model actually wrote.
+  {
+    const causes = {
+      // Buyer-anchored, so the seller-value guard correctly leaves it alone —
+      // but £999,999 is not this probe's price, so the sentence filter takes
+      // the whole one-sentence field with it.
+      unbacked_currency: 'The interesting part is that I asked about a £999,999 property and still heard nothing back.',
+      invented_loss: 'The interesting part is that a 1.5% instruction was sitting in the enquiry you already answered fast.',
+      internal_reasoning: 'The evidence in this diagnosis shows the seller side was never acknowledged.',
+      blank: '',
+    };
+
+    for (const [cause, hook2] of Object.entries(causes)) {
+      // (a) the correction is told WHY, and the existing bounded correction
+      //     path repairs it — one call, no new generator, no invented text.
+      const notes = [];
+      const fixed = await run({
+        findings: ordered(F.positive, F.sellerMissed),
+        reply: (call, tool) => {
+          if (call === 1) return answer({ email_commercial_hook_email_2: hook2 });
+          assert.ok(tool.input_schema.required.includes('email_commercial_hook_email_2'),
+            `${cause}: the correction must be scoped to the field that failed`);
+          notes.push(_internal.REPAIR_NOTES.email_commercial_hook_email_2[cause]);
+          return { email_commercial_hook_email_2: answer().email_commercial_hook_email_2 };
+        },
+      });
+      assert.ok(has(fixed.row.email_commercial_hook_email_2),
+        `${cause}: Email 2's hook must not be blank after the correction`);
+      assert.strictEqual(fixed.calls, 2, `${cause}: the EXISTING two-call budget is what repaired it`);
+      assert.ok(notes.every(Boolean),
+        `${cause}: the correction must carry a repair note naming this cause, not the bare "blank"`);
+
+      // (b) the model misses twice, so there is no usable line to persist and
+      //     nothing here may invent one — the ROW is refused rather than
+      //     written with a blank mandatory field.
+      await assert.rejects(
+        run({ findings: ordered(F.positive, F.sellerMissed), reply: () => answer({ email_commercial_hook_email_2: hook2 }) }),
+        (err) => err instanceof AiStructuredOutputError
+          && /email_commercial_hook_email_2/.test(err.message),
+        `${cause}: a blank Email 2 hook must never reach the sheet`,
+      );
+    }
+    ok('BUG 2: every sanitiser-emptied Email 2 hook is repaired by the existing correction, and a blank one can never be persisted');
+  }
+
+  // The line attempt 1 banked is not lost when attempt 2 comes back empty.
+  {
+    const banked = 'You handled the viewing side well; the part worth a look is that the same message had already given you a second reason to call.';
+    const { row } = await run({
+      findings: ordered(F.positive, F.sellerMissed),
+      // Attempt 1: a usable line, rejected only for restating the first hook.
+      // Attempt 2: nothing at all. The banked line must still be persisted.
+      reply: (call) => (call === 1
+        ? answer({ email_commercial_hook: banked, email_commercial_hook_email_2: banked })
+        : { email_commercial_hook_email_2: '' }),
+    });
+    assert.ok(has(row.email_commercial_hook_email_2),
+      'a usable line banked on attempt 1 must survive an attempt 2 that came back empty');
+    ok('BUG 2: usable copy is banked per FIELD across both attempts, not thrown away with the losing candidate');
+  }
+
   // ══ the counts the hook is built from ═════════════════════════════════════
   {
     const shape = buildOpportunityShape(PROBE, { ...INTEL, contact_attempts: 3, follow_ups: 2, viewing_progression: 'booked', seller_recognition: 'none', response_hours: 14.5 });
