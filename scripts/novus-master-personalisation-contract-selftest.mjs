@@ -36,6 +36,8 @@ import {
   readsAsInventedLoss, stripInventedLoss, hasUnreliableVoicemailEvidence,
   makesUnsupportedVoicemailClaim, agencyMadeNextStepAttempt, readsAsUnfairOutcomeCriticism,
   secondHookFailure, readsAsThirdPersonProspect, cleanAddressForEmail,
+  attributesEnquiryAddressToSeller, stripEnquiryAddressAttribution,
+  claimsProspectReply, evidenceShowsProspectReply,
 } from '../lib/probe-personalisation.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -139,37 +141,76 @@ async function main() {
     ok('B1 [rule 21]: invented fees/commissions/percentages are rejected end-to-end, not just detectable in isolation');
   }
 
-  // B2. Rule 5/6 — GAP: buyer-property ADDRESS provenance has no dedicated
-  // guard. attributesEnquiryPriceToSeller / stripSellerPriceAttribution cover
-  // the PRICE half of "never attribute the buyer property to the seller
-  // opportunity"; there is no equivalent structural check that the buyer
-  // property's ADDRESS is never asserted to BE the seller's declared
-  // property. The data model has no seller-address field at all (confirmed:
-  // no seller_address/selling_address/property_to_sell_address column
-  // anywhere in lib/), so this is the one place a model could misattribute
-  // the enquiry's own address to the seller side and nothing downstream
-  // would catch it. This test PINS the current (unguarded) behaviour so a
-  // future fix must consciously touch this assertion rather than silently
-  // leaving the gap in place.
+  // B2. Rule 5/6 — BUYER ADDRESS MUST NOT BECOME SELLER ADDRESS.
+  //
+  // PROBES.property_address is the property enquired about AS A BUYER, and the
+  // data model carries no seller-property address at all. The guard is the
+  // same provenance shape as the seller-price rule: does the address sit in a
+  // clause that claims it as the prospect's own / the property to sell / the
+  // instruction / the valuation property?
   {
-    const addressLeak = baseAnswer({
-      email_observation: 'You got back to me quickly, but you never mentioned that Grey Lady Place is actually the property I want to sell.',
+    const A = 'Grey Lady Place';
+    // Detection: attribution in the address's own clause.
+    for (const leak of [
+      'My property on Grey Lady Place was never valued.',
+      'The Grey Lady Place property I had to sell was ignored.',
+      'your team ignored my Grey Lady Place valuation opportunity.',
+      'Nobody offered a valuation on Grey Lady Place, the property I have to sell.',
+    ]) {
+      assert.strictEqual(attributesEnquiryAddressToSeller(leak, A), true,
+        `address attribution must be detected: "${leak}"`);
+      const cleaned = stripEnquiryAddressAttribution(leak, A);
+      assert.strictEqual(cleaned.includes(A), false, `the address must not survive in seller context: "${leak}"`);
+      assert.ok(cleaned.trim(), `sanitising must not empty the field: "${leak}"`);
+      assert.ok(cleaned.split(/\s+/).length >= leak.split(/\s+/).length - 4,
+        `the commercial point must survive, not just a fragment: "${leak}" -> "${cleaned}"`);
+    }
+
+    // Legitimate buyer-side usage survives BYTE-IDENTICAL, including the
+    // mixed-clause sentence where a seller mention sits in another clause.
+    for (const fine of [
+      'You replied about Grey Lady Place quickly.',
+      'My enquiry about Grey Lady Place got a fast reply.',
+      'The Grey Lady Place viewing was offered the same day.',
+      "You replied fast about Grey Lady Place, but nobody picked up that I'd also said I had a property to sell.",
+    ]) {
+      assert.strictEqual(attributesEnquiryAddressToSeller(fine, A), false,
+        `buyer-side use of the enquiry address is not an attribution: "${fine}"`);
+      assert.strictEqual(stripEnquiryAddressAttribution(fine, A), fine,
+        `correctly-scoped copy must pass through byte-identical: "${fine}"`);
+    }
+
+    // AN ADDRESS IS NEVER ITS OWN SELLER EVIDENCE. Real street names carry the
+    // lexicon's own words, and a naive clause scan flags every correct mention.
+    for (const addr of ['Vendor Lane', 'Valuation Road', 'Sellers Close']) {
+      assert.strictEqual(
+        attributesEnquiryAddressToSeller(`So the person enquiring about ${addr} was warmer than the enquiry looked.`, addr),
+        false, `the street name itself must not read as seller context: ${addr}`);
+      assert.strictEqual(
+        attributesEnquiryAddressToSeller(`My property on ${addr} was never valued.`, addr),
+        true, `but a genuine attribution on the same address is still caught: ${addr}`);
+    }
+
+    // End to end: rejected, repaired inside the existing budget, and the
+    // mandatory field is never left blank.
+    const { row, calls } = await run({
+      findings: [POSITIVE, SELLER_MISSED],
+      reply: (call) => (call === 1
+        ? baseAnswer({ email_observation: 'You got back to me quickly, but you never mentioned that Grey Lady Place is actually the property I have to sell.' })
+        : baseAnswer()),
     });
-    const { row, calls } = await run({ findings: [POSITIVE, SELLER_MISSED], reply: () => addressLeak });
-    assert.strictEqual(calls, 1, 'GAP: no guard rejects this, so no repair is even attempted');
-    assert.match(row.email_observation, /Grey Lady Place is actually the property I want to sell/,
-      'GAP: the buyer-enquiry address is attributed to the seller opportunity and nothing blocks it — see contract rule 5/6');
-    ok('B2 [GAP — rule 5/6]: buyer-property address attributed to the seller opportunity is NOT currently caught by any guard');
+    assert.strictEqual(calls, 2, 'the address attribution is rejected and one bounded repair is attempted');
+    assert.strictEqual(attributesEnquiryAddressToSeller(row.email_observation, A), false,
+      'no address attribution reaches the persisted row');
+    assert.ok(has(row.email_observation), 'and the mandatory field is never blanked by this guard');
+    ok('B2 [rule 5/6]: buyer-enquiry address attributed to the seller property is caught as a provenance rule, stripped surgically, and legitimate buyer-side use survives verbatim');
   }
 
-  // B3. Rule 23 — GAP: "no transcript" is read the same as "no unreliable
-  // marker", so a voicemail finding whose evidence merely says a transcript
-  // was never captured (as opposed to showing it cut off, garbled, etc.) is
-  // NOT flagged by hasUnreliableVoicemailEvidence, and a claim about that
-  // call's content is therefore not blocked by makesUnsupportedVoicemailClaim
-  // either. The two states — "unreliable/incomplete evidence" and "no
-  // evidence at all" — are conflated: neither is currently caught unless the
-  // finding text uses one of the explicit uncertainty markers.
+  // B3. Rule 23 — NO TRANSCRIPT DOES NOT MEAN NO CONTENT.
+  //
+  // The existing voicemail uncertainty mechanism is extended, not replaced: a
+  // record that was never captured leaves content just as unknown as a record
+  // that is damaged, so both raise the same flag and block the same claims.
   {
     const noTranscriptFinding = {
       finding_index: 3, finding_type: 'problem',
@@ -177,35 +218,120 @@ async function main() {
       evidence: 'Call log shows one outbound call of 42 seconds; no transcript was captured.',
       significance_note: 'Call content cannot be reviewed.',
     };
-    assert.strictEqual(hasUnreliableVoicemailEvidence([noTranscriptFinding]), false,
-      'GAP: "no transcript captured" carries none of the explicit uncertainty markers, so it reads as reliable');
-    assert.strictEqual(
-      makesUnsupportedVoicemailClaim('the call had no real content and nothing of substance was said.'),
-      false, 'GAP: this claim does not even mention "voicemail", so the existing guard cannot reach it either');
-    ok('B3 [GAP — rule 23]: "no transcript recorded" is not distinguished from "unreliable/incomplete evidence", and a claim about a no-transcript call\'s content is not blocked');
+    const cutOffVoicemail = {
+      finding_index: 4, finding_type: 'problem',
+      finding: 'The voicemail cut off mid-sentence with no availability request given.',
+      evidence: 'Voicemail transcript: "Hi it\'s Terry, just calling about your enq—" (cuts off).',
+      significance_note: 'Transcript is incomplete.',
+    };
+    const cleanVoicemail = {
+      finding_index: 5, finding_type: 'problem',
+      finding: 'The voicemail never mentioned the property or offered a viewing.',
+      evidence: 'Full transcript: "Hi, thanks for enquiring, give me a call back when you can." Nothing else was said.',
+      significance_note: 'A complete, legible transcript.',
+    };
+
+    assert.strictEqual(hasUnreliableVoicemailEvidence([noTranscriptFinding]), true,
+      '"no transcript was captured" leaves the content unknown, exactly like a damaged one');
+    // EXISTING BEHAVIOUR UNCHANGED.
+    assert.strictEqual(hasUnreliableVoicemailEvidence([cutOffVoicemail]), true,
+      'the explicit cut-off case behaves exactly as before');
+    assert.strictEqual(hasUnreliableVoicemailEvidence([cleanVoicemail]), false,
+      'a complete, legible transcript is still not unreliable');
+
+    // Claims about what the call CONTAINED are blocked.
+    for (const claim of [
+      'the call had no real content.',
+      'nothing substantive was said on that call.',
+      'the voicemail contained no meaningful content at all.',
+    ]) assert.strictEqual(makesUnsupportedVoicemailClaim(claim), true, `content claim must be blocked: "${claim}"`);
+
+    // Evidence-bounded wording stays fully sayable — this is what the copy
+    // SHOULD say, so it must never be rejected.
+    for (const bounded of [
+      'there is no recorded content showing seller progression.',
+      'there is no evidenced progression from the available call record.',
+      'nobody ever called back after leaving that voicemail.',
+    ]) assert.strictEqual(makesUnsupportedVoicemailClaim(bounded), false, `evidence-bounded wording must survive: "${bounded}"`);
+
+    // End to end: the claim is ungroundable, so it never banks.
+    const { row } = await run({
+      findings: [POSITIVE, noTranscriptFinding],
+      reply: () => baseAnswer({
+        main_finding_index: 3, wider_finding_index: null,
+        main_finding: 'the call had no real content.',
+        email_observation: 'You called once, but the call had no real content and nothing substantive was said.',
+      }),
+    });
+    assert.strictEqual(row.main_finding, '',
+      'a claim about a never-captured call\'s content is never persisted');
+    assert.strictEqual(row.email_observation, '', 'nor the same claim in the Instantly observation');
+    ok('B3 [rule 23]: "no transcript captured" now raises the same uncertainty as a damaged one, content claims are blocked, evidence-bounded wording survives, and cut-off/garbled behaviour is unchanged');
   }
 
-  // B4. Rule 24 — GAP: no guard exists for the PROSPECT falsely being
-  // described as having replied, engaged or conversed. Every existing guard
-  // (readsAsThirdPersonProspect, readsAsUnfairOutcomeCriticism,
-  // claimsUnaskedQuestions) checks how the AGENCY's actions are described,
-  // never whether the copy invents a reply, call or conversation FROM the
-  // prospect's own side — which the probe rule (I deliberately never reply)
-  // makes structurally impossible to be true.
+  // B4. Rule 24 — NO FALSE PROSPECT-REPLY CLAIMS.
+  //
+  // The probe sends one enquiry and then deliberately says nothing for the
+  // whole observation window. A structural first-person-subject + contact-verb
+  // test catches the invented action without enumerating phrasings, and
+  // without touching the enquiry verbs the email is legitimately built from.
   {
-    const falseProspectReply = "I called back twice about this, but nobody ever got back to me on the seller side.";
-    assert.strictEqual(readsAsThirdPersonProspect(falseProspectReply), false,
-      'GAP: this passes every existing first-person/third-person check');
-    assert.strictEqual(readsAsUnfairOutcomeCriticism(falseProspectReply), false,
-      'GAP: it does not match the unfair-outcome-criticism patterns either');
+    for (const invented of [
+      'I replied to your email but heard nothing back.',
+      'I was already replying to your outreach when it went quiet.',
+      'I called back twice about this.',
+      'we were speaking about the property that week.',
+      'we had a conversation about the valuation.',
+      'you already had me engaged as a buyer.',
+      'I responded the same day.',
+    ]) assert.strictEqual(claimsProspectReply(invented), true, `invented prospect action must be rejected: "${invented}"`);
+
+    // PROBE FACTS SURVIVE — these are what the email is actually made of.
+    for (const fact of [
+      'I enquired about the property on 21 August.',
+      'I said I had a property to sell.',
+      "I'd mentioned that I had a place to sell too.",
+      'I asked for more details about the property.',
+      // Negated forms are TRUE statements about the probe.
+      'I never replied during the observation period.',
+      "I didn't call back, and nothing followed your first reply.",
+      // Second-person copy about the AGENCY replying is the normal case.
+      'You got back to me quickly, but nobody picked up that I had a property to sell.',
+      'You replied within minutes of the enquiry landing.',
+    ]) assert.strictEqual(claimsProspectReply(fact), false, `legitimate probe fact must survive: "${fact}"`);
+
+    // End to end: unsupported, so it is rejected AND never banked.
     const { row, calls } = await run({
       findings: [POSITIVE, SELLER_MISSED],
-      reply: () => baseAnswer({ email_observation: falseProspectReply }),
+      reply: () => baseAnswer({ email_observation: 'I replied to your email twice, but nobody picked up that I had a property to sell.' }),
     });
-    assert.strictEqual(calls, 1, 'GAP: nothing rejects it, so no repair is attempted');
-    assert.strictEqual(row.email_observation, falseProspectReply,
-      'GAP: a false claim that the prospect (who never replies, by design) called back is persisted verbatim — see contract rule 24');
-    ok('B4 [GAP — rule 24]: no guard blocks a false claim that the prospect replied/called/engaged, even though the probe design makes it always false');
+    assert.strictEqual(calls, 2, 'the repair is attempted');
+    assert.strictEqual(row.email_observation, '',
+      'a false prospect-reply claim is never persisted, repaired or not');
+
+    // UNLESS THE EVIDENCE SAYS OTHERWISE. The rule is "do not invent", not
+    // "the prospect can never have acted".
+    const repliedFinding = {
+      finding_index: 3, finding_type: 'problem',
+      finding: 'The buyer replied to the first email asking for a viewing time, and nobody answered.',
+      evidence: 'Inbound message from the enquirer at 09:14; no agency response followed.',
+      significance_note: 'A live conversation was dropped.',
+    };
+    assert.strictEqual(evidenceShowsProspectReply([repliedFinding]), true,
+      'a finding that records an inbound reply supports the claim');
+    assert.strictEqual(evidenceShowsProspectReply([POSITIVE, SELLER_MISSED]), false,
+      'the ordinary probe findings support no prospect-side action');
+    const supported = await run({
+      findings: [POSITIVE, repliedFinding],
+      reply: () => baseAnswer({
+        main_finding_index: 3, wider_finding_index: null,
+        email_observation: 'I replied asking for a viewing time, and nothing came back after that.',
+      }),
+    });
+    assert.strictEqual(supported.calls, 1, 'evidenced prospect contact costs no repair call');
+    assert.ok(has(supported.row.email_observation),
+      'and the evidenced claim is persisted rather than blocked');
+    ok('B4 [rule 24]: invented prospect replies/calls/conversations are rejected and never banked, probe facts and negated forms survive, and an evidenced inbound reply stays sayable');
   }
 
   // B5. Rules 16/17 — Hook 1 vs Hook 2 distinctness, re-pinned at the master
