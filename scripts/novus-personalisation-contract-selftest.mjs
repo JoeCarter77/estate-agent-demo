@@ -23,6 +23,7 @@ import { normaliseToolInput, containsToolMarkup, splitLeakedValue, AiStructuredO
 import {
   personaliseProbe, buildOpportunityShape, hookFailureAgainstObservation,
   quantifiesOpportunityShape, readsAsThirdPersonProspect, normalizeCurrencyFigure,
+  stripUnbackedCurrency,
   readsAsConsultantSpeak, claimsUnaskedQuestions, namesConcreteOutcome,
   introducesUnselectedFinding, readsAsUnfairOutcomeCriticism,
   agencyMadeNextStepAttempt, secondHookFailure, isDistinctText,
@@ -803,12 +804,49 @@ async function main() {
       findings: ordered(F.positive, F.sellerMissed),
       reply: () => answer({
         main_finding_index: 2, wider_finding_index: null,
-        commercial_consequence: 'a £450,000 property to sell was never valued or even mentioned.',
+        commercial_consequence: 'the £450,000 buyer enquiry never got a follow-up.',
       }),
     });
     assert.match(row.commercial_consequence, /£450,000/,
       "the probe's own property value survives the currency allow-list");
     ok('the currency allow-list recognises the probe\'s own price in its persisted "£450,000.00" form');
+  }
+
+  // ══ PROBES.property_price must never become the SELLER's declared value ══
+  // property_price is the buyer-enquiry property's value. The prospect also
+  // declared (as PROBE.enquiry_text does) a separate property to sell whose
+  // value is unknown — so that figure must never be attached to the seller
+  // side, however the two are worded.
+  {
+    const sellerLeaks = [
+      'The declared £450,000 property to sell was never valued or even mentioned.',
+      'That is a £450,000 valuation opportunity sitting unexplored.',
+      'A £450,000 instruction was never picked up.',
+      'They already had a valuation opportunity worth £450,000.',
+    ];
+    for (const leak of sellerLeaks) {
+      assert.strictEqual(stripUnbackedCurrency(leak, '450000'), '',
+        `seller-side claim must not carry the buyer-enquiry price: "${leak}"`);
+    }
+    const legitimate = [
+      'The £450,000 buyer enquiry was never followed up.',
+      'I also said I had a property to sell, but nobody picked that up.',
+      'A potential seller instruction sat there unexplored.',
+    ];
+    for (const text of legitimate) {
+      assert.notStrictEqual(stripUnbackedCurrency(text, '450000'), '',
+        `grounded, correctly-scoped wording must survive: "${text}"`);
+    }
+    const { row } = await run({
+      findings: ordered(F.positive, F.sellerMissed),
+      reply: () => answer({
+        main_finding_index: 2, wider_finding_index: null,
+        commercial_consequence: 'The declared £450,000 property to sell was never valued or even mentioned.',
+      }),
+    });
+    assert.strictEqual(/£450,000/.test(row.commercial_consequence || ''), false,
+      'no seller-side £450,000 claim survives when the seller value is unknown');
+    ok('PROBES.property_price (a buyer-enquiry value) never becomes the seller\'s declared property value anywhere in persisted prose');
   }
 
   // ══ the counts the hook is built from ═════════════════════════════════════
