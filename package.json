@@ -26,6 +26,7 @@
     "novus:diagnosis-seller-price-selftest": "node scripts/novus-diagnosis-seller-price-selftest.mjs",
     "novus:email-personalisation-selftest": "node scripts/novus-email-personalisation-selftest.mjs",
     "novus:personalisation-contract-selftest": "node scripts/novus-personalisation-contract-selftest.mjs",
+    "novus:master-personalisation-contract-selftest": "node scripts/novus-master-personalisation-contract-selftest.mjs",
     "novus:personalisation-regen-selftest": "node scripts/novus-personalisation-regen-selftest.mjs",
     "novus:probe-id-whitespace-selftest": "node scripts/novus-probe-id-whitespace-selftest.mjs",
     "novus:diagnosis-persistence-selftest": "node scripts/novus-diagnosis-persistence-selftest.mjs",
