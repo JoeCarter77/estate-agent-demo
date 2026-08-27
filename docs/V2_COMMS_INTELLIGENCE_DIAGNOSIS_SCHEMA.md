@@ -248,6 +248,51 @@ the no-human-contact rule and the deterministic demo journey, and reads
 `DIAGNOSIS` for finalisation/fallback handling. Those rows are not a second
 source of model-authored email claims.
 
+### The `DIAGNOSIS` boundary is structural, not conventional
+
+`DIAGNOSIS_FINDINGS` is the **single authoritative commercial interpretation
+layer**. The broad `DIAGNOSIS` prose — `diagnosis_summary`, `strengths`,
+`missed_opportunities`, `commercial_implication` — is **NON-AUTHORITATIVE
+downstream**: no step reads its text, and nothing prospect-facing may rest on
+it.
+
+Keeping the prose out of the *prompt* was only half of that. The whole
+`DIAGNOSIS` row used to be passed into `personaliseProbe()`, where any later
+edit could reach a prose field and put a second, differently-worded account of
+the probe back into the email. So the row is now narrowed at the boundary:
+`lib/personalisation-rebuild.mjs` builds `{ novus_opportunity }` and passes
+that, and `personaliseProbe()` narrows again to the same single enum before
+anything else runs. Whatever a caller hands in, no `DIAGNOSIS` prose field
+survives the call.
+
+```
+BEFORE                                  AFTER
+──────                                  ─────
+DIAGNOSIS row ──(whole object)──▶       DIAGNOSIS row ──(novus_opportunity)──▶
+  personaliseProbe(ctx.diagnosis)         personaliseProbe(ctx.novusOpportunity)
+    ├─ pickHeroJourney(novus_opportunity)   └─ pickHeroJourney(novus_opportunity)
+    └─ …and four prose fields in reach
+```
+
+`novus_opportunity` is a three-value enum, not prose, and it feeds one
+deterministic lookup: the `strong_handling_*` hero journey for a probe with no
+story finding. That decision is unchanged.
+
+**Why the prose fields stay.** `diagnosis_summary` must remain non-blank — it
+is the pipeline's structural "diagnosed and frozen" flag, read by
+`lib/diagnosis-rebuild.mjs`, `lib/intelligence-rebuild.mjs`,
+`lib/observation-recompute.mjs` and `lib/personalisation-rebuild.mjs` as a
+presence check, never as text. The other three are the DIAGNOSIS tab's read
+for the sales call. All four are deprecated **in place** and marked
+NON-AUTHORITATIVE at source: no column is dropped and no historical data is
+migrated, because safe deprecation beats unnecessary migration risk.
+
+Pinned by Section C of
+`scripts/novus-master-personalisation-contract-selftest.mjs`: a `DIAGNOSIS`
+row whose every prose field contradicts the findings must produce a
+byte-identical `PERSONALISATION` row, spend the same AI budget, and leak no
+prose token into the model or the sheet.
+
 ### One authoritative selection
 
 The model chooses the story first:
