@@ -23,7 +23,7 @@ import { normaliseToolInput, containsToolMarkup, splitLeakedValue, AiStructuredO
 import {
   personaliseProbe, buildOpportunityShape, hookFailureAgainstObservation,
   quantifiesOpportunityShape, readsAsThirdPersonProspect, normalizeCurrencyFigure,
-  stripUnbackedCurrency,
+  stripUnbackedCurrency, attributesEnquiryPriceToSeller,
   readsAsConsultantSpeak, claimsUnaskedQuestions, namesConcreteOutcome,
   introducesUnselectedFinding, readsAsUnfairOutcomeCriticism,
   agencyMadeNextStepAttempt, secondHookFailure, isDistinctText,
@@ -35,6 +35,12 @@ import { needsPersonalisation } from '../lib/personalisation-rebuild.mjs';
 let passed = 0;
 const ok = (m) => { passed += 1; console.log(`  ✓ ${m}`); };
 const has = (v) => Boolean(String(v ?? '').trim());
+const wordCountOf = (v) => String(v ?? '').trim().split(/\s+/).filter(Boolean).length;
+
+// The three Instantly variables that must never persist blank.
+const MANDATORY_EMAIL_FIELDS = [
+  'email_observation', 'email_commercial_hook', 'email_commercial_hook_email_2',
+];
 
 const PROBE = {
   probe_id: 'prb_contract_1', agency_id: 'agc_contract', probe_reference: 'NOV-C-1',
@@ -813,40 +819,125 @@ async function main() {
   }
 
   // ══ PROBES.property_price must never become the SELLER's declared value ══
-  // property_price is the buyer-enquiry property's value. The prospect also
-  // declared (as PROBE.enquiry_text does) a separate property to sell whose
-  // value is unknown — so that figure must never be attached to the seller
-  // side, however the two are worded.
+  //
+  // PROBE.property_price (£450,000.00) is the asking price of the property the
+  // prospect enquired about AS A BUYER. PROBE.enquiry_text also declares a
+  // separate property to sell, and NOTHING on file says what that one is
+  // worth. So the enquiry price may never be attached to the seller side —
+  // and this is a provenance rule, not a phrase list: the paraphrases below
+  // are the ones that walked straight through the original fixed-list guard.
   {
     const sellerLeaks = [
+      'a £450k seller conversation sat right there unopened.',
+      'a seller with a £215,000 property to list went completely uncontacted.',
+      'a seller opportunity worth around £225k was never explored.',
+      'That was a priced seller opportunity nobody touched.',
       'The declared £450,000 property to sell was never valued or even mentioned.',
       'That is a £450,000 valuation opportunity sitting unexplored.',
       'A £450,000 instruction was never picked up.',
       'They already had a valuation opportunity worth £450,000.',
+      'You had a vendor sitting on a £450,000 home and never called.',
     ];
     for (const leak of sellerLeaks) {
-      assert.strictEqual(stripUnbackedCurrency(leak, '450000'), '',
-        `seller-side claim must not carry the buyer-enquiry price: "${leak}"`);
+      assert.strictEqual(attributesEnquiryPriceToSeller(leak), true,
+        `seller-price attribution must be detected: "${leak}"`);
+      const cleaned = stripUnbackedCurrency(leak, '£450,000.00');
+      assert.strictEqual(/[£$€]\s?\d/.test(cleaned), false,
+        `no figure may survive in seller context: "${leak}" -> "${cleaned}"`);
+      assert.strictEqual(/\bpriced\b/i.test(cleaned), false,
+        `no bare price implication may survive either: "${leak}" -> "${cleaned}"`);
+      // BUG 2, at the sanitiser: the price goes, the sentence does NOT.
+      assert.ok(cleaned.trim(), `sanitising must not empty the field: "${leak}"`);
+      assert.ok(wordCountOf(cleaned) >= wordCountOf(leak) - 4,
+        `the commercial point must survive, not just a fragment: "${leak}" -> "${cleaned}"`);
     }
+    ok('seller-price attribution is caught as a provenance rule — every paraphrase loses the figure and keeps the commercial point');
+  }
+
+  // ══ legitimate BUYER-side use of the enquiry price still survives ═════════
+  {
     const legitimate = [
       'The £450,000 buyer enquiry was never followed up.',
+      'You had a £450,000 buyer enquiry in front of you without establishing whether I was ready to move.',
+      // Both sides in ONE sentence: the price is buyer-side, the seller mention
+      // sits in a different clause, so nothing is attributed and nothing moves.
+      "You replied fast on the £450,000 property I asked about, but nobody picked up that I'd also said I had a property to sell.",
+      'You had a £450,000 buyer enquiry and never asked whether I was also a seller.',
+      // Non-priced seller wording was never the problem and must not be touched.
       'I also said I had a property to sell, but nobody picked that up.',
       'A potential seller instruction sat there unexplored.',
     ];
     for (const text of legitimate) {
-      assert.notStrictEqual(stripUnbackedCurrency(text, '450000'), '',
-        `grounded, correctly-scoped wording must survive: "${text}"`);
+      assert.strictEqual(attributesEnquiryPriceToSeller(text), false,
+        `buyer-side use of the enquiry price is not an attribution: "${text}"`);
+      assert.strictEqual(stripUnbackedCurrency(text, '£450,000.00'), text,
+        `correctly-scoped copy must pass through byte-identical: "${text}"`);
     }
+    ok('the enquiry price still speaks for the BUYER side, including alongside a seller mention in another clause of the same sentence');
+  }
+
+  // ══ BUG 2: the three mandatory email fields survive the whole flow ════════
+  //
+  // The old guard caught a bad seller-price sentence by dropping it, and since
+  // each of these fields IS one sentence, the field went blank. Now the price
+  // is removed surgically, a `seller_price_attribution` rejection is raised,
+  // and the EXISTING bounded correction gets one chance to rewrite the line —
+  // with the de-priced text banked as the fallback either way.
+  {
+    const priced = {
+      email_observation: 'You never came back on my £450,000 seller enquiry at all.',
+      email_commercial_hook: 'a £450k seller conversation sat right there unopened.',
+      email_commercial_hook_email_2: 'a seller with a £215,000 property to list went completely uncontacted.',
+    };
+
+    // (a) the correction call fixes it — the normal path.
+    const fixed = await run({
+      findings: ordered(F.positive, F.sellerMissed),
+      reply: (call) => (call === 1 ? answer(priced) : answer()),
+    });
+    for (const field of MANDATORY_EMAIL_FIELDS) {
+      assert.ok(has(fixed.row[field]), `${field} must not be blank after correction`);
+      assert.strictEqual(/[£$€]\s?\d/.test(fixed.row[field]), false, `${field} keeps no seller figure`);
+    }
+    assert.ok(fixed.calls === 2, 'the existing bounded correction path is what repaired it');
+
+    // (b) the correction call misses too — the fallback must still not blank.
+    const stubborn = await run({
+      findings: ordered(F.positive, F.sellerMissed),
+      reply: () => answer(priced),
+    });
+    for (const field of MANDATORY_EMAIL_FIELDS) {
+      assert.ok(has(stubborn.row[field]),
+        `${field} must fall back to the de-priced text, never to a blank`);
+      assert.strictEqual(/[£$€]\s?\d/.test(stubborn.row[field]), false,
+        `${field} still carries no seller figure after fallback`);
+    }
+    assert.ok(stubborn.calls <= 2, 'and it stays inside the existing two-call budget');
+    ok('BUG 2: all three mandatory email fields stay populated and price-free whether the bounded correction fixes the line or not');
+  }
+
+  // ══ the end-to-end case in the brief ═════════════════════════════════════
+  // Enquiry property £450,000, seller declared, seller value unknown.
+  {
     const { row } = await run({
       findings: ordered(F.positive, F.sellerMissed),
       reply: () => answer({
         main_finding_index: 2, wider_finding_index: null,
         commercial_consequence: 'The declared £450,000 property to sell was never valued or even mentioned.',
+        main_finding: 'a £450k seller conversation was never opened.',
+        email_observation: 'You replied fast, but a £450,000 seller opportunity went unacknowledged.',
+        email_commercial_hook: 'a seller opportunity worth around £450,000 sat unexplored.',
+        email_commercial_hook_email_2: 'The interesting part is the £450,000 vendor you already had in the same message.',
       }),
     });
-    assert.strictEqual(/£450,000/.test(row.commercial_consequence || ''), false,
-      'no seller-side £450,000 claim survives when the seller value is unknown');
-    ok('PROBES.property_price (a buyer-enquiry value) never becomes the seller\'s declared property value anywhere in persisted prose');
+    for (const [field, value] of Object.entries(row)) {
+      assert.strictEqual(attributesEnquiryPriceToSeller(value), false,
+        `${field} must carry no seller-side price attribution: "${value}"`);
+    }
+    for (const field of MANDATORY_EMAIL_FIELDS) {
+      assert.ok(has(row[field]), `${field} is mandatory and must be populated`);
+    }
+    ok('end to end: £450,000 enquiry + declared seller + unknown seller value => no seller-side price anywhere, all three mandatory fields populated');
   }
 
   // ══ the counts the hook is built from ═════════════════════════════════════
