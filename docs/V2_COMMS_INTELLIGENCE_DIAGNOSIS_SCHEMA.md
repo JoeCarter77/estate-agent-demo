@@ -293,6 +293,54 @@ row whose every prose field contradicts the findings must produce a
 byte-identical `PERSONALISATION` row, spend the same AI budget, and leak no
 prose token into the model or the sheet.
 
+### Relationship and provenance validation (rules 41-48)
+
+Every other factual guard asks *is this fact true?* `lib/factual-relationships.mjs`
+asks the question they all skip: **is this relationship between the facts true?**
+
+> TRUE — the enquiry declared a property to sell
+> TRUE — the agency called twice
+> FALSE — *"I was already on the phone with you twice, and still told you I had a property to sell"*
+
+Nothing there is fabricated. A declaration has been **relocated** out of the only
+message it ever occupied. The same shape produces a co-occurrence that never
+co-occurred, certainty drawn from an uncaptured call, a comparison nobody made,
+and knowledge attributed to people nobody asked.
+
+The layer is **support-relative, never a phrase list**, and it has to be: four
+pinned-good strings across the suites say *"in the same message"* and are
+correct, because those probes' enquiries genuinely carried the viewing request
+and the seller declaration together. The same sentence is false when it binds
+that enquiry fact to an agency reply. What licenses a claim:
+
+| Support source | Authority |
+| --- | --- |
+| `PROBES.enquiry_text` + `hasVendorDeclaration()` | the deterministic record of what the original enquiry contained |
+| the **selected** `DIAGNOSIS_FINDINGS` | finding / evidence / significance_note text |
+| two booleans the caller has already derived from those findings | whether prospect contact is evidenced; whether a call record's content is unknown |
+
+`DIAGNOSIS` prose is not a support source — it is non-authoritative and this
+layer never sees it.
+
+Seven detectors run over the six gated prose fields, in the existing
+gate → correction → never-persist flow. Every reason is a **truth** failure, so
+none of them banks a soft fallback.
+
+### The findings layer obeys these rules itself
+
+A downstream safety net is not a licence. A `DIAGNOSIS_FINDING` once shipped
+reading *"… once he confirmed it"* while its own evidence showed only that the
+agency **asked** whether he was selling. Letting Personalisation rewrite that
+into something plausible would leave the false finding sitting in the sheet,
+still authoritative — so `lib/probe-diagnosis.mjs` strips the invented clause
+where the finding is written, **surgically**, keeping the genuine commercial
+point ("they asked for something the enquiry had already told them").
+
+The two layers use deliberately different subject lexicons and must keep doing
+so: findings are written analytically (*"the enquirer"*, *"he"*), the email is
+written in the enquirer's own voice (*"I"*). Applying either lexicon in the
+other layer would reject correct copy.
+
 ### One authoritative selection
 
 The model chooses the story first:

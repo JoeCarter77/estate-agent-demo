@@ -44,6 +44,7 @@ import assert from 'node:assert';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import {
   personaliseProbe, attributesEnquiryPriceToSeller, stripSellerPriceAttribution,
@@ -52,9 +53,14 @@ import {
   secondHookFailure, readsAsThirdPersonProspect, cleanAddressForEmail,
   attributesEnquiryAddressToSeller, stripEnquiryAddressAttribution,
   claimsProspectReply, evidenceShowsProspectReply,
-  readsAsFalseChronology, pickHeroJourney,
+  readsAsFalseChronology, pickHeroJourney, _internal as _personalisationInternal,
 } from '../lib/probe-personalisation.mjs';
 import { needsPersonalisation, rebuildAllPersonalisation } from '../lib/personalisation-rebuild.mjs';
+import {
+  buildSupportContext, findUnsupportedRelationship, RELATIONSHIP_REASONS,
+  findingInventsProspectResponse,
+} from '../lib/factual-relationships.mjs';
+import { _internal as _diagnosisInternal } from '../lib/probe-diagnosis.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let passed = 0;
@@ -63,6 +69,7 @@ const has = (v) => Boolean(String(v ?? '').trim());
 // A story finding (problem/opportunity) — a positive can never carry the main
 // beat, which is what C4's per-fixture main_finding_index has to respect.
 const isStory = (f) => f.finding_type !== 'positive';
+const { NEVER_PERSIST_REASONS } = _personalisationInternal;
 
 const PROBE = {
   probe_id: 'prb_master_1', agency_id: 'agc_master', probe_reference: 'NOV-M-1',
@@ -909,6 +916,317 @@ async function main() {
     assert.strictEqual(readsAsInventedLoss('the £425,000 enquiry went unanswered for 17 hours.'), false,
       'the probe\'s own enquiry price is a fact, not an invented loss');
     ok('C15 [rules 21/40]: fees, commissions, percentages and revenue losses are invented commercial facts and are stripped; the enquiry\'s own price is not');
+  }
+
+
+  // ══ Section D: RELATIONSHIP & PROVENANCE (contract rules 41-48) ═══════════
+  //
+  // Every guard in sections A-C asks whether a FACT is true. These ask whether
+  // the RELATIONSHIP BETWEEN the facts is true — and that is a different
+  // failure, because each individual fact in the sentence can be correct while
+  // the sentence is false:
+  //
+  //   TRUE  the enquiry declared a property to sell
+  //   TRUE  the agency called twice
+  //   FALSE "I was already on the phone with you twice, and still told you
+  //          I had a property to sell"
+  //
+  // The invention is the JOIN. Nothing was fabricated; a declaration was
+  // relocated out of the only message it ever occupied.
+  //
+  // SUPPORT-RELATIVE, NOT A BLACKLIST — and D1 is the block that proves it,
+  // because the identical sentence has to pass on one probe and fail on
+  // another. Four pinned-good strings in the existing suites say "in the same
+  // message", and they are correct: those probes' enquiries really did carry
+  // the viewing request and the seller declaration together. A phrase list
+  // would delete all four.
+  const REL_PROBE = {
+    ...PROBE,
+    enquiry_text: 'Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market.',
+  };
+  const BUYER_ONLY_PROBE = { ...PROBE, enquiry_text: 'Interested in viewing this property.' };
+  const relSupport = (over = {}) => buildSupportContext({
+    probe: REL_PROBE, findings: [POSITIVE, SELLER_MISSED], ...over,
+  });
+
+  // D1 [rule 41] — THE SAME WORDS, TRUE ON ONE PROBE AND FALSE ON ANOTHER.
+  {
+    const sameMessage = 'The vendor had already volunteered themselves in the same message.';
+    assert.strictEqual(findUnsupportedRelationship(sameMessage, relSupport()), null,
+      'co-occurrence is CORRECT when the enquiry genuinely carried both — this exact wording is pinned copy');
+    assert.strictEqual(
+      findUnsupportedRelationship(sameMessage, buildSupportContext({ probe: BUYER_ONLY_PROBE, findings: [POSITIVE, SELLER_MISSED] })),
+      'unsupported_co_occurrence',
+      'and UNSUPPORTED on a probe whose enquiry declared no seller position — same sentence, different verdict');
+
+    // The agency-anchored form is the real failure: an enquiry fact welded
+    // onto something the agency sent days later.
+    assert.strictEqual(findUnsupportedRelationship('Your reply and my seller declaration were in the same message.', relSupport()),
+      'unsupported_co_occurrence', 'binding an enquiry fact to an agency message is a false co-occurrence');
+
+    // The other three pinned-good "same message" strings, unchanged.
+    for (const good of [
+      'the second reason to call was sitting in the same message.',
+      'the same message had already given you a second reason to call.',
+      'The interesting part is the £450,000 vendor you already had in the same message.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(good, relSupport()), null, `pinned-good copy must survive: "${good}"`);
+    }
+    // A co-occurrence claim with no seller content is not this rule's business.
+    assert.strictEqual(
+      findUnsupportedRelationship('You answered the price question but ignored the availability question in the same message.',
+        buildSupportContext({ probe: BUYER_ONLY_PROBE, findings: [POSITIVE] })),
+      null, 'the rule is scoped to seller-declaration provenance, not to every co-occurrence');
+    ok('D1 [rule 41, test C]: co-occurrence is judged against the probe\'s own enquiry — the same "same message" wording passes where the enquiry carried both and fails where it did not');
+  }
+
+  // D2 [rules 42/47, test D] — A DECLARATION KEEPS THE MOMENT IT WAS MADE IN.
+  // prb_hist_0006: the seller position came from the original enquiry and was
+  // never mentioned on either call.
+  {
+    for (const bad of [
+      'I was already on the phone with you twice, and still told you I had a property to sell.',
+      'I told you on those calls I had a property to sell.',
+      'During the call I mentioned I had a place to sell.',
+      'When you called I said I had a property to sell.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(bad, relSupport()), 'unsupported_declaration_timing',
+        `a declaration relocated into an agency contact event must be caught: "${bad}"`);
+    }
+    for (const good of [
+      "You called twice, but the seller declaration I'd already included in my original enquiry was never progressed.",
+      "You got back to me quickly, but nobody picked up that I'd also said I had a property to sell.",
+      "I'd already said in my original enquiry that my property wasn't on the market.",
+      'I never told you on the call that I was selling.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(good, relSupport()), null,
+        `correct provenance and negated forms must survive: "${good}"`);
+    }
+    // Evidenced prospect contact licenses it — the rule is "do not invent",
+    // not "the prospect can never have spoken".
+    assert.strictEqual(
+      findUnsupportedRelationship('I told you on those calls I had a property to sell.', relSupport({ prospectContactEvidenced: true })),
+      null, 'a probe whose findings evidence a prospect-side exchange may say so');
+    ok('D2 [rules 42/47, test D]: a seller declaration pinned to a call or a reply is rejected; the original-enquiry provenance, negated forms and genuinely evidenced contact all survive');
+  }
+
+  // D3 [rules 45/48, test A/G] — KEEP THE EVIDENCE'S EPISTEMIC LEVEL.
+  // prb_mt0ptc0o: unknown call content turned into certainty about what was
+  // NOT said. prb_hist_0003: a potential opportunity turned into a won
+  // instruction.
+  {
+    const UNKNOWN_CALL = {
+      finding_index: 2, finding_type: 'problem',
+      finding: 'The seller opportunity was not evidenced as addressed.',
+      evidence: 'Call logged, no transcript/content captured; seller opportunity not evidenced as addressed.',
+      significance_note: 'What was discussed is unknown.',
+    };
+    assert.strictEqual(hasUnreliableVoicemailEvidence([UNKNOWN_CALL]), true,
+      'an uncaptured call leaves its content unknown');
+    // The exact live failure, through the guard that owns this rule.
+    assert.strictEqual(makesUnsupportedVoicemailClaim('nobody on that call asked about the property I still need to sell.'), true,
+      'a definite claim about who said what on an uncaptured call is blocked');
+    assert.strictEqual(makesUnsupportedVoicemailClaim('There is no recorded evidence showing the seller opportunity was addressed.'), false,
+      'the evidence-bounded statement of the SAME point is exactly what should be said');
+    // The whole-record wording is unaffected — it has no call locator.
+    assert.strictEqual(makesUnsupportedVoicemailClaim("You called within the hour, but nobody picked up that I'd also said I had a property to sell."), false,
+      'a seller miss judged across the whole record stays fully sayable');
+
+    // Possibility -> certainty.
+    assert.strictEqual(findUnsupportedRelationship('a seller instruction nobody even looked at.', relSupport()), 'certainty_upgrade',
+      'a potential opportunity may not be reported as a won instruction');
+    for (const good of [
+      'a potential seller instruction was never explored.',
+      'a valuation opportunity was left on the table.',
+      'the declared property to sell was never progressed into a valuation.',
+      'the voicemail cut off with no availability request or callback instruction given.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(good, relSupport()), null,
+        `hedged, opportunity-level and non-seller wording must survive: "${good}"`);
+    }
+    ok('D3 [rules 45/48, tests A/G]: unknown call content stays unknown and a potential opportunity stays potential — evidence-bounded and hedged wording pass untouched');
+  }
+
+  // D4 [rules 44/46, tests E/F] — NO INVENTED COMPARISONS OR MIND-READING.
+  {
+    for (const bad of [
+      'the seller side was arguably more valuable than the viewing.',
+      'the bigger opportunity of the two was never touched.',
+      'that seller lead was worth far more than the viewing.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(bad, relSupport()), 'unsupported_comparative',
+        `nothing on file ranks the two opportunities: "${bad}"`);
+    }
+    for (const bad of [
+      'before anyone else even knew it was coming to market.',
+      'no other agent knew about it yet.',
+      'the agency probably thought it was just a viewing request.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(bad, relSupport()), 'third_party_knowledge',
+        `a mind-state nobody evidenced must be caught: "${bad}"`);
+    }
+    // THE MUST-PASS. A statement of general market PRACTICE is not a claim
+    // about who knew about this property, and it is pinned-good copy.
+    assert.strictEqual(
+      findUnsupportedRelationship('Worth knowing how rare that is: most branches work the buying side of a message like mine and never notice the second half.', relSupport()),
+      null, 'a general market-practice observation is not a third-party knowledge claim');
+    ok('D4 [rules 44/46, tests E/F]: invented value comparisons and third-party/internal mind-states are rejected, while a general market-practice observation stays valid');
+  }
+
+  // D5 [rule 43] — A CAUSAL JOIN MAY NOT MANUFACTURE AN EXCHANGE.
+  // Scoped deliberately: ordinary commercial implication is the email's job
+  // and is untouched. What is rejected is "you did X, so I did Y".
+  {
+    assert.strictEqual(findUnsupportedRelationship('You asked, so I replied confirming I had a property to sell.', relSupport()),
+      'unsupported_causal_link', 'a cause-and-effect exchange with a prospect action is invented');
+    for (const good of [
+      'That meant the valuation was never booked and the seller side never opened.',
+      'So the buyer side moved forward, while the potential seller was missed entirely.',
+      'So 1 enquiry got a fast first reply and 0 follow-ups after it.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(good, relSupport()), null,
+        `agency-side commercial implication is the email's job and must survive: "${good}"`);
+    }
+    ok('D5 [rule 43]: a causal join that manufactures a prospect response is rejected; agency-side commercial implication is untouched');
+  }
+
+  // D6 [rules 41-48] — END TO END, AND NEVER BANKED.
+  // A relationship failure is a truth failure: repaired once, and if the
+  // repair misses the field blanks rather than persisting a sentence the agent
+  // can disprove.
+  {
+    const repaired = await run({
+      probe: REL_PROBE, findings: [POSITIVE, SELLER_MISSED],
+      reply: (call) => (call === 1
+        ? baseAnswer({ email_observation: 'I was already on the phone with you twice, and still told you I had a property to sell.' })
+        : baseAnswer({ email_observation: "You called twice, but the seller declaration from my original enquiry was never picked up." })),
+    });
+    assert.strictEqual(repaired.calls, 2, 'the relocated declaration is rejected and one repair is attempted');
+    assert.match(repaired.row.email_observation, /from my original enquiry/i,
+      'and the provenance-correct version is what persists');
+
+    // A PRE-EXISTING INTERACTION, PINNED SO IT IS VISIBLE RATHER THAN
+    // REDISCOVERED. The brief's own suggested repair wording ends "...my
+    // original enquiry was never progressed", which the UNFAIR-OUTCOME guard
+    // reads as "enquiry ... never progressed" — its entity scan takes the
+    // nearest noun it knows, and that is "enquiry" rather than "declaration".
+    // That guard predates this layer and is out of scope here, so the
+    // end-to-end repair above uses wording that clears both. D2 pins the
+    // brief's exact sentence against the rule it is actually about.
+    assert.strictEqual(
+      readsAsUnfairOutcomeCriticism('the seller declaration in my original enquiry was never progressed.'), true,
+      'documented: the unfair-outcome guard claims this phrasing first — a known, pre-existing interaction, not a relationship failure');
+    assert.strictEqual(
+      findUnsupportedRelationship('the seller declaration in my original enquiry was never progressed.', relSupport()), null,
+      'and the relationship layer itself is entirely happy with it');
+
+    const unrepaired = await run({
+      probe: REL_PROBE, findings: [POSITIVE, SELLER_MISSED],
+      reply: () => baseAnswer({ email_commercial_hook: 'the seller side was arguably more valuable than the viewing.' }),
+    });
+    assert.strictEqual(has(unrepaired.row.email_commercial_hook), false,
+      'an unrepaired relationship failure is never banked as a soft fallback');
+    for (const reason of RELATIONSHIP_REASONS) {
+      assert.strictEqual(NEVER_PERSIST_REASONS.has(reason), true,
+        `${reason} must be a never-persist reason, not a bankable wording preference`);
+    }
+    ok('D6 [rules 41-48]: relationship failures flow through the existing correction budget, repair into the supported wording, and never bank when the repair misses');
+  }
+
+  // D7 [rule 27 + 41/47 upstream] — THE FINDINGS LAYER OBEYS THE RULES ITSELF.
+  // prb_mt0puwtj_1r7vrh's finding CONTAINED "once he confirmed it" while its
+  // evidence showed only that the agency asked. Personalisation rewriting that
+  // into something plausible would leave the false finding persisted and still
+  // authoritative, so it is cleaned where it is written.
+  {
+    const contaminated = {
+      finding_type: 'problem',
+      finding: 'The agency asked whether he was selling once he confirmed it.',
+      evidence: 'Agency message: "Do you have a property to sell?"',
+      significance_note: 'They asked for something already on file.',
+    };
+    assert.strictEqual(findingInventsProspectResponse(contaminated), true,
+      'a finding asserting a prospect confirmation its own evidence does not record is contaminated');
+
+    const cleaned = _diagnosisInternal.sanitizeFindings([contaminated], { max: 3 });
+    assert.strictEqual(cleaned.length, 1, 'the finding survives — the real commercial point is not thrown away');
+    assert.strictEqual(/once he confirmed/i.test(cleaned[0].finding), false,
+      'but the invented confirmation is gone from what gets persisted');
+    assert.match(cleaned[0].finding, /asked whether he was selling/i,
+      'and what remains is the genuine finding: they asked for something already declared');
+
+    // Third-person analytic wording that is CORRECT must survive untouched —
+    // and note the asymmetry this pins: the downstream prospect-reply guard is
+    // first-person only, precisely so this analytic voice is never flagged.
+    const fine = {
+      finding_type: 'problem',
+      finding: 'The agency asked whether he was selling, despite the enquiry already declaring it.',
+      evidence: 'Agency message: "Do you have a property to sell?"',
+      significance_note: 'They asked for something already on file.',
+    };
+    assert.strictEqual(findingInventsProspectResponse(fine), false, 'correct analytic wording is not contaminated');
+    assert.deepStrictEqual(_diagnosisInternal.sanitizeFindings([fine], { max: 3 })[0].finding, fine.finding,
+      'and passes through byte-identical');
+    assert.strictEqual(claimsProspectReply('That seller was already engaging with your agency as a buyer.'), false,
+      'the downstream guard stays first-person, so analytic third-person copy is never caught by it');
+    ok('D7 [rule 27 + 41/47]: an invented prospect confirmation is stripped from the finding AT SOURCE, the genuine finding survives, and correct analytic wording is untouched');
+  }
+
+  // D8 [test H] — GOOD COPY NON-REGRESSION, AT SCALE.
+  //
+  // Every distinct piece of gated prose across the suites that actually drive
+  // personaliseProbe(), checked against the whole relationship layer under the
+  // support set most likely to produce a false positive. This is the block
+  // that makes "support-relative, not a blacklist" a measured claim rather
+  // than an intention: if any detector were really a phrase list, this corpus
+  // is where it would show.
+  //
+  // The master suite itself is excluded — it is full of deliberate violations,
+  // and scanning it would be circular. novus-demo-selftest is excluded for a
+  // different and more interesting reason, pinned separately below.
+  {
+    const GATED_PATH_SUITES = SIBLING_SUITES.filter((suite) => suite !== 'novus-demo-selftest.mjs');
+    const prose = (suite) => {
+      const source = readFileSync(path.join(here, suite), 'utf8');
+      const matches = source.match(/(?:email_observation|email_commercial_hook|email_commercial_hook_email_2|fair_observation|main_finding|commercial_consequence): (?:'[^']{15,}'|"[^"]{15,}")/g) || [];
+      return matches.map((m) => m.replace(/^[a-z_0-9]+: ['"]/, '').replace(/['"]$/, ''));
+    };
+    const corpus = [...new Set(GATED_PATH_SUITES.flatMap(prose))];
+    assert.ok(corpus.length >= 40, `the corpus must be substantial, got ${corpus.length}`);
+    const flagged = corpus
+      .map((line) => [line, findUnsupportedRelationship(line, relSupport())])
+      .filter(([, reason]) => reason);
+    assert.deepStrictEqual(flagged, [],
+      `existing gated prose must be untouched by the relationship layer:\n${flagged.map(([l, r]) => `  [${r}] ${l}`).join('\n')}`);
+    ok(`D8 [test H]: all ${corpus.length} distinct gated prose fixtures across the gate-driving suites pass the relationship layer unchanged`);
+  }
+
+  // D9 [rule 45] — A REAL VIOLATION IN FIXTURE DATA, REPORTED RATHER THAN
+  // QUIETLY PASSED OR QUIETLY EDITED.
+  //
+  // Two commercial_consequence strings in novus-demo-selftest call a merely
+  // POTENTIAL seller opportunity "the instruction", which is exactly the
+  // certainty upgrade rule 45 forbids. They are not a production regression:
+  // they are pre-built PERSONALISATION SHEET ROWS handed straight to the demo
+  // compiler, so they never traverse personaliseProbe's gates and this layer
+  // never sees them. Had they come through the gate they would be rejected —
+  // which is precisely what this block asserts.
+  //
+  // Left in place deliberately. Rewriting another suite's demo fixtures is an
+  // unrelated change, and silently excluding them would hide the finding. This
+  // pins the truth: the rule works, the fixtures are wrong, and the two facts
+  // are recorded rather than reconciled by fudging either.
+  {
+    const demoFixtures = (readFileSync(path.join(here, 'novus-demo-selftest.mjs'), 'utf8')
+      .match(/commercial_consequence: '[^']{15,}'/g) || [])
+      .map((m) => m.replace(/^[a-z_0-9]+: '/, '').replace(/'$/, ''))
+      .filter((line) => /\binstruction\b/i.test(line));
+    assert.ok(demoFixtures.length >= 1, 'the fixtures this block documents must still exist');
+    for (const fixture of demoFixtures) {
+      assert.strictEqual(findUnsupportedRelationship(fixture, relSupport()), 'certainty_upgrade',
+        `this demo fixture upgrades a potential opportunity into a won instruction: "${fixture}"`);
+    }
+    ok(`D9 [rule 45]: ${demoFixtures.length} ungated demo fixtures genuinely violate the certainty rule and are recorded as such — they bypass the gate, so no production copy regresses`);
   }
 
   console.log(`\n${passed} checks passed.`);
