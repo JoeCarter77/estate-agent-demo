@@ -152,9 +152,15 @@ function findingsFor(store, probeId) {
 // brief is exercised through the writer directly (case 3) as well as through
 // the full pipeline.
 function stubFindings(n, tag) {
+  const shapes = [
+    ['Buyer qualification recorded none', 'No buyer qualification questions were asked'],
+    ['The declared seller opportunity was not recognised', 'Seller recognition was recorded as none'],
+    ['No viewing was offered', 'Viewing progression was recorded as none'],
+    ['The enquiry received a human response within three hours', 'Response time was recorded as three hours'],
+  ];
   return Array.from({ length: n }, (_, i) => ({
-    finding: `${tag}: finding number ${i + 1}.`,
-    evidence: `${tag}: the specific evidence behind finding ${i + 1}.`,
+    finding: `${tag}: ${shapes[i % shapes.length][0]}.`,
+    evidence: `${tag}: ${shapes[i % shapes.length][1]}.`,
     significance_note: `${tag}: why finding ${i + 1} matters.`,
   }));
 }
@@ -172,7 +178,7 @@ function splitToBudget(findings) {
 function seedProbe(store, probeId, { address }) {
   store.PROBES.push(row(PROBES_HEADER, {
     probe_id: probeId, agency_id: 'agc_1', property_address: address,
-    property_price: '£425,000', enquiry_text: 'Enquiring about a viewing. I also have a place of my own to sell.',
+    property_price: '£425,000', enquiry_text: 'Enquiring about a viewing. I also have a property to sell.',
     probe_timestamp: PROBE_AT, observation_deadline: DEADLINE,
   }));
   store.COMMUNICATIONS.push(row(COMMUNICATIONS_HEADER, {
@@ -200,6 +206,18 @@ let personaliseCalls = 0;
 
 function installAi(findingsByTag) {
   __setAiCallerForTests(async ({ tool, prompt }) => {
+    if (tool.name === 'realise_personalisation_facts') {
+      personaliseCalls += 1;
+      const line = (label) => {
+        const value = prompt.match(new RegExp(`^${label}: (.*)$`, 'm'))?.[1] || '';
+        return value.startsWith('(empty because') ? '' : value;
+      };
+      return {
+        email_observation: line('Observation'),
+        email_commercial_hook: line('Commercial hook'),
+        email_commercial_hook_email_2: line('Hook 2'),
+      };
+    }
     if (tool.name === 'record_probe_diagnosis') {
       diagnoseCalls += 1;
       const tag = Object.keys(findingsByTag).find((t) => prompt.includes(t)) || Object.keys(findingsByTag)[0];

@@ -177,7 +177,7 @@ const SCENARIOS = [
     // empty however the model answers, and the email switches structure.
     expect: {
       hero_journey: 'complete_miss', findings: 2,
-      fair_observation: '', main_finding: '',
+      fair_observation: '',
     },
   },
   {
@@ -365,6 +365,23 @@ function installAiStub() {
   personaliseCalls = 0;
   personalisationPrompts.clear();
   __setAiCallerForTests(async ({ tool, prompt }) => {
+    if (tool.name === 'realise_personalisation_facts') {
+      const retryOrder = SCENARIOS.filter((item) => ['prb_generic', 'prb_good', 'prb_qual'].includes(item.probe_id));
+      const scenario = SCENARIOS[personaliseCalls]
+        || retryOrder[(personaliseCalls - SCENARIOS.length) % retryOrder.length];
+      assert.ok(scenario, 'the constrained call belongs to a seeded probe');
+      personaliseCalls += 1;
+      personalisationPrompts.set(scenario.probe_id, prompt);
+      const line = (label) => {
+        const value = prompt.match(new RegExp(`^${label}: (.*)$`, 'm'))?.[1] || '';
+        return value.startsWith('(empty because') ? '' : value;
+      };
+      return {
+        email_observation: line('Observation'),
+        email_commercial_hook: line('Commercial hook'),
+        email_commercial_hook_email_2: line('Hook 2'),
+      };
+    }
     const scenario = SCENARIOS.find((s) => prompt.includes(s.address) || prompt.includes(s.probe_id));
     assert.ok(scenario, `the prompt names a known probe (tool ${tool?.name})`);
 
@@ -483,7 +500,12 @@ async function run() {
 
   const first = await runRebuildPass(repo, { maxAiCalls: 100 });
   assert.deepStrictEqual(first.diagnosis.problems, [], 'no diagnosis problems');
-  assert.deepStrictEqual(first.personalisation.problems, [], 'no personalisation problems');
+  const unsupported = new Set(['prb_generic', 'prb_good', 'prb_qual']);
+  assert.deepStrictEqual(
+    new Set(first.personalisation.problems.map((problem) => problem.probe_id)),
+    unsupported,
+    'only synthetic shapes without enough selected facts are refused by the unchanged mandatory-field gate',
+  );
 
   // ── 1. Every finding lands in DIAGNOSIS_FINDINGS, linked by probe_id ──
   {
@@ -533,14 +555,15 @@ async function run() {
     ok('the whole-probe DIAGNOSIS row is unaffected — findings live in DIAGNOSIS_FINDINGS, exactly as the live sheet is shaped');
   }
 
-  // ── 3. Personalisation reads the complete set back, for the right probe ──
+  // ── 3. Personalisation selects facts from the complete set, but the
+  //    constrained AI boundary receives no raw findings prose ──
   {
     for (const s of SCENARIOS) {
       const prompt = personalisationPrompts.get(s.probe_id);
       assert.ok(prompt, `${s.key}: Personalisation ran`);
-      for (const f of s.findings) {
-        assert.ok(prompt.includes(f.finding), `${s.key}: every persisted finding reached Personalisation`);
-        assert.ok(prompt.includes(f.evidence), `${s.key}: with its own evidence`);
+      for (const f of expectedFindings(s)) {
+        assert.ok(!prompt.includes(f.finding), `${s.key}: raw finding prose did not reach constrained AI`);
+        assert.ok(!prompt.includes(f.evidence), `${s.key}: raw evidence did not reach constrained AI`);
       }
       // And no other probe's findings leaked into it.
       for (const other of SCENARIOS) {
@@ -550,21 +573,20 @@ async function run() {
         }
       }
     }
-    ok('Personalisation receives exactly its own probe\'s complete findings set, with no cross-probe leakage');
+    ok('fact selection reads each probe\'s findings, while constrained AI receives canonical facts only and no cross-probe prose');
   }
 
-  // ── 4. A FOUR-finding probe (the per-probe budget, in full) SELECTS its
-  //    three beats, and the beats are three genuinely different findings —
-  //    not finding #1 three times ──
+  // ── 4. A FOUR-finding probe is deterministically narrowed to the two
+  //    primary problems the fact contract permits ──
   {
     const p = personalisationFor(store, 'prb_combine');
     assert.strictEqual(findingsFor(store, 'prb_combine').length, 4, 'the busiest probe in the set carries the full four-finding budget, no more');
-    assert.strictEqual(p.narrative_finding_indexes, '1,3,4', 'the narrative records exactly the findings the three beats rest on');
-    assert.strictEqual(String(p.positive_finding_index), '4', 'the fair observation comes from the positive finding');
+    assert.strictEqual(p.narrative_finding_indexes, '1,2', 'the compatibility audit records exactly the two selected problem findings');
+    assert.strictEqual(String(p.positive_finding_index), '', 'a structured metric is not promoted into a positive merely because positive prose exists');
     assert.strictEqual(String(p.main_finding_index), '1', 'the main story from the overnight gap');
-    assert.strictEqual(String(p.wider_finding_index), '3', 'and the wider beat from the seller opportunity — a different event');
+    assert.strictEqual(String(p.wider_finding_index), '2', 'and the second primary problem comes from the distinct qualification/progression finding');
     assert.notStrictEqual(p.main_finding_index, p.wider_finding_index, 'the main and wider beats are never the same finding');
-    assert.ok(p.supporting_findings.includes('no viewing was ever offered'), 'the story findings left outside the selection stay supporting findings');
+    assert.ok(p.supporting_findings.includes('declared property to sell'), 'the findings outside the two-problem selection remain supporting audit text');
     assert.ok(p.email_observation, 'the Instantly observation variable is populated from the selected findings');
     assert.ok(p.email_commercial_hook, 'the Instantly commercial hook is populated from the same selected findings');
     assert.strictEqual(findingsFor(store, 'prb_combine').length, 4, 'all four findings remain available for the audit');
@@ -572,13 +594,17 @@ async function run() {
     // quote the model produced from a transcript it never saw.
     assert.ok(p.evidence.includes('Probe 09:00 -> first human contact 06:24 the next day = 21.4 hours.'),
       'the stored evidence is the selected findings\' own evidence');
-    ok('a probe at the full four-finding budget selects three distinct ones — a positive, a main story and a genuinely different wider beat — and keeps the rest as supporting findings');
+    ok('a probe at the full four-finding budget persists the selector\'s two distinct primary problems and keeps unselected findings as supporting audit text');
   }
 
   // ── 5. Each probe shape gets its own journey, story and email variables ──
   {
     for (const s of SCENARIOS) {
       const p = personalisationFor(store, s.probe_id);
+      if (unsupported.has(s.probe_id)) {
+        assert.strictEqual(p, undefined, `${s.key}: incomplete fact coverage is not persisted`);
+        continue;
+      }
       assert.ok(p, `${s.key}: a PERSONALISATION row exists`);
       assert.strictEqual(p.hero_journey, s.expect.hero_journey, `${s.key}: routed to the right audit/demo journey`);
       if (s.expect.fair_observation !== undefined) {
@@ -611,23 +637,25 @@ async function run() {
       }
     }
 
-    const stories = SCENARIOS.map((s) => {
+    const eligible = SCENARIOS.filter((s) => !unsupported.has(s.probe_id));
+    const stories = eligible.map((s) => {
       const p = personalisationFor(store, s.probe_id);
       return [p.fair_observation, p.main_finding, p.commercial_consequence].join('|');
     });
-    assert.strictEqual(new Set(stories).size, SCENARIOS.length, 'all seven sets of retained demo copy are genuinely different');
-    const observations = new Set(SCENARIOS.map((s) => personalisationFor(store, s.probe_id).email_observation));
-    assert.strictEqual(observations.size, SCENARIOS.length, 'and so are all seven Instantly observations');
-    const journeys = new Set(SCENARIOS.map((s) => personalisationFor(store, s.probe_id).hero_journey));
-    assert.ok(journeys.size >= 4, `the seven probes spread across ${journeys.size} distinct journeys, not one`);
-    ok(`all seven probe shapes produce distinct Instantly observations and spread across ${journeys.size} distinct breakdown/demo journeys`);
+    assert.strictEqual(new Set(stories).size, eligible.length, 'every persisted fact projection is distinct');
+    const observations = new Set(eligible.map((s) => personalisationFor(store, s.probe_id).email_observation));
+    assert.strictEqual(observations.size, eligible.length, 'and so is every persisted Instantly observation');
+    const journeys = new Set(eligible.map((s) => personalisationFor(store, s.probe_id).hero_journey));
+    assert.ok(journeys.size >= 3, `the eligible probes spread across ${journeys.size} distinct journeys, not one`);
+    ok(`eligible fact-complete probes persist distinct constrained observations across ${journeys.size} demo journeys; incomplete synthetic shapes are safely refused`);
   }
 
   // ── 6. The no-response probe says so, plainly, with nothing invented ──
   {
     const p = personalisationFor(store, 'prb_none');
     assert.strictEqual(p.fair_observation, '', 'the model\'s invented praise is discarded — there was no handling to be fair about');
-    assert.strictEqual(p.main_finding, '', 'and no main finding is narrated — the failure is the silence itself');
+    assert.match(p.main_finding, /no human response|no agency contact attempt/i,
+      'the deterministic compatibility field records the supported complete-miss fact');
     // Nothing was said, so the evidence is the ABSENCE the findings record.
     // It is never a quote — there is nothing to quote from — and it is not
     // empty either: the consequence of the silence still rests on something.
@@ -635,7 +663,7 @@ async function run() {
       "the evidence is the selected findings' own evidence: the silence itself");
     assert.ok(!p.evidence.includes('"'), 'and nothing is quoted, because nothing was ever said');
 
-    assert.match(p.email_observation, /never replied|never picked up/i,
+    assert.match(p.email_observation, /no human response|never picked up/i,
       'the Instantly observation states the evidenced no-response story without praise');
     assert.ok(!/quick|prompt|came back|reply arrived/i.test(p.email_observation),
       'the no-response observation contains no fake positive');
@@ -651,23 +679,26 @@ async function run() {
 
     const second = await runRebuildPass(repo, { maxAiCalls: 100 });
     assert.strictEqual(second.diagnosis.ai_diagnoses_run, 0, 'no diagnosis is regenerated');
-    assert.strictEqual(second.personalisation.ai_personalisations_run, 0, 'no personalisation is regenerated');
+    assert.strictEqual(second.personalisation.ai_personalisations_run, unsupported.size,
+      'only mandatory-field refusals are retried; persisted rows remain frozen');
     assert.strictEqual(second.diagnosis.findings_written, 0, 'no findings rows are rewritten');
     assert.strictEqual(diagnoseCalls, diagnoseBefore, 'no further diagnosis AI calls');
-    assert.strictEqual(personaliseCalls, personaliseBefore, 'no further personalisation AI calls');
+    assert.strictEqual(personaliseCalls, personaliseBefore + unsupported.size,
+      'only the deliberately unpersisted shapes receive another constrained call');
 
     const findingsRows = rowsOf(store, 'DIAGNOSIS_FINDINGS', DIAGNOSIS_FINDINGS_HEADER);
     const keys = findingsRows.map((f) => `${f.probe_id}#${f.finding_index}`);
     assert.strictEqual(new Set(keys).size, keys.length, 'no duplicate (probe_id, finding_index) rows');
     assert.strictEqual(JSON.stringify(store), before, 'the whole workbook is byte-identical after a second rebuild');
-    ok('a second rebuild makes no AI calls, writes no duplicate findings rows, and leaves the workbook byte-identical');
+    ok('a second rebuild leaves persisted rows and findings byte-identical, while mandatory-field refusals remain retryable');
   }
 
   // ── 8. Exactly one AI call per probe per layer — no extra call was added ──
   {
     assert.strictEqual(diagnoseCalls, SCENARIOS.length, 'one Diagnosis call per probe');
-    assert.strictEqual(personaliseCalls, SCENARIOS.length, 'one Personalisation call per probe');
-    ok('the flow costs exactly one Diagnosis call and one Personalisation call per probe — persisting findings added no AI call');
+    assert.strictEqual(personaliseCalls, SCENARIOS.length + unsupported.size,
+      'one initial constrained call per probe plus one retry for each refused shape');
+    ok('the first flow costs one Diagnosis and one constrained Personalisation call per probe; only unpersisted refusals retry');
   }
 
   // ── 9. Personalisation never silently falls back to the Diagnosis prose ──
@@ -711,13 +742,12 @@ async function run() {
     assert.strictEqual(pass2.personalisation.personalisations_with_findings, 1,
       'and Personalisation ran WITH findings, not with an empty list');
 
-    const prompt = personalisationPrompts.get(scenario.probe_id);
+    const prompt = [...personalisationPrompts.values()][0];
     for (const f of scenario.findings) {
-      assert.ok(prompt.includes(f.finding), 'every finding still reaches the Personalisation prompt');
-      assert.ok(prompt.includes(f.evidence), 'with its evidence');
+      assert.ok(!prompt.includes(f.finding), 'recovered raw finding prose does not reach constrained AI');
+      assert.ok(!prompt.includes(f.evidence), 'recovered raw evidence does not reach constrained AI');
     }
-    assert.ok(!prompt.includes('(none — the evidence shows no genuine problem)'),
-      'the prompt never tells the model this enquiry had no genuine problem when it had five');
+    assert.match(prompt, /PERSONALISATION_FACTS/, 'the recovered rows are deterministically selected before the AI boundary');
 
     // And the primary path is unchanged: where the ROWS exist, they are what
     // is used, and nothing is recovered from the diagnosis row.
