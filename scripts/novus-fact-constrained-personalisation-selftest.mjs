@@ -27,9 +27,11 @@ for (const fixture of fixtures) {
   constrainedFieldCount += Object.values(gold).filter(Boolean).length;
   assert.doesNotMatch(
     Object.values(gold).join(' '),
-    /\b(?:supported facts|selected facts|declared seller opportunity|recorded progression)\b/i,
+    /\b(?:supported facts|selected facts|declared seller opportunity|recorded progression|agency-controlled|commercial weakness)\b/i,
     `${fixture.probe_id}: constrained copy avoids internal system language`,
   );
+  assert.match(gold.email_commercial_hook, /^That meant that\b/, `${fixture.probe_id}: Hook 1 uses the required opening`);
+  assert.doesNotMatch(gold.email_commercial_hook_email_2, /^That meant that\b/, `${fixture.probe_id}: Hook 2 uses a distinct opening`);
   const calls = [];
   __setAiCallerForTests(async (request) => {
     calls.push(request);
@@ -68,6 +70,20 @@ ok('all 14 probes use only observation facts at the AI boundary and pass the fac
 assert.equal(constrainedFieldCount, 42, 'all 14 × 3 constrained outreach fields are populated');
 ok('all 42 constrained outreach fields are populated from supplied facts');
 
+{
+  const facts = selectPersonalisationFacts(fixtures[8]);
+  const gold = renderCanonicalFactCopy(facts);
+  __setAiCallerForTests(async () => ({
+    ...gold,
+    email_commercial_hook: gold.email_commercial_hook.replace(/^That meant that /, ''),
+    email_commercial_hook_email_2: `That meant that ${gold.email_commercial_hook_email_2.toLowerCase()}`,
+  }));
+  const worded = await personaliseProbeFromFacts(facts, { enabled: true });
+  assert.equal(worded.email_commercial_hook, gold.email_commercial_hook);
+  assert.equal(worded.email_commercial_hook_email_2, gold.email_commercial_hook_email_2);
+}
+ok('the hook wording layer guarantees the required distinct openings');
+
 const persistentSellerMiss = renderCanonicalFactCopy(selectPersonalisationFacts(fixtures[8]));
 assert.equal(
   persistentSellerMiss.email_observation,
@@ -78,6 +94,17 @@ assert.equal(
   persistentSellerMiss.email_commercial_hook_email_2,
   'Persistence on the enquiry did not extend to the seller opportunity.',
   'the second hook is a distinct commercial framing of the same observation',
+);
+assert.equal(
+  persistentSellerMiss.email_commercial_hook,
+  'That meant that a potential valuation opportunity was left without any acknowledgement or next step.',
+  'seller-miss Hook 1 prioritises the valuation opportunity in owner-facing language',
+);
+const slowSellerMiss = renderCanonicalFactCopy(selectPersonalisationFacts(fixtures[1]));
+assert.equal(
+  slowSellerMiss.email_commercial_hook,
+  'That meant that the enquiry was sitting untouched for more than 16 hours; a potential valuation opportunity went unacknowledged.',
+  'slow-response seller misses combine both observed issues naturally',
 );
 assert.deepEqual(validateFactConstrainedOutput(selectPersonalisationFacts(fixtures[8]), {
   ...persistentSellerMiss,
