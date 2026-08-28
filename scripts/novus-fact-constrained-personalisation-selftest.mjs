@@ -106,6 +106,62 @@ assert.equal(
   'That meant that the enquiry was sitting untouched for more than 16 hours; a potential valuation opportunity went unacknowledged.',
   'slow-response seller misses combine both observed issues naturally',
 );
+const hookOnlySellerFacts = selectPersonalisationFacts({
+  findings: [
+    {
+      finding_index: 1,
+      finding_type: 'problem',
+      finding: 'Response time exceeded 16 hours and the declared property to sell was never acknowledged.',
+      evidence: 'First human response after 20 hours; seller recognition none.',
+    },
+    {
+      finding_index: 2,
+      finding_type: 'positive',
+      finding: 'The buyer was asked for availability.',
+      evidence: 'Viewing progression: availability requested.',
+    },
+  ],
+  intelligence: {
+    human_contact: 'yes',
+    response_hours: 20,
+    contact_attempts: 1,
+    follow_ups: 0,
+    viewing_progression: 'availability_requested',
+    seller_recognition: 'none',
+  },
+  probe: { enquiry_text: 'Interested in viewing. Declared: has a property to sell — it is not yet on the market.' },
+});
+const hookOnlySellerCopy = renderCanonicalFactCopy(hookOnlySellerFacts);
+assert.equal(
+  hookOnlySellerCopy.email_observation,
+  'Your team asked for my availability for a viewing, but the first human response came more than 16 hours after the enquiry.',
+  'the seller hook fact does not alter the selected observation',
+);
+assert.equal(
+  hookOnlySellerCopy.email_commercial_hook,
+  'That meant that the enquiry was sitting untouched for more than 16 hours while a potential valuation opportunity in the same message went unacknowledged.',
+);
+assert.equal(
+  hookOnlySellerCopy.email_commercial_hook_email_2,
+  "By the time the enquiry was picked up, the seller opportunity I'd already mentioned still hadn't been addressed.",
+);
+assert.deepEqual(
+  validateFactConstrainedOutput(hookOnlySellerFacts, hookOnlySellerCopy).rejections,
+  [],
+  'the preferred seller-aware hooks pass every unchanged validator',
+);
+const speedOnlyRejections = validateFactConstrainedOutput(hookOnlySellerFacts, {
+  ...hookOnlySellerCopy,
+  email_observation: 'Although your team asked for my availability for a viewing, the first human response came more than 16 hours after the enquiry.',
+  email_commercial_hook: 'That meant that the enquiry missed the chance of a prompt first response.',
+  email_commercial_hook_email_2: 'A prompt first response was the missing piece.',
+}).rejections;
+assert.deepEqual(
+  new Set(speedOnlyRejections.map((item) => item.field)),
+  new Set(['email_commercial_hook', 'email_commercial_hook_email_2']),
+  'both speed-only hooks are rejected when an unrecognised seller opportunity is retained for hooks',
+);
+ok('a hook-only seller fact overrides speed-only commercial framing without changing the observation');
 assert.deepEqual(validateFactConstrainedOutput(selectPersonalisationFacts(fixtures[8]), {
   ...persistentSellerMiss,
   email_observation: "Your team made 2 follow-up attempts, but nobody picked up on the property I'd said I had to sell, and there were no recorded questions about my position as a buyer.",
