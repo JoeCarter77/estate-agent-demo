@@ -13,7 +13,7 @@
     { "source": "/api/novus/contacts/resolution-backlog", "destination": "/api/novus/personalisation?novus_operation=resolution-backlog" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/d/(.*)", "destination": "/index.html" },
-    { "source": "/:demo_slug((?!api$|demo$|novus$|capture$|d$)[^/]+)", "destination": "/demo.html?slug=:demo_slug" }
+    { "source": "/:demo_slug((?!api$|demo$|novus$|capture$|d$)[^/]+)", "destination": "/demo.html" }
   ],
   "headers": [
     {
