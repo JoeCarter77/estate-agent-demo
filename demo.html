@@ -769,13 +769,14 @@
   const ACTS = 4;
   let demoSlug = '';
 
-  // /demo/{demo_slug} is the public route. ?slug= is accepted too so the page
-  // can be opened directly as /demo.html?slug=... while testing.
+  // /{demo_slug} is the public route; /demo/{demo_slug} remains supported.
+  // ?slug= is accepted too so the page can be opened directly while testing.
   function resolveSlug() {
     const params = new URLSearchParams(location.search);
     const fromQuery = (params.get('slug') || '').trim();
     if (fromQuery) return fromQuery;
     const segments = location.pathname.split('/').filter(Boolean);
+    if (segments.length === 1 && segments[0] !== 'demo.html') return decodeURIComponent(segments[0]);
     if (segments.length >= 2 && segments[0] === 'demo') return decodeURIComponent(segments[1]);
     return '';
   }
