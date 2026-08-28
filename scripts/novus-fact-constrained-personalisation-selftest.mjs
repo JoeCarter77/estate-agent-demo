@@ -53,13 +53,18 @@ for (const fixture of fixtures) {
     assert.ok(!prompt.includes(finding.evidence), `${fixture.probe_id}: raw finding evidence never reaches constrained AI`);
   }
   assert.match(system, /constrained surface realiser/);
+  assert.match(prompt, /OBSERVATION_FACTS:/);
+  assert.ok(prompt.includes(`FINAL_EMAIL_OBSERVATION: ${gold.email_observation}`), `${fixture.probe_id}: hooks receive the final observation`);
+  for (const fact of [...facts.consequences, ...facts.secondary_facts]) {
+    assert.ok(!prompt.includes(fact.text), `${fixture.probe_id}: hook generation receives no consequence or secondary fact text`);
+  }
   assert.match(prompt, /GOLD GRAMMAR SHAPES/);
   for (const line of Object.values(gold).filter(Boolean)) assert.ok(prompt.includes(line), `${fixture.probe_id}: gold examples contain only current supplied facts`);
 
   const validated = validateFactConstrainedOutput(facts, row);
   assert.deepEqual(validated.rejections, [], `${fixture.probe_id}: existing factual validators pass`);
 }
-ok('all 14 probes use only PERSONALISATION_FACTS at the AI boundary and pass the factual validators');
+ok('all 14 probes use only observation facts at the AI boundary and pass the factual validators');
 assert.equal(constrainedFieldCount, 42, 'all 14 × 3 constrained outreach fields are populated');
 ok('all 42 constrained outreach fields are populated from supplied facts');
 
@@ -71,8 +76,8 @@ assert.equal(
 );
 assert.equal(
   persistentSellerMiss.email_commercial_hook_email_2,
-  'There was persistence on the enquiry, but the seller opportunity was never recognised.',
-  'the invalid response-dependent second hook is replaced with the requested agency-controlled framing',
+  'Persistence on the enquiry did not extend to the seller opportunity.',
+  'the second hook is a distinct commercial framing of the same observation',
 );
 assert.deepEqual(validateFactConstrainedOutput(selectPersonalisationFacts(fixtures[8]), {
   ...persistentSellerMiss,
@@ -101,12 +106,60 @@ const unknownFacts = {
   consequences: [],
   secondary_facts: [{ type: 'communication_content_unknown', text: 'The recorded communication has no available content or transcript; what was discussed is unknown.', provenance: [] }],
 };
-assert.match(renderCanonicalFactCopy(unknownFacts).email_commercial_hook_email_2, /unknown/i);
+assert.doesNotMatch(renderCanonicalFactCopy(unknownFacts).email_commercial_hook_email_2, /unknown|transcript|content/i);
 assert.deepEqual(validateFactConstrainedOutput(unknownFacts, {
   ...renderCanonicalFactCopy(unknownFacts),
   email_commercial_hook_email_2: 'Nothing was mentioned on that call.',
 }).rejections.map((item) => item.reason).some((reason) => /unknown_call_certainty|unsupported voicemail/i.test(reason)), true);
-ok('unknown communication content remains unknown and certainty upgrades are rejected');
+ok('secondary uncertainty facts cannot introduce a new hook claim, while certainty upgrades remain rejected');
+
+{
+  const facts = selectPersonalisationFacts(fixtures[8]);
+  const gold = renderCanonicalFactCopy(facts);
+  const paraphraseReasons = validateFactConstrainedOutput(facts, {
+    ...gold,
+    email_commercial_hook: gold.email_observation,
+  }).rejections.filter((item) => item.field === 'email_commercial_hook').map((item) => item.reason).join('\n');
+  assert.match(paraphraseReasons, /restates_observation/);
+
+  for (const forbidden of [
+    'That was £20,000 in lost revenue.',
+    'That meant a lost instruction.',
+    'That meant a lost fee.',
+    'That was a lost valuation.',
+    'That was a lost client.',
+  ]) {
+    const reasons = validateFactConstrainedOutput(facts, { ...gold, email_commercial_hook: forbidden })
+      .rejections.filter((item) => item.field === 'email_commercial_hook').map((item) => item.reason).join('\n');
+    assert.match(reasons, /forbidden commercial loss claim|numeric commercial impact|invented commercial loss/);
+  }
+
+  assert.deepEqual(validateFactConstrainedOutput(facts, {
+    ...gold,
+    email_commercial_hook: 'The seller opportunity was left untouched.',
+  }).rejections, [], 'a conservative observation-implied seller frame remains allowed');
+}
+ok('hooks reject paraphrase, commercial loss and numeric impact while allowing conservative seller framing');
+
+{
+  const facts = selectPersonalisationFacts(fixtures[8]);
+  const gold = renderCanonicalFactCopy(facts);
+  const prompts = [];
+  let call = 0;
+  __setAiCallerForTests(async ({ prompt }) => {
+    prompts.push(prompt);
+    call += 1;
+    return call === 1
+      ? { ...gold, email_commercial_hook: 'That meant a lost instruction.' }
+      : { ...gold, email_observation: 'A changed observation that must not survive.' };
+  });
+  const row = await personaliseProbeFromFacts(facts, { enabled: true });
+  assert.equal(row.email_observation, gold.email_observation);
+  assert.equal(row.ai_calls_used, 2);
+  assert.match(prompts[1], /observation is locked/i);
+  assert.match(prompts[1], new RegExp(`FINAL_EMAIL_OBSERVATION: ${gold.email_observation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+}
+ok('a valid final observation is locked byte-for-byte during hook-only repair');
 
 const completeMiss = selectPersonalisationFacts(fixtures[0]);
 const malicious = {
