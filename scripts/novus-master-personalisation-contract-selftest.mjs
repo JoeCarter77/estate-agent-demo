@@ -1105,20 +1105,14 @@ async function main() {
     assert.match(repaired.row.email_observation, /from my original enquiry/i,
       'and the provenance-correct version is what persists');
 
-    // A PRE-EXISTING INTERACTION, PINNED SO IT IS VISIBLE RATHER THAN
-    // REDISCOVERED. The brief's own suggested repair wording ends "...my
-    // original enquiry was never progressed", which the UNFAIR-OUTCOME guard
-    // reads as "enquiry ... never progressed" — its entity scan takes the
-    // nearest noun it knows, and that is "enquiry" rather than "declaration".
-    // That guard predates this layer and is out of scope here, so the
-    // end-to-end repair above uses wording that clears both. D2 pins the
-    // brief's exact sentence against the rule it is actually about.
+    // The wording D10 restored. Both guards are now happy with it, which is
+    // what makes the brief's own suggested repair sentence usable end to end.
     assert.strictEqual(
-      readsAsUnfairOutcomeCriticism('the seller declaration in my original enquiry was never progressed.'), true,
-      'documented: the unfair-outcome guard claims this phrasing first — a known, pre-existing interaction, not a relationship failure');
+      readsAsUnfairOutcomeCriticism('the seller declaration in my original enquiry was never progressed.'), false,
+      'the passive, agency-owned criticism is no longer claimed by the unfair-outcome guard (see D10)');
     assert.strictEqual(
       findUnsupportedRelationship('the seller declaration in my original enquiry was never progressed.', relSupport()), null,
-      'and the relationship layer itself is entirely happy with it');
+      'and the relationship layer is happy with it too');
 
     const unrepaired = await run({
       probe: REL_PROBE, findings: [POSITIVE, SELLER_MISSED],
@@ -1227,6 +1221,84 @@ async function main() {
         `this demo fixture upgrades a potential opportunity into a won instruction: "${fixture}"`);
     }
     ok(`D9 [rule 45]: ${demoFixtures.length} ungated demo fixtures genuinely violate the certainty rule and are recorded as such — they bypass the gate, so no production copy regresses`);
+  }
+
+
+  // ══ Section D10: THE UNFAIR-OUTCOME FALSE POSITIVE ═══════════════════════
+  //
+  // The guard exists to stop the email blaming the agency for OUR silence. It
+  // was reading the entity and the verb and ignoring the VOICE, and voice is
+  // the entire distinction:
+  //
+  //   "the enquiry never MOVED FORWARD"      active, intransitive. An enquiry
+  //     moves forward only while both sides keep going, and we deliberately
+  //     stopped. Blaming them for that is unfair, and stays rejected.
+  //
+  //   "the seller side WAS NEVER PROGRESSED" passive; the implied actor is the
+  //     agency. Offering a valuation, asking a qualifying question, booking an
+  //     appraisal — all things they could do alone, on the day, with no reply
+  //     from us. Fair, useful, and it was being deleted.
+  //
+  // The `[^.!?]{0,28}` gap swallowed the passive auxiliary, so `was`/`were`
+  // never reached the match and both sentences looked identical to the guard.
+  {
+    for (const fair of [
+      'the seller declaration in my original enquiry was never progressed',
+      'the seller side was never progressed',
+      'the seller opportunity was never progressed into a valuation',
+      'the declared property to sell was never progressed',
+      "You called twice, but the seller declaration in my original enquiry was never progressed.",
+    ]) {
+      assert.strictEqual(readsAsUnfairOutcomeCriticism(fair), false,
+        `agency-owned criticism in the passive must be sayable: "${fair}"`);
+    }
+
+    // THE ACTIVE FORMS ARE UNCHANGED. Nothing below is newly allowed.
+    for (const unfair of [
+      'nothing progressed',
+      'the enquiry never moved forward',
+      'the buyer side never progressed',
+      'the opportunity never went anywhere',
+      'the viewing never got booked',
+      'neither opportunity became a conversation',
+      'None of it moved forward.',
+    ]) {
+      assert.strictEqual(readsAsUnfairOutcomeCriticism(unfair), true,
+        `criticism that needed MY reply must stay rejected: "${unfair}"`);
+    }
+
+    // TWO-WAY ENTITIES ARE THE EXCEPTION, IN BOTH VOICES. A conversation is
+    // not something one party can progress alone, so the passive gets it no
+    // exemption — this is what stops the fix becoming a loophole.
+    for (const twoWay of [
+      'the conversation was never progressed',
+      'the thread was never progressed',
+      'the conversation never went anywhere',
+    ]) {
+      assert.strictEqual(readsAsUnfairOutcomeCriticism(twoWay), true,
+        `a two-way entity cannot be progressed by the agency alone: "${twoWay}"`);
+    }
+
+    // A REQUIRED-FAIL CASE THAT WAS SILENTLY PASSING. The quantifier
+    // alternation knew the pronoun forms only, so the same claim with the
+    // number spelled out went straight through.
+    for (const counted of [
+      'none of the four attempts became a real conversation',
+      'not one of the three attempts became a conversation',
+    ]) {
+      assert.strictEqual(readsAsUnfairOutcomeCriticism(counted), true,
+        `a counted quantifier is the same unfair claim: "${counted}"`);
+    }
+    assert.strictEqual(readsAsUnfairOutcomeCriticism('none of them became a real conversation'), true,
+      'and the pronoun form it already caught is unchanged');
+
+    // The fairness GATE itself is untouched: this is still only ever applied
+    // on a probe where the agency genuinely put the ball back in our court.
+    assert.strictEqual(agencyMadeNextStepAttempt({ human_contact: 'yes', viewing_progression: 'invited' }), true,
+      'agencyMadeNextStepAttempt is unchanged');
+    assert.strictEqual(agencyMadeNextStepAttempt({ human_contact: 'none' }), false,
+      'and still false where nobody came back at all');
+    ok('D10 [rules 25/35/36]: passive, agency-owned "was never progressed" is sayable again; active self-motion claims, two-way entities and counted quantifiers all stay rejected');
   }
 
   console.log(`\n${passed} checks passed.`);
