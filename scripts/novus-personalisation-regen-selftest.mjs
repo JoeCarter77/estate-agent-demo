@@ -166,7 +166,7 @@ function seed(store, ids, { withPersonalisation }) {
     store.INTELLIGENCE.push(row(INTELLIGENCE_HEADER, {
       probe_id: probeId, agency_id: `agc_${probeId}`, observation_status: 'closed',
       human_contact: 'yes', response_hours: 5, contact_attempts: 1, follow_ups: 0,
-      channels_used: 'email', communication_quality: 'generic', grade: 'D',
+      channels_used: 'email', viewing_progression: 'none', communication_quality: 'generic', grade: 'D',
       grade_reason: 'Pre-seeded.',
     }));
     store.DIAGNOSIS.push(row(DIAGNOSIS_HEADER, {
@@ -175,9 +175,9 @@ function seed(store, ids, { withPersonalisation }) {
     }));
     store.DIAGNOSIS_FINDINGS.push(row(DIAGNOSIS_FINDINGS_HEADER, {
       probe_id: probeId, finding_index: 1, finding_type: 'problem',
-      finding: 'Nobody asked what we were looking for.',
-      evidence: 'The reply never asked a single question about the search.',
-      significance_note: 'A buyer already in the inbox stayed anonymous.',
+      finding: 'The buyer enquiry was not progressed to a viewing invitation.',
+      evidence: 'Viewing progression was recorded as none.',
+      significance_note: 'The buyer enquiry had no concrete next step.',
     }));
     store.DIAGNOSIS_FINDINGS.push(row(DIAGNOSIS_FINDINGS_HEADER, {
       probe_id: probeId, finding_index: 2, finding_type: 'positive',
@@ -234,7 +234,31 @@ const FIRST_ANSWER = {
 function installAiStub({ correctionFails = false, firstAnswerFails = false } = {}) {
   let personaliseCalls = 0;
   let correctionCalls = 0;
-  __setAiCallerForTests(async ({ tool }) => {
+  __setAiCallerForTests(async ({ tool, prompt }) => {
+    if (tool?.name === 'realise_personalisation_facts') {
+      personaliseCalls += 1;
+      if (firstAnswerFails) {
+        throw new AiStructuredOutputError('Model response hit max_tokens before the tool result was complete', {
+          truncated: true, missing: ['email_commercial_hook_email_2'],
+        });
+      }
+      if (personaliseCalls % 2 === 1) {
+        return {
+          email_observation: 'After I replied, you called three times about a new seller instruction.',
+          email_commercial_hook: 'That caused a sale.',
+          email_commercial_hook_email_2: 'Every branch lost £20,000.',
+        };
+      }
+      const line = (label) => {
+        const value = prompt.match(new RegExp(`^${label}: (.*)$`, 'm'))?.[1] || '';
+        return value.startsWith('(empty because') ? '' : value;
+      };
+      return {
+        email_observation: line('Observation'),
+        email_commercial_hook: line('Commercial hook'),
+        email_commercial_hook_email_2: line('Hook 2'),
+      };
+    }
     if (tool?.name === 'correct_probe_personalisation_fields') {
       correctionCalls += 1;
       if (correctionFails) {
@@ -284,15 +308,13 @@ async function run() {
     ]);
     const untouchedBefore = unrelatedRows();
 
-    const stub = installAiStub({ correctionFails: true });
+    const stub = installAiStub();
     const summary = await runRebuildPass(repo, {
       maxAiCalls: 15, probeIds: TARGETS,
     });
 
-    // Every one of the five needed the bounded correction, and every
-    // correction call failed the wire's contract. Before the fix that
-    // rethrew, losing a complete gated answer the probe already had.
-    assert.strictEqual(stub.counts().correctionCalls, TARGETS.length, 'every targeted probe reached the bounded correction');
+    assert.strictEqual(stub.counts().personaliseCalls, TARGETS.length * 2,
+      'every target reaches the fact-constrained validator and its one bounded facts-only correction');
     assert.deepStrictEqual(summary.personalisation.problems, [], 'a failed correction is not a failed probe');
     assert.strictEqual(summary.personalisation.personalisation_created, TARGETS.length,
       'all five eligible targeted probes regenerate PERSONALISATION');
@@ -303,13 +325,11 @@ async function run() {
       const written = personalised.get(probeId);
       assert.ok(written, `${probeId} has a PERSONALISATION row`);
       assert.ok(String(written.primary_narrative).trim(), `${probeId} has the finalised signal set`);
-      // The soft fallback: the sanitised original of the field the correction
-      // never came back to fix, not a blank.
       assert.ok(String(written.email_commercial_hook).trim(),
-        `${probeId} keeps the sanitised original hook rather than persisting a blank`);
+        `${probeId} persists a supplied deterministic consequence`);
       assert.ok(String(written.email_observation).trim(), `${probeId} keeps its email observation`);
     }
-    ok('a probe whose bounded correction call fails still gets its PERSONALISATION row, from the complete gated answer attempt 1 already produced');
+    ok('all targeted fact-complete probes reject invented first drafts and regenerate complete constrained PERSONALISATION rows');
 
     // 2. The demos.
     assert.strictEqual(summary.demos.demos_created, TARGETS.length, 'the five DEMOS compile in the same pass');
@@ -318,7 +338,7 @@ async function run() {
     for (const probeId of TARGETS) assert.ok(demoProbeIds.has(probeId), `${probeId} has a DEMOS row`);
     ok('PERSONALISATION completing compiles the five DEMOS rows in the same invocation');
 
-    // 3. The counters. Ten calls were spent; the summary says ten.
+    // 3. The counters report the constrained calls actually spent.
     const p = summary.personalisation;
     assert.strictEqual(p.ai_personalisations_run, stub.counts().personaliseCalls + stub.counts().correctionCalls,
       'ai_personalisations_run reports every AI call actually spent, correction calls included');
@@ -369,7 +389,7 @@ async function run() {
       maxAiCalls: 15, probeIds: TARGETS.slice(0, 1),
     });
 
-    assert.strictEqual(stub.counts().personaliseCalls, 2, 'both attempts were spent on the unusable answer');
+    assert.strictEqual(stub.counts().personaliseCalls, 1, 'a transport-level failure stops before any candidate can be persisted');
     assert.strictEqual(summary.personalisation.personalisation_created, 0, 'no half row is persisted');
     assert.strictEqual(summary.personalisation.problems.length, 1, 'the probe is reported as a problem');
     assert.strictEqual(summary.personalisation.personalisations_with_findings, 0,
