@@ -1294,13 +1294,52 @@ async function main() {
     assert.strictEqual(readsAsUnfairOutcomeCriticism('none of them became a real conversation'), true,
       'and the pronoun form it already caught is unchanged');
 
+    // THE SAME FALSE POSITIVE IN THE QUANTIFIER RULES. "both leads were never
+    // progressed" and "neither side was ever progressed" belong to exactly the
+    // class above — passive, agency-owned — but were rejected by the separate
+    // "both …"/"neither …" patterns, which triggered on a bare `never`/verb
+    // without looking at voice at all. Progressing two opportunities is two
+    // things the agency could have done on the day, on its own.
+    for (const fair of [
+      'both leads were never progressed',
+      'both sides were never progressed',
+      'both opportunities were never progressed',
+      'neither side was ever progressed',
+      'neither lead was ever progressed',
+      'neither opportunity was progressed',
+    ]) {
+      assert.strictEqual(readsAsUnfairOutcomeCriticism(fair), false,
+        `agency-owned progression in the passive must be sayable under any quantifier: "${fair}"`);
+    }
+
+    // AND THE TWO-WAY COMPLETIONS UNDER THE SAME QUANTIFIERS STAY REJECTED.
+    // This is the boundary that stops the exemption becoming a loophole:
+    // going anywhere, becoming a conversation, being converted or booked are
+    // all outcomes that needed us to keep talking.
+    for (const unfair of [
+      'neither lead went anywhere',
+      'both conversations went nowhere',
+      'neither side became a real conversation',
+      'neither opportunity became a conversation',
+      'neither side was ever converted',
+      'neither lead was ever booked',
+      'both sides never went anywhere',
+      'both opportunities were left hanging',
+      'both sides stayed where they started',
+      'both sides remained unprogressed',
+      'the conversation went nowhere',
+    ]) {
+      assert.strictEqual(readsAsUnfairOutcomeCriticism(unfair), true,
+        `a completion that depended on my participation must stay rejected: "${unfair}"`);
+    }
+
     // The fairness GATE itself is untouched: this is still only ever applied
     // on a probe where the agency genuinely put the ball back in our court.
     assert.strictEqual(agencyMadeNextStepAttempt({ human_contact: 'yes', viewing_progression: 'invited' }), true,
       'agencyMadeNextStepAttempt is unchanged');
     assert.strictEqual(agencyMadeNextStepAttempt({ human_contact: 'none' }), false,
       'and still false where nobody came back at all');
-    ok('D10 [rules 25/35/36]: passive, agency-owned "was never progressed" is sayable again; active self-motion claims, two-way entities and counted quantifiers all stay rejected');
+    ok('D10 [rules 25/35/36]: passive, agency-owned "was never progressed" is sayable again under every quantifier (the, both, neither); active self-motion claims, two-way entities and counted quantifiers all stay rejected');
   }
 
 
