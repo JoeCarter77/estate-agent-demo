@@ -63,6 +63,28 @@ ok('all 14 probes use only PERSONALISATION_FACTS at the AI boundary and pass the
 assert.equal(constrainedFieldCount, 42, 'all 14 × 3 constrained outreach fields are populated');
 ok('all 42 constrained outreach fields are populated from supplied facts');
 
+const persistentSellerMiss = renderCanonicalFactCopy(selectPersonalisationFacts(fixtures[8]));
+assert.equal(
+  persistentSellerMiss.email_observation,
+  "Although your team made 2 follow-up attempts, nobody picked up on the property I'd said I had to sell, and there were no recorded questions about my position as a buyer.",
+  'the valid prb_hist_0009/prb_hist_0022-style observation remains unchanged',
+);
+assert.equal(
+  persistentSellerMiss.email_commercial_hook_email_2,
+  'There was persistence on the enquiry, but the seller opportunity was never recognised.',
+  'the invalid response-dependent second hook is replaced with the requested agency-controlled framing',
+);
+assert.deepEqual(validateFactConstrainedOutput(selectPersonalisationFacts(fixtures[8]), {
+  ...persistentSellerMiss,
+  email_observation: "Your team made 2 follow-up attempts, but nobody picked up on the property I'd said I had to sell, and there were no recorded questions about my position as a buyer.",
+}).rejections, [], 'the requested prb_hist_0022 framing is accepted verbatim');
+assert.equal(
+  renderCanonicalFactCopy(selectPersonalisationFacts(fixtures[7])).email_observation,
+  "Your team asked for my availability for a viewing, but nobody picked up on the property I'd said I had to sell.",
+  'a valid existing availability-request observation remains unchanged',
+);
+ok('valid persistence, seller-opportunity, qualification-question and availability-request copy remains unchanged');
+
 const noPositive = {
   positive: [],
   problems: [{ type: 'slow_human_response', text: 'The first human response was recorded more than 16 hours after the enquiry.', provenance: [] }],
@@ -96,6 +118,45 @@ const maliciousReasons = validateFactConstrainedOutput(completeMiss, malicious).
 assert.match(maliciousReasons, /vocabulary absent|quantities absent/);
 assert.match(maliciousReasons, /unsupported prospect reply|false chronology|invented commercial loss|certainty_upgrade|unsupported_universal/);
 ok('new facts, quantities, replies, chronology, universal claims, values and seller instructions are rejected');
+
+{
+  const facts = selectPersonalisationFacts(fixtures[8]);
+  const gold = renderCanonicalFactCopy(facts);
+  for (const invalid of [
+    'The buyer enquiry never progressed to an actual viewing time or booking.',
+    'The viewing was never confirmed as an appointment.',
+    'The buyer never reached a booked slot.',
+    'Buyer qualification was never completed.',
+    'The enquiry contained buyer and seller opportunities, without evidence that both were progressed.',
+  ]) {
+    const reasons = validateFactConstrainedOutput(facts, {
+      ...gold,
+      email_observation: invalid,
+    }).rejections.filter((item) => item.field === 'email_observation').map((item) => item.reason);
+    assert.ok(reasons.includes('response-dependent outcome criticism'), `response-dependent criticism is rejected: ${invalid}`);
+  }
+}
+ok('viewing, appointment, booked-slot, qualification and generic progression outcomes are rejected');
+
+{
+  const facts = selectPersonalisationFacts(fixtures[8]);
+  const gold = renderCanonicalFactCopy(facts);
+  const prompts = [];
+  let call = 0;
+  __setAiCallerForTests(async ({ prompt }) => {
+    prompts.push(prompt);
+    call += 1;
+    return call === 1
+      ? { ...gold, email_observation: 'The buyer enquiry never progressed to an actual viewing time or booking.' }
+      : gold;
+  });
+  const row = await personaliseProbeFromFacts(facts, { enabled: true });
+  assert.equal(row.ai_calls_used, 2);
+  assert.equal(row.email_observation, gold.email_observation);
+  assert.match(prompts[1], /response-dependent outcome criticism/);
+  assert.ok(!prompts[1].includes('never progressed to an actual viewing time or booking'));
+}
+ok('response-dependent criticism uses the existing bounded facts-only repair path');
 
 // One bad result receives one facts-only repair. The invalid prose is not
 // echoed into the repair prompt, so it cannot become a second factual source.
