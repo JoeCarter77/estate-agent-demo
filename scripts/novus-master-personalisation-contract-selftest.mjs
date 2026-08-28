@@ -1537,6 +1537,176 @@ async function main() {
     }
   }
 
+
+  // ══ Section F: THE FOUR CLASSES FROM THE LATEST PRODUCTION BATCH ══════════
+  //
+  // Four more ways to assert a relationship the evidence does not carry. Same
+  // support-relative discipline as Section D: each is judged against the
+  // selected findings and the structured INTELLIGENCE state, never against a
+  // list of forbidden phrases.
+  const UNKNOWN_CALL_FINDING = {
+    finding_index: 2, finding_type: 'problem',
+    finding: 'The seller opportunity was not evidenced as addressed.',
+    evidence: 'Call logged, no transcript/content captured.',
+    significance_note: 'What was discussed is unknown.',
+  };
+
+  // F1 [class 1] — A UNIVERSAL CLAIM NEEDS EVIDENCE ACROSS EVERY ITEM.
+  //
+  // "Each time you called, nobody mentioned it" asserts something about ALL
+  // the calls. The evidence covers the record, not each item in it, so the
+  // quantifier is doing work nothing supports. The honest version drops the
+  // enumeration and says what IS on file.
+  {
+    const support = relSupport({ intelligence: { contact_attempts: 3, follow_ups: 2 } });
+    for (const bad of [
+      'Each time you called, nobody mentioned the property I had to sell.',
+      'All three attempts ignored the seller side completely.',
+      'None of them acknowledged the property I said I had to sell.',
+      'Every one of your messages skipped the seller declaration.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(bad, support), 'unsupported_universal',
+        `a universal over the contact set needs evidence across every item: "${bad}"`);
+    }
+
+    // PAIRED MUST-PASS. A whole-record claim makes no per-item assertion, and
+    // a universal the FINDINGS themselves state is supported by definition.
+    for (const good of [
+      'The property I said I had to sell was never acknowledged.',
+      "You got back to me quickly, but nobody picked up that I'd also said I had a property to sell.",
+      // Counted, but the count matches this probe's structured state (3
+      // attempts, 2 follow-ups after the first) — the count rule is F4's, and
+      // it must not fire here.
+      'You followed up twice across phone and email.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(good, support), null,
+        `a whole-record claim asserts nothing per-item and must survive: "${good}"`);
+    }
+    const statedByFindings = relSupport({
+      intelligence: { contact_attempts: 3 },
+      findings: [{
+        finding_index: 1, finding_type: 'problem',
+        finding: 'None of the three messages mentioned the seller position.',
+        evidence: 'All three agency emails were reviewed; none references the declared property to sell.',
+        significance_note: 'Consistently missed.',
+      }],
+    });
+    assert.strictEqual(
+      findUnsupportedRelationship('None of them mentioned the seller position.', statedByFindings), null,
+      'a universal the findings established across the whole set is supported');
+    ok('F1 [class 1]: a universal quantifier over the contact set is rejected unless the findings evidence it across every item; whole-record claims are untouched');
+  }
+
+  // F2 [class 2] — UNKNOWN CONTENT BLOCKS A UNIVERSAL NEGATIVE ABOUT CONTENT.
+  //
+  // The existing gate needed an explicit call locator ("on that call"), which
+  // is what kept whole-record wording sayable. "The seller opportunity was
+  // never discussed" carries no locator and still asserts the content of a
+  // call nobody captured.
+  {
+    const unknown = relSupport({ findings: [POSITIVE, UNKNOWN_CALL_FINDING], callContentUnknown: true });
+    for (const bad of [
+      'The seller opportunity was never discussed.',
+      'My property to sell was never mentioned.',
+      'Selling never came up at all.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(bad, unknown), 'unknown_call_certainty',
+        `unknown content cannot support a universal negative about what was said: "${bad}"`);
+    }
+
+    // PAIRED MUST-PASS. Evidence-bounded wording states our RECORD and is the
+    // correct way to make the same point; outcome verbs describe what the
+    // agency did with the enquiry, not what was said on an uncaptured call;
+    // and with the content KNOWN the same sentence is fine.
+    for (const good of [
+      'There is no recorded evidence showing the seller opportunity was discussed.',
+      "You got back to me quickly, but nobody picked up that I'd also said I had a property to sell.",
+      'The declared property to sell was never progressed into a valuation.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(good, unknown), null,
+        `evidence-bounded and outcome wording must survive an unknown call record: "${good}"`);
+    }
+    assert.strictEqual(
+      findUnsupportedRelationship('The seller opportunity was never discussed.', relSupport()), null,
+      'with the call content on file, the same sentence is a supported claim');
+    ok('F2 [class 2]: with call content unknown, a universal negative about what was discussed is blocked even without a call locator; evidence-bounded and outcome wording still pass');
+  }
+
+  // F3 [class 3] — A DEMONSTRATIVE ANCHOR NEEDS SHARED PROVENANCE.
+  //
+  // "That call also covered the property I had to sell" binds my enquiry's
+  // declaration to an agency event. Same failure the "same message" rule
+  // already catches, reached through a different anchor.
+  {
+    const support = relSupport();
+    for (const bad of [
+      'That call also covered the property I had to sell.',
+      'That email contained both the viewing offer and my seller declaration.',
+      'That reply dealt with the viewing and the property I had to sell.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(bad, support), 'unsupported_co_occurrence',
+        `an agency event cannot be given my enquiry's declaration: "${bad}"`);
+    }
+
+    // PAIRED MUST-PASS — the pinned-good enquiry-anchored co-occurrence, and
+    // a demonstrative that makes no co-occurrence claim at all.
+    for (const good of [
+      'The vendor had already volunteered themselves in the same message.',
+      'the same message had already given you a second reason to call.',
+      'That call came within the hour.',
+      'You replied about Flat 702 the same day.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(good, support), null,
+        `enquiry-anchored co-occurrence and plain demonstratives must survive: "${good}"`);
+    }
+    ok('F3 [class 3]: "that call/email/reply also contained X" is rejected where X came from my enquiry; enquiry-anchored co-occurrence is untouched');
+  }
+
+  // F4 [class 4] — ONE AUTHORITATIVE COUNT.
+  //
+  // INTELLIGENCE.contact_attempts is the structured count the whole pipeline
+  // already reasons from. Prospect-facing copy citing a different number is
+  // simply wrong, and it is the single easiest thing for an agent to check.
+  {
+    const twoAttempts = relSupport({ intelligence: { contact_attempts: 2, follow_ups: 1 } });
+    for (const bad of [
+      'You called three times and never mentioned the seller side.',
+      'You followed up four times across phone and email.',
+      'You came back to me five times.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(bad, twoAttempts), 'unsupported_contact_count',
+        `a contact count must match the authoritative structured count of 2: "${bad}"`);
+    }
+
+    // PAIRED MUST-PASS — the true count in words or digits, the follow-up
+    // count (a different authoritative field), and copy citing no count.
+    for (const good of [
+      'You called twice and never mentioned the seller side.',
+      'You came back to me 2 times.',
+      'You followed up once after the first reply.',
+      'You got back to me quickly, but the seller side was never acknowledged.',
+      'I enquired about a £425,000 property.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(good, twoAttempts), null,
+        `the authoritative count and uncounted copy must survive: "${good}"`);
+    }
+    // THE TWO COUNTS ARE CHECKED INDEPENDENTLY, because they mean different
+    // things: contact_attempts is every time they came back, follow_ups is
+    // only the ones after the first. A probe with 4 attempts made 3 follow-ups,
+    // and the pinned-good "you followed up three times" is correct there.
+    const fourAttempts = relSupport({ intelligence: { contact_attempts: 4, follow_ups: 3 } });
+    assert.strictEqual(
+      findUnsupportedRelationship('You followed up three times across phone and email.', fourAttempts), null,
+      'the follow-up count is checked against follow_ups, not against contact_attempts');
+    assert.strictEqual(
+      findUnsupportedRelationship('You called four times.', fourAttempts), null,
+      'and the attempt count against contact_attempts on the same probe');
+    assert.strictEqual(
+      findUnsupportedRelationship('You followed up four times.', fourAttempts), 'unsupported_contact_count',
+      'so citing the attempt total as the follow-up count is still a mismatch');
+    ok('F4 [class 4]: a prospect-facing contact count is checked against INTELLIGENCE.contact_attempts, in words or digits; the true count and uncounted copy pass');
+  }
+
   console.log(`\n${passed} checks passed.`);
 }
 
