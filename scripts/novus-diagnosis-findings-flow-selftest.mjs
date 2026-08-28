@@ -500,11 +500,11 @@ async function run() {
 
   const first = await runRebuildPass(repo, { maxAiCalls: 100 });
   assert.deepStrictEqual(first.diagnosis.problems, [], 'no diagnosis problems');
-  const unsupported = new Set(['prb_generic', 'prb_good', 'prb_qual']);
+  const unsupported = new Set();
   assert.deepStrictEqual(
     new Set(first.personalisation.problems.map((problem) => problem.probe_id)),
     unsupported,
-    'only synthetic shapes without enough selected facts are refused by the unchanged mandatory-field gate',
+    'observation-derived hooks satisfy the unchanged mandatory-field gate for every supported observation shape',
   );
 
   // ── 1. Every finding lands in DIAGNOSIS_FINDINGS, linked by probe_id ──
@@ -647,7 +647,7 @@ async function run() {
     assert.strictEqual(observations.size, eligible.length, 'and so is every persisted Instantly observation');
     const journeys = new Set(eligible.map((s) => personalisationFor(store, s.probe_id).hero_journey));
     assert.ok(journeys.size >= 3, `the eligible probes spread across ${journeys.size} distinct journeys, not one`);
-    ok(`eligible fact-complete probes persist distinct constrained observations across ${journeys.size} demo journeys; incomplete synthetic shapes are safely refused`);
+    ok(`eligible fact-complete probes persist distinct constrained observations and observation-derived hooks across ${journeys.size} demo journeys`);
   }
 
   // ── 6. The no-response probe says so, plainly, with nothing invented ──
@@ -680,25 +680,25 @@ async function run() {
     const second = await runRebuildPass(repo, { maxAiCalls: 100 });
     assert.strictEqual(second.diagnosis.ai_diagnoses_run, 0, 'no diagnosis is regenerated');
     assert.strictEqual(second.personalisation.ai_personalisations_run, unsupported.size,
-      'only mandatory-field refusals are retried; persisted rows remain frozen');
+      'persisted rows remain frozen and require no further Personalisation calls');
     assert.strictEqual(second.diagnosis.findings_written, 0, 'no findings rows are rewritten');
     assert.strictEqual(diagnoseCalls, diagnoseBefore, 'no further diagnosis AI calls');
     assert.strictEqual(personaliseCalls, personaliseBefore + unsupported.size,
-      'only the deliberately unpersisted shapes receive another constrained call');
+      'no persisted shape receives another constrained call');
 
     const findingsRows = rowsOf(store, 'DIAGNOSIS_FINDINGS', DIAGNOSIS_FINDINGS_HEADER);
     const keys = findingsRows.map((f) => `${f.probe_id}#${f.finding_index}`);
     assert.strictEqual(new Set(keys).size, keys.length, 'no duplicate (probe_id, finding_index) rows');
     assert.strictEqual(JSON.stringify(store), before, 'the whole workbook is byte-identical after a second rebuild');
-    ok('a second rebuild leaves persisted rows and findings byte-identical, while mandatory-field refusals remain retryable');
+    ok('a second rebuild leaves persisted rows and findings byte-identical');
   }
 
   // ── 8. Exactly one AI call per probe per layer — no extra call was added ──
   {
     assert.strictEqual(diagnoseCalls, SCENARIOS.length, 'one Diagnosis call per probe');
     assert.strictEqual(personaliseCalls, SCENARIOS.length + unsupported.size,
-      'one initial constrained call per probe plus one retry for each refused shape');
-    ok('the first flow costs one Diagnosis and one constrained Personalisation call per probe; only unpersisted refusals retry');
+      'one constrained call per probe');
+    ok('the first flow costs one Diagnosis and one constrained Personalisation call per probe');
   }
 
   // ── 9. Personalisation never silently falls back to the Diagnosis prose ──
@@ -747,7 +747,7 @@ async function run() {
       assert.ok(!prompt.includes(f.finding), 'recovered raw finding prose does not reach constrained AI');
       assert.ok(!prompt.includes(f.evidence), 'recovered raw evidence does not reach constrained AI');
     }
-    assert.match(prompt, /PERSONALISATION_FACTS/, 'the recovered rows are deterministically selected before the AI boundary');
+    assert.match(prompt, /OBSERVATION_FACTS/, 'the recovered rows are deterministically selected before the AI boundary');
 
     // And the primary path is unchanged: where the ROWS exist, they are what
     // is used, and nothing is recovered from the diagnosis row.
