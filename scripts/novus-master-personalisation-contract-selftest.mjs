@@ -55,7 +55,9 @@ import {
   claimsProspectReply, evidenceShowsProspectReply,
   readsAsFalseChronology, pickHeroJourney, _internal as _personalisationInternal,
 } from '../lib/probe-personalisation.mjs';
-import { needsPersonalisation, rebuildAllPersonalisation } from '../lib/personalisation-rebuild.mjs';
+import {
+  needsPersonalisation, rebuildAllPersonalisation, blankMandatoryEmailFields,
+} from '../lib/personalisation-rebuild.mjs';
 import {
   buildSupportContext, findUnsupportedRelationship, RELATIONSHIP_REASONS,
   findingInventsProspectResponse,
@@ -1299,6 +1301,201 @@ async function main() {
     assert.strictEqual(agencyMadeNextStepAttempt({ human_contact: 'none' }), false,
       'and still false where nobody came back at all');
     ok('D10 [rules 25/35/36]: passive, agency-owned "was never progressed" is sayable again; active self-motion claims, two-way entities and counted quantifiers all stay rejected');
+  }
+
+
+  // ══ Section E: THE TERMINAL PERSISTENCE INVARIANT ════════════════════════
+  //
+  // The three email variables were mandatory everywhere except at the write.
+  // personaliseProbe() can legitimately return one blank — its last resort is
+  // `{ ...best.row, ...best.softFallbacks }`, and a NEVER_PERSIST reason banks
+  // no fallback on purpose, because a sentence asserting something untrue is
+  // worth less than nothing. That blank is a REFUSAL. Nothing downstream
+  // treated it as one: it flowed into the patch, spread over the existing row
+  // in the update branch (overwriting a good Hook 2 with an empty cell), and
+  // was written.
+  //
+  // These blocks drive the REAL persistence path — rebuildAllPersonalisation
+  // against a repo that records what would actually reach the sheet — rather
+  // than asserting on personaliseProbe's return value.
+  {
+    const P_HEADER = ['personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
+      'primary_narrative', 'narrative_finding_indexes', 'positive_finding_index', 'main_finding_index',
+      'wider_finding_index', 'supporting_findings', 'evidence', 'novus_counterfactual', 'fair_observation',
+      'main_finding', 'commercial_consequence', 'property_reference', 'email_observation',
+      'email_commercial_hook', 'email_commercial_hook_email_2', 'created_at', 'updated_at'];
+    const D_HEADER = ['diagnosis_id', 'agency_id', 'probe_id', 'strengths', 'missed_opportunities',
+      'commercial_implication', 'novus_opportunity', 'diagnosis_summary'];
+    const F_HEADER = ['probe_id', 'finding_index', 'finding_type', 'finding', 'evidence', 'significance_note'];
+    const PROBE_ID = 'prb_persist_1';
+
+    // existingPersonalisationRow: null for the append path, or an object for
+    // the update path. header: overridable, to prove the column mapping.
+    const makeRepo = ({ existingRow = null, header = P_HEADER } = {}) => {
+      const written = [];
+      const table = (h, rows) => ({ header: h, rows });
+      return {
+        written,
+        async getTable(tab) {
+          if (tab === 'INTELLIGENCE') {
+            return table(['intelligence_id', 'agency_id', 'probe_id', 'human_contact', 'response_hours',
+              'viewing_progression', 'seller_recognition', 'observation_status'],
+            [['int_1', 'agc_master', PROBE_ID, 'yes', '0.13', 'invited', 'none', 'closed']]);
+          }
+          if (tab === 'DIAGNOSIS') {
+            return table(D_HEADER, [['dia_1', 'agc_master', PROBE_ID, '', '', '', 'Core (front desk)', 'final']]);
+          }
+          if (tab === 'PERSONALISATION') {
+            return table(header, existingRow ? [header.map((k) => existingRow[k] ?? '')] : []);
+          }
+          if (tab === 'AGENCIES') return table(['agency_id', 'agency_name'], [['agc_master', 'Example Estates']]);
+          if (tab === 'DIAGNOSIS_FINDINGS') {
+            return table(F_HEADER, [
+              [PROBE_ID, '1', 'positive', POSITIVE.finding, POSITIVE.evidence, POSITIVE.significance_note],
+              [PROBE_ID, '2', 'opportunity', SELLER_MISSED.finding, SELLER_MISSED.evidence, SELLER_MISSED.significance_note],
+            ]);
+          }
+          return table([], []);
+        },
+        async writeRowsBatch(writes) { written.push(...writes); },
+      };
+    };
+
+    const rebuild = async (repo, answer) => {
+      __setAiCallerForTests(async () => answer);
+      return rebuildAllPersonalisation(repo, new Map([[PROBE_ID, { ...PROBE, probe_id: PROBE_ID }]]));
+    };
+    const cell = (row, header, field) => row[header.indexOf(field)];
+
+    // E1-E4 — a blank in ANY mandatory field refuses the write, and
+    // whitespace is blank.
+    for (const [label, blanked] of [
+      ['Hook 2', 'email_commercial_hook_email_2'],
+      ['Hook 1', 'email_commercial_hook'],
+      ['observation', 'email_observation'],
+    ]) {
+      const repo = makeRepo();
+      const summary = await rebuild(repo, baseAnswer({ [blanked]: '' }));
+      assert.deepStrictEqual(repo.written, [], `a blank ${label} must reach no write at all`);
+      assert.strictEqual(summary.personalisation_created, 0, `and must not be counted as created (${label})`);
+      assert.strictEqual(summary.personalisations_processed, 0, `nor as processed (${label})`);
+      assert.deepStrictEqual(summary.personalised_probe_ids, [],
+        `nor handed to the demo compile step (${label})`);
+      assert.strictEqual(summary.mandatory_field_refusals, 1, `and the refusal is counted (${label})`);
+      assert.strictEqual(summary.problems.length, 1, `and reported (${label})`);
+      assert.strictEqual(summary.problems[0].reason, 'mandatory_email_field_blank');
+      assert.deepStrictEqual(summary.problems[0].blank_fields, [blanked]);
+      assert.strictEqual(summary.problems[0].probe_id, PROBE_ID);
+    }
+    ok('E1-E3 [blank Hook 2 / Hook 1 / observation]: none can persist — no write, no counters, not handed to demo compile, and problems[] names the reason and the exact field');
+
+    {
+      const repo = makeRepo();
+      const summary = await rebuild(repo, baseAnswer({ email_commercial_hook_email_2: '   \n\t  ' }));
+      assert.deepStrictEqual(repo.written, [], 'whitespace-only is blank and must not persist');
+      assert.deepStrictEqual(summary.problems[0].blank_fields, ['email_commercial_hook_email_2']);
+      ok('E4 [whitespace]: a whitespace-only mandatory field counts as blank — it would satisfy every truthiness check between here and the sheet');
+    }
+
+    // E5 — the valid row still persists, byte-identically.
+    let validRowObject = null;
+    {
+      const repo = makeRepo();
+      const summary = await rebuild(repo, baseAnswer());
+      assert.strictEqual(repo.written.length, 1, 'a complete row is written exactly once');
+      assert.strictEqual(summary.personalisation_created, 1);
+      assert.strictEqual(summary.mandatory_field_refusals, 0);
+      assert.deepStrictEqual(summary.problems, []);
+      assert.deepStrictEqual(summary.personalised_probe_ids, [PROBE_ID]);
+      const row = repo.written[0].row;
+      assert.strictEqual(repo.written[0].tab, 'PERSONALISATION');
+      assert.strictEqual(cell(row, P_HEADER, 'email_observation'), baseAnswer().email_observation,
+        'email_observation persists byte-identically');
+      assert.strictEqual(cell(row, P_HEADER, 'email_commercial_hook'), baseAnswer().email_commercial_hook,
+        'email_commercial_hook persists byte-identically');
+      assert.strictEqual(cell(row, P_HEADER, 'email_commercial_hook_email_2'), baseAnswer().email_commercial_hook_email_2,
+        'email_commercial_hook_email_2 persists byte-identically');
+      validRowObject = Object.fromEntries(P_HEADER.map((k, i) => [k, row[i]]));
+      ok('E5 [valid row]: a complete row is written unchanged — the invariant refuses, it never rewrites');
+    }
+
+    // E6 — THE ONE THAT MATTERED MOST. An existing valid row must survive an
+    // invalid regeneration. This is the update branch, where the blank used to
+    // spread over the good value and empty the cell in place.
+    {
+      const repo = makeRepo({ existingRow: { ...validRowObject, email_commercial_hook_email_2: '' } });
+      // The stored row is missing Hook 2, so needsPersonalisation() re-runs it;
+      // the regeneration comes back blank again.
+      const summary = await rebuild(repo, baseAnswer({ email_commercial_hook_email_2: '' }));
+      assert.deepStrictEqual(repo.written, [], 'the update path refuses too — it is the same single write site');
+      assert.strictEqual(summary.personalisation_updated, 0, 'and counts no update');
+      assert.strictEqual(summary.problems[0].reason, 'mandatory_email_field_blank');
+
+      // And with a GOOD stored Hook 2 that a bad regeneration would overwrite:
+      // needsPersonalisation() leaves a complete row alone entirely, which is
+      // the outer half of the same protection.
+      const intact = makeRepo({ existingRow: validRowObject });
+      const untouched = await rebuild(intact, baseAnswer({ email_commercial_hook_email_2: '' }));
+      assert.deepStrictEqual(intact.written, [], 'a complete existing row is never rewritten at all');
+      assert.strictEqual(untouched.personalisations_processed, 0);
+      ok('E6 [no destructive overwrite]: an existing valid row cannot be emptied by an invalid regeneration — the merged result is what the invariant tests, so the update branch cannot spread a blank over a good value');
+    }
+
+    // E7 — the column mapping for the field that was going missing.
+    {
+      assert.strictEqual(P_HEADER.indexOf('email_commercial_hook_email_2'), 18,
+        'the header carries the column at a stable index');
+      const repo = makeRepo();
+      await rebuild(repo, baseAnswer());
+      const row = repo.written[0].row;
+      assert.strictEqual(row.length, P_HEADER.length, 'the written row matches the header width');
+      assert.strictEqual(row[P_HEADER.indexOf('email_commercial_hook_email_2')],
+        baseAnswer().email_commercial_hook_email_2,
+        'and the value lands in its own column, not a neighbouring one');
+
+      // A WORKBOOK WHOSE HEADER PREDATES THE FIELD behaves exactly as it did
+      // before the field existed, rather than being refused for ever. Same
+      // column-scoping needsPersonalisation() already uses — without this the
+      // invariant would deadlock every legacy sheet.
+      const legacyHeader = P_HEADER.filter((k) => k !== 'email_commercial_hook_email_2');
+      const legacyRepo = makeRepo({ header: legacyHeader });
+      const legacy = await rebuild(legacyRepo, baseAnswer({ email_commercial_hook_email_2: '' }));
+      assert.strictEqual(legacyRepo.written.length, 1,
+        'a sheet with no such column cannot store the field, so it is not demanded');
+      assert.deepStrictEqual(legacy.problems, []);
+      assert.strictEqual(blankMandatoryEmailFields({ email_observation: 'a', email_commercial_hook: 'b' },
+        new Set(legacyHeader)).length, 0, 'and the helper agrees directly');
+      ok('E7 [column mapping]: email_commercial_hook_email_2 maps to its own column and persists there; a legacy sheet without the column is unaffected rather than deadlocked');
+    }
+
+    // E8 — the report is usable on its own.
+    {
+      const repo = makeRepo();
+      const summary = await rebuild(repo, baseAnswer({ email_observation: '', email_commercial_hook_email_2: '' }));
+      const problem = summary.problems[0];
+      assert.strictEqual(problem.reason, 'mandatory_email_field_blank');
+      assert.deepStrictEqual(problem.blank_fields, ['email_observation', 'email_commercial_hook_email_2'],
+        'every blank field is listed, in the contract order, not just the first');
+      assert.match(problem.error, /mandatory email field/i, 'and the message says what happened in words');
+      assert.strictEqual(summary.mandatory_field_refusals, 1);
+      assert.strictEqual(summary.remaining_personalisations, 0,
+        'a refusal is not a budget skip — it is a completed decision');
+      ok('E8 [reporting]: problems[] carries reason, probe_id, every blank field and a readable message, and the pass counts its refusals');
+    }
+
+    // E9 — the invariant is exactly one gate, and it is the only write site.
+    {
+      const source = readFileSync(path.join(here, '..', 'lib', 'personalisation-rebuild.mjs'), 'utf8');
+      const writeSites = source.match(/writes\.push\(\{\s*tab: 'PERSONALISATION'/g) || [];
+      assert.strictEqual(writeSites.length, 1,
+        'PERSONALISATION must have exactly ONE write site — append, update, regeneration, fallback, correction and partial merge all funnel through it');
+      const repoSource = readFileSync(path.join(here, '..', 'lib', 'personalisation-rebuild.mjs'), 'utf8');
+      const guardIndex = repoSource.indexOf('blankMandatoryEmailFields(merged, personalisationColumns)');
+      const writeIndex = repoSource.indexOf("writes.push({ tab: 'PERSONALISATION'");
+      assert.ok(guardIndex > 0 && guardIndex < writeIndex,
+        'and the invariant runs immediately BEFORE that write, not after it');
+      ok('E9 [single gate]: PERSONALISATION has exactly one write site and the invariant sits immediately before it, so every path — append, update, regeneration, fallback, correction, partial merge — is covered by one check');
+    }
   }
 
   console.log(`\n${passed} checks passed.`);
