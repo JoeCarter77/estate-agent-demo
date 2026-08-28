@@ -1012,6 +1012,90 @@ async function main() {
     ok('D2 [rules 42/47, test D]: a seller declaration pinned to a call or a reply is rejected; the original-enquiry provenance, negated forms and genuinely evidenced contact all survive');
   }
 
+  // D2a [rules 41/43/47] — NOMINAL RESPONSES AND ELLIPTICAL CO-OCCURRENCE.
+  // These are the exact two production forms that escaped the existing
+  // subject+verb reply detector and explicit seller-anchor co-occurrence rule.
+  {
+    assert.strictEqual(
+      findUnsupportedRelationship('no valuation was offered off the back of that answer', relSupport()),
+      'unsupported_prospect_reply',
+      'a nominal reference to a prospect answer still requires prospect-side response evidence');
+    assert.strictEqual(
+      findUnsupportedRelationship('the seller question never progressed to a valuation offer.', relSupport()),
+      null,
+      'the same supported agency-side progression point must remain sayable without inventing a prospect answer');
+    for (const unsupportedResponse of [
+      'following my response, no valuation was offered.',
+      'after my answer, the seller side went no further.',
+      'once I confirmed, the valuation opportunity was left untouched.',
+      'when I replied, nobody progressed the seller question.',
+    ]) {
+      assert.strictEqual(
+        findUnsupportedRelationship(unsupportedResponse, relSupport()),
+        'unsupported_prospect_reply',
+        `a prospect response construction must require evidence: "${unsupportedResponse}"`);
+    }
+    for (const originalEnquiryFact of [
+      "I'd already said in my original enquiry that I had a property to sell.",
+      'I mentioned in my enquiry that I had a property to sell.',
+      'I declared a property to sell in the original enquiry.',
+    ]) {
+      assert.strictEqual(
+        findUnsupportedRelationship(originalEnquiryFact, relSupport()),
+        null,
+        `an original-enquiry declaration must remain valid: "${originalEnquiryFact}"`);
+    }
+    assert.strictEqual(
+      findUnsupportedRelationship(
+        'no valuation was offered off the back of that answer',
+        relSupport({ prospectContactEvidenced: true }),
+      ),
+      null,
+      'explicit prospect-side response evidence licenses the same response wording');
+
+    const crossEventSupport = buildSupportContext({
+      probe: REL_PROBE,
+      findings: [
+        {
+          finding_index: 1,
+          finding_type: 'positive',
+          finding: 'A later agency email asked when would be convenient to view.',
+          evidence: 'The agency email asked: "When would be convenient for you to view?"',
+          significance_note: 'The buying side progressed in the agency reply.',
+        },
+        {
+          ...SELLER_MISSED,
+          finding: 'The original enquiry declared a property to sell, but it was not acknowledged.',
+          evidence: 'The seller declaration appeared in the original enquiry.',
+        },
+      ],
+    });
+    const sameEnquirySupport = buildSupportContext({
+      probe: REL_PROBE,
+      findings: [{
+        finding_index: 1,
+        finding_type: 'opportunity',
+        finding: 'The original enquiry contained both a viewing request and a declared property to sell.',
+        evidence: 'Both facts appeared together in the original enquiry.',
+        significance_note: 'One enquiry carried buyer and potential seller opportunities.',
+      }],
+    });
+    const sameMessageClaim = 'the second opportunity sitting in the very same message';
+    assert.strictEqual(
+      findUnsupportedRelationship(sameMessageClaim, crossEventSupport),
+      'unsupported_co_occurrence',
+      'an elliptical same-message claim must fail when the selected facts come from different events');
+    assert.strictEqual(
+      findUnsupportedRelationship('The seller declaration and viewing offer were in the same reply.', crossEventSupport),
+      'unsupported_co_occurrence',
+      'same-reply wording is governed by the same event-provenance rule');
+    assert.strictEqual(
+      findUnsupportedRelationship(sameMessageClaim, sameEnquirySupport),
+      null,
+      'the same wording must pass when both selected facts genuinely came from the original enquiry');
+    ok('D2a [rules 41/43/47]: nominal prospect responses require evidence and elliptical same-message claims are support-relative');
+  }
+
   // D3 [rules 45/48, test A/G] — KEEP THE EVIDENCE'S EPISTEMIC LEVEL.
   // prb_mt0ptc0o: unknown call content turned into certainty about what was
   // NOT said. prb_hist_0003: a potential opportunity turned into a won
