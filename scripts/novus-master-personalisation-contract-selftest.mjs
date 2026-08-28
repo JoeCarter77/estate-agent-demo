@@ -44,6 +44,7 @@ import assert from 'node:assert';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import {
   personaliseProbe, attributesEnquiryPriceToSeller, stripSellerPriceAttribution,
@@ -52,9 +53,16 @@ import {
   secondHookFailure, readsAsThirdPersonProspect, cleanAddressForEmail,
   attributesEnquiryAddressToSeller, stripEnquiryAddressAttribution,
   claimsProspectReply, evidenceShowsProspectReply,
-  readsAsFalseChronology, pickHeroJourney,
+  readsAsFalseChronology, pickHeroJourney, _internal as _personalisationInternal,
 } from '../lib/probe-personalisation.mjs';
-import { needsPersonalisation, rebuildAllPersonalisation } from '../lib/personalisation-rebuild.mjs';
+import {
+  needsPersonalisation, rebuildAllPersonalisation, blankMandatoryEmailFields,
+} from '../lib/personalisation-rebuild.mjs';
+import {
+  buildSupportContext, findUnsupportedRelationship, RELATIONSHIP_REASONS,
+  findingInventsProspectResponse,
+} from '../lib/factual-relationships.mjs';
+import { _internal as _diagnosisInternal } from '../lib/probe-diagnosis.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let passed = 0;
@@ -63,6 +71,7 @@ const has = (v) => Boolean(String(v ?? '').trim());
 // A story finding (problem/opportunity) — a positive can never carry the main
 // beat, which is what C4's per-fixture main_finding_index has to respect.
 const isStory = (f) => f.finding_type !== 'positive';
+const { NEVER_PERSIST_REASONS } = _personalisationInternal;
 
 const PROBE = {
   probe_id: 'prb_master_1', agency_id: 'agc_master', probe_reference: 'NOV-M-1',
@@ -909,6 +918,623 @@ async function main() {
     assert.strictEqual(readsAsInventedLoss('the £425,000 enquiry went unanswered for 17 hours.'), false,
       'the probe\'s own enquiry price is a fact, not an invented loss');
     ok('C15 [rules 21/40]: fees, commissions, percentages and revenue losses are invented commercial facts and are stripped; the enquiry\'s own price is not');
+  }
+
+
+  // ══ Section D: RELATIONSHIP & PROVENANCE (contract rules 41-48) ═══════════
+  //
+  // Every guard in sections A-C asks whether a FACT is true. These ask whether
+  // the RELATIONSHIP BETWEEN the facts is true — and that is a different
+  // failure, because each individual fact in the sentence can be correct while
+  // the sentence is false:
+  //
+  //   TRUE  the enquiry declared a property to sell
+  //   TRUE  the agency called twice
+  //   FALSE "I was already on the phone with you twice, and still told you
+  //          I had a property to sell"
+  //
+  // The invention is the JOIN. Nothing was fabricated; a declaration was
+  // relocated out of the only message it ever occupied.
+  //
+  // SUPPORT-RELATIVE, NOT A BLACKLIST — and D1 is the block that proves it,
+  // because the identical sentence has to pass on one probe and fail on
+  // another. Four pinned-good strings in the existing suites say "in the same
+  // message", and they are correct: those probes' enquiries really did carry
+  // the viewing request and the seller declaration together. A phrase list
+  // would delete all four.
+  const REL_PROBE = {
+    ...PROBE,
+    enquiry_text: 'Interested in viewing this property. Also declared: has a property to sell — it is not yet on the market.',
+  };
+  const BUYER_ONLY_PROBE = { ...PROBE, enquiry_text: 'Interested in viewing this property.' };
+  const relSupport = (over = {}) => buildSupportContext({
+    probe: REL_PROBE, findings: [POSITIVE, SELLER_MISSED], ...over,
+  });
+
+  // D1 [rule 41] — THE SAME WORDS, TRUE ON ONE PROBE AND FALSE ON ANOTHER.
+  {
+    const sameMessage = 'The vendor had already volunteered themselves in the same message.';
+    assert.strictEqual(findUnsupportedRelationship(sameMessage, relSupport()), null,
+      'co-occurrence is CORRECT when the enquiry genuinely carried both — this exact wording is pinned copy');
+    assert.strictEqual(
+      findUnsupportedRelationship(sameMessage, buildSupportContext({ probe: BUYER_ONLY_PROBE, findings: [POSITIVE, SELLER_MISSED] })),
+      'unsupported_co_occurrence',
+      'and UNSUPPORTED on a probe whose enquiry declared no seller position — same sentence, different verdict');
+
+    // The agency-anchored form is the real failure: an enquiry fact welded
+    // onto something the agency sent days later.
+    assert.strictEqual(findUnsupportedRelationship('Your reply and my seller declaration were in the same message.', relSupport()),
+      'unsupported_co_occurrence', 'binding an enquiry fact to an agency message is a false co-occurrence');
+
+    // The other three pinned-good "same message" strings, unchanged.
+    for (const good of [
+      'the second reason to call was sitting in the same message.',
+      'the same message had already given you a second reason to call.',
+      'The interesting part is the £450,000 vendor you already had in the same message.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(good, relSupport()), null, `pinned-good copy must survive: "${good}"`);
+    }
+    // A co-occurrence claim with no seller content is not this rule's business.
+    assert.strictEqual(
+      findUnsupportedRelationship('You answered the price question but ignored the availability question in the same message.',
+        buildSupportContext({ probe: BUYER_ONLY_PROBE, findings: [POSITIVE] })),
+      null, 'the rule is scoped to seller-declaration provenance, not to every co-occurrence');
+    ok('D1 [rule 41, test C]: co-occurrence is judged against the probe\'s own enquiry — the same "same message" wording passes where the enquiry carried both and fails where it did not');
+  }
+
+  // D2 [rules 42/47, test D] — A DECLARATION KEEPS THE MOMENT IT WAS MADE IN.
+  // prb_hist_0006: the seller position came from the original enquiry and was
+  // never mentioned on either call.
+  {
+    for (const bad of [
+      'I was already on the phone with you twice, and still told you I had a property to sell.',
+      'I told you on those calls I had a property to sell.',
+      'During the call I mentioned I had a place to sell.',
+      'When you called I said I had a property to sell.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(bad, relSupport()), 'unsupported_declaration_timing',
+        `a declaration relocated into an agency contact event must be caught: "${bad}"`);
+    }
+    for (const good of [
+      "You called twice, but the seller declaration I'd already included in my original enquiry was never progressed.",
+      "You got back to me quickly, but nobody picked up that I'd also said I had a property to sell.",
+      "I'd already said in my original enquiry that my property wasn't on the market.",
+      'I never told you on the call that I was selling.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(good, relSupport()), null,
+        `correct provenance and negated forms must survive: "${good}"`);
+    }
+    // Evidenced prospect contact licenses it — the rule is "do not invent",
+    // not "the prospect can never have spoken".
+    assert.strictEqual(
+      findUnsupportedRelationship('I told you on those calls I had a property to sell.', relSupport({ prospectContactEvidenced: true })),
+      null, 'a probe whose findings evidence a prospect-side exchange may say so');
+    ok('D2 [rules 42/47, test D]: a seller declaration pinned to a call or a reply is rejected; the original-enquiry provenance, negated forms and genuinely evidenced contact all survive');
+  }
+
+  // D3 [rules 45/48, test A/G] — KEEP THE EVIDENCE'S EPISTEMIC LEVEL.
+  // prb_mt0ptc0o: unknown call content turned into certainty about what was
+  // NOT said. prb_hist_0003: a potential opportunity turned into a won
+  // instruction.
+  {
+    const UNKNOWN_CALL = {
+      finding_index: 2, finding_type: 'problem',
+      finding: 'The seller opportunity was not evidenced as addressed.',
+      evidence: 'Call logged, no transcript/content captured; seller opportunity not evidenced as addressed.',
+      significance_note: 'What was discussed is unknown.',
+    };
+    assert.strictEqual(hasUnreliableVoicemailEvidence([UNKNOWN_CALL]), true,
+      'an uncaptured call leaves its content unknown');
+    // The exact live failure, through the guard that owns this rule.
+    assert.strictEqual(makesUnsupportedVoicemailClaim('nobody on that call asked about the property I still need to sell.'), true,
+      'a definite claim about who said what on an uncaptured call is blocked');
+    assert.strictEqual(makesUnsupportedVoicemailClaim('There is no recorded evidence showing the seller opportunity was addressed.'), false,
+      'the evidence-bounded statement of the SAME point is exactly what should be said');
+    // The whole-record wording is unaffected — it has no call locator.
+    assert.strictEqual(makesUnsupportedVoicemailClaim("You called within the hour, but nobody picked up that I'd also said I had a property to sell."), false,
+      'a seller miss judged across the whole record stays fully sayable');
+
+    // Possibility -> certainty.
+    assert.strictEqual(findUnsupportedRelationship('a seller instruction nobody even looked at.', relSupport()), 'certainty_upgrade',
+      'a potential opportunity may not be reported as a won instruction');
+    for (const good of [
+      'a potential seller instruction was never explored.',
+      'a valuation opportunity was left on the table.',
+      'the declared property to sell was never progressed into a valuation.',
+      'the voicemail cut off with no availability request or callback instruction given.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(good, relSupport()), null,
+        `hedged, opportunity-level and non-seller wording must survive: "${good}"`);
+    }
+    ok('D3 [rules 45/48, tests A/G]: unknown call content stays unknown and a potential opportunity stays potential — evidence-bounded and hedged wording pass untouched');
+  }
+
+  // D4 [rules 44/46, tests E/F] — NO INVENTED COMPARISONS OR MIND-READING.
+  {
+    for (const bad of [
+      'the seller side was arguably more valuable than the viewing.',
+      'the bigger opportunity of the two was never touched.',
+      'that seller lead was worth far more than the viewing.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(bad, relSupport()), 'unsupported_comparative',
+        `nothing on file ranks the two opportunities: "${bad}"`);
+    }
+    for (const bad of [
+      'before anyone else even knew it was coming to market.',
+      'no other agent knew about it yet.',
+      'the agency probably thought it was just a viewing request.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(bad, relSupport()), 'third_party_knowledge',
+        `a mind-state nobody evidenced must be caught: "${bad}"`);
+    }
+    // THE MUST-PASS. A statement of general market PRACTICE is not a claim
+    // about who knew about this property, and it is pinned-good copy.
+    assert.strictEqual(
+      findUnsupportedRelationship('Worth knowing how rare that is: most branches work the buying side of a message like mine and never notice the second half.', relSupport()),
+      null, 'a general market-practice observation is not a third-party knowledge claim');
+    ok('D4 [rules 44/46, tests E/F]: invented value comparisons and third-party/internal mind-states are rejected, while a general market-practice observation stays valid');
+  }
+
+  // D5 [rule 43] — A CAUSAL JOIN MAY NOT MANUFACTURE AN EXCHANGE.
+  // Scoped deliberately: ordinary commercial implication is the email's job
+  // and is untouched. What is rejected is "you did X, so I did Y".
+  {
+    assert.strictEqual(findUnsupportedRelationship('You asked, so I replied confirming I had a property to sell.', relSupport()),
+      'unsupported_causal_link', 'a cause-and-effect exchange with a prospect action is invented');
+    for (const good of [
+      'That meant the valuation was never booked and the seller side never opened.',
+      'So the buyer side moved forward, while the potential seller was missed entirely.',
+      'So 1 enquiry got a fast first reply and 0 follow-ups after it.',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(good, relSupport()), null,
+        `agency-side commercial implication is the email's job and must survive: "${good}"`);
+    }
+    ok('D5 [rule 43]: a causal join that manufactures a prospect response is rejected; agency-side commercial implication is untouched');
+  }
+
+  // D6 [rules 41-48] — END TO END, AND NEVER BANKED.
+  // A relationship failure is a truth failure: repaired once, and if the
+  // repair misses the field blanks rather than persisting a sentence the agent
+  // can disprove.
+  {
+    const repaired = await run({
+      probe: REL_PROBE, findings: [POSITIVE, SELLER_MISSED],
+      reply: (call) => (call === 1
+        ? baseAnswer({ email_observation: 'I was already on the phone with you twice, and still told you I had a property to sell.' })
+        : baseAnswer({ email_observation: "You called twice, but the seller declaration from my original enquiry was never picked up." })),
+    });
+    assert.strictEqual(repaired.calls, 2, 'the relocated declaration is rejected and one repair is attempted');
+    assert.match(repaired.row.email_observation, /from my original enquiry/i,
+      'and the provenance-correct version is what persists');
+
+    // The wording D10 restored. Both guards are now happy with it, which is
+    // what makes the brief's own suggested repair sentence usable end to end.
+    assert.strictEqual(
+      readsAsUnfairOutcomeCriticism('the seller declaration in my original enquiry was never progressed.'), false,
+      'the passive, agency-owned criticism is no longer claimed by the unfair-outcome guard (see D10)');
+    assert.strictEqual(
+      findUnsupportedRelationship('the seller declaration in my original enquiry was never progressed.', relSupport()), null,
+      'and the relationship layer is happy with it too');
+
+    const unrepaired = await run({
+      probe: REL_PROBE, findings: [POSITIVE, SELLER_MISSED],
+      reply: () => baseAnswer({ email_commercial_hook: 'the seller side was arguably more valuable than the viewing.' }),
+    });
+    assert.strictEqual(has(unrepaired.row.email_commercial_hook), false,
+      'an unrepaired relationship failure is never banked as a soft fallback');
+    for (const reason of RELATIONSHIP_REASONS) {
+      assert.strictEqual(NEVER_PERSIST_REASONS.has(reason), true,
+        `${reason} must be a never-persist reason, not a bankable wording preference`);
+    }
+    ok('D6 [rules 41-48]: relationship failures flow through the existing correction budget, repair into the supported wording, and never bank when the repair misses');
+  }
+
+  // D7 [rule 27 + 41/47 upstream] — THE FINDINGS LAYER OBEYS THE RULES ITSELF.
+  // prb_mt0puwtj_1r7vrh's finding CONTAINED "once he confirmed it" while its
+  // evidence showed only that the agency asked. Personalisation rewriting that
+  // into something plausible would leave the false finding persisted and still
+  // authoritative, so it is cleaned where it is written.
+  {
+    const contaminated = {
+      finding_type: 'problem',
+      finding: 'The agency asked whether he was selling once he confirmed it.',
+      evidence: 'Agency message: "Do you have a property to sell?"',
+      significance_note: 'They asked for something already on file.',
+    };
+    assert.strictEqual(findingInventsProspectResponse(contaminated), true,
+      'a finding asserting a prospect confirmation its own evidence does not record is contaminated');
+
+    const cleaned = _diagnosisInternal.sanitizeFindings([contaminated], { max: 3 });
+    assert.strictEqual(cleaned.length, 1, 'the finding survives — the real commercial point is not thrown away');
+    assert.strictEqual(/once he confirmed/i.test(cleaned[0].finding), false,
+      'but the invented confirmation is gone from what gets persisted');
+    assert.match(cleaned[0].finding, /asked whether he was selling/i,
+      'and what remains is the genuine finding: they asked for something already declared');
+
+    // Third-person analytic wording that is CORRECT must survive untouched —
+    // and note the asymmetry this pins: the downstream prospect-reply guard is
+    // first-person only, precisely so this analytic voice is never flagged.
+    const fine = {
+      finding_type: 'problem',
+      finding: 'The agency asked whether he was selling, despite the enquiry already declaring it.',
+      evidence: 'Agency message: "Do you have a property to sell?"',
+      significance_note: 'They asked for something already on file.',
+    };
+    assert.strictEqual(findingInventsProspectResponse(fine), false, 'correct analytic wording is not contaminated');
+    assert.deepStrictEqual(_diagnosisInternal.sanitizeFindings([fine], { max: 3 })[0].finding, fine.finding,
+      'and passes through byte-identical');
+    assert.strictEqual(claimsProspectReply('That seller was already engaging with your agency as a buyer.'), false,
+      'the downstream guard stays first-person, so analytic third-person copy is never caught by it');
+    ok('D7 [rule 27 + 41/47]: an invented prospect confirmation is stripped from the finding AT SOURCE, the genuine finding survives, and correct analytic wording is untouched');
+  }
+
+  // D8 [test H] — GOOD COPY NON-REGRESSION, AT SCALE.
+  //
+  // Every distinct piece of gated prose across the suites that actually drive
+  // personaliseProbe(), checked against the whole relationship layer under the
+  // support set most likely to produce a false positive. This is the block
+  // that makes "support-relative, not a blacklist" a measured claim rather
+  // than an intention: if any detector were really a phrase list, this corpus
+  // is where it would show.
+  //
+  // The master suite itself is excluded — it is full of deliberate violations,
+  // and scanning it would be circular. novus-demo-selftest is excluded for a
+  // different and more interesting reason, pinned separately below.
+  {
+    const GATED_PATH_SUITES = SIBLING_SUITES.filter((suite) => suite !== 'novus-demo-selftest.mjs');
+    const prose = (suite) => {
+      const source = readFileSync(path.join(here, suite), 'utf8');
+      const matches = source.match(/(?:email_observation|email_commercial_hook|email_commercial_hook_email_2|fair_observation|main_finding|commercial_consequence): (?:'[^']{15,}'|"[^"]{15,}")/g) || [];
+      return matches.map((m) => m.replace(/^[a-z_0-9]+: ['"]/, '').replace(/['"]$/, ''));
+    };
+    const corpus = [...new Set(GATED_PATH_SUITES.flatMap(prose))];
+    assert.ok(corpus.length >= 40, `the corpus must be substantial, got ${corpus.length}`);
+    const flagged = corpus
+      .map((line) => [line, findUnsupportedRelationship(line, relSupport())])
+      .filter(([, reason]) => reason);
+    assert.deepStrictEqual(flagged, [],
+      `existing gated prose must be untouched by the relationship layer:\n${flagged.map(([l, r]) => `  [${r}] ${l}`).join('\n')}`);
+    ok(`D8 [test H]: all ${corpus.length} distinct gated prose fixtures across the gate-driving suites pass the relationship layer unchanged`);
+  }
+
+  // D9 [rule 45] — A REAL VIOLATION IN FIXTURE DATA, REPORTED RATHER THAN
+  // QUIETLY PASSED OR QUIETLY EDITED.
+  //
+  // Two commercial_consequence strings in novus-demo-selftest call a merely
+  // POTENTIAL seller opportunity "the instruction", which is exactly the
+  // certainty upgrade rule 45 forbids. They are not a production regression:
+  // they are pre-built PERSONALISATION SHEET ROWS handed straight to the demo
+  // compiler, so they never traverse personaliseProbe's gates and this layer
+  // never sees them. Had they come through the gate they would be rejected —
+  // which is precisely what this block asserts.
+  //
+  // Left in place deliberately. Rewriting another suite's demo fixtures is an
+  // unrelated change, and silently excluding them would hide the finding. This
+  // pins the truth: the rule works, the fixtures are wrong, and the two facts
+  // are recorded rather than reconciled by fudging either.
+  {
+    const demoFixtures = (readFileSync(path.join(here, 'novus-demo-selftest.mjs'), 'utf8')
+      .match(/commercial_consequence: '[^']{15,}'/g) || [])
+      .map((m) => m.replace(/^[a-z_0-9]+: '/, '').replace(/'$/, ''))
+      .filter((line) => /\binstruction\b/i.test(line));
+    assert.ok(demoFixtures.length >= 1, 'the fixtures this block documents must still exist');
+    for (const fixture of demoFixtures) {
+      assert.strictEqual(findUnsupportedRelationship(fixture, relSupport()), 'certainty_upgrade',
+        `this demo fixture upgrades a potential opportunity into a won instruction: "${fixture}"`);
+    }
+    ok(`D9 [rule 45]: ${demoFixtures.length} ungated demo fixtures genuinely violate the certainty rule and are recorded as such — they bypass the gate, so no production copy regresses`);
+  }
+
+
+  // ══ Section D10: THE UNFAIR-OUTCOME FALSE POSITIVE ═══════════════════════
+  //
+  // The guard exists to stop the email blaming the agency for OUR silence. It
+  // was reading the entity and the verb and ignoring the VOICE, and voice is
+  // the entire distinction:
+  //
+  //   "the enquiry never MOVED FORWARD"      active, intransitive. An enquiry
+  //     moves forward only while both sides keep going, and we deliberately
+  //     stopped. Blaming them for that is unfair, and stays rejected.
+  //
+  //   "the seller side WAS NEVER PROGRESSED" passive; the implied actor is the
+  //     agency. Offering a valuation, asking a qualifying question, booking an
+  //     appraisal — all things they could do alone, on the day, with no reply
+  //     from us. Fair, useful, and it was being deleted.
+  //
+  // The `[^.!?]{0,28}` gap swallowed the passive auxiliary, so `was`/`were`
+  // never reached the match and both sentences looked identical to the guard.
+  {
+    for (const fair of [
+      'the seller declaration in my original enquiry was never progressed',
+      'the seller side was never progressed',
+      'the seller opportunity was never progressed into a valuation',
+      'the declared property to sell was never progressed',
+      "You called twice, but the seller declaration in my original enquiry was never progressed.",
+    ]) {
+      assert.strictEqual(readsAsUnfairOutcomeCriticism(fair), false,
+        `agency-owned criticism in the passive must be sayable: "${fair}"`);
+    }
+
+    // THE ACTIVE FORMS ARE UNCHANGED. Nothing below is newly allowed.
+    for (const unfair of [
+      'nothing progressed',
+      'the enquiry never moved forward',
+      'the buyer side never progressed',
+      'the opportunity never went anywhere',
+      'the viewing never got booked',
+      'neither opportunity became a conversation',
+      'None of it moved forward.',
+    ]) {
+      assert.strictEqual(readsAsUnfairOutcomeCriticism(unfair), true,
+        `criticism that needed MY reply must stay rejected: "${unfair}"`);
+    }
+
+    // TWO-WAY ENTITIES ARE THE EXCEPTION, IN BOTH VOICES. A conversation is
+    // not something one party can progress alone, so the passive gets it no
+    // exemption — this is what stops the fix becoming a loophole.
+    for (const twoWay of [
+      'the conversation was never progressed',
+      'the thread was never progressed',
+      'the conversation never went anywhere',
+    ]) {
+      assert.strictEqual(readsAsUnfairOutcomeCriticism(twoWay), true,
+        `a two-way entity cannot be progressed by the agency alone: "${twoWay}"`);
+    }
+
+    // A REQUIRED-FAIL CASE THAT WAS SILENTLY PASSING. The quantifier
+    // alternation knew the pronoun forms only, so the same claim with the
+    // number spelled out went straight through.
+    for (const counted of [
+      'none of the four attempts became a real conversation',
+      'not one of the three attempts became a conversation',
+    ]) {
+      assert.strictEqual(readsAsUnfairOutcomeCriticism(counted), true,
+        `a counted quantifier is the same unfair claim: "${counted}"`);
+    }
+    assert.strictEqual(readsAsUnfairOutcomeCriticism('none of them became a real conversation'), true,
+      'and the pronoun form it already caught is unchanged');
+
+    // THE SAME FALSE POSITIVE IN THE QUANTIFIER RULES. "both leads were never
+    // progressed" and "neither side was ever progressed" belong to exactly the
+    // class above — passive, agency-owned — but were rejected by the separate
+    // "both …"/"neither …" patterns, which triggered on a bare `never`/verb
+    // without looking at voice at all. Progressing two opportunities is two
+    // things the agency could have done on the day, on its own.
+    for (const fair of [
+      'both leads were never progressed',
+      'both sides were never progressed',
+      'both opportunities were never progressed',
+      'neither side was ever progressed',
+      'neither lead was ever progressed',
+      'neither opportunity was progressed',
+    ]) {
+      assert.strictEqual(readsAsUnfairOutcomeCriticism(fair), false,
+        `agency-owned progression in the passive must be sayable under any quantifier: "${fair}"`);
+    }
+
+    // AND THE TWO-WAY COMPLETIONS UNDER THE SAME QUANTIFIERS STAY REJECTED.
+    // This is the boundary that stops the exemption becoming a loophole:
+    // going anywhere, becoming a conversation, being converted or booked are
+    // all outcomes that needed us to keep talking.
+    for (const unfair of [
+      'neither lead went anywhere',
+      'both conversations went nowhere',
+      'neither side became a real conversation',
+      'neither opportunity became a conversation',
+      'neither side was ever converted',
+      'neither lead was ever booked',
+      'both sides never went anywhere',
+      'both opportunities were left hanging',
+      'both sides stayed where they started',
+      'both sides remained unprogressed',
+      'the conversation went nowhere',
+    ]) {
+      assert.strictEqual(readsAsUnfairOutcomeCriticism(unfair), true,
+        `a completion that depended on my participation must stay rejected: "${unfair}"`);
+    }
+
+    // The fairness GATE itself is untouched: this is still only ever applied
+    // on a probe where the agency genuinely put the ball back in our court.
+    assert.strictEqual(agencyMadeNextStepAttempt({ human_contact: 'yes', viewing_progression: 'invited' }), true,
+      'agencyMadeNextStepAttempt is unchanged');
+    assert.strictEqual(agencyMadeNextStepAttempt({ human_contact: 'none' }), false,
+      'and still false where nobody came back at all');
+    ok('D10 [rules 25/35/36]: passive, agency-owned "was never progressed" is sayable again under every quantifier (the, both, neither); active self-motion claims, two-way entities and counted quantifiers all stay rejected');
+  }
+
+
+  // ══ Section E: THE TERMINAL PERSISTENCE INVARIANT ════════════════════════
+  //
+  // The three email variables were mandatory everywhere except at the write.
+  // personaliseProbe() can legitimately return one blank — its last resort is
+  // `{ ...best.row, ...best.softFallbacks }`, and a NEVER_PERSIST reason banks
+  // no fallback on purpose, because a sentence asserting something untrue is
+  // worth less than nothing. That blank is a REFUSAL. Nothing downstream
+  // treated it as one: it flowed into the patch, spread over the existing row
+  // in the update branch (overwriting a good Hook 2 with an empty cell), and
+  // was written.
+  //
+  // These blocks drive the REAL persistence path — rebuildAllPersonalisation
+  // against a repo that records what would actually reach the sheet — rather
+  // than asserting on personaliseProbe's return value.
+  {
+    const P_HEADER = ['personalisation_id', 'agency_id', 'probe_id', 'hero_journey',
+      'primary_narrative', 'narrative_finding_indexes', 'positive_finding_index', 'main_finding_index',
+      'wider_finding_index', 'supporting_findings', 'evidence', 'novus_counterfactual', 'fair_observation',
+      'main_finding', 'commercial_consequence', 'property_reference', 'email_observation',
+      'email_commercial_hook', 'email_commercial_hook_email_2', 'created_at', 'updated_at'];
+    const D_HEADER = ['diagnosis_id', 'agency_id', 'probe_id', 'strengths', 'missed_opportunities',
+      'commercial_implication', 'novus_opportunity', 'diagnosis_summary'];
+    const F_HEADER = ['probe_id', 'finding_index', 'finding_type', 'finding', 'evidence', 'significance_note'];
+    const PROBE_ID = 'prb_persist_1';
+
+    // existingPersonalisationRow: null for the append path, or an object for
+    // the update path. header: overridable, to prove the column mapping.
+    const makeRepo = ({ existingRow = null, header = P_HEADER } = {}) => {
+      const written = [];
+      const table = (h, rows) => ({ header: h, rows });
+      return {
+        written,
+        async getTable(tab) {
+          if (tab === 'INTELLIGENCE') {
+            return table(['intelligence_id', 'agency_id', 'probe_id', 'human_contact', 'response_hours',
+              'viewing_progression', 'seller_recognition', 'observation_status'],
+            [['int_1', 'agc_master', PROBE_ID, 'yes', '0.13', 'invited', 'none', 'closed']]);
+          }
+          if (tab === 'DIAGNOSIS') {
+            return table(D_HEADER, [['dia_1', 'agc_master', PROBE_ID, '', '', '', 'Core (front desk)', 'final']]);
+          }
+          if (tab === 'PERSONALISATION') {
+            return table(header, existingRow ? [header.map((k) => existingRow[k] ?? '')] : []);
+          }
+          if (tab === 'AGENCIES') return table(['agency_id', 'agency_name'], [['agc_master', 'Example Estates']]);
+          if (tab === 'DIAGNOSIS_FINDINGS') {
+            return table(F_HEADER, [
+              [PROBE_ID, '1', 'positive', POSITIVE.finding, POSITIVE.evidence, POSITIVE.significance_note],
+              [PROBE_ID, '2', 'opportunity', SELLER_MISSED.finding, SELLER_MISSED.evidence, SELLER_MISSED.significance_note],
+            ]);
+          }
+          return table([], []);
+        },
+        async writeRowsBatch(writes) { written.push(...writes); },
+      };
+    };
+
+    const rebuild = async (repo, answer) => {
+      __setAiCallerForTests(async () => answer);
+      return rebuildAllPersonalisation(repo, new Map([[PROBE_ID, { ...PROBE, probe_id: PROBE_ID }]]));
+    };
+    const cell = (row, header, field) => row[header.indexOf(field)];
+
+    // E1-E4 — a blank in ANY mandatory field refuses the write, and
+    // whitespace is blank.
+    for (const [label, blanked] of [
+      ['Hook 2', 'email_commercial_hook_email_2'],
+      ['Hook 1', 'email_commercial_hook'],
+      ['observation', 'email_observation'],
+    ]) {
+      const repo = makeRepo();
+      const summary = await rebuild(repo, baseAnswer({ [blanked]: '' }));
+      assert.deepStrictEqual(repo.written, [], `a blank ${label} must reach no write at all`);
+      assert.strictEqual(summary.personalisation_created, 0, `and must not be counted as created (${label})`);
+      assert.strictEqual(summary.personalisations_processed, 0, `nor as processed (${label})`);
+      assert.deepStrictEqual(summary.personalised_probe_ids, [],
+        `nor handed to the demo compile step (${label})`);
+      assert.strictEqual(summary.mandatory_field_refusals, 1, `and the refusal is counted (${label})`);
+      assert.strictEqual(summary.problems.length, 1, `and reported (${label})`);
+      assert.strictEqual(summary.problems[0].reason, 'mandatory_email_field_blank');
+      assert.deepStrictEqual(summary.problems[0].blank_fields, [blanked]);
+      assert.strictEqual(summary.problems[0].probe_id, PROBE_ID);
+    }
+    ok('E1-E3 [blank Hook 2 / Hook 1 / observation]: none can persist — no write, no counters, not handed to demo compile, and problems[] names the reason and the exact field');
+
+    {
+      const repo = makeRepo();
+      const summary = await rebuild(repo, baseAnswer({ email_commercial_hook_email_2: '   \n\t  ' }));
+      assert.deepStrictEqual(repo.written, [], 'whitespace-only is blank and must not persist');
+      assert.deepStrictEqual(summary.problems[0].blank_fields, ['email_commercial_hook_email_2']);
+      ok('E4 [whitespace]: a whitespace-only mandatory field counts as blank — it would satisfy every truthiness check between here and the sheet');
+    }
+
+    // E5 — the valid row still persists, byte-identically.
+    let validRowObject = null;
+    {
+      const repo = makeRepo();
+      const summary = await rebuild(repo, baseAnswer());
+      assert.strictEqual(repo.written.length, 1, 'a complete row is written exactly once');
+      assert.strictEqual(summary.personalisation_created, 1);
+      assert.strictEqual(summary.mandatory_field_refusals, 0);
+      assert.deepStrictEqual(summary.problems, []);
+      assert.deepStrictEqual(summary.personalised_probe_ids, [PROBE_ID]);
+      const row = repo.written[0].row;
+      assert.strictEqual(repo.written[0].tab, 'PERSONALISATION');
+      assert.strictEqual(cell(row, P_HEADER, 'email_observation'), baseAnswer().email_observation,
+        'email_observation persists byte-identically');
+      assert.strictEqual(cell(row, P_HEADER, 'email_commercial_hook'), baseAnswer().email_commercial_hook,
+        'email_commercial_hook persists byte-identically');
+      assert.strictEqual(cell(row, P_HEADER, 'email_commercial_hook_email_2'), baseAnswer().email_commercial_hook_email_2,
+        'email_commercial_hook_email_2 persists byte-identically');
+      validRowObject = Object.fromEntries(P_HEADER.map((k, i) => [k, row[i]]));
+      ok('E5 [valid row]: a complete row is written unchanged — the invariant refuses, it never rewrites');
+    }
+
+    // E6 — THE ONE THAT MATTERED MOST. An existing valid row must survive an
+    // invalid regeneration. This is the update branch, where the blank used to
+    // spread over the good value and empty the cell in place.
+    {
+      const repo = makeRepo({ existingRow: { ...validRowObject, email_commercial_hook_email_2: '' } });
+      // The stored row is missing Hook 2, so needsPersonalisation() re-runs it;
+      // the regeneration comes back blank again.
+      const summary = await rebuild(repo, baseAnswer({ email_commercial_hook_email_2: '' }));
+      assert.deepStrictEqual(repo.written, [], 'the update path refuses too — it is the same single write site');
+      assert.strictEqual(summary.personalisation_updated, 0, 'and counts no update');
+      assert.strictEqual(summary.problems[0].reason, 'mandatory_email_field_blank');
+
+      // And with a GOOD stored Hook 2 that a bad regeneration would overwrite:
+      // needsPersonalisation() leaves a complete row alone entirely, which is
+      // the outer half of the same protection.
+      const intact = makeRepo({ existingRow: validRowObject });
+      const untouched = await rebuild(intact, baseAnswer({ email_commercial_hook_email_2: '' }));
+      assert.deepStrictEqual(intact.written, [], 'a complete existing row is never rewritten at all');
+      assert.strictEqual(untouched.personalisations_processed, 0);
+      ok('E6 [no destructive overwrite]: an existing valid row cannot be emptied by an invalid regeneration — the merged result is what the invariant tests, so the update branch cannot spread a blank over a good value');
+    }
+
+    // E7 — the column mapping for the field that was going missing.
+    {
+      assert.strictEqual(P_HEADER.indexOf('email_commercial_hook_email_2'), 18,
+        'the header carries the column at a stable index');
+      const repo = makeRepo();
+      await rebuild(repo, baseAnswer());
+      const row = repo.written[0].row;
+      assert.strictEqual(row.length, P_HEADER.length, 'the written row matches the header width');
+      assert.strictEqual(row[P_HEADER.indexOf('email_commercial_hook_email_2')],
+        baseAnswer().email_commercial_hook_email_2,
+        'and the value lands in its own column, not a neighbouring one');
+
+      // A WORKBOOK WHOSE HEADER PREDATES THE FIELD behaves exactly as it did
+      // before the field existed, rather than being refused for ever. Same
+      // column-scoping needsPersonalisation() already uses — without this the
+      // invariant would deadlock every legacy sheet.
+      const legacyHeader = P_HEADER.filter((k) => k !== 'email_commercial_hook_email_2');
+      const legacyRepo = makeRepo({ header: legacyHeader });
+      const legacy = await rebuild(legacyRepo, baseAnswer({ email_commercial_hook_email_2: '' }));
+      assert.strictEqual(legacyRepo.written.length, 1,
+        'a sheet with no such column cannot store the field, so it is not demanded');
+      assert.deepStrictEqual(legacy.problems, []);
+      assert.strictEqual(blankMandatoryEmailFields({ email_observation: 'a', email_commercial_hook: 'b' },
+        new Set(legacyHeader)).length, 0, 'and the helper agrees directly');
+      ok('E7 [column mapping]: email_commercial_hook_email_2 maps to its own column and persists there; a legacy sheet without the column is unaffected rather than deadlocked');
+    }
+
+    // E8 — the report is usable on its own.
+    {
+      const repo = makeRepo();
+      const summary = await rebuild(repo, baseAnswer({ email_observation: '', email_commercial_hook_email_2: '' }));
+      const problem = summary.problems[0];
+      assert.strictEqual(problem.reason, 'mandatory_email_field_blank');
+      assert.deepStrictEqual(problem.blank_fields, ['email_observation', 'email_commercial_hook_email_2'],
+        'every blank field is listed, in the contract order, not just the first');
+      assert.match(problem.error, /mandatory email field/i, 'and the message says what happened in words');
+      assert.strictEqual(summary.mandatory_field_refusals, 1);
+      assert.strictEqual(summary.remaining_personalisations, 0,
+        'a refusal is not a budget skip — it is a completed decision');
+      ok('E8 [reporting]: problems[] carries reason, probe_id, every blank field and a readable message, and the pass counts its refusals');
+    }
+
+    // E9 — the invariant is exactly one gate, and it is the only write site.
+    {
+      const source = readFileSync(path.join(here, '..', 'lib', 'personalisation-rebuild.mjs'), 'utf8');
+      const writeSites = source.match(/writes\.push\(\{\s*tab: 'PERSONALISATION'/g) || [];
+      assert.strictEqual(writeSites.length, 1,
+        'PERSONALISATION must have exactly ONE write site — append, update, regeneration, fallback, correction and partial merge all funnel through it');
+      const repoSource = readFileSync(path.join(here, '..', 'lib', 'personalisation-rebuild.mjs'), 'utf8');
+      const guardIndex = repoSource.indexOf('blankMandatoryEmailFields(merged, personalisationColumns)');
+      const writeIndex = repoSource.indexOf("writes.push({ tab: 'PERSONALISATION'");
+      assert.ok(guardIndex > 0 && guardIndex < writeIndex,
+        'and the invariant runs immediately BEFORE that write, not after it');
+      ok('E9 [single gate]: PERSONALISATION has exactly one write site and the invariant sits immediately before it, so every path — append, update, regeneration, fallback, correction, partial merge — is covered by one check');
+    }
   }
 
   console.log(`\n${passed} checks passed.`);
