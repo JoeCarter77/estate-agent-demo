@@ -293,7 +293,16 @@ const SCENARIOS = [
       wider_finding_index: null,
       supporting_findings: '',
       fair_observation: 'Four attempts across two channels is more persistence than most agencies manage.',
-      main_finding: 'Your team chased us four times, and each one essentially asked us to get back to you, rather than putting a viewing in front of us.',
+      // NO COUNT CITED. This scenario seeds contact_attempts: 4, but
+      // runRebuildPass recomputes INTELLIGENCE deterministically from
+      // COMMUNICATIONS and the scenario supplies ONE communication — so the
+      // structured count the pipeline actually derives is 1. The old wording
+      // ("chased us four times") was therefore the exact class-4 error in
+      // miniature: prospect-facing copy citing a contact count the record does
+      // not carry. Rephrased to make the same point about persistence without
+      // asserting a number, which leaves every derived value, grade and
+      // hero-journey expectation in this suite byte-identical.
+      main_finding: 'Your team kept chasing, and each attempt essentially asked us to get back to you, rather than putting a viewing in front of us.',
       commercial_consequence: 'all that effort ended without the one step that moves a sale forward.',
     },
     expect: { hero_journey: 'fast_response_stalled_follow_up', findings: 2 },
