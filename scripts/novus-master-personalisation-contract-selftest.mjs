@@ -1678,6 +1678,49 @@ async function main() {
     assert.strictEqual(
       findUnsupportedRelationship('None of them mentioned the seller position.', statedByFindings), null,
       'a universal the findings established across the whole set is supported');
+
+    const oneNamedContact = relSupport({
+      intelligence: { contact_attempts: 2 },
+      findings: [{
+        finding_index: 1, finding_type: 'positive',
+        finding: 'One agency email named the specific property.',
+        evidence: 'The first email referenced Grey Lady Place.',
+        significance_note: 'At least one contact was property-specific.',
+      }],
+    });
+    for (const unsupportedUniversal of [
+      'naming the specific property each time',
+      'the seller point was raised each time',
+      'they mentioned the property every time',
+    ]) {
+      assert.strictEqual(
+        findUnsupportedRelationship(unsupportedUniversal, oneNamedContact),
+        'unsupported_universal',
+        `one evidenced contact cannot support a claim about every contact: "${unsupportedUniversal}"`);
+    }
+    for (const nonAssertiveUniversal of [
+      'the question is whether it happens every time, not just this time',
+      'does this happen every time?',
+      'it may not happen every time',
+    ]) {
+      assert.strictEqual(
+        findUnsupportedRelationship(nonAssertiveUniversal, oneNamedContact),
+        null,
+        `rhetorical or uncertain wording is not an asserted universal fact: "${nonAssertiveUniversal}"`);
+    }
+    const everyNamedContact = relSupport({
+      intelligence: { contact_attempts: 2 },
+      findings: [{
+        finding_index: 1, finding_type: 'positive',
+        finding: 'Every contact named the specific property.',
+        evidence: 'Both agency contacts referenced Grey Lady Place.',
+        significance_note: 'Property naming was consistent across the full contact set.',
+      }],
+    });
+    assert.strictEqual(
+      findUnsupportedRelationship('naming the specific property each time', everyNamedContact),
+      null,
+      'the same universal wording is valid when every contact genuinely supports it');
     ok('F1 [class 1]: a universal quantifier over the contact set is rejected unless the findings evidence it across every item; whole-record claims are untouched');
   }
 
@@ -1788,7 +1831,57 @@ async function main() {
     assert.strictEqual(
       findUnsupportedRelationship('You followed up four times.', fourAttempts), 'unsupported_contact_count',
       'so citing the attempt total as the follow-up count is still a mismatch');
+    assert.strictEqual(
+      findUnsupportedRelationship('across four contact attempts and five communications', fourAttempts),
+      'unsupported_contact_count',
+      'raw communication count cannot be combined with the authoritative contact-attempt metric');
+    assert.strictEqual(
+      findUnsupportedRelationship('across four contact attempts', fourAttempts), null,
+      'the authoritative contact-attempt metric remains valid on its own');
+    for (const duration of [
+      'replied within 2 hours',
+      'called back in 36 minutes',
+    ]) {
+      assert.strictEqual(findUnsupportedRelationship(duration, fourAttempts), null,
+        `duration wording is not a contact count: "${duration}"`);
+    }
     ok('F4 [class 4]: a prospect-facing contact count is checked against INTELLIGENCE.contact_attempts, in words or digits; the true count and uncounted copy pass');
+  }
+
+  // F5 [class 3] — SAME-MESSAGE ANCHORS CAN INHERIT THEIR REFERENT.
+  {
+    const crossEvent = buildSupportContext({
+      probe: REL_PROBE,
+      findings: [
+        {
+          finding_index: 1, finding_type: 'positive',
+          finding: 'The reply asked when would be convenient to view.',
+          evidence: 'The later email asked when would be convenient to view.',
+          significance_note: 'The viewing question progressed the buying side.',
+        },
+        {
+          finding_index: 2, finding_type: 'opportunity',
+          finding: 'The enquirer declared a property to sell, but no valuation was offered.',
+          evidence: 'The enquiry declared a property to sell.',
+          significance_note: 'The seller opportunity was not progressed.',
+        },
+      ],
+    });
+    const sameEvent = buildSupportContext({
+      probe: REL_PROBE,
+      findings: [{
+        finding_index: 1, finding_type: 'opportunity',
+        finding: 'The original enquiry contained both the viewing request and seller declaration.',
+        evidence: 'Both facts appeared together in the original enquiry.',
+        significance_note: 'One enquiry carried both opportunities.',
+      }],
+    });
+    const inheritedMessage = 'The viewing question moved the buyer side forward, but the same message already gave you a second seller opportunity.';
+    assert.strictEqual(findUnsupportedRelationship(inheritedMessage, crossEvent), 'unsupported_co_occurrence',
+      'same-message wording inherits the later viewing-email referent and cannot absorb the enquiry seller declaration');
+    assert.strictEqual(findUnsupportedRelationship(inheritedMessage, sameEvent), null,
+      'the same wording remains valid when both linked facts genuinely share the original enquiry');
+    ok('F5 [class 3]: inherited same-message referents are judged against selected-finding event provenance');
   }
 
   console.log(`\n${passed} checks passed.`);
