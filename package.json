@@ -42,6 +42,8 @@
     "novus:occurred-at-fallback-selftest": "node scripts/novus-occurred-at-fallback-selftest.mjs",
     "novus:demo-selftest": "node scripts/novus-demo-selftest.mjs",
     "novus:demo": "node scripts/novus-demo.mjs",
+    "novus:outbound-selftest": "node scripts/novus-outbound-selftest.mjs",
+    "novus:outbound": "node scripts/rebuild-outbound.mjs",
     "novus:historical-replay": "node scripts/novus-historical-replay.mjs",
     "novus:probe-rerun": "node scripts/novus-probe-rerun.mjs"
   },

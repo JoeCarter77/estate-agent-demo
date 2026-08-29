@@ -51,6 +51,11 @@
 //
 // Optional body: { "batch_size": N } — override the per-invocation AI-call
 // budget (default below / NOVUS_REBUILD_BATCH_SIZE). Mainly for tests.
+
+// Optional body: { "operation": "rebuild_outbound", "dry_run": true } —
+// compile the current AGENCIES + PROBES + PERSONALISATION + DEMOS state into an
+// operator report without running the Intelligence pipeline. Only literal
+// dry_run:false writes the resulting upserts to OUTBOUND.
 //
 // Optional body: { "probe_ids": ["prb_...", "prb_..."] } — restricts the full
 // rebuild (Intelligence, then Diagnosis, then Personalisation) to exactly
@@ -79,6 +84,7 @@
 import { getRepo } from '../../../lib/sheets.mjs';
 import { runRebuildPass } from '../../../lib/rebuild-pass.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
+import { rebuildOutbound } from '../../../lib/outbound.mjs';
 import { requireAuth } from '../_auth.mjs';
 
 export const maxDuration = 60;
@@ -135,6 +141,21 @@ export default async function handler(req, res) {
   }
 
   const probeId = String(body.probe_id || '').trim();
+
+  // The OUTBOUND compiler shares this protected operator endpoint instead of
+  // consuming a thirteenth Vercel Function. It is a separate deterministic
+  // operation: no Intelligence rebuild, AI call, Instantly call or email send
+  // occurs. Writes remain fail-safe and require literal dry_run: false.
+  if (body.operation === 'rebuild_outbound') {
+    try {
+      const result = await rebuildOutbound(getRepo(), { dryRun: body.dry_run !== false });
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error('outbound rebuild error:', err);
+      return res.status(500).json({ error: err.message || 'Failed to rebuild OUTBOUND' });
+    }
+  }
+
   // probe_ids is genuinely ignored (not even validated) once the singular
   // probe_id short-circuits below — matches the documented precedence.
   const probeIdsField = probeId ? { present: false, ids: null, invalid: false } : normalizeProbeIds(body.probe_ids);
