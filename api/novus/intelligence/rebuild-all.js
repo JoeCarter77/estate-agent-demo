@@ -56,6 +56,13 @@
 // compile the current AGENCIES + PROBES + PERSONALISATION + DEMOS state into an
 // operator report without running the Intelligence pipeline. Only literal
 // dry_run:false writes the resulting upserts to OUTBOUND.
+
+// Optional body: { "operation": "instantly_outbound", "dry_run": true } —
+// read the compiled OUTBOUND queue and report eligible rows plus bounded exact
+// Instantly payload samples. Dry-run makes no Instantly request and no Sheet
+// write. Literal dry_run:false enters the separately guarded one-outbound_id
+// live path; that path requires an exact confirmation value and cannot upload
+// more than one lead.
 //
 // Optional body: { "probe_ids": ["prb_...", "prb_..."] } — restricts the full
 // rebuild (Intelligence, then Diagnosis, then Personalisation) to exactly
@@ -85,6 +92,7 @@ import { getRepo } from '../../../lib/sheets.mjs';
 import { runRebuildPass } from '../../../lib/rebuild-pass.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 import { rebuildOutbound } from '../../../lib/outbound.mjs';
+import { buildInstantlyDryRun, uploadSingleOutboundLead } from '../../../lib/instantly-outbound.mjs';
 import { requireAuth } from '../_auth.mjs';
 
 export const maxDuration = 60;
@@ -153,6 +161,33 @@ export default async function handler(req, res) {
     } catch (err) {
       console.error('outbound rebuild error:', err);
       return res.status(500).json({ error: err.message || 'Failed to rebuild OUTBOUND' });
+    }
+  }
+
+  // Instantly is only the execution layer: this operation reads the existing
+  // OUTBOUND tab and never invokes the OUTBOUND compiler. It shares this
+  // protected operator endpoint so no additional Vercel Function is created.
+  if (body.operation === 'instantly_outbound') {
+    try {
+      const repo = getRepo();
+      if (body.dry_run !== false) {
+        const result = await buildInstantlyDryRun(repo, {
+          campaignId: process.env.INSTANTLY_CAMPAIGN_ID,
+          sampleLimit: body.sample_limit,
+        });
+        return res.status(200).json(result);
+      }
+      const result = await uploadSingleOutboundLead(repo, {
+        outboundId: body.outbound_id,
+        confirmation: body.confirmation,
+        ...(body.test_email !== undefined ? { testEmail: body.test_email } : {}),
+        apiKey: process.env.INSTANTLY_API_KEY,
+        campaignId: process.env.INSTANTLY_CAMPAIGN_ID,
+      });
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error('instantly outbound error:', err?.message || String(err));
+      return res.status(400).json({ error: err?.message || 'Instantly OUTBOUND handoff failed' });
     }
   }
 
