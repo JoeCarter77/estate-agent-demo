@@ -59,6 +59,7 @@ import { matchProbe } from '../lib/matching.mjs';
 import { DEMOS_HEADER, DEMO_VERSION } from '../lib/demos.mjs';
 import { OUTBOUND_HEADER } from '../lib/outbound.mjs';
 import finalizeHandler from '../api/novus/intelligence/finalize.js';
+import rebuildAllHandler from '../api/novus/intelligence/rebuild-all.js';
 
 const PROBES_HEADER = [
   'probe_id', 'probe_reference', 'agency_id', 'portal', 'property_address', 'property_url',
@@ -659,6 +660,7 @@ async function runNightlyOutboundOnly() {
   const res = {
     status(code) { this.statusCode = code; return this; },
     json(body) { response = body; return body; },
+    setHeader() {},
     end() {},
   };
   try {
@@ -698,9 +700,28 @@ async function runNightlyOutboundOnly() {
   assert.equal(outbound.instantly_lead_id, 'lead_123');
   assert.equal(outbound.instantly_added_at, '2026-08-28T12:00:00.000Z');
   assert.equal(outbound.last_error, 'historic error');
+
+  // The Google Sheet button calls this protected full-rebuild handler. Reset
+  // OUTBOUND so this independently proves it writes a READY row through the
+  // same post-DEMOS compiler rather than a separate implementation.
+  store.OUTBOUND = [OUTBOUND_HEADER.slice(), ['SCHEMA NOTE', 'Fixture']];
+  const oldAuthUser = process.env.NOVUS_BASIC_AUTH_USER;
+  const oldAuthPass = process.env.NOVUS_BASIC_AUTH_PASS;
+  process.env.NOVUS_BASIC_AUTH_USER = 'nightly-test-user';
+  process.env.NOVUS_BASIC_AUTH_PASS = 'nightly-test-pass';
+  const basic = Buffer.from('nightly-test-user:nightly-test-pass').toString('base64');
+  await rebuildAllHandler({ method: 'POST', headers: { authorization: `Basic ${basic}` }, body: {} }, res);
+  assert.equal(res.statusCode, 200);
+  assert.ok(response.demos, 'full rebuild completed its DEMOS stage');
+  assert.equal(response.outbound.dry_run, false);
+  assert.equal(response.outbound.create_count, 1);
+  outbound = findRow(store, 'OUTBOUND', OUTBOUND_HEADER, 'prb_nightly');
+  assert.equal(outbound.outbound_status, 'READY');
+  if (oldAuthUser === undefined) delete process.env.NOVUS_BASIC_AUTH_USER; else process.env.NOVUS_BASIC_AUTH_USER = oldAuthUser;
+  if (oldAuthPass === undefined) delete process.env.NOVUS_BASIC_AUTH_PASS; else process.env.NOVUS_BASIC_AUTH_PASS = oldAuthPass;
   if (oldSecret === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = oldSecret;
   if (oldBatchSize === undefined) delete process.env.NOVUS_REBUILD_BATCH_SIZE; else process.env.NOVUS_REBUILD_BATCH_SIZE = oldBatchSize;
-  ok('03:00 finalize runs DEMOS then a non-dry OUTBOUND rebuild, writes READY, preserves SENT/SUPPRESSED, and makes no network call');
+  ok('03:00 finalize and the Google Sheet full rebuild run DEMOS then a non-dry OUTBOUND rebuild, write READY, preserve SENT/SUPPRESSED, and make no network call');
   console.log(`\n${passed} checks passed.`);
 }
 

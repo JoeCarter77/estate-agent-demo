@@ -181,7 +181,12 @@ export default async function handler(req, res) {
       return res.status(200).json(result);
     }
 
-    const summary = await runRebuildPass(repo, { forceAi, maxAiCalls: batchSize, probeIds: probeIds || undefined });
+    const summary = await runRebuildPass(repo, {
+      forceAi,
+      maxAiCalls: batchSize,
+      probeIds: probeIds || undefined,
+      rebuildOutbound: true,
+    });
 
     return res.status(200).json({ ...summary, batch_size: batchSize, ...(probeIds ? { targeted_probe_ids: probeIds } : {}) });
   } catch (err) {
