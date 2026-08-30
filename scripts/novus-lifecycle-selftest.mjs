@@ -56,6 +56,9 @@ import { recomputeProbeObservation } from '../lib/observation-recompute.mjs';
 import { rebuildAllIntelligence } from '../lib/intelligence-rebuild.mjs';
 import { runRebuildPass } from '../lib/rebuild-pass.mjs';
 import { matchProbe } from '../lib/matching.mjs';
+import { DEMOS_HEADER, DEMO_VERSION } from '../lib/demos.mjs';
+import { OUTBOUND_HEADER } from '../lib/outbound.mjs';
+import finalizeHandler from '../api/novus/intelligence/finalize.js';
 
 const PROBES_HEADER = [
   'probe_id', 'probe_reference', 'agency_id', 'portal', 'property_address', 'property_url',
@@ -524,10 +527,185 @@ async function run() {
   assert.deepStrictEqual(findRow(store, 'PROBES', PROBES_HEADER, 'prb_explicit_deadline'), explicitProbe, 'prb_explicit_deadline PROBES row is byte-identical after a second pass');
   ok('the backfill is fully idempotent — a second rebuild pass changes nothing further for any of these probes (requirement 10d)');
 
+  // ── 11: the nightly OUTBOUND compile follows the DEMOS stage ────────────
+  // Seed the already-compiled, campaign-ready downstream state that the
+  // deterministic OUTBOUND compiler consumes. The opted-in pass must execute
+  // its normal DEMOS stage first, then write READY, while leaving later SENT
+  // and SUPPRESSED execution state untouched.
+  store.DEMOS = [DEMOS_HEADER.slice(), ['SCHEMA NOTE', 'Fixture']];
+  store.OUTBOUND = [OUTBOUND_HEADER.slice(), ['SCHEMA NOTE', 'Fixture']];
+  store.AGENCIES = [[
+    'agency_id', 'agency_name', 'clean_agency_name', 'outreach_contact_name',
+    'outreach_contact_email', 'email_verification_status',
+  ], ['SCHEMA NOTE', 'Fixture'], [
+    'agc_b', 'Expire Estates', 'Expire Estates', 'Bradley Stanton',
+    'bradley@example.com', 'VALID',
+  ]];
+  const expireProbeIndex = store.PROBES.findIndex((r, index) => index > 1 && r[PROBES_HEADER.indexOf('probe_id')] === 'prb_expire');
+  store.PROBES[0].push('property_street');
+  store.PROBES[expireProbeIndex].push('2 Expire Street');
+  store.DEMOS.push(row(DEMOS_HEADER, {
+    agency_id: 'agc_b', probe_id: 'prb_expire', demo_slug: 'expire-estates-rm-expire',
+    demo_status: 'ready', property_image_status: 'ok', demo_version: String(DEMO_VERSION),
+    enquiry_date: '1 January', enquiry_time: '09:00',
+  }));
+  const expirePersonalisation = {
+    personalisation_id: 'per_expire', agency_id: 'agc_b', probe_id: 'prb_expire',
+    primary_narrative: 'stub narrative',
+    email_observation: 'No follow-up was recorded after the enquiry.',
+    email_commercial_hook: 'The enquiry did not become a conversation.',
+    email_commercial_hook_email_2: 'The opportunity remained untouched.',
+  };
+  const personalisationProbeColumn = PERSONALISATION_HEADER.indexOf('probe_id');
+  const expirePersonalisationIndex = store.PERSONALISATION
+    .findIndex((r, index) => index > 1 && r[personalisationProbeColumn] === 'prb_expire');
+  if (expirePersonalisationIndex > 1) {
+    store.PERSONALISATION[expirePersonalisationIndex] = row(PERSONALISATION_HEADER, expirePersonalisation);
+  } else {
+    store.PERSONALISATION.push(row(PERSONALISATION_HEADER, expirePersonalisation));
+  }
+
+  const nightly = await runRebuildPass(repo, { rebuildOutbound: true });
+  assert.ok(nightly.demos, 'the nightly pass completed its DEMOS stage');
+  assert.equal(nightly.outbound.create_count, 1, 'the nightly pass writes the newly eligible row');
+  const outboundRow = findRow(store, 'OUTBOUND', OUTBOUND_HEADER, 'prb_expire');
+  assert.equal(outboundRow.outbound_status, 'READY');
+  outboundRow.outbound_status = 'SENT';
+  outboundRow.instantly_lead_id = 'lead_123';
+  outboundRow.instantly_added_at = '2026-08-28T12:00:00.000Z';
+  outboundRow.last_error = 'historic error';
+  const outboundIndex = store.OUTBOUND.findIndex((r, index) => index > 1 && r[OUTBOUND_HEADER.indexOf('probe_id')] === 'prb_expire');
+  store.OUTBOUND[outboundIndex] = row(OUTBOUND_HEADER, outboundRow);
+  await runRebuildPass(repo, { rebuildOutbound: true });
+  const preservedSent = findRow(store, 'OUTBOUND', OUTBOUND_HEADER, 'prb_expire');
+  assert.equal(preservedSent.outbound_status, 'SENT');
+  assert.equal(preservedSent.instantly_lead_id, 'lead_123');
+  assert.equal(preservedSent.instantly_added_at, '2026-08-28T12:00:00.000Z');
+  assert.equal(preservedSent.last_error, 'historic error');
+  preservedSent.outbound_status = 'SUPPRESSED';
+  store.OUTBOUND[outboundIndex] = row(OUTBOUND_HEADER, preservedSent);
+  await runRebuildPass(repo, { rebuildOutbound: true });
+  const preservedSuppressed = findRow(store, 'OUTBOUND', OUTBOUND_HEADER, 'prb_expire');
+  assert.equal(preservedSuppressed.outbound_status, 'SUPPRESSED');
+  assert.equal(preservedSuppressed.instantly_lead_id, 'lead_123');
+  assert.equal(preservedSuppressed.instantly_added_at, '2026-08-28T12:00:00.000Z');
+  assert.equal(preservedSuppressed.last_error, 'historic error');
+  ok('the nightly path runs after DEMOS, writes eligible OUTBOUND rows, and preserves SENT and SUPPRESSED execution fields');
+
   console.log(`\n${passed} checks passed.`);
 }
 
-run().catch((err) => {
+async function runNightlyOutboundOnly() {
+  console.log('Nightly OUTBOUND finalization path — hermetic selftest\n');
+
+  const { store, repo } = makeFakeSheet();
+  __setRepoForTests(repo);
+
+  // Keep this fixture fully downstream: the normal pass sees an already
+  // finalised probe, then reaches DEMOS before compiling the ready OUTBOUND
+  // row. fetch is a tripwire for any accidental provider/email call.
+  store.AGENCIES = [[
+    'agency_id', 'agency_name', 'clean_agency_name', 'outreach_contact_name',
+    'outreach_contact_email', 'email_verification_status',
+  ], ['SCHEMA NOTE', 'Fixture'], [
+    'agc_nightly', 'Nightly Estates', 'Nightly Estates', 'Alex Nightly',
+    'alex@example.com', 'VALID',
+  ]];
+  store.PROBES[0].push('property_street');
+  const nightlyProbe = row(PROBES_HEADER, {
+    probe_id: 'prb_nightly', probe_reference: 'RM-NIGHTLY', agency_id: 'agc_nightly',
+    property_address: '3 Cron Street', property_price: '£300,000', probe_status: 'closed',
+    probe_timestamp: OLD_TIMESTAMP, observation_deadline: OLD_TIMESTAMP,
+  });
+  nightlyProbe.push('3 Cron Street');
+  store.PROBES.push(nightlyProbe);
+  store.INTELLIGENCE.push(row(INTELLIGENCE_HEADER, {
+    intelligence_id: 'itl_nightly', agency_id: 'agc_nightly', probe_id: 'prb_nightly',
+    observation_status: 'closed', communication_quality: 'competent', grade: 'B',
+  }));
+  store.DIAGNOSIS.push(row(DIAGNOSIS_HEADER, {
+    diagnosis_id: 'dgn_nightly', agency_id: 'agc_nightly', probe_id: 'prb_nightly',
+    diagnosis_summary: 'Finalised diagnosis.',
+  }));
+  store.PERSONALISATION.push(row(PERSONALISATION_HEADER, {
+    personalisation_id: 'per_nightly', agency_id: 'agc_nightly', probe_id: 'prb_nightly',
+    primary_narrative: 'A ready story.',
+    email_observation: 'No follow-up was recorded.',
+    email_commercial_hook: 'The enquiry did not become a conversation.',
+    email_commercial_hook_email_2: 'The opportunity remained untouched.',
+  }));
+  store.DEMOS = [DEMOS_HEADER.slice(), ['SCHEMA NOTE', 'Fixture'], row(DEMOS_HEADER, {
+    agency_id: 'agc_nightly', probe_id: 'prb_nightly', demo_slug: 'nightly-estates-rm-nightly',
+    demo_status: 'ready', demo_version: String(DEMO_VERSION), property_image_status: 'ok',
+    enquiry_date: '1 January', enquiry_time: '09:00',
+  })];
+  store.OUTBOUND = [OUTBOUND_HEADER.slice(), ['SCHEMA NOTE', 'Fixture']];
+
+  const trace = [];
+  const getTable = repo.getTable.bind(repo);
+  const writeRowsBatch = repo.writeRowsBatch.bind(repo);
+  const appendRowsBatch = repo.appendRowsBatch.bind(repo);
+  repo.getTable = async (tab) => { trace.push(`read:${tab}`); return getTable(tab); };
+  repo.writeRowsBatch = async (...args) => { trace.push('write:OUTBOUND'); return writeRowsBatch(...args); };
+  repo.appendRowsBatch = async (...args) => { trace.push('append:OUTBOUND'); return appendRowsBatch(...args); };
+
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error('Unexpected network/Instantly/email call'); };
+  const oldSecret = process.env.CRON_SECRET;
+  const oldBatchSize = process.env.NOVUS_REBUILD_BATCH_SIZE;
+  process.env.CRON_SECRET = 'nightly-test-secret';
+  process.env.NOVUS_REBUILD_BATCH_SIZE = '1';
+  let response;
+  const res = {
+    status(code) { this.statusCode = code; return this; },
+    json(body) { response = body; return body; },
+    end() {},
+  };
+  try {
+    await finalizeHandler({ method: 'GET', headers: { authorization: 'Bearer nightly-test-secret' } }, res);
+  } finally {
+    globalThis.fetch = oldFetch;
+    if (oldSecret === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = oldSecret;
+    if (oldBatchSize === undefined) delete process.env.NOVUS_REBUILD_BATCH_SIZE; else process.env.NOVUS_REBUILD_BATCH_SIZE = oldBatchSize;
+  }
+
+  assert.equal(res.statusCode, 200);
+  assert.ok(response.demos, 'finalize completed the DEMOS stage');
+  assert.equal(response.outbound.dry_run, false);
+  assert.equal(response.outbound.create_count, 1);
+  let outbound = findRow(store, 'OUTBOUND', OUTBOUND_HEADER, 'prb_nightly');
+  assert.equal(outbound.outbound_status, 'READY');
+  assert.ok(trace.lastIndexOf('read:DEMOS') < trace.indexOf('read:OUTBOUND'), 'OUTBOUND is read only after DEMOS');
+  assert.ok(trace.includes('append:OUTBOUND'), 'eligible OUTBOUND row is written');
+
+  outbound.outbound_status = 'SENT';
+  outbound.instantly_lead_id = 'lead_123';
+  outbound.instantly_added_at = '2026-08-28T12:00:00.000Z';
+  outbound.last_error = 'historic error';
+  const outboundIndex = store.OUTBOUND.findIndex((r, index) => index > 1 && r[OUTBOUND_HEADER.indexOf('probe_id')] === 'prb_nightly');
+  store.OUTBOUND[outboundIndex] = row(OUTBOUND_HEADER, outbound);
+  process.env.CRON_SECRET = 'nightly-test-secret';
+  await finalizeHandler({ method: 'GET', headers: { authorization: 'Bearer nightly-test-secret' } }, res);
+  outbound = findRow(store, 'OUTBOUND', OUTBOUND_HEADER, 'prb_nightly');
+  assert.equal(outbound.outbound_status, 'SENT');
+  assert.equal(outbound.instantly_lead_id, 'lead_123');
+  outbound.outbound_status = 'SUPPRESSED';
+  store.OUTBOUND[outboundIndex] = row(OUTBOUND_HEADER, outbound);
+  process.env.CRON_SECRET = 'nightly-test-secret';
+  await finalizeHandler({ method: 'GET', headers: { authorization: 'Bearer nightly-test-secret' } }, res);
+  outbound = findRow(store, 'OUTBOUND', OUTBOUND_HEADER, 'prb_nightly');
+  assert.equal(outbound.outbound_status, 'SUPPRESSED');
+  assert.equal(outbound.instantly_lead_id, 'lead_123');
+  assert.equal(outbound.instantly_added_at, '2026-08-28T12:00:00.000Z');
+  assert.equal(outbound.last_error, 'historic error');
+  if (oldSecret === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = oldSecret;
+  if (oldBatchSize === undefined) delete process.env.NOVUS_REBUILD_BATCH_SIZE; else process.env.NOVUS_REBUILD_BATCH_SIZE = oldBatchSize;
+  ok('03:00 finalize runs DEMOS then a non-dry OUTBOUND rebuild, writes READY, preserves SENT/SUPPRESSED, and makes no network call');
+  console.log(`\n${passed} checks passed.`);
+}
+
+const selectedRun = process.env.NOVUS_ONLY_NIGHTLY_OUTBOUND_TEST ? runNightlyOutboundOnly : run;
+selectedRun().catch((err) => {
   console.error('FAILED:', err);
   process.exitCode = 1;
 });

@@ -105,7 +105,10 @@ export default async function handler(req, res) {
 
   try {
     const repo = getRepo();
-    const summary = await runRebuildPass(repo, { maxAiCalls: batchSize });
+    const summary = await runRebuildPass(repo, {
+      maxAiCalls: batchSize,
+      rebuildOutbound: true,
+    });
     return res.status(200).json({ ...summary, batch_size: batchSize });
   } catch (err) {
     console.error('intelligence finalize (cron) error:', err);
