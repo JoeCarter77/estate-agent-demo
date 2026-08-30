@@ -7,6 +7,7 @@ import {
   buildInstantlyDryRun,
   mapOutboundToInstantly,
   outboundEligibilityReasons,
+  uploadEligibleOutboundLeads,
   uploadSingleOutboundLead,
 } from '../lib/instantly-outbound.mjs';
 import { OUTBOUND_HEADER } from '../lib/outbound.mjs';
@@ -65,6 +66,12 @@ function makeRepo(rows = [BASE_ROW], header = OUTBOUND_HEADER) {
 
 function objectAt(workbook, sheetRow = 3) {
   return Object.fromEntries(workbook.store[0].map((column, index) => [column, workbook.store[sheetRow - 1][index] ?? '']));
+}
+
+function objectById(workbook, outboundId) {
+  const idIndex = workbook.store[0].indexOf('outbound_id');
+  const sheetRow = workbook.store.findIndex((item, index) => index > 1 && item[idIndex] === outboundId) + 1;
+  return objectAt(workbook, sheetRow);
 }
 
 function fakeResponse(status, body) {
@@ -232,6 +239,86 @@ ok('existing instantly_added_at is skipped');
   const workbook = makeRepo([BASE_ROW], missingHeader);
   await assert.rejects(buildInstantlyDryRun(workbook.repo, { campaignId: CAMPAIGN_ID }), /missing required column.*demo_url/);
   ok('missing required OUTBOUND headers fail closed');
+}
+
+{
+  const workbook = makeRepo([
+    { ...BASE_ROW, outbound_id: 'out_1', outreach_contact_email: 'one@example.com' },
+    { ...BASE_ROW, outbound_id: 'out_existing', instantly_lead_id: 'lead_existing' },
+    { ...BASE_ROW, outbound_id: 'out_suppressed', outbound_status: 'SUPPRESSED' },
+    { ...BASE_ROW, outbound_id: 'out_sent', outbound_status: 'SENT' },
+    { ...BASE_ROW, outbound_id: 'out_error', outbound_status: 'ERROR' },
+    { ...BASE_ROW, outbound_id: 'out_2', outreach_contact_email: 'two@example.com' },
+    { ...BASE_ROW, outbound_id: 'out_3', outreach_contact_email: 'three@example.com' },
+  ]);
+  const calls = [];
+  const fetchImpl = async (_url, init) => {
+    const payload = JSON.parse(init.body);
+    calls.push(payload);
+    if (payload.email === 'two@example.com') return fakeResponse(429, { message: 'rate limited' });
+    return fakeResponse(200, { id: `lead_${payload.email.split('@')[0]}` });
+  };
+
+  const first = await uploadEligibleOutboundLeads(workbook.repo, {
+    apiKey: API_KEY,
+    campaignId: CAMPAIGN_ID,
+    fetchImpl,
+    now: () => NOW,
+    concurrency: 1,
+  });
+  assert.equal(first.eligible_rows, 3);
+  assert.equal(first.uploaded_rows, 2);
+  assert.equal(first.failed_rows, 1);
+  assert.equal(first.skipped_rows, 4);
+  assert.equal(calls.length, 3);
+  assert.deepEqual(calls.map((payload) => payload.email), ['one@example.com', 'two@example.com', 'three@example.com']);
+  assert.ok(calls.every((payload) => payload.skip_if_in_workspace === true && payload.skip_if_in_campaign === true));
+  assert.equal(objectById(workbook, 'out_1').instantly_lead_id, 'lead_one');
+  assert.equal(objectById(workbook, 'out_1').instantly_added_at, NOW);
+  assert.equal(objectById(workbook, 'out_1').last_error, '');
+  assert.equal(objectById(workbook, 'out_1').outbound_status, 'READY');
+  assert.equal(objectById(workbook, 'out_2').instantly_lead_id, '');
+  assert.equal(objectById(workbook, 'out_2').instantly_added_at, '');
+  assert.match(objectById(workbook, 'out_2').last_error, /HTTP 429/);
+  assert.equal(objectById(workbook, 'out_2').outbound_status, 'READY');
+  assert.equal(objectById(workbook, 'out_3').instantly_lead_id, 'lead_three');
+  ok('bulk uploads multiple eligible rows and uses the proven duplicate-safe payload flags');
+  ok('already-uploaded, SUPPRESSED, SENT and ERROR rows are skipped');
+  ok('one failed upload records its error, preserves READY, and does not stop a later eligible row');
+  ok('successful bulk rows receive both markers, clear last_error, and remain READY');
+
+  calls.length = 0;
+  const rerun = await uploadEligibleOutboundLeads(workbook.repo, {
+    apiKey: API_KEY,
+    campaignId: CAMPAIGN_ID,
+    fetchImpl,
+    now: () => NOW,
+    concurrency: 2,
+  });
+  assert.equal(rerun.eligible_rows, 1);
+  assert.equal(rerun.uploaded_rows, 0);
+  assert.equal(rerun.failed_rows, 1);
+  assert.deepEqual(calls.map((payload) => payload.email), ['two@example.com']);
+  ok('rerun skips every prior success and retries only the still-unmarked failed row');
+}
+
+{
+  const workbook = makeRepo([
+    { ...BASE_ROW, outbound_id: 'out_sent', outbound_status: 'SENT' },
+    { ...BASE_ROW, outbound_id: 'out_done', instantly_added_at: NOW },
+  ]);
+  let calls = 0;
+  const result = await uploadEligibleOutboundLeads(workbook.repo, {
+    apiKey: API_KEY,
+    campaignId: CAMPAIGN_ID,
+    fetchImpl: async () => { calls += 1; return fakeResponse(200, { id: 'never' }); },
+  });
+  assert.equal(result.eligible_rows, 0);
+  assert.equal(result.uploaded_rows, 0);
+  assert.equal(result.failed_rows, 0);
+  assert.equal(calls, 0);
+  assert.equal(workbook.writes.length, 0);
+  ok('zero eligible rows is a clean no-op with 0 uploaded and no writes or API calls');
 }
 
 console.log(`\n✅ NOVUS Instantly OUTBOUND self-test passed (${passed} focused assertions).`);

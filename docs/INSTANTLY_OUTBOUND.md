@@ -54,5 +54,21 @@ npm run novus:instantly-live -- \
   --confirm UPLOAD_ONE_TO_INSTANTLY
 ```
 
-There is no bulk live mode. Before either live command, confirm manually that
-the target Instantly campaign is in the intended non-sending/test state.
+Production bulk handoff for every eligible OUTBOUND row:
+
+```bash
+npm run novus:instantly-live -- \
+  --bulk \
+  --confirm UPLOAD_ALL_ELIGIBLE_TO_INSTANTLY
+```
+
+The bulk operation is safely rerunnable. It selects only `READY` rows with
+both `instantly_lead_id` and `instantly_added_at` blank, writes those markers
+only after Instantly returns a nonblank lead ID, preserves `READY`, and
+continues after individual failures. Before a live command, confirm manually
+that the target Instantly campaign is in the intended non-sending/test state.
+
+The existing Vercel nightly finalizer owns automation. Its existing
+`0 3 * * *` UTC schedule runs the normal pipeline, rebuilds OUTBOUND, then
+uses this same bulk handoff for any newly eligible rows. No second scheduler
+is used.

@@ -7,10 +7,13 @@
 //   node scripts/instantly-outbound.mjs --live --outbound-id out_... --confirm UPLOAD_ONE_TO_INSTANTLY --test-email you@example.com
 //   node scripts/instantly-outbound.mjs --live --outbound-id out_... --confirm UPLOAD_ONE_TO_INSTANTLY
 //
+// Production bulk mode (uploads every eligible row, safely rerunnable):
+//   node scripts/instantly-outbound.mjs --live --bulk --confirm UPLOAD_ALL_ELIGIBLE_TO_INSTANTLY
+//
 // INSTANTLY_API_KEY and INSTANTLY_CAMPAIGN_ID are server-side Vercel env vars.
 // This CLI sends neither value and never prints the API key.
 
-import { INSTANTLY_LIVE_CONFIRMATION } from '../lib/instantly-outbound.mjs';
+import { INSTANTLY_BULK_CONFIRMATION, INSTANTLY_LIVE_CONFIRMATION } from '../lib/instantly-outbound.mjs';
 
 function parseArgs(argv) {
   const flags = {};
@@ -44,7 +47,19 @@ function requestBody(flags) {
       sample_limit: flags['sample-limit'] === undefined ? 3 : Number(flags['sample-limit']),
     };
   }
-  if (!flags['outbound-id']) throw new Error('--live requires --outbound-id');
+  if (flags.bulk === true) {
+    if (flags['outbound-id'] || flags['test-email']) throw new Error('--bulk cannot be combined with --outbound-id or --test-email');
+    if (flags.confirm !== INSTANTLY_BULK_CONFIRMATION) {
+      throw new Error(`--bulk requires --confirm ${INSTANTLY_BULK_CONFIRMATION}`);
+    }
+    return {
+      operation: 'instantly_outbound',
+      dry_run: false,
+      bulk: true,
+      confirmation: flags.confirm,
+    };
+  }
+  if (!flags['outbound-id']) throw new Error('--live requires --outbound-id or --bulk');
   if (!flags.confirm) {
     throw new Error(`--live requires --confirm ${INSTANTLY_LIVE_CONFIRMATION}`);
   }
@@ -71,6 +86,18 @@ function printDryRun(result) {
 }
 
 function printLive(result) {
+  if (Array.isArray(result.uploaded) && Array.isArray(result.failures)) {
+    console.log('NOVUS OUTBOUND -> Instantly bulk handoff complete');
+    console.log(`eligible rows: ${result.eligible_rows}`);
+    console.log(`uploaded rows: ${result.uploaded_rows}`);
+    console.log(`failed rows:   ${result.failed_rows}`);
+    console.log(`skipped rows:  ${result.skipped_rows}`);
+    for (const failure of result.failures) {
+      console.error(`FAILED ${failure.outbound_id}: ${failure.error}`);
+    }
+    if (result.failed_rows > 0) process.exitCode = 1;
+    return;
+  }
   if (result.test_mode) {
     console.log(result.message || 'TEST MODE: lead accepted; OUTBOUND was not modified.');
     console.log(`outbound_id: ${result.outbound_id}`);

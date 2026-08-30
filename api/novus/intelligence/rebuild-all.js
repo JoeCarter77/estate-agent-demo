@@ -60,9 +60,9 @@
 // Optional body: { "operation": "instantly_outbound", "dry_run": true } —
 // read the compiled OUTBOUND queue and report eligible rows plus bounded exact
 // Instantly payload samples. Dry-run makes no Instantly request and no Sheet
-// write. Literal dry_run:false enters the separately guarded one-outbound_id
-// live path; that path requires an exact confirmation value and cannot upload
-// more than one lead.
+// write. Literal dry_run:false enters either the separately guarded
+// one-outbound_id check path or the production bulk path; bulk requires its
+// own exact confirmation value and processes every currently eligible row.
 //
 // Optional body: { "probe_ids": ["prb_...", "prb_..."] } — restricts the full
 // rebuild (Intelligence, then Diagnosis, then Personalisation) to exactly
@@ -92,7 +92,12 @@ import { getRepo } from '../../../lib/sheets.mjs';
 import { runRebuildPass } from '../../../lib/rebuild-pass.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 import { rebuildOutbound } from '../../../lib/outbound.mjs';
-import { buildInstantlyDryRun, uploadSingleOutboundLead } from '../../../lib/instantly-outbound.mjs';
+import {
+  INSTANTLY_BULK_CONFIRMATION,
+  buildInstantlyDryRun,
+  uploadEligibleOutboundLeads,
+  uploadSingleOutboundLead,
+} from '../../../lib/instantly-outbound.mjs';
 import { requireAuth } from '../_auth.mjs';
 
 export const maxDuration = 60;
@@ -174,6 +179,18 @@ export default async function handler(req, res) {
         const result = await buildInstantlyDryRun(repo, {
           campaignId: process.env.INSTANTLY_CAMPAIGN_ID,
           sampleLimit: body.sample_limit,
+        });
+        return res.status(200).json(result);
+      }
+      if (body.bulk === true) {
+        if (body.confirmation !== INSTANTLY_BULK_CONFIRMATION) {
+          return res.status(400).json({
+            error: `Bulk live mode requires confirmation=${INSTANTLY_BULK_CONFIRMATION}`,
+          });
+        }
+        const result = await uploadEligibleOutboundLeads(repo, {
+          apiKey: process.env.INSTANTLY_API_KEY,
+          campaignId: process.env.INSTANTLY_CAMPAIGN_ID,
         });
         return res.status(200).json(result);
       }

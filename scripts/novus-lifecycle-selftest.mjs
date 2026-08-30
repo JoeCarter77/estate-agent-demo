@@ -604,7 +604,7 @@ async function runNightlyOutboundOnly() {
 
   // Keep this fixture fully downstream: the normal pass sees an already
   // finalised probe, then reaches DEMOS before compiling the ready OUTBOUND
-  // row. fetch is a tripwire for any accidental provider/email call.
+  // row. The fetch stub accepts only the expected final Instantly call.
   store.AGENCIES = [[
     'agency_id', 'agency_name', 'clean_agency_name', 'outreach_contact_name',
     'outreach_contact_email', 'email_verification_status',
@@ -649,13 +649,29 @@ async function runNightlyOutboundOnly() {
   repo.getTable = async (tab) => { trace.push(`read:${tab}`); return getTable(tab); };
   repo.writeRowsBatch = async (...args) => { trace.push('write:OUTBOUND'); return writeRowsBatch(...args); };
   repo.appendRowsBatch = async (...args) => { trace.push('append:OUTBOUND'); return appendRowsBatch(...args); };
+  repo.writeCellsBatch = async (writes) => {
+    trace.push('write:INSTANTLY_MARKERS');
+    for (const write of writes) {
+      store[write.tab][write.rowNumber - 1][write.columnNumber - 1] = write.value;
+    }
+  };
 
   const oldFetch = globalThis.fetch;
-  globalThis.fetch = async () => { throw new Error('Unexpected network/Instantly/email call'); };
+  globalThis.fetch = async (url) => {
+    if (url === 'https://api.instantly.ai/api/v2/leads') {
+      trace.push('instantly:POST');
+      return { ok: true, status: 200, async text() { return JSON.stringify({ id: 'lead_nightly' }); } };
+    }
+    throw new Error(`Unexpected network call: ${url}`);
+  };
   const oldSecret = process.env.CRON_SECRET;
   const oldBatchSize = process.env.NOVUS_REBUILD_BATCH_SIZE;
+  const oldInstantlyKey = process.env.INSTANTLY_API_KEY;
+  const oldInstantlyCampaign = process.env.INSTANTLY_CAMPAIGN_ID;
   process.env.CRON_SECRET = 'nightly-test-secret';
   process.env.NOVUS_REBUILD_BATCH_SIZE = '1';
+  process.env.INSTANTLY_API_KEY = 'nightly-instantly-key';
+  process.env.INSTANTLY_CAMPAIGN_ID = 'nightly-campaign';
   let response;
   const res = {
     status(code) { this.statusCode = code; return this; },
@@ -669,16 +685,22 @@ async function runNightlyOutboundOnly() {
     globalThis.fetch = oldFetch;
     if (oldSecret === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = oldSecret;
     if (oldBatchSize === undefined) delete process.env.NOVUS_REBUILD_BATCH_SIZE; else process.env.NOVUS_REBUILD_BATCH_SIZE = oldBatchSize;
+    if (oldInstantlyKey === undefined) delete process.env.INSTANTLY_API_KEY; else process.env.INSTANTLY_API_KEY = oldInstantlyKey;
+    if (oldInstantlyCampaign === undefined) delete process.env.INSTANTLY_CAMPAIGN_ID; else process.env.INSTANTLY_CAMPAIGN_ID = oldInstantlyCampaign;
   }
 
   assert.equal(res.statusCode, 200);
   assert.ok(response.demos, 'finalize completed the DEMOS stage');
   assert.equal(response.outbound.dry_run, false);
   assert.equal(response.outbound.create_count, 1);
+  assert.equal(response.instantly.uploaded_rows, 1);
+  assert.equal(response.instantly.failed_rows, 0);
   let outbound = findRow(store, 'OUTBOUND', OUTBOUND_HEADER, 'prb_nightly');
   assert.equal(outbound.outbound_status, 'READY');
+  assert.equal(outbound.instantly_lead_id, 'lead_nightly');
   assert.ok(trace.lastIndexOf('read:DEMOS') < trace.indexOf('read:OUTBOUND'), 'OUTBOUND is read only after DEMOS');
   assert.ok(trace.includes('append:OUTBOUND'), 'eligible OUTBOUND row is written');
+  assert.ok(trace.lastIndexOf('append:OUTBOUND') < trace.indexOf('instantly:POST'), 'Instantly handoff runs only after OUTBOUND is rebuilt');
 
   outbound.outbound_status = 'SENT';
   outbound.instantly_lead_id = 'lead_123';
@@ -687,6 +709,8 @@ async function runNightlyOutboundOnly() {
   const outboundIndex = store.OUTBOUND.findIndex((r, index) => index > 1 && r[OUTBOUND_HEADER.indexOf('probe_id')] === 'prb_nightly');
   store.OUTBOUND[outboundIndex] = row(OUTBOUND_HEADER, outbound);
   process.env.CRON_SECRET = 'nightly-test-secret';
+  process.env.INSTANTLY_API_KEY = 'nightly-instantly-key';
+  process.env.INSTANTLY_CAMPAIGN_ID = 'nightly-campaign';
   await finalizeHandler({ method: 'GET', headers: { authorization: 'Bearer nightly-test-secret' } }, res);
   outbound = findRow(store, 'OUTBOUND', OUTBOUND_HEADER, 'prb_nightly');
   assert.equal(outbound.outbound_status, 'SENT');
@@ -694,6 +718,8 @@ async function runNightlyOutboundOnly() {
   outbound.outbound_status = 'SUPPRESSED';
   store.OUTBOUND[outboundIndex] = row(OUTBOUND_HEADER, outbound);
   process.env.CRON_SECRET = 'nightly-test-secret';
+  process.env.INSTANTLY_API_KEY = 'nightly-instantly-key';
+  process.env.INSTANTLY_CAMPAIGN_ID = 'nightly-campaign';
   await finalizeHandler({ method: 'GET', headers: { authorization: 'Bearer nightly-test-secret' } }, res);
   outbound = findRow(store, 'OUTBOUND', OUTBOUND_HEADER, 'prb_nightly');
   assert.equal(outbound.outbound_status, 'SUPPRESSED');
@@ -721,7 +747,9 @@ async function runNightlyOutboundOnly() {
   if (oldAuthPass === undefined) delete process.env.NOVUS_BASIC_AUTH_PASS; else process.env.NOVUS_BASIC_AUTH_PASS = oldAuthPass;
   if (oldSecret === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = oldSecret;
   if (oldBatchSize === undefined) delete process.env.NOVUS_REBUILD_BATCH_SIZE; else process.env.NOVUS_REBUILD_BATCH_SIZE = oldBatchSize;
-  ok('03:00 finalize and the Google Sheet full rebuild run DEMOS then a non-dry OUTBOUND rebuild, write READY, preserve SENT/SUPPRESSED, and make no network call');
+  if (oldInstantlyKey === undefined) delete process.env.INSTANTLY_API_KEY; else process.env.INSTANTLY_API_KEY = oldInstantlyKey;
+  if (oldInstantlyCampaign === undefined) delete process.env.INSTANTLY_CAMPAIGN_ID; else process.env.INSTANTLY_CAMPAIGN_ID = oldInstantlyCampaign;
+  ok('03:00 finalize preserves the existing pipeline, rebuilds OUTBOUND after DEMOS, then hands eligible READY rows to Instantly; the Google Sheet rebuild remains non-sending');
   console.log(`\n${passed} checks passed.`);
 }
 

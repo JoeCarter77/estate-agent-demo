@@ -66,12 +66,32 @@
 import crypto from 'node:crypto';
 import { getRepo } from '../../../lib/sheets.mjs';
 import { runRebuildPass } from '../../../lib/rebuild-pass.mjs';
+import { uploadEligibleOutboundLeads } from '../../../lib/instantly-outbound.mjs';
 
 export const maxDuration = 60;
 
 // Same conservative reasoning as api/novus/intelligence/rebuild-all.js's
 // DEFAULT_BATCH_SIZE.
 const DEFAULT_BATCH_SIZE = 15;
+
+export async function runNightlyFinalizer(repo, {
+  batchSize = DEFAULT_BATCH_SIZE,
+  rebuild = runRebuildPass,
+  handoff = uploadEligibleOutboundLeads,
+  instantlyOptions = {},
+} = {}) {
+  const summary = await rebuild(repo, {
+    maxAiCalls: batchSize,
+    rebuildOutbound: true,
+  });
+  if (!summary?.outbound) throw new Error('Nightly OUTBOUND rebuild did not complete');
+
+  // This is intentionally last. The shared handoff re-reads the OUTBOUND tab
+  // produced above and applies the same marker-based eligibility rules used
+  // by the protected manual bulk operation.
+  const instantly = await handoff(repo, instantlyOptions);
+  return { ...summary, instantly, batch_size: batchSize };
+}
 
 function safeEqual(a, b) {
   const ab = Buffer.from(String(a));
@@ -105,11 +125,14 @@ export default async function handler(req, res) {
 
   try {
     const repo = getRepo();
-    const summary = await runRebuildPass(repo, {
-      maxAiCalls: batchSize,
-      rebuildOutbound: true,
+    const summary = await runNightlyFinalizer(repo, {
+      batchSize,
+      instantlyOptions: {
+        apiKey: process.env.INSTANTLY_API_KEY,
+        campaignId: process.env.INSTANTLY_CAMPAIGN_ID,
+      },
     });
-    return res.status(200).json({ ...summary, batch_size: batchSize });
+    return res.status(200).json(summary);
   } catch (err) {
     console.error('intelligence finalize (cron) error:', err);
     return res.status(500).json({ error: err.message || 'Failed to finalise expired probes' });
