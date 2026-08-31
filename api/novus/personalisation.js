@@ -28,6 +28,10 @@ import { NeverBounceError, verifyEmail } from '../../lib/neverbounce.mjs';
 import { resolveAgencyContact, listResolutionBacklog } from '../../lib/contact-resolution.mjs';
 import { requireAuth, requireReplyPollerSecret } from './_auth.mjs';
 import { pollInstantlyReplies } from '../../lib/instantly-reply-poll.mjs';
+import { classifyReply, CONFIDENCE_THRESHOLD } from '../../lib/reply-classification.mjs';
+import { _internal as aiClientInternal } from '../../lib/ai-client.mjs';
+import { normalizeInstantlyEmail } from '../../lib/reply-router.mjs';
+import { PHRASES, DETERMINISTIC_PHRASES } from '../../lib/reply-classification-fixtures.mjs';
 
 // Contact resolution can run owner web research, a Hunter Finder lookup and
 // several Hunter Verifier checks in one invocation; 20s was sized for the read-only
@@ -268,7 +272,11 @@ async function handleInstantlyReplyPollDryRun(req, res) {
   const limit = Number.isInteger(requested) && requested > 0 && requested <= 100 ? requested : 50;
 
   try {
-    const summary = await pollInstantlyReplies({ repo: getRepo(), apiKey, limit, dryRun: true });
+    // Semantic classification is opt-in and only runs when a key exists. In
+    // dry-run it classifies and reports what it WOULD write; it updates
+    // nothing. ?classify=0 turns it off for a pure zero-cost pass.
+    const classify = process.env.ANTHROPIC_API_KEY ? req.query?.classify !== '0' : false;
+    const summary = await pollInstantlyReplies({ repo: getRepo(), apiKey, limit, dryRun: true, classify });
     return res.status(200).json({ success: true, ...summary });
   } catch (err) {
     // Never echo the API key, on any path.
@@ -317,7 +325,11 @@ async function handleInstantlyReplyPoll(req, res) {
   const limit = Number.isInteger(requested) && requested > 0 && requested <= 100 ? requested : 50;
 
   try {
-    const summary = await pollInstantlyReplies({ repo: getRepo(), apiKey, limit, dryRun: false });
+    // Classification runs AFTER each raw row is appended, and updates only the
+    // derived classification columns on that same row. It still sends nothing,
+    // writes nothing to Instantly, and touches no OUTBOUND row.
+    const classify = process.env.ANTHROPIC_API_KEY ? req.query?.classify !== '0' : false;
+    const summary = await pollInstantlyReplies({ repo: getRepo(), apiKey, limit, dryRun: false, classify });
     return res.status(200).json({
       success: true,
       dry_run: false,
@@ -330,6 +342,9 @@ async function handleInstantlyReplyPoll(req, res) {
       ambiguous: summary.ambiguous,
       persisted: summary.persisted,
       failed: summary.failed,
+      classified: summary.classified,
+      classification_fallbacks: summary.classification_fallbacks,
+      classification_updates: summary.classification_updates,
       events: summary.events,
       skipped: summary.skipped,
     });
@@ -355,6 +370,106 @@ async function handleInstantlyReplyPoll(req, res) {
   }
 }
 
+// GET /api/novus/personalisation?novus_operation=reply-classifier-live-test
+// (also reachable via the /api/novus/instantly/reply-classifier-live-test
+// rewrite, if one is added — not required, the query-param route works as-is).
+//
+// LIVE MODEL DIAGNOSTIC. Runs the fixed phrase test set (the SAME table the
+// offline selftest asserts against — lib/reply-classification-fixtures.mjs)
+// through classifyReply() EXACTLY as built: no prompt change, no threshold
+// change, nothing special-cased for this route. Every phrase is wrapped in a
+// synthetic normalised reply object and passed straight into the real
+// classifier, so this exercises the identical code path production replies do
+// — deterministic rules first, semantic AI only for what is left.
+//
+// READ-ONLY, by construction, not by extra guarding: classifyReply() never
+// calls repo, Instantly, or anything else. This handler never calls getRepo()
+// at all, so there is no Sheets access, no REPLY_EVENTS write, no OUTBOUND
+// write, no Instantly write, and no email send — there is nothing in this
+// function capable of any of those. The only network call it makes is the
+// Anthropic Messages call inside callAi(), once per case that reaches the
+// model.
+//
+// Existing NOVUS Basic Auth guards it, same as every other operation on this
+// function — see requireAuth in ./_auth.mjs, enforced by the router below
+// before this function is entered.
+async function handleReplyClassifierLiveTest(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    // Fail clearly, without ever echoing whether some OTHER key-shaped env var
+    // exists, and without touching the model.
+    return res.status(500).json({
+      success: false,
+      error: 'ANTHROPIC_API_KEY is not configured in this environment.',
+    });
+  }
+
+  const cases = [...DETERMINISTIC_PHRASES, ...PHRASES].map(([phrase, expected]) => ({ phrase, expected }));
+
+  const results = [];
+  for (const { phrase, expected } of cases) {
+    // A minimal synthetic Instantly email, normalised through the SAME
+    // normalizeInstantlyEmail() production replies go through, so
+    // classifyReply() sees exactly the shape it sees live (cleaned_reply_text,
+    // is_auto_reply, etc.) rather than a hand-built shortcut object.
+    const reply = normalizeInstantlyEmail({
+      id: `live-test-${results.length}`,
+      ue_type: 2,
+      eaccount: 'joe@novushq.co.uk',
+      from_address_email: 'agency@example-agency.co.uk',
+      to_address_email_list: 'joe@novushq.co.uk',
+      lead: 'agency@example-agency.co.uk',
+      timestamp: new Date().toISOString(),
+      subject: 'Re: your enquiry handling',
+      body: { text: phrase },
+    });
+
+    let decision;
+    let error = null;
+    try {
+      decision = await classifyReply(reply);
+    } catch (err) {
+      // classifyReply() is built not to throw (every failure mode resolves to
+      // a safe OTHER_UNCLEAR decision) — this is a last-resort guard so one
+      // unexpected error cannot abort the whole diagnostic run.
+      error = err?.message || 'classification threw unexpectedly';
+      decision = { classification: 'OTHER_UNCLEAR', confidence: null, next_action: 'MANUAL_REVIEW', priority: 'HIGH', reason: '', source: 'HANDLER_ERROR' };
+    }
+
+    results.push({
+      phrase,
+      expected_classification: expected,
+      actual_classification: decision.classification,
+      confidence: decision.confidence,
+      next_action: decision.next_action,
+      priority: decision.priority,
+      reason: decision.reason,
+      source: decision.source,
+      agreement: decision.classification === expected,
+      error,
+    });
+  }
+
+  const agreementCount = results.filter((r) => r.agreement).length;
+  const disagreements = results.filter((r) => !r.agreement);
+  const lowConfidenceCases = results.filter((r) => typeof r.confidence === 'number' && r.confidence < CONFIDENCE_THRESHOLD);
+  const otherUnclearCases = results.filter((r) => r.actual_classification === 'OTHER_UNCLEAR');
+
+  return res.status(200).json({
+    success: true,
+    model: aiClientInternal.DEFAULT_MODEL,
+    confidence_threshold: CONFIDENCE_THRESHOLD,
+    total_cases: results.length,
+    agreement_count: agreementCount,
+    agreement_percentage: results.length ? Math.round((agreementCount / results.length) * 1000) / 10 : 0,
+    disagreements,
+    low_confidence_cases: lowConfidenceCases,
+    other_unclear_cases: otherUnclearCases,
+    results,
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method === 'POST' && req.query?.novus_operation === 'verify-contact') {
@@ -376,6 +491,10 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && req.query?.novus_operation === 'instantly-reply-poll-dry-run') {
     if (!requireAuth(req, res)) return;
     return handleInstantlyReplyPollDryRun(req, res);
+  }
+  if (req.method === 'GET' && req.query?.novus_operation === 'reply-classifier-live-test') {
+    if (!requireAuth(req, res)) return;
+    return handleReplyClassifierLiveTest(req, res);
   }
   if (req.method === 'POST' && req.query?.novus_operation === 'instantly-reply-poll') {
     // TWO layers, in order, both before any Instantly or Sheets access: the

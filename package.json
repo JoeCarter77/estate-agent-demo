@@ -51,6 +51,7 @@
     "novus:reply-poll-selftest": "node scripts/novus-instantly-reply-poll-selftest.mjs",
     "novus:reply-persistence-selftest": "node scripts/novus-reply-persistence-selftest.mjs",
     "novus:reply-poller-auth-selftest": "node scripts/novus-reply-poller-auth-selftest.mjs",
+    "novus:reply-classification-selftest": "node scripts/novus-reply-classification-selftest.mjs",
     "novus:historical-replay": "node scripts/novus-historical-replay.mjs",
     "novus:probe-rerun": "node scripts/novus-probe-rerun.mjs"
   },
