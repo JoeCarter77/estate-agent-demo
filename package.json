@@ -47,6 +47,7 @@
     "novus:instantly-dry-run": "node scripts/instantly-outbound.mjs --dry-run",
     "novus:instantly-live": "node scripts/instantly-outbound.mjs --live",
     "novus:instantly-selftest": "node scripts/novus-instantly-outbound-selftest.mjs",
+    "novus:reply-router-selftest": "node scripts/novus-reply-router-selftest.mjs",
     "novus:historical-replay": "node scripts/novus-historical-replay.mjs",
     "novus:probe-rerun": "node scripts/novus-probe-rerun.mjs"
   },
