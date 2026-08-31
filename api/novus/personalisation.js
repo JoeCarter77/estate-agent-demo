@@ -3,6 +3,7 @@
 //                                 POST /api/novus/contacts/verify (via rewrite)
 //                                 POST /api/novus/contacts/resolve (via rewrite)
 //                                 GET  /api/novus/instantly/replies-test (via rewrite)
+//                                 GET  /api/novus/instantly/reply-poll-dry-run (via rewrite)
 //
 // Read-only lookup for the PERSONALISATION row lib/personalisation-rebuild.mjs
 // writes (via the existing /api/novus/intelligence/rebuild-all + cron finalize
@@ -25,6 +26,7 @@ import { getRepo } from '../../lib/sheets.mjs';
 import { NeverBounceError, verifyEmail } from '../../lib/neverbounce.mjs';
 import { resolveAgencyContact, listResolutionBacklog } from '../../lib/contact-resolution.mjs';
 import { requireAuth } from './_auth.mjs';
+import { pollInstantlyReplies } from '../../lib/instantly-reply-poll.mjs';
 
 // Contact resolution can run owner web research, a Hunter Finder lookup and
 // several Hunter Verifier checks in one invocation; 20s was sized for the read-only
@@ -237,6 +239,51 @@ async function handleInstantlyRepliesTest(req, res) {
   });
 }
 
+// Inbound reply poll, DRY RUN —
+// GET /api/novus/personalisation?novus_operation=instantly-reply-poll-dry-run
+// (also reachable via the /api/novus/instantly/reply-poll-dry-run rewrite).
+//
+// READ-ONLY. One GET to Instantly for received emails only, plus Google Sheets
+// READS (OUTBOUND once per pass, REPLY_EVENTS per candidate) to match and to
+// de-duplicate. It proposes REPLY_EVENTS rows and writes none.
+//
+// dryRun is hard-coded true and is NOT taken from the query string: there is no
+// request this operation can be sent that causes a write. It changes no
+// outbound_status, writes no suppression, sends nothing, and calls no Instantly
+// write endpoint. Another operation on this already-protected function, for the
+// same Hobby-plan reason as verify-contact above.
+async function handleInstantlyReplyPollDryRun(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+
+  const apiKey = process.env.INSTANTLY_REPLY_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({
+      success: false,
+      error: 'INSTANTLY_REPLY_API_KEY is not set in this environment.',
+    });
+  }
+
+  const requested = Number(req.query?.limit);
+  const limit = Number.isInteger(requested) && requested > 0 && requested <= 100 ? requested : 50;
+
+  try {
+    const summary = await pollInstantlyReplies({ repo: getRepo(), apiKey, limit, dryRun: true });
+    return res.status(200).json({ success: true, ...summary });
+  } catch (err) {
+    // Never echo the API key, on any path.
+    if (err?.instantly_status) {
+      return res.status(502).json({
+        success: false,
+        error: 'Instantly API returned an error',
+        instantly_status: err.instantly_status,
+        instantly_error: err.instantly_error,
+      });
+    }
+    console.error('instantly-reply-poll-dry-run error:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Reply poll failed' });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method === 'POST' && req.query?.novus_operation === 'verify-contact') {
@@ -254,6 +301,10 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && req.query?.novus_operation === 'instantly-replies-test') {
     if (!requireAuth(req, res)) return;
     return handleInstantlyRepliesTest(req, res);
+  }
+  if (req.method === 'GET' && req.query?.novus_operation === 'instantly-reply-poll-dry-run') {
+    if (!requireAuth(req, res)) return;
+    return handleInstantlyReplyPollDryRun(req, res);
   }
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   if (!requireAuth(req, res)) return;

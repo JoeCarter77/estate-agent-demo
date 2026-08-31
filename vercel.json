@@ -12,6 +12,7 @@
     { "source": "/api/novus/contacts/resolve", "destination": "/api/novus/personalisation?novus_operation=resolve-contact" },
     { "source": "/api/novus/contacts/resolution-backlog", "destination": "/api/novus/personalisation?novus_operation=resolution-backlog" },
     { "source": "/api/novus/instantly/replies-test", "destination": "/api/novus/personalisation?novus_operation=instantly-replies-test" },
+    { "source": "/api/novus/instantly/reply-poll-dry-run", "destination": "/api/novus/personalisation?novus_operation=instantly-reply-poll-dry-run" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/d/(.*)", "destination": "/index.html" },
     { "source": "/:demo_slug((?!api$|demo$|novus$|capture$|d$)[^/]+)", "destination": "/demo.html" }

@@ -111,8 +111,11 @@ check(() => assert.ok(!NEXT_ACTIONS.some((a) => /STOP|PAUSE/i.test(a)), 'no stop
 check(() => assert.ok(OUTBOUND_STATUSES.includes('SUPPRESSED')));
 check(() => assert.ok(OUTBOUND_HEADER.includes(OUTREACH_ID_SOURCE_COLUMN), 'outreach_id sources from OUTBOUND.outbound_id'));
 check(() => assert.ok(!OUTBOUND_HEADER.includes('outreach_id')));
-// Matching is documented but explicitly NOT built.
-check(() => assert.equal(MATCH_PLAN.implemented, false));
+// Matching is implemented in lib/instantly-reply-poll.mjs, email-only because
+// OUTBOUND carries no campaign_id to corroborate against.
+check(() => assert.equal(MATCH_PLAN.implemented, true));
+check(() => assert.equal(MATCH_PLAN.method, 'EMAIL_ONLY'));
+check(() => assert.equal(MATCH_PLAN.campaign_corroboration_available, false));
 check(() => assert.equal(MATCH_PLAN.primary.to, 'OUTBOUND.outreach_contact_email'));
 
 // --- Address parsing ---------------------------------------------------------
