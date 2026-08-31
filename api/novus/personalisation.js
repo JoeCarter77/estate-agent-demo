@@ -4,6 +4,7 @@
 //                                 POST /api/novus/contacts/resolve (via rewrite)
 //                                 GET  /api/novus/instantly/replies-test (via rewrite)
 //                                 GET  /api/novus/instantly/reply-poll-dry-run (via rewrite)
+//                                 POST /api/novus/instantly/reply-poll (via rewrite)
 //
 // Read-only lookup for the PERSONALISATION row lib/personalisation-rebuild.mjs
 // writes (via the existing /api/novus/intelligence/rebuild-all + cron finalize
@@ -25,7 +26,7 @@
 import { getRepo } from '../../lib/sheets.mjs';
 import { NeverBounceError, verifyEmail } from '../../lib/neverbounce.mjs';
 import { resolveAgencyContact, listResolutionBacklog } from '../../lib/contact-resolution.mjs';
-import { requireAuth } from './_auth.mjs';
+import { requireAuth, requireReplyPollerSecret } from './_auth.mjs';
 import { pollInstantlyReplies } from '../../lib/instantly-reply-poll.mjs';
 
 // Contact resolution can run owner web research, a Hunter Finder lookup and
@@ -284,6 +285,76 @@ async function handleInstantlyReplyPollDryRun(req, res) {
   }
 }
 
+// Inbound reply poll, LIVE —
+// POST /api/novus/personalisation?novus_operation=instantly-reply-poll
+// (also reachable via the /api/novus/instantly/reply-poll rewrite).
+//
+// The ONLY write this performs is APPENDING REPLY_EVENTS rows for confirmed
+// inbound replies that matched exactly one OUTBOUND row and were not already
+// processed. It changes no outbound_status, writes no suppression, sends
+// nothing, calls no AI, and calls no Instantly write endpoint.
+//
+// POST, not GET, because it writes — the dry-run diagnostic stays on GET.
+//
+// Guarded by Basic Auth AND by the dedicated X-NOVUS-REPLY-POLLER-SECRET header
+// (see requireReplyPollerSecret in ./_auth.mjs), both enforced by the router
+// before this function is entered — so a blocked request performs zero Instantly
+// reads and zero Google Sheets access. The dry-run operation is NOT so guarded.
+// Another operation on this already-protected function, for the same Hobby-plan
+// 12-function reason as the operations above.
+async function handleInstantlyReplyPoll(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+
+  const apiKey = process.env.INSTANTLY_REPLY_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({
+      success: false,
+      error: 'INSTANTLY_REPLY_API_KEY is not set in this environment.',
+    });
+  }
+
+  const requested = Number(req.query?.limit);
+  const limit = Number.isInteger(requested) && requested > 0 && requested <= 100 ? requested : 50;
+
+  try {
+    const summary = await pollInstantlyReplies({ repo: getRepo(), apiKey, limit, dryRun: false });
+    return res.status(200).json({
+      success: true,
+      dry_run: false,
+      fetched: summary.fetched,
+      inbound_confirmed: summary.inbound_confirmed,
+      skipped_not_inbound: summary.skipped_not_inbound,
+      duplicates_skipped: summary.duplicates_skipped,
+      matched: summary.matched,
+      unmatched: summary.unmatched,
+      ambiguous: summary.ambiguous,
+      persisted: summary.persisted,
+      failed: summary.failed,
+      events: summary.events,
+      skipped: summary.skipped,
+    });
+  } catch (err) {
+    // Never echo the API key, on any path.
+    if (err?.instantly_status) {
+      return res.status(502).json({
+        success: false,
+        error: 'Instantly API returned an error',
+        instantly_status: err.instantly_status,
+        instantly_error: err.instantly_error,
+      });
+    }
+    if (err?.header_mismatch) {
+      return res.status(500).json({
+        success: false,
+        error: 'REPLY_EVENTS header does not match the expected schema; nothing was appended.',
+        header_mismatch: err.header_mismatch,
+      });
+    }
+    console.error('instantly-reply-poll error:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Reply poll failed' });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method === 'POST' && req.query?.novus_operation === 'verify-contact') {
@@ -305,6 +376,13 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && req.query?.novus_operation === 'instantly-reply-poll-dry-run') {
     if (!requireAuth(req, res)) return;
     return handleInstantlyReplyPollDryRun(req, res);
+  }
+  if (req.method === 'POST' && req.query?.novus_operation === 'instantly-reply-poll') {
+    // TWO layers, in order, both before any Instantly or Sheets access: the
+    // shared human Basic Auth, then the dedicated poller secret.
+    if (!requireAuth(req, res)) return;
+    if (!requireReplyPollerSecret(req, res)) return;
+    return handleInstantlyReplyPoll(req, res);
   }
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   if (!requireAuth(req, res)) return;

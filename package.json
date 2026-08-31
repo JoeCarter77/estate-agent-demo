@@ -49,6 +49,8 @@
     "novus:instantly-selftest": "node scripts/novus-instantly-outbound-selftest.mjs",
     "novus:reply-router-selftest": "node scripts/novus-reply-router-selftest.mjs",
     "novus:reply-poll-selftest": "node scripts/novus-instantly-reply-poll-selftest.mjs",
+    "novus:reply-persistence-selftest": "node scripts/novus-reply-persistence-selftest.mjs",
+    "novus:reply-poller-auth-selftest": "node scripts/novus-reply-poller-auth-selftest.mjs",
     "novus:historical-replay": "node scripts/novus-historical-replay.mjs",
     "novus:probe-rerun": "node scripts/novus-probe-rerun.mjs"
   },
