@@ -2,6 +2,7 @@
 //                                 GET /api/novus/personalisation?agency_id=...
 //                                 POST /api/novus/contacts/verify (via rewrite)
 //                                 POST /api/novus/contacts/resolve (via rewrite)
+//                                 GET  /api/novus/instantly/replies-test (via rewrite)
 //
 // Read-only lookup for the PERSONALISATION row lib/personalisation-rebuild.mjs
 // writes (via the existing /api/novus/intelligence/rebuild-all + cron finalize
@@ -94,6 +95,131 @@ async function handleResolutionBacklog(req, res) {
   }
 }
 
+// Instantly reply-router connectivity test —
+// GET /api/novus/personalisation?novus_operation=instantly-replies-test
+// (also reachable via the /api/novus/instantly/replies-test rewrite).
+//
+// READ-ONLY. One GET against Instantly API V2's /emails collection, returning
+// a simplified view of whatever came back. It sends nothing, updates no lead,
+// suppresses nothing, writes no Sheets row (never calls getRepo()) and runs no
+// classification. It exists here, as another operation on an already-protected
+// function, for the same Hobby-plan reason as verify-contact above.
+//
+// Deliberately separate from the OUTBOUND handoff (lib/instantly-outbound.mjs,
+// untouched by this file): that is a WRITE path on INSTANTLY_API_KEY, this is a
+// READ path on its own credential, INSTANTLY_REPLY_API_KEY.
+const INSTANTLY_EMAILS_URL = 'https://api.instantly.ai/api/v2/emails';
+const INSTANTLY_REPLIES_TEST_LIMIT = 20;
+
+// Instantly's reply payload shape is not yet observed (no campaign has run),
+// so every read below is defensive: unknown envelope, unknown field names,
+// unknown nesting. Nothing assumes a field exists.
+function pickField(obj, ...keys) {
+  if (!obj || typeof obj !== 'object') return undefined;
+  for (const key of keys) {
+    const value = obj[key];
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return undefined;
+}
+
+function emailsFromPayload(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+  for (const key of ['items', 'data', 'emails', 'results', 'records']) {
+    if (Array.isArray(payload[key])) return payload[key];
+  }
+  return [];
+}
+
+function textPreview(value, max = 300) {
+  if (typeof value !== 'string') return undefined;
+  const text = value.replace(/\s+/g, ' ').trim();
+  if (!text) return undefined;
+  return text.length > max ? `${text.slice(0, max)}\u2026` : text;
+}
+
+function emailBodyPreview(email) {
+  const body = pickField(email, 'body', 'content', 'message');
+  if (typeof body === 'string') return textPreview(body);
+  if (body && typeof body === 'object') return textPreview(pickField(body, 'text', 'plain', 'html'));
+  return textPreview(pickField(email, 'body_text', 'text', 'content_preview', 'snippet', 'preview'));
+}
+
+function simplifyInstantlyEmail(email) {
+  if (!email || typeof email !== 'object') return { raw_type: typeof email };
+  return {
+    id: pickField(email, 'id', 'email_id', '_id'),
+    timestamp: pickField(email, 'timestamp', 'timestamp_created', 'timestamp_email', 'created_at', 'date'),
+    subject: pickField(email, 'subject'),
+    from: pickField(email, 'from_address_email', 'from_address', 'from', 'from_email'),
+    to: pickField(email, 'to_address_email_list', 'to_address_email', 'to_address', 'to', 'to_email'),
+    lead_email: pickField(email, 'lead', 'lead_email', 'email'),
+    lead_id: pickField(email, 'lead_id', 'leadId'),
+    campaign_id: pickField(email, 'campaign_id', 'campaign', 'campaignId'),
+    thread_id: pickField(email, 'thread_id', 'threadId'),
+    is_unread: pickField(email, 'is_unread', 'unread'),
+    is_auto_reply: pickField(email, 'is_auto_reply', 'auto_reply', 'ai_interest_status_auto_reply'),
+    body_preview: emailBodyPreview(email),
+  };
+}
+
+async function handleInstantlyRepliesTest(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+
+  const apiKey = process.env.INSTANTLY_REPLY_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({
+      success: false,
+      error: 'INSTANTLY_REPLY_API_KEY is not set in this environment.',
+    });
+  }
+
+  let response;
+  let text;
+  try {
+    response = await fetch(`${INSTANTLY_EMAILS_URL}?limit=${INSTANTLY_REPLIES_TEST_LIMIT}`, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+    });
+    text = await response.text();
+  } catch (err) {
+    // Transport failure. Never echo the key back.
+    return res.status(502).json({
+      success: false,
+      error: 'Request to Instantly failed',
+      message: String(err?.message || err),
+    });
+  }
+
+  let payload = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const status = response.status === 401 || response.status === 403 ? response.status : 502;
+    return res.status(status).json({
+      success: false,
+      error: 'Instantly API returned an error',
+      instantly_status: response.status,
+      instantly_error:
+        pickField(payload, 'error', 'message', 'detail') ?? textPreview(text, 500) ?? '(empty response body)',
+    });
+  }
+
+  // Zero emails is the EXPECTED result until the campaign goes live.
+  const items = emailsFromPayload(payload);
+  return res.status(200).json({
+    success: true,
+    count: items.length,
+    emails: items.map(simplifyInstantlyEmail),
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method === 'POST' && req.query?.novus_operation === 'verify-contact') {
@@ -107,6 +233,10 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && req.query?.novus_operation === 'resolution-backlog') {
     if (!requireAuth(req, res)) return;
     return handleResolutionBacklog(req, res);
+  }
+  if (req.method === 'GET' && req.query?.novus_operation === 'instantly-replies-test') {
+    if (!requireAuth(req, res)) return;
+    return handleInstantlyRepliesTest(req, res);
   }
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   if (!requireAuth(req, res)) return;
