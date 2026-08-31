@@ -21,6 +21,7 @@ import {
   classifyReply,
   validateClassifierResult,
   buildClassifierPrompt,
+  buildContextBlock,
   CONFIDENCE_THRESHOLD,
   AI_CLASSIFICATIONS,
 } from '../lib/reply-classification.mjs';
@@ -35,7 +36,8 @@ import {
   ROUTING_TABLE,
 } from '../lib/reply-router.mjs';
 import { pollInstantlyReplies } from '../lib/instantly-reply-poll.mjs';
-import { PHRASES, DETERMINISTIC_PHRASES } from '../lib/reply-classification-fixtures.mjs';
+import { PHRASES, DETERMINISTIC_PHRASES, CONTEXTUAL_PHRASES } from '../lib/reply-classification-fixtures.mjs';
+import { buildThreadIndex, selectThreadContext, buildContextSweepUrl } from '../lib/reply-thread-context.mjs';
 
 let passed = 0;
 const failures = [];
@@ -299,12 +301,164 @@ section('6. End-to-end through the poller: persist first, then classify');
     summary5.duplicates_skipped === 1 && summary5.classified === 0 && repo.table.length === 2);
 }
 
-section('7. Phrase table — expected contract');
+section('7. Thread context selection');
+{
+  const threadMsg = (over) => ({
+    id: over.id, ue_type: over.ue_type, eaccount: NOVUS,
+    from_address_email: over.from, to_address_email_list: over.to,
+    lead: LEAD, thread_id: over.thread_id || 'th_1', timestamp: over.timestamp,
+    subject: 'Re: enquiry', body: { text: over.text },
+  });
+
+  const raw = [
+    // NOVUS campaign email, oldest
+    threadMsg({ id: 'm1', ue_type: 1, from: NOVUS, to: LEAD, timestamp: '2026-08-30T09:00:00Z', text: 'We ran a test enquiry past your team. Want me to send the breakdown?' }),
+    // prospect asks something
+    threadMsg({ id: 'm2', ue_type: 2, from: LEAD, to: NOVUS, timestamp: '2026-08-30T10:00:00Z', text: 'What is this about?' }),
+    // NOVUS follow-up offering a CALL — the immediately previous message
+    threadMsg({ id: 'm3', ue_type: 1, from: NOVUS, to: LEAD, timestamp: '2026-08-30T11:00:00Z', text: 'Happy to jump on a quick call — does Thursday suit?' }),
+    // a LATER NOVUS message, after the reply: must never be used
+    threadMsg({ id: 'm5', ue_type: 1, from: NOVUS, to: LEAD, timestamp: '2026-08-30T14:00:00Z', text: 'Just bumping this up your inbox.' }),
+    // another thread entirely
+    threadMsg({ id: 'x1', ue_type: 1, from: NOVUS, to: LEAD, thread_id: 'th_OTHER', timestamp: '2026-08-30T11:30:00Z', text: 'Different thread entirely.' }),
+  ];
+
+  const index = buildThreadIndex(raw);
+  check('index is keyed by thread_id', index.has('th_1') && index.has('th_OTHER'));
+  check('thread th_1 holds only its own messages', index.get('th_1').length === 4);
+
+  const theReply = reply('yeah okay', { id: 'm4', timestamp: '2026-08-30T12:00:00Z' });
+  const ctx = selectThreadContext(theReply, index, {});
+  check('previous NOVUS message is the IMMEDIATELY preceding one',
+    ctx.previous_novus_message.includes('quick call'), ctx.previous_novus_message);
+  check('an older NOVUS message does not win', !ctx.previous_novus_message.includes('breakdown'));
+  check('a LATER NOVUS message is never used', !ctx.previous_novus_message.includes('bumping'));
+  check('previous prospect message is selected', ctx.previous_prospect_message.includes('What is this about'));
+  check('context_source reports the sweep', ctx.context_source === 'THREAD_SWEEP');
+  check('demo_already_sent is unknown (null), never guessed false', ctx.demo_already_sent === null);
+
+  const otherThread = selectThreadContext(reply('hi', { id: 'z', thread_id: 'th_NONE', timestamp: '2026-08-30T12:00:00Z' }), index, {});
+  check('an unknown thread yields blank context', otherThread.previous_novus_message === '' && otherThread.context_source === 'NONE');
+
+  // The reply's own message must never be its own context.
+  const selfIndex = buildThreadIndex([threadMsg({ id: 'm4', ue_type: 2, from: LEAD, to: NOVUS, timestamp: '2026-08-30T12:00:00Z', text: 'yeah okay' })]);
+  const selfCtx = selectThreadContext(theReply, selfIndex, {});
+  check('the reply is never its own context', selfCtx.previous_prospect_message === '');
+
+  // demo_already_sent, from thread evidence only.
+  const demoIndex = buildThreadIndex([
+    threadMsg({ id: 'd1', ue_type: 1, from: NOVUS, to: LEAD, timestamp: '2026-08-30T11:00:00Z', text: 'Here it is: https://demo.getnovus.co.uk/acme-estates' }),
+  ]);
+  const demoCtx = selectThreadContext(theReply, demoIndex, { demoUrl: 'https://demo.getnovus.co.uk/acme-estates' });
+  check('demo_already_sent true when the link is evidenced in the thread', demoCtx.demo_already_sent === true);
+  const noDemoCtx = selectThreadContext(theReply, demoIndex, { demoUrl: 'https://demo.getnovus.co.uk/other-agency' });
+  check('demo_already_sent false when a different link was sent', noDemoCtx.demo_already_sent === false);
+
+  // Unorderable timestamps must not be assumed earlier.
+  const badTime = selectThreadContext(reply('yeah okay', { id: 'q', timestamp: 'not-a-date' }), index, {});
+  check('an unorderable reply timestamp yields no context',
+    badTime.previous_novus_message === '' && badTime.context_source === 'UNORDERABLE_REPLY_TIMESTAMP');
+
+  check('sweep URL is bounded and newest-first',
+    buildContextSweepUrl({ limit: 100 }).includes('limit=100') && buildContextSweepUrl().includes('sort_order=desc'));
+  check('sweep URL sets no email_type filter (sent AND manual both needed)',
+    !buildContextSweepUrl().includes('email_type'));
+}
+
+section('8. Context reaches the prompt, and absence is stated explicitly');
+{
+  const withCtx = buildClassifierPrompt('yeah okay', { previous_novus_message: 'Want me to send the demo?', demo_already_sent: false });
+  check('previous NOVUS message appears in the prompt', withCtx.includes('Want me to send the demo?'));
+  check('the reply is clearly separated from the context',
+    withCtx.indexOf('Want me to send the demo?') < withCtx.indexOf('REPLY TO CLASSIFY'));
+  check('demo-not-sent state is stated', withCtx.includes('has NOT yet been sent'));
+
+  const noCtx = buildClassifierPrompt('yeah okay', null);
+  check('absent context is stated explicitly, not omitted', noCtx.includes('none available'));
+  check('unknown demo state is NOT asserted either way',
+    !noCtx.includes('has NOT yet been sent') && !noCtx.includes('has ALREADY been sent'));
+
+  const sentCtx = buildContextBlock({ previous_novus_message: 'Here is the breakdown', demo_already_sent: true });
+  check('demo-already-sent state is stated', sentCtx.includes('ALREADY been sent'));
+
+  // Context is passed through classifyReply to the model.
+  const ai = fakeAi('POSITIVE_MEETING', 0.93);
+  await classifyReply(reply('yeah okay'), { aiCall: ai, context: { previous_novus_message: 'Open to a quick call tomorrow?' } });
+  check('classifyReply forwards context to the model', ai.calls[0].prompt.includes('quick call tomorrow'));
+
+  // Deterministic paths still bypass the model even with context present.
+  const ai2 = fakeAi('POSITIVE_SEND_DEMO', 0.99);
+  const optOut = await classifyReply(reply('please remove me from your list'), {
+    aiCall: ai2, context: { previous_novus_message: 'Want me to send the demo?' },
+  });
+  check('context does not weaken deterministic OPT_OUT',
+    optOut.classification === 'OPT_OUT' && ai2.calls.length === 0);
+}
+
+section('9. Context retrieval failure never blocks persistence');
+{
+  const emails = [email('yeah okay', { id: 'em_ctx_fail' })];
+  const fetchImpl = async (url) => {
+    // The received-emails poll succeeds; the context sweep 500s.
+    if (!String(url).includes('email_type=received')) {
+      return { ok: false, status: 500, text: async () => JSON.stringify({ error: 'boom' }) };
+    }
+    return { ok: true, status: 200, text: async () => JSON.stringify({ items: emails }) };
+  };
+  const repo = memRepo();
+  const summary = await pollInstantlyReplies({
+    repo, apiKey: 'SECRET', fetchImpl, dryRun: false, classify: true, now: 'T0',
+    aiCall: fakeAi('OTHER_UNCLEAR', 0.4),
+  });
+  check('reply still persisted despite context failure', summary.persisted === 1 && repo.table.length === 2);
+  check('context failure is reported, not thrown', typeof summary.context_error === 'string' && summary.context_error.length > 0);
+  check('context counted as missing', summary.context_missing === 1 && summary.context_resolved === 0);
+  const stored = Object.fromEntries(REPLY_EVENTS_HEADER.map((k, i) => [k, repo.table[1][i]]));
+  check('raw body intact after context failure', stored.body_text === 'yeah okay');
+  check('low confidence still routed to review', stored.classification === 'OTHER_UNCLEAR' && stored.next_action === 'MANUAL_REVIEW');
+}
+
+section('10. Context sweep is ONE call per pass, and none when not classifying');
+{
+  const emails = [
+    email('yeah okay', { id: 'a1', thread_id: 'th_A' }),
+    email('sounds good', { id: 'a2', thread_id: 'th_B' }),
+    email('sure', { id: 'a3', thread_id: 'th_A' }),
+  ];
+  let sweepCalls = 0;
+  const fetchImpl = async (url) => {
+    if (!String(url).includes('email_type=received')) {
+      sweepCalls += 1;
+      return { ok: true, status: 200, text: async () => JSON.stringify({ items: [] }) };
+    }
+    return { ok: true, status: 200, text: async () => JSON.stringify({ items: emails }) };
+  };
+
+  sweepCalls = 0;
+  await pollInstantlyReplies({
+    repo: memRepo(), apiKey: 'SECRET', fetchImpl, dryRun: false, classify: true, now: 'T0',
+    aiCall: fakeAi('OTHER_UNCLEAR', 0.4),
+  });
+  check('three replies, exactly ONE context sweep', sweepCalls === 1, `${sweepCalls} sweeps`);
+
+  sweepCalls = 0;
+  await pollInstantlyReplies({ repo: memRepo(), apiKey: 'SECRET', fetchImpl, dryRun: false, now: 'T0' });
+  check('no classification -> no context sweep at all', sweepCalls === 0, `${sweepCalls} sweeps`);
+}
+
+section('11. Phrase table — expected contract');
 {
   const valid = PHRASES.every(([, cls]) => AI_CLASSIFICATIONS.includes(cls));
   check('every expected class is one the model may return', valid);
   check('mixed intent "Yes send it over, how much is it?" expects QUESTION',
     PHRASES.find(([p]) => p.startsWith('Yes send it over'))[1] === 'QUESTION');
+
+  check('contextual set covers all 9 required cases', CONTEXTUAL_PHRASES.length === 9);
+  const sameTextDifferentMeaning = CONTEXTUAL_PHRASES.filter((c) => c.phrase === 'yeah okay');
+  check('"yeah okay" appears with three different expected outcomes',
+    new Set(sameTextDifferentMeaning.map((c) => c.expected)).size === 3);
+  check('every contextual expectation is a class the model may return',
+    CONTEXTUAL_PHRASES.every((c) => AI_CLASSIFICATIONS.includes(c.expected)));
 }
 
 // ── Optional live run against the real model ────────────────────────────────
@@ -315,14 +469,18 @@ if (process.argv.includes('--live')) {
   } else {
     const rows = [];
     let agree = 0;
-    for (const [phrase, expected] of [...DETERMINISTIC_PHRASES, ...PHRASES]) {
-      const d = await classifyReply(reply(phrase));
+    const liveCases = [
+      ...[...DETERMINISTIC_PHRASES, ...PHRASES].map(([phrase, expected]) => ({ phrase, expected, context: null, set: 'context_free', label: '' })),
+      ...CONTEXTUAL_PHRASES.map((c) => ({ phrase: c.phrase, expected: c.expected, context: c.context, set: 'contextual', label: c.label })),
+    ];
+    for (const { phrase, expected, context, set, label } of liveCases) {
+      const d = await classifyReply(reply(phrase), { context });
       const ok = d.classification === expected;
       if (ok) agree += 1;
-      rows.push({ phrase, expected, actual: d.classification, confidence: d.confidence,
+      rows.push({ set, label, phrase, expected, actual: d.classification, confidence: d.confidence,
         next_action: d.next_action, priority: d.priority, source: d.source, reason: d.reason });
     }
-    console.table(rows.map((r) => ({ phrase: r.phrase, expected: r.expected, actual: r.actual,
+    console.table(rows.map((r) => ({ set: r.set, phrase: r.phrase, expected: r.expected, actual: r.actual,
       conf: r.confidence, next_action: r.next_action, match: r.expected === r.actual ? 'yes' : 'NO' })));
     console.log(JSON.stringify(rows, null, 2));
     console.log(`\nLive agreement: ${agree}/${rows.length}`);

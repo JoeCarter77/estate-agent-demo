@@ -31,7 +31,7 @@ import { pollInstantlyReplies } from '../../lib/instantly-reply-poll.mjs';
 import { classifyReply, CONFIDENCE_THRESHOLD } from '../../lib/reply-classification.mjs';
 import { _internal as aiClientInternal } from '../../lib/ai-client.mjs';
 import { normalizeInstantlyEmail } from '../../lib/reply-router.mjs';
-import { PHRASES, DETERMINISTIC_PHRASES } from '../../lib/reply-classification-fixtures.mjs';
+import { PHRASES, DETERMINISTIC_PHRASES, CONTEXTUAL_PHRASES } from '../../lib/reply-classification-fixtures.mjs';
 
 // Contact resolution can run owner web research, a Hunter Finder lookup and
 // several Hunter Verifier checks in one invocation; 20s was sized for the read-only
@@ -405,10 +405,22 @@ async function handleReplyClassifierLiveTest(req, res) {
     });
   }
 
-  const cases = [...DETERMINISTIC_PHRASES, ...PHRASES].map(([phrase, expected]) => ({ phrase, expected }));
+  // TWO fixture sets, run through the SAME classifier:
+  //   context_free — the original baseline table, no thread context supplied.
+  //     Kept unchanged so its score stays comparable run to run.
+  //   contextual   — the same reply text with different immediately-previous
+  //     NOVUS messages, which is the whole point of this change.
+  const cases = [
+    ...[...DETERMINISTIC_PHRASES, ...PHRASES].map(([phrase, expected]) => ({
+      phrase, expected, context: null, set: 'context_free', label: '',
+    })),
+    ...CONTEXTUAL_PHRASES.map((c) => ({
+      phrase: c.phrase, expected: c.expected, context: c.context, set: 'contextual', label: c.label,
+    })),
+  ];
 
   const results = [];
-  for (const { phrase, expected } of cases) {
+  for (const { phrase, expected, context, set, label } of cases) {
     // A minimal synthetic Instantly email, normalised through the SAME
     // normalizeInstantlyEmail() production replies go through, so
     // classifyReply() sees exactly the shape it sees live (cleaned_reply_text,
@@ -428,7 +440,7 @@ async function handleReplyClassifierLiveTest(req, res) {
     let decision;
     let error = null;
     try {
-      decision = await classifyReply(reply);
+      decision = await classifyReply(reply, { context });
     } catch (err) {
       // classifyReply() is built not to throw (every failure mode resolves to
       // a safe OTHER_UNCLEAR decision) — this is a last-resort guard so one
@@ -438,7 +450,11 @@ async function handleReplyClassifierLiveTest(req, res) {
     }
 
     results.push({
+      set,
+      label,
       phrase,
+      previous_novus_message: context?.previous_novus_message || null,
+      demo_already_sent: context?.demo_already_sent ?? null,
       expected_classification: expected,
       actual_classification: decision.classification,
       confidence: decision.confidence,
@@ -451,7 +467,18 @@ async function handleReplyClassifierLiveTest(req, res) {
     });
   }
 
-  const agreementCount = results.filter((r) => r.agreement).length;
+  const score = (rows) => {
+    const agreed = rows.filter((r) => r.agreement).length;
+    return {
+      total_cases: rows.length,
+      agreement_count: agreed,
+      agreement_percentage: rows.length ? Math.round((agreed / rows.length) * 1000) / 10 : 0,
+    };
+  };
+
+  const contextFree = results.filter((r) => r.set === 'context_free');
+  const contextual = results.filter((r) => r.set === 'contextual');
+
   const disagreements = results.filter((r) => !r.agreement);
   const lowConfidenceCases = results.filter((r) => typeof r.confidence === 'number' && r.confidence < CONFIDENCE_THRESHOLD);
   const otherUnclearCases = results.filter((r) => r.actual_classification === 'OTHER_UNCLEAR');
@@ -460,9 +487,11 @@ async function handleReplyClassifierLiveTest(req, res) {
     success: true,
     model: aiClientInternal.DEFAULT_MODEL,
     confidence_threshold: CONFIDENCE_THRESHOLD,
-    total_cases: results.length,
-    agreement_count: agreementCount,
-    agreement_percentage: results.length ? Math.round((agreementCount / results.length) * 1000) / 10 : 0,
+    ...score(results),
+    by_set: {
+      context_free: score(contextFree),
+      contextual: score(contextual),
+    },
     disagreements,
     low_confidence_cases: lowConfidenceCases,
     other_unclear_cases: otherUnclearCases,
