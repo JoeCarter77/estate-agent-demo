@@ -213,9 +213,20 @@ async function handleInstantlyRepliesTest(req, res) {
 
   // Zero emails is the EXPECTED result until the campaign goes live.
   const items = emailsFromPayload(payload);
+
+  // available_fields lists the KEY NAMES (never the values) present on the
+  // first email. simplifyInstantlyEmail whitelists fields, so without this we
+  // cannot tell whether Instantly exposes a stronger direction/message-type
+  // field (ue_type, email_type, eaccount, ...) that lib/reply-router.mjs should
+  // preserve. Key names are not secrets; no value is echoed.
+  const availableFields = items.length && items[0] && typeof items[0] === 'object'
+    ? Object.keys(items[0]).sort()
+    : [];
+
   return res.status(200).json({
     success: true,
     count: items.length,
+    available_fields: availableFields,
     emails: items.map(simplifyInstantlyEmail),
   });
 }

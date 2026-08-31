@@ -1,8 +1,9 @@
 // Hermetic NOVUS reply-router tests. Run: npm run novus:reply-router-selftest
 //
-// Fully offline: no network, no Google Sheets, no Instantly, no AI. The only
-// repo used is an in-test fake that records every call, so any accidental
-// Sheets access shows up as a failed assertion.
+// Fully offline: no network, no Google Sheets, no Instantly, no AI, no sends.
+// The only repo is an in-test fake recording every call, so ANY accidental
+// Sheets access shows up as a failed assertion. globalThis.fetch is replaced by
+// a throwing stub for the whole run to prove nothing reaches the network.
 
 import assert from 'node:assert/strict';
 import {
@@ -10,14 +11,19 @@ import {
   REPLY_EVENTS_TAB,
   REPLY_EVENTS_IDEMPOTENCY_COLUMN,
   OUTREACH_ID_SOURCE_COLUMN,
+  MATCH_PLAN,
   CLASSIFICATIONS,
   NEXT_ACTIONS,
   PRIORITIES,
   SUPPRESSION_TYPES,
   ACTION_STATUSES,
+  DIRECTIONS,
   ROUTING_TABLE,
   DEFAULT_DRY_RUN,
-  normalizeReplyEmail,
+  extractEmails,
+  cleanReplyText,
+  detectDirection,
+  normalizeInstantlyEmail,
   detectOptOut,
   routeReply,
   buildReplyEventRow,
@@ -27,26 +33,59 @@ import {
 } from '../lib/reply-router.mjs';
 import { OUTBOUND_HEADER, OUTBOUND_STATUSES } from '../lib/outbound.mjs';
 
+const originalFetch = globalThis.fetch;
+globalThis.fetch = () => { throw new Error('network access is forbidden in this self-test'); };
+
 let assertions = 0;
 function check(fn) { fn(); assertions += 1; }
+
+// ---------------------------------------------------------------------------
+// THE REAL OBSERVED OBJECTS, from one controlled Instantly test exchange.
+// Both arrived in the SAME API result, which is exactly why direction has to be
+// deterministic: the poller sees our own sent email alongside the reply.
+// ---------------------------------------------------------------------------
+const REAL_INBOUND = {
+  id: '01a0596e-d338-72e6-a586-98eac9e4ba20',
+  timestamp: '2026-08-31T20:07:11.000Z',
+  subject: 'Re: TEST',
+  from: 'joedcarter1@gmail.com',
+  to: 'joe@novushq.co.uk',
+  lead_email: 'joedcarter1@gmail.com',
+  campaign_id: 'ba02b5cd-f734-465a-9251-1a565270b876',
+  thread_id: 'ba-AayEOdow6Hjmghl06cSGgbe',
+  is_unread: 1,
+  body_preview: 'Yes send On Mon, 31 Aug 2026 at 21:01, Joe Carter <joe@novushq.co.uk> wrote: >',
+};
+
+const REAL_OUTBOUND = {
+  id: 'outbound-copy-1',
+  timestamp: '2026-08-31T20:01:00.000Z',
+  subject: 'TEST',
+  from: 'joe@novushq.co.uk',
+  to: 'joedcarter1@gmail.com',
+  lead_email: 'joedcarter1@gmail.com',
+  campaign_id: 'ba02b5cd-f734-465a-9251-1a565270b876',
+  thread_id: 'ba-AayEOdow6Hjmghl06cSGgbe',
+  is_unread: 0,
+  body_preview: 'Hi Joe, quick note about your listing.',
+};
 
 // --- Schema matches the REPLY_EVENTS tab exactly -----------------------------
 const EXPECTED_HEADER = [
   'reply_event_id', 'instantly_email_id', 'agency_id', 'outreach_id', 'lead_email',
-  'campaign_id', 'thread_id', 'received_at', 'subject', 'body_text', 'is_auto_reply',
-  'classification', 'confidence', 'suppression_type', 'next_action', 'priority',
-  'processed_at', 'action_status', 'action_completed_at', 'classifier_reason',
+  'campaign_id', 'thread_id', 'received_at', 'subject', 'body_text', 'cleaned_reply_text',
+  'is_auto_reply', 'classification', 'confidence', 'suppression_type', 'next_action',
+  'priority', 'processed_at', 'action_status', 'action_completed_at', 'classifier_reason',
   'error', 'notes',
 ];
 check(() => assert.deepEqual(REPLY_EVENTS_HEADER, EXPECTED_HEADER, 'header must match the tab exactly'));
 check(() => assert.equal(REPLY_EVENTS_TAB, 'REPLY_EVENTS'));
 check(() => assert.equal(REPLY_EVENTS_IDEMPOTENCY_COLUMN, 'instantly_email_id'));
 
-// The routing table only ever names values from the agreed enums.
 for (const [classification, route] of Object.entries(ROUTING_TABLE)) {
-  check(() => assert.ok(CLASSIFICATIONS.includes(classification), `${classification} in enum`));
-  check(() => assert.ok(NEXT_ACTIONS.includes(route.next_action), `${route.next_action} in enum`));
-  check(() => assert.ok(PRIORITIES.includes(route.priority), `${route.priority} in enum`));
+  check(() => assert.ok(CLASSIFICATIONS.includes(classification)));
+  check(() => assert.ok(NEXT_ACTIONS.includes(route.next_action)));
+  check(() => assert.ok(PRIORITIES.includes(route.priority)));
   check(() => assert.ok(SUPPRESSION_TYPES.includes(route.suppression_type)));
 }
 check(() => assert.equal(Object.keys(ROUTING_TABLE).length, CLASSIFICATIONS.length, 'every classification is routed'));
@@ -54,36 +93,106 @@ check(() => assert.equal(Object.keys(ROUTING_TABLE).length, CLASSIFICATIONS.leng
 // No STOP-style action exists: Instantly owns the automatic sequence stop.
 check(() => assert.ok(!NEXT_ACTIONS.some((a) => /STOP|PAUSE/i.test(a)), 'no stop/pause action'));
 
-// NOVUS-local suppression rides on a value OUTBOUND already supports, so no
-// schema change is needed for opt-outs to survive an Instantly recreate.
+// NOVUS-local suppression rides on a status OUTBOUND already supports.
 check(() => assert.ok(OUTBOUND_STATUSES.includes('SUPPRESSED')));
 check(() => assert.ok(OUTBOUND_HEADER.includes(OUTREACH_ID_SOURCE_COLUMN), 'outreach_id sources from OUTBOUND.outbound_id'));
-check(() => assert.ok(!OUTBOUND_HEADER.includes('outreach_id'), 'OUTBOUND has no literal outreach_id column'));
+check(() => assert.ok(!OUTBOUND_HEADER.includes('outreach_id')));
+// Matching is documented but explicitly NOT built.
+check(() => assert.equal(MATCH_PLAN.implemented, false));
+check(() => assert.equal(MATCH_PLAN.primary.to, 'OUTBOUND.outreach_contact_email'));
 
-// --- Normalisation is defensive about an unknown payload shape ---------------
-check(() => assert.deepEqual(normalizeReplyEmail(null), {
-  email_id: undefined, lead_email: undefined, subject: '', body_text: '',
-  is_auto_reply: false, campaign_id: undefined, thread_id: undefined, timestamp: undefined,
-}));
-check(() => assert.equal(normalizeReplyEmail({ body: { text: 'hi' } }).body_text, 'hi'));
-check(() => assert.equal(normalizeReplyEmail({ content: 'hi' }).body_text, 'hi'));
-// An unknown/missing auto-reply flag must never default to "automated", or a
-// real human reply would be routed to no-action.
-check(() => assert.equal(normalizeReplyEmail({}).is_auto_reply, false));
-check(() => assert.equal(normalizeReplyEmail({ is_auto_reply: 'true' }).is_auto_reply, true));
-check(() => assert.equal(normalizeReplyEmail({ auto_reply: 1 }).is_auto_reply, true));
-check(() => assert.equal(normalizeReplyEmail({ is_auto_reply: 'no' }).is_auto_reply, false));
+// --- Address parsing ---------------------------------------------------------
+check(() => assert.deepEqual(extractEmails('joe@novushq.co.uk'), ['joe@novushq.co.uk']));
+check(() => assert.deepEqual(extractEmails('Joe Carter <Joe@Novushq.co.uk>'), ['joe@novushq.co.uk']));
+check(() => assert.deepEqual(extractEmails('a@b.com, c@d.com'), ['a@b.com', 'c@d.com']));
+check(() => assert.deepEqual(extractEmails(['a@b.com', 'a@b.com']), ['a@b.com'], 'de-duplicated'));
+check(() => assert.deepEqual(extractEmails(null), []));
+
+// --- Direction on the REAL objects -------------------------------------------
+const inbound = normalizeInstantlyEmail(REAL_INBOUND);
+const outbound = normalizeInstantlyEmail(REAL_OUTBOUND);
+check(() => assert.equal(inbound.direction, 'INBOUND', 'real prospect reply is INBOUND'));
+check(() => assert.equal(outbound.direction, 'OUTBOUND', 'our own sent copy is OUTBOUND'));
+check(() => assert.ok(DIRECTIONS.includes(inbound.direction)));
+
+// is_unread is IRRELEVANT to direction: flip both and nothing changes.
+check(() => assert.equal(normalizeInstantlyEmail({ ...REAL_INBOUND, is_unread: 0 }).direction, 'INBOUND'));
+check(() => assert.equal(normalizeInstantlyEmail({ ...REAL_OUTBOUND, is_unread: 1 }).direction, 'OUTBOUND'));
+check(() => assert.equal(normalizeInstantlyEmail({ ...REAL_INBOUND, is_unread: undefined }).direction, 'INBOUND'));
+// ...but it is still normalised and preserved.
+check(() => assert.equal(inbound.is_unread, true));
+check(() => assert.equal(outbound.is_unread, false));
+
+// UNKNOWN rather than a guess.
+check(() => assert.equal(detectDirection({ fromEmail: 'x@y.com', toEmails: ['z@w.com'], leadEmail: 'a@b.com' }), 'UNKNOWN'));
+check(() => assert.equal(detectDirection({ fromEmail: '', toEmails: ['joe@novushq.co.uk'], leadEmail: 'a@b.com' }), 'UNKNOWN'));
+check(() => assert.equal(detectDirection({ fromEmail: 'a@b.com', toEmails: [], leadEmail: 'a@b.com' }), 'UNKNOWN'));
+// A third party replying into the thread is not the lead: UNKNOWN, not INBOUND.
+check(() => assert.equal(normalizeInstantlyEmail({ ...REAL_INBOUND, from: 'someone.else@agency.com' }).direction, 'UNKNOWN'));
+// lead_email that IS the NOVUS mailbox satisfies both tests at once -> ambiguous.
+check(() => assert.equal(detectDirection({
+  fromEmail: 'joe@novushq.co.uk', toEmails: ['joe@novushq.co.uk'], leadEmail: 'joe@novushq.co.uk',
+}), 'UNKNOWN'));
+// Mailbox set is configurable without a code change.
+check(() => assert.equal(normalizeInstantlyEmail(REAL_INBOUND, { mailboxes: ['other@elsewhere.com'] }).direction, 'UNKNOWN'));
+
+// --- Normalised field mapping from the REAL inbound object -------------------
+check(() => assert.equal(inbound.email_id, '01a0596e-d338-72e6-a586-98eac9e4ba20'));
+check(() => assert.equal(inbound.timestamp, '2026-08-31T20:07:11.000Z'));
+check(() => assert.equal(inbound.subject, 'Re: TEST'));
+check(() => assert.equal(inbound.from_email, 'joedcarter1@gmail.com'));
+check(() => assert.deepEqual(inbound.to_emails, ['joe@novushq.co.uk']));
+check(() => assert.equal(inbound.lead_email, 'joedcarter1@gmail.com'));
+check(() => assert.equal(inbound.campaign_id, 'ba02b5cd-f734-465a-9251-1a565270b876'));
+check(() => assert.equal(inbound.thread_id, 'ba-AayEOdow6Hjmghl06cSGgbe'));
+check(() => assert.equal(inbound.is_auto_reply, false, 'absent flag must never default to automated'));
+check(() => assert.deepEqual(inbound.provider_hints, {}, 'no direction/type hints in the observed payload'));
+// A provider direction field, IF it appears, is preserved but not acted on.
+const withHint = normalizeInstantlyEmail({ ...REAL_INBOUND, ue_type: 2, eaccount: 'joe@novushq.co.uk' });
+check(() => assert.deepEqual(withHint.provider_hints, { ue_type: 2, eaccount: 'joe@novushq.co.uk' }));
+check(() => assert.equal(withHint.direction, 'INBOUND', 'hints preserved, direction still address-derived'));
+
+// --- Quoted-history cleaning on the REAL body --------------------------------
+check(() => assert.equal(inbound.cleaned_reply_text, 'Yes send', 'the real preview cleans to "Yes send"'));
+// Raw body is preserved verbatim — cleaning never deletes content.
+check(() => assert.equal(inbound.raw_body_text, REAL_INBOUND.body_preview));
+check(() => assert.ok(inbound.raw_body_text.includes('wrote:')));
+check(() => assert.ok(inbound.raw_body_text.length > inbound.cleaned_reply_text.length));
+
+check(() => assert.equal(cleanReplyText('Yes send\n> quoted line'), 'Yes send'));
+check(() => assert.equal(cleanReplyText('Sounds good\n-----Original Message-----\nblah'), 'Sounds good'));
+check(() => assert.equal(cleanReplyText('Interested\n\nFrom: Joe\nSent: Monday\nTo: me'), 'Interested'));
+check(() => assert.equal(cleanReplyText('No markers here'), 'No markers here'));
+check(() => assert.equal(cleanReplyText('   spaced   out   '), 'spaced out'));
+check(() => assert.equal(cleanReplyText(''), ''));
+// "From" in ordinary prose is not a quoted header (needs Sent:/To:/Subject:).
+check(() => assert.equal(cleanReplyText('From the listing it looks fine'), 'From the listing it looks fine'));
+// A body that is ONLY quoted history falls back to the raw text rather than
+// going empty — an empty cleaned text would hide an opt-out phrase.
+check(() => assert.equal(cleanReplyText('> only quoted'), '> only quoted'));
+
+// --- Routing: the REAL reply ------------------------------------------------
+// "Yes send" is plainly POSITIVE_SEND_DEMO to a human, and that is precisely
+// what must NOT happen automatically: AI is not wired, so it goes to a human.
+const realDecision = routeReply(inbound);
+check(() => assert.equal(realDecision.classification, 'OTHER_UNCLEAR'));
+check(() => assert.equal(realDecision.next_action, 'MANUAL_REVIEW'));
+check(() => assert.equal(realDecision.priority, 'HIGH'));
+check(() => assert.equal(realDecision.suppression_type, 'NONE'));
+check(() => assert.equal(realDecision.confidence, null, 'no fabricated score without a model'));
+check(() => assert.deepEqual(Object.keys(realDecision).sort(),
+  ['classification', 'confidence', 'next_action', 'priority', 'reason', 'suppression_type']));
 
 // --- Rule 1: auto-reply ------------------------------------------------------
-const ooo = routeReply({ is_auto_reply: true, body_text: 'I am out of the office' });
+const ooo = routeReply(normalizeInstantlyEmail({ ...REAL_INBOUND, is_auto_reply: true, body_preview: 'I am out of the office' }));
 check(() => assert.equal(ooo.classification, 'OOO_AUTOMATED'));
+check(() => assert.equal(ooo.confidence, 1));
 check(() => assert.equal(ooo.suppression_type, 'NONE'));
 check(() => assert.equal(ooo.next_action, 'NONE'));
 check(() => assert.equal(ooo.priority, 'LOW'));
-
-// An OOO that quotes our own footer must stay OOO — auto-reply wins, and it is
-// checked before opt-out matching precisely so this cannot suppress a live lead.
-const oooQuoting = routeReply({ is_auto_reply: true, body_text: 'Out of office. To unsubscribe click here' });
+// Auto-reply is checked FIRST, so an OOO quoting our footer cannot suppress a
+// live prospect.
+const oooQuoting = routeReply(normalizeInstantlyEmail({ ...REAL_INBOUND, is_auto_reply: true, body_preview: 'Out of office. To unsubscribe click here' }));
 check(() => assert.equal(oooQuoting.classification, 'OOO_AUTOMATED'));
 check(() => assert.equal(oooQuoting.suppression_type, 'NONE'));
 
@@ -96,88 +205,94 @@ const OPT_OUT_BODIES = [
   "don't contact me",
   'STOP EMAILING ME',
   "Please don't email me again",
-  'Please  remove   me',           // collapsed whitespace
-  'please don’t email me again', // curly apostrophe
+  'Please do not email me again',
+  'Please  remove   me',            // collapsed whitespace
+  'please don’t email me again',  // curly apostrophe
 ];
 for (const body of OPT_OUT_BODIES) {
-  const d = routeReply({ is_auto_reply: false, body_text: body });
+  const d = routeReply(normalizeInstantlyEmail({ ...REAL_INBOUND, body_preview: body }));
   check(() => assert.equal(d.classification, 'OPT_OUT', `opt-out: ${body}`));
+  check(() => assert.equal(d.confidence, 1, `certain: ${body}`));
   check(() => assert.equal(d.suppression_type, 'PERMANENT', `permanent: ${body}`));
   check(() => assert.equal(d.next_action, 'NONE', `no action: ${body}`));
   check(() => assert.equal(d.priority, 'NORMAL', `normal: ${body}`));
 }
-// Opt-out language in the subject counts too.
-check(() => assert.equal(routeReply({ subject: 'Unsubscribe', body_text: 'thanks' }).classification, 'OPT_OUT'));
-check(() => assert.ok(detectOptOut({ body_text: 'remove me' })));
-check(() => assert.equal(detectOptOut({ body_text: 'sounds good, send it over' }), null));
+check(() => assert.equal(routeReply(normalizeInstantlyEmail({ ...REAL_INBOUND, subject: 'Unsubscribe' })).classification, 'OPT_OUT'));
+check(() => assert.equal(detectOptOut({ cleaned_reply_text: 'sounds good, send it over' }), null));
 
-// --- Rule 3: everything semantic is a human's problem for now ----------------
-for (const body of ['Yes please send the demo', 'Can you do Tuesday at 3?', 'Not right now', 'what is this?']) {
-  const d = routeReply({ is_auto_reply: false, body_text: body });
-  check(() => assert.equal(d.classification, 'OTHER_UNCLEAR', `unclear: ${body}`));
-  check(() => assert.equal(d.next_action, 'MANUAL_REVIEW', `review: ${body}`));
-  check(() => assert.equal(d.priority, 'HIGH', `high: ${body}`));
-  check(() => assert.equal(d.suppression_type, 'NONE'));
-}
-
-// --- Row construction --------------------------------------------------------
-const reply = normalizeReplyEmail({
-  id: 'em_1', lead: 'a@b.com', subject: 'Re: hi', body: { text: 'remove me' },
-  campaign_id: 'c1', thread_id: 't1', timestamp: '2026-08-31T10:00:00Z',
+// Opt-out matching reads CLEANED text: a positive reply above a quoted footer
+// containing "unsubscribe" is NOT an opt-out.
+const positiveOverFooter = normalizeInstantlyEmail({
+  ...REAL_INBOUND,
+  body_preview: 'Yes please send it On Mon, 31 Aug 2026 at 21:01, Joe Carter <joe@novushq.co.uk> wrote: > unsubscribe here',
 });
-const row = buildReplyEventRow(reply, routeReply(reply), { replyEventId: 'rpl_test', now: '2026-08-31T10:00:01Z' });
+check(() => assert.equal(positiveOverFooter.cleaned_reply_text, 'Yes please send it'));
+check(() => assert.equal(routeReply(positiveOverFooter).classification, 'OTHER_UNCLEAR', 'quoted footer must not suppress'));
+
+// --- Row construction from the REAL reply ------------------------------------
+const row = buildReplyEventRow(inbound, realDecision, { replyEventId: 'rpl_test', now: '2026-08-31T20:07:12.000Z' });
 check(() => assert.deepEqual(Object.keys(row), EXPECTED_HEADER, 'row key order matches the tab'));
-check(() => assert.equal(row.instantly_email_id, 'em_1'));
-check(() => assert.equal(row.classification, 'OPT_OUT'));
-check(() => assert.equal(row.suppression_type, 'PERMANENT'));
-// OPT_OUT is PENDING, not NO_ACTION: NOVUS still owes a suppression write.
-check(() => assert.equal(row.action_status, 'PENDING'));
-check(() => assert.ok(ACTION_STATUSES.includes(row.action_status)));
+check(() => assert.equal(row.instantly_email_id, '01a0596e-d338-72e6-a586-98eac9e4ba20'));
+check(() => assert.equal(row.received_at, '2026-08-31T20:07:11.000Z'));
+check(() => assert.equal(row.lead_email, 'joedcarter1@gmail.com'));
+check(() => assert.equal(row.campaign_id, 'ba02b5cd-f734-465a-9251-1a565270b876'));
+check(() => assert.equal(row.thread_id, 'ba-AayEOdow6Hjmghl06cSGgbe'));
+check(() => assert.equal(row.body_text, REAL_INBOUND.body_preview, 'raw body preserved in the row'));
+check(() => assert.equal(row.cleaned_reply_text, 'Yes send'));
 check(() => assert.equal(row.is_auto_reply, 'FALSE'));
+check(() => assert.equal(row.confidence, '', 'null confidence serialises to blank'));
+check(() => assert.equal(row.action_status, 'REVIEW'));
+check(() => assert.ok(ACTION_STATUSES.includes(row.action_status)));
 check(() => assert.equal(row.action_completed_at, ''));
-// No match step yet, so identity fields stay blank rather than guessed.
+// No match step yet: identity fields stay blank rather than guessed.
 check(() => assert.equal(row.agency_id, ''));
 check(() => assert.equal(row.outreach_id, ''));
+// The id factory follows the repo's existing convention.
+const minted = buildReplyEventRow(inbound, realDecision, { now: 'T' });
+check(() => assert.match(minted.reply_event_id, /^rpl_[0-9a-z]+_[0-9a-z]+$/));
 
-const oooRow = buildReplyEventRow({ email_id: 'em_2', is_auto_reply: true }, routeReply({ is_auto_reply: true }), { now: 'T' });
-check(() => assert.equal(oooRow.action_status, 'NO_ACTION'));
-check(() => assert.equal(oooRow.is_auto_reply, 'TRUE'));
-const unclearRow = buildReplyEventRow({ email_id: 'em_3' }, routeReply({ body_text: 'hmm' }), { now: 'T' });
-check(() => assert.equal(unclearRow.action_status, 'REVIEW'));
-check(() => assert.equal(unclearRow.confidence, '', 'no confidence score without a model'));
+const optOutRow = buildReplyEventRow(
+  normalizeInstantlyEmail({ ...REAL_INBOUND, body_preview: 'unsubscribe' }),
+  routeReply(normalizeInstantlyEmail({ ...REAL_INBOUND, body_preview: 'unsubscribe' })),
+  { now: 'T' },
+);
+check(() => assert.equal(optOutRow.confidence, '1'));
+check(() => assert.equal(optOutRow.suppression_type, 'PERMANENT'));
+// PENDING, not NO_ACTION: NOVUS still owes itself a suppression write.
+check(() => assert.equal(optOutRow.action_status, 'PENDING'));
 
-// --- Persistence is dry-run by default and never touches Sheets --------------
+// --- No live writes ----------------------------------------------------------
 function fakeRepo(existing = null) {
   return {
     calls: [],
     async findById(tab, col, val) { this.calls.push(['findById', tab, col, val]); return existing; },
     async appendRecord(tab, obj) { this.calls.push(['appendRecord', tab, obj]); },
     async updateById() { this.calls.push(['updateById']); throw new Error('REPLY_EVENTS rows are never updated'); },
+    async updateCell() { this.calls.push(['updateCell']); throw new Error('no cell writes'); },
   };
 }
 
 check(() => assert.equal(DEFAULT_DRY_RUN, true));
 
 let repo = fakeRepo();
-let result = await persistReplyEvent(row); // no options at all
+let result = await persistReplyEvent(row);
 check(() => assert.equal(result.dryRun, true));
 check(() => assert.equal(result.persisted, false));
 check(() => assert.equal(result.skipped, 'dry_run'));
 
 repo = fakeRepo();
-result = await persistReplyEvent(row, { repo }); // repo supplied but still dry-run
+result = await persistReplyEvent(row, { repo });
 check(() => assert.equal(result.persisted, false));
 check(() => assert.deepEqual(repo.calls, [], 'dry-run makes ZERO repo calls — no read, no write'));
 
-// Live mode is opt-in and demands a repo.
 await assert.rejects(() => persistReplyEvent(row, { dryRun: false }), /requires a repo/);
 assertions += 1;
 
-// Live append happens only after the idempotency check.
+// Live append only after the idempotency check (not reachable in production yet).
 repo = fakeRepo(null);
 result = await persistReplyEvent(row, { repo, dryRun: false });
 check(() => assert.equal(result.persisted, true));
-check(() => assert.deepEqual(repo.calls[0], ['findById', 'REPLY_EVENTS', 'instantly_email_id', 'em_1']));
+check(() => assert.deepEqual(repo.calls[0], ['findById', 'REPLY_EVENTS', 'instantly_email_id', '01a0596e-d338-72e6-a586-98eac9e4ba20']));
 check(() => assert.equal(repo.calls[1][0], 'appendRecord'));
 check(() => assert.equal(repo.calls.length, 2));
 
@@ -192,19 +307,26 @@ check(() => assert.ok(!repo.calls.some((c) => c[0] === 'updateById'), 'existing 
 await assert.rejects(() => findExistingReplyEvent(fakeRepo(), '  '), /instantly_email_id is required/);
 assertions += 1;
 
-// --- One email = one row: a later reply on the same thread is a NEW event ----
-const first = await processReplyEmail({ id: 'em_10', thread_id: 't9', body: 'hello' });
-const second = await processReplyEmail({ id: 'em_11', thread_id: 't9', body: 'following up' });
-check(() => assert.notEqual(first.row.reply_event_id, second.row.reply_event_id));
-check(() => assert.notEqual(first.row.instantly_email_id, second.row.instantly_email_id));
-check(() => assert.equal(first.row.thread_id, second.row.thread_id));
-check(() => assert.equal(first.persistence.dryRun, true));
-check(() => assert.equal(second.persistence.persisted, false));
+// --- End-to-end on the real pair ---------------------------------------------
+const processedInbound = await processReplyEmail(REAL_INBOUND);
+check(() => assert.equal(processedInbound.reply.direction, 'INBOUND'));
+check(() => assert.equal(processedInbound.decision.classification, 'OTHER_UNCLEAR'));
+check(() => assert.equal(processedInbound.row.cleaned_reply_text, 'Yes send'));
+check(() => assert.equal(processedInbound.persistence.dryRun, true));
+check(() => assert.equal(processedInbound.persistence.persisted, false));
 
-// --- The decision object is exactly the agreed five keys ---------------------
-check(() => assert.deepEqual(
-  Object.keys(routeReply({ body_text: 'anything' })).sort(),
-  ['classification', 'next_action', 'priority', 'reason', 'suppression_type'],
-));
+// Our own sent copy, present in the SAME API result, must not become an event.
+const processedOutbound = await processReplyEmail(REAL_OUTBOUND);
+check(() => assert.equal(processedOutbound.reply.direction, 'OUTBOUND'));
+check(() => assert.equal(processedOutbound.decision, null, 'outbound copy is never routed'));
+check(() => assert.equal(processedOutbound.row, null, 'outbound copy creates no REPLY_EVENTS row'));
+check(() => assert.equal(processedOutbound.skipped, 'direction_outbound'));
 
+// One email = one row: a later reply on the same thread is a NEW event.
+const second = await processReplyEmail({ ...REAL_INBOUND, id: 'em_second', body_preview: 'following up' });
+check(() => assert.notEqual(processedInbound.row.reply_event_id, second.row.reply_event_id));
+check(() => assert.notEqual(processedInbound.row.instantly_email_id, second.row.instantly_email_id));
+check(() => assert.equal(processedInbound.row.thread_id, second.row.thread_id));
+
+globalThis.fetch = originalFetch;
 console.log(`\n✅ NOVUS reply-router self-test passed (${assertions} focused assertions).`);
