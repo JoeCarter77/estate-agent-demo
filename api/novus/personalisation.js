@@ -158,6 +158,12 @@ function simplifyInstantlyEmail(email) {
     lead_id: pickField(email, 'lead_id', 'leadId'),
     campaign_id: pickField(email, 'campaign_id', 'campaign', 'campaignId'),
     thread_id: pickField(email, 'thread_id', 'threadId'),
+    // eaccount verbatim: lib/reply-router.mjs prefers it as the NOVUS-side
+    // address for direction validation, but we have only seen the field NAME so
+    // far. Surfaced raw to confirm whether it is an address, an account
+    // id/UUID, or some other structure. It is a mailbox identifier, not a
+    // credential — the API key is never echoed anywhere in this response.
+    eaccount: pickField(email, 'eaccount', 'email_account'),
     is_unread: pickField(email, 'is_unread', 'unread'),
     is_auto_reply: pickField(email, 'is_auto_reply', 'auto_reply', 'ai_interest_status_auto_reply'),
     body_preview: emailBodyPreview(email),
