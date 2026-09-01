@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { __setRepoForTests } from '../lib/sheets.mjs';
-import handler from '../api/novus/debug/inbound-match-dry-run.js';
+import handler from '../api/novus/intelligence/rebuild-all.js';
 
 const NOW = Date.now();
 const occurredAt = new Date(NOW - 60 * 60 * 1000).toISOString();
@@ -64,7 +64,8 @@ const repo = {
 
 function req({ password = 'test-pass', query = {} } = {}) {
   return {
-    method: 'GET', query, url: '/api/novus/debug/inbound-match-dry-run',
+    method: 'GET', query: { action: 'inbound-match-dry-run', ...query },
+    url: '/api/novus/intelligence/rebuild-all?action=inbound-match-dry-run',
     headers: { authorization: `Basic ${Buffer.from(`test-user:${password}`).toString('base64')}` },
   };
 }
@@ -88,6 +89,11 @@ await handler(req({ password: 'wrong' }), denied);
 assert.equal(denied.statusCode, 401);
 assert.equal(reads, 0, 'auth failure occurs before any Sheets read');
 
+const ordinaryGet = res();
+await handler({ ...req(), query: {}, url: '/api/novus/intelligence/rebuild-all' }, ordinaryGet);
+assert.equal(ordinaryGet.statusCode, 405, 'ordinary GET behaviour remains unchanged');
+assert.equal(reads, 0, 'ordinary GET does not touch Sheets');
+
 const response = res();
 await handler(req(), response);
 assert.equal(response.statusCode, 200);
@@ -95,13 +101,17 @@ assert.equal(response.headers['Cache-Control'], 'no-store');
 assert.equal(response.body.read_only, true);
 assert.deepEqual(response.body.parameters, { days: 14, limit: 100 });
 assert.deepEqual(response.body.summary, {
-  reviewed: 4, recoverable: 1, still_unmatched: 1, ambiguous: 1, conflict: 1,
+  reviewed: 4, recoverable: 1, unmatched: 1, ambiguous: 1, conflict: 1,
 });
 assert.equal(reads, 3, 'exactly one read for each required tab');
 assert.equal(response.body.rows.find((row) => row.communication_id === 'com_recoverable').proposed_probe_id, 'prb_b');
 assert.equal(response.body.rows.find((row) => row.communication_id === 'com_conflict').status, 'conflict');
 assert.ok(!response.body.rows.some((row) => row.communication_id === 'com_resolved_excluded'));
-assert.ok(response.body.rows.every((row) => Object.hasOwn(row, 'evidence_summary')));
+assert.ok(response.body.rows.every((row) => Object.hasOwn(row, 'evidence_reason')));
+
+const capped = res();
+await handler(req({ query: { days: '999', limit: '999' } }), capped);
+assert.deepEqual(capped.body.parameters, { days: 90, limit: 500 });
 
 __setRepoForTests(null);
 console.log('✅ Read-only inbound-match debug endpoint contract passed.');

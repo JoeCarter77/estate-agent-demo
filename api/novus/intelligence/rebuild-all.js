@@ -99,6 +99,7 @@ import {
   uploadSingleOutboundLead,
 } from '../../../lib/instantly-outbound.mjs';
 import { requireAuth } from '../_auth.mjs';
+import { inboundMatchDryRunOptions, runInboundMatchDryRun } from '../../../lib/inbound-match-review.mjs';
 
 export const maxDuration = 60;
 
@@ -143,6 +144,24 @@ function normalizeProbeIds(raw) {
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // Temporary, production-safe review mode. This GET branch returns before
+  // every rebuild/outbound/write path below and the review module exposes no
+  // repository mutation methods to the matcher. Every non-matching request
+  // retains this endpoint's existing POST-only behaviour.
+  const action = String(req.query?.action || '').trim();
+  if (req.method === 'GET' && action === 'inbound-match-dry-run') {
+    if (!requireAuth(req, res)) return;
+    res.setHeader('Cache-Control', 'no-store');
+    try {
+      const result = await runInboundMatchDryRun(getRepo(), inboundMatchDryRunOptions(req));
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error('inbound match dry-run error:', err?.message || String(err));
+      return res.status(500).json({ error: err?.message || 'Failed to run inbound match dry-run' });
+    }
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!requireAuth(req, res)) return;
 
