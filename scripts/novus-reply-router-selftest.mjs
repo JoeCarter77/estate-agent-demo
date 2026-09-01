@@ -305,6 +305,18 @@ const OPT_OUT_BODIES = [
   'Please do not email me again',
   'Please  remove   me',            // collapsed whitespace
   'please don’t email me again',  // curly apostrophe
+  // FIRST PERSON PLURAL. A work inbox speaks for the agency, and the
+  // singular-only list missed every one of these. The first is verbatim from a
+  // real reply that was classified NOT_INTERESTED with NO suppression.
+  'So you sent our team a fake enquiry? Please remove us off your email list.',
+  'Not interested, take us off your mailing list.',
+  'take me off your list',
+  'Please remove our details',
+  "Don't email us again.",
+  'Stop emailing us',
+  'This is ridiculous. Stop emailing me.',
+  'no more emails please',
+  'please opt us out',
 ];
 for (const body of OPT_OUT_BODIES) {
   const d = routeReply(normalizeInstantlyEmail({ ...REAL_INBOUND, content_preview: body }));
@@ -316,6 +328,12 @@ for (const body of OPT_OUT_BODIES) {
 }
 check(() => assert.equal(routeReply(normalizeInstantlyEmail({ ...REAL_INBOUND, subject: 'Unsubscribe' })).classification, 'OPT_OUT'));
 check(() => assert.equal(detectOptOut({ cleaned_reply_text: 'sounds good, send it over' }), null));
+
+// Negative sentiment is NOT an opt-out. Permanent suppression must never be
+// applied to someone who only declined this offer or asked for a later date.
+for (const notOptOut of ['No thanks', 'Maybe later', 'Not interested', 'not for us', 'Please remove that from the demo']) {
+  check(() => assert.equal(detectOptOut({ cleaned_reply_text: notOptOut }), null, `not an opt-out: ${notOptOut}`));
+}
 
 // Opt-out matching reads CLEANED text: a positive reply above a quoted footer
 // containing "unsubscribe" is NOT an opt-out.

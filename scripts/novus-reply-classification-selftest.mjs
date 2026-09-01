@@ -26,6 +26,7 @@ import {
   AI_CLASSIFICATIONS,
   isSendDemoCta,
   isSimpleAffirmative,
+  isSimpleDeferral,
   extractCtaRegion,
 } from '../lib/reply-classification.mjs';
 import {
@@ -33,6 +34,7 @@ import {
   routeReply,
   buildReplyEventRow,
   buildClassificationPatch,
+  detectOptOut,
   updateReplyEventClassification,
   REPLY_EVENTS_HEADER,
   RAW_EVIDENCE_FIELDS,
@@ -47,6 +49,10 @@ import {
   REAL_REGRESSION_REPLY,
   SEND_DEMO_CTA_CASES,
   CROSS_CONTEXT_CASES,
+  DEFERRAL_CTA_CASES,
+  OPT_OUT_CASES,
+  NOT_OPT_OUT_CASES,
+  REAL_CASE_C_REPLY,
 } from '../lib/reply-classification-fixtures.mjs';
 import {
   buildThreadIndex,
@@ -615,6 +621,137 @@ section('14. The CTA survives a long parent message');
   check('a long parent keeps its opening too', trimmed.includes('Hi Adam'));
   check('the excerpt stays bounded', trimmed.length <= 600 + 8);
   check('a long CTA is still recognised after excerpting', isSendDemoCta(trimmed));
+}
+
+section('15. REAL CASE B — contextual deferral reaches NOT_NOW above threshold');
+{
+  // The model fake here proposes NOT_NOW at the real 0.75, which falls below
+  // the 0.85 threshold and becomes OTHER_UNCLEAR — the exact live failure.
+  const belowThreshold = () => fakeAi('NOT_NOW', 0.75, 'reproduces the live 0.75');
+  const ctaContext = { previous_novus_message: REAL_SEND_DEMO_CTA, demo_already_sent: false };
+
+  for (const { phrase, defer, label } of DEFERRAL_CTA_CASES) {
+    const ai = belowThreshold();
+    const d = await classifyReply(reply(phrase), { aiCall: ai, context: ctaContext });
+    const shown = label || phrase;
+    if (defer) {
+      check(`send-CTA + "${shown}" -> NOT_NOW >= ${CONFIDENCE_THRESHOLD}`,
+        d.classification === 'NOT_NOW' && d.confidence >= CONFIDENCE_THRESHOLD,
+        `${d.classification} @ ${d.confidence}`);
+      check(`  "${shown}" routes to nurture, never a send`,
+        d.next_action === 'CREATE_NURTURE' && d.next_action !== 'SEND_DEMO');
+    } else {
+      check(`send-CTA + "${shown}" -> no naive deterministic NOT_NOW`,
+        d.source !== 'DETERMINISTIC_CONTEXTUAL', `source=${d.source}`);
+      check(`  "${shown}" is handed to the model`, ai.calls.length === 1);
+    }
+  }
+
+  // A deferral against a CALL CTA is still NOT_NOW — the routing is identical.
+  {
+    const ai = belowThreshold();
+    const d = await classifyReply(reply('Maybe later'), {
+      aiCall: ai, context: { previous_novus_message: 'Can I give you a call tomorrow?' },
+    });
+    check('call-CTA + "Maybe later" -> NOT_NOW too', d.classification === 'NOT_NOW');
+  }
+
+  // With no proposition at all there is nothing to defer, so the model decides.
+  {
+    const ai = belowThreshold();
+    const d = await classifyReply(reply('Maybe later'), { aiCall: ai, context: null });
+    check('no context + "Maybe later" -> the model decides',
+      d.source !== 'DETERMINISTIC_CONTEXTUAL' && ai.calls.length === 1);
+  }
+
+  // A deferral must never become a send.
+  check('a deferral is not an affirmative', !isSimpleAffirmative('maybe later'));
+  check('an affirmative is not a deferral', !isSimpleDeferral('sure thing'));
+}
+
+section('16. REAL CASE C — OPT_OUT precedence and permanent suppression');
+{
+  // The model would call this NOT_INTERESTED at high confidence — exactly what
+  // happened live. Deterministic opt-out must win before the model is reached.
+  const wouldSayNotInterested = () => fakeAi('NOT_INTERESTED', 0.90, 'reads as a rejection');
+
+  for (const phrase of OPT_OUT_CASES) {
+    const ai = wouldSayNotInterested();
+    const d = await classifyReply(reply(phrase), { aiCall: ai, context: null });
+    check(`OPT_OUT: "${phrase}"`, d.classification === 'OPT_OUT', `${d.classification} @ ${d.confidence}`);
+    check(`  permanent suppression, not NONE`, d.suppression_type === 'PERMANENT', d.suppression_type);
+    check(`  terminal action and no model call`, d.next_action === 'NONE' && ai.calls.length === 0);
+  }
+
+  // REAL CASE C in full: a complaint AND a removal request. The removal wins.
+  {
+    const ai = wouldSayNotInterested();
+    const d = await classifyReply(reply(REAL_CASE_C_REPLY), { aiCall: ai, context: null });
+    check('REAL CASE C -> OPT_OUT, not NOT_INTERESTED', d.classification === 'OPT_OUT');
+    check('REAL CASE C -> PERMANENT suppression', d.suppression_type === 'PERMANENT');
+    check('REAL CASE C -> no SEND_DEMO', d.next_action !== 'SEND_DEMO');
+    check('REAL CASE C -> decided deterministically', ai.calls.length === 0);
+  }
+
+  // Negative sentiment alone is NOT an opt-out: permanent suppression must not
+  // be applied to someone who only declined this offer.
+  for (const [phrase] of NOT_OPT_OUT_CASES) {
+    check(`"${phrase}" is not an opt-out`, detectOptOut({ cleaned_reply_text: phrase }) === null);
+  }
+
+  // OPT_OUT beats the contextual affirmative rule as well.
+  {
+    const ai = wouldSayNotInterested();
+    const d = await classifyReply(reply('Sure, but please take us off your list'), {
+      aiCall: ai, context: { previous_novus_message: REAL_SEND_DEMO_CTA },
+    });
+    check('an affirmative carrying a removal request is OPT_OUT',
+      d.classification === 'OPT_OUT' && d.suppression_type === 'PERMANENT');
+  }
+
+  // QUOTED HISTORY MUST NEVER TRIGGER AN OPT-OUT. The new reply is positive;
+  // an older quoted message contains an unsubscribe request.
+  {
+    const quoted = normalizeInstantlyEmail({
+      id: 'oo_q', ue_type: 2, eaccount: NOVUS,
+      from_address_email: LEAD, to_address_email_list: NOVUS, lead: LEAD,
+      thread_id: 'th_1', timestamp: '2026-08-31T10:00:00Z', subject: 'Re: enquiry',
+      body: { text: `Yes please send it over.\n\nOn Mon, 1 Sep 2026 at 09:14, Joe Carter <${NOVUS}> wrote:\n> please unsubscribe me` },
+    });
+    check('the quoted opt-out is not in the prospect\'s own words',
+      !quoted.cleaned_reply_text.includes('unsubscribe'), quoted.cleaned_reply_text);
+    check('a quoted "please unsubscribe me" cannot opt the prospect out',
+      detectOptOut(quoted) === null);
+    check('the reply still routes on its own words',
+      routeReply(quoted).classification !== 'OPT_OUT');
+    // ...but the SAME phrase newly authored by the prospect does opt them out.
+    const authored = normalizeInstantlyEmail({
+      id: 'oo_a', ue_type: 2, eaccount: NOVUS,
+      from_address_email: LEAD, to_address_email_list: NOVUS, lead: LEAD,
+      thread_id: 'th_1', timestamp: '2026-08-31T10:00:00Z', subject: 'Re: enquiry',
+      body: { text: 'please unsubscribe me' },
+    });
+    check('the same phrase, newly authored, IS an opt-out',
+      routeReply(authored).classification === 'OPT_OUT');
+  }
+}
+
+section('17. The proposition is named for the model');
+{
+  const block = buildContextBlock({ previous_novus_message: REAL_SEND_DEMO_CTA });
+  check('a send CTA is described as a send offer', block.includes('offered to SEND'));
+  const callBlock = buildContextBlock({ previous_novus_message: 'Can I give you a call tomorrow?' });
+  check('a call CTA is described as a call', callBlock.includes('CALL'));
+  check('a call CTA warns it is not a send request', callBlock.includes('NOT a request to send'));
+  const none = buildContextBlock(null);
+  check('no context asserts no proposition', !none.includes('WHAT NOVUS ASKED'));
+
+  check('cta type is carried on the context object',
+    selectThreadContext(reply('sure', { id: 'cta_1' }), buildThreadIndex([{
+      id: 'cta_p', ue_type: 1, eaccount: NOVUS, from_address_email: NOVUS,
+      to_address_email_list: LEAD, lead: LEAD, thread_id: 'th_1',
+      timestamp: '2026-08-30T09:00:00Z', subject: 'x', body: { text: REAL_SEND_DEMO_CTA },
+    }]), {}).previous_novus_cta_type === 'SEND_DEMO');
 }
 
 // ── Optional live run against the real model ────────────────────────────────
