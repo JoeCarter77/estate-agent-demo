@@ -18,8 +18,8 @@
 // this endpoint lives under /api/novus/webhooks/*, already excluded from
 // Basic Auth by middleware.js.
 //
-// Flow: RAW_EVENTS (idempotent on provider+CallSid) -> deterministic Agency
-// match by phone -> deterministic Probe match (only if Agency matched) ->
+// Flow: RAW_EVENTS (idempotent on provider+CallSid) -> deterministic caller/
+// transcript/property evidence reconciliation ->
 // COMMUNICATIONS -> automatic observation/intelligence recompute (only if
 // matched to an active probe) -> TwiML instructing Twilio to record a
 // voicemail. The recording/transcript arrive later via voice-recording.js,
@@ -28,7 +28,7 @@
 import { getRepo } from '../../../lib/sheets.mjs';
 import { newRawEventId, newCommunicationId } from '../../../lib/ids.mjs';
 import { normalizePhone, canonicalTimestamp } from '../../../lib/normalize.mjs';
-import { matchAgencyByPhone, matchActiveProbe } from '../../../lib/phone-matching.mjs';
+import { matchInboundCommunication } from '../../../lib/inbound-matching.mjs';
 import { classifyCommunication } from '../../../lib/classification.mjs';
 import { requireTwilioSignature, parseTwilioBody, sendTwiml, escapeXml } from '../../../lib/twilio-webhook.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
@@ -97,33 +97,17 @@ export default async function handler(req, res) {
       created_at: nowIso,
     });
 
-    // 2) Deterministic Agency match by phone, then (only if matched)
-    // deterministic Probe match. Never guessed — ambiguous/unmatched stays that way.
-    const agencyResult = await matchAgencyByPhone(repo, fromRaw);
-
-    let matchStatus = agencyResult.match_status;
-    let matchingMethod = agencyResult.matching_method;
-    let matchScore = agencyResult.match_score;
-    const agencyId = agencyResult.agency_id;
-    let probeId = '';
-    let probeTimestamp;
-
-    if (agencyResult.match_status === 'matched') {
-      const probeResult = await matchActiveProbe(repo, agencyId, now);
-      if (probeResult.status === 'matched') {
-        probeId = probeResult.probe_id;
-        probeTimestamp = probeResult.probe_timestamp;
-        matchStatus = 'matched';
-      } else if (probeResult.status === 'ambiguous') {
-        matchStatus = 'ambiguous';
-        matchingMethod = '';
-        matchScore = 0;
-      } else {
-        matchStatus = 'unmatched';
-        matchingMethod = '';
-        matchScore = 0;
-      }
-    }
+    // 2) At ringing time caller number is the available evidence. The same
+    // shared matcher is rerun when a transcript arrives.
+    const match = await matchInboundCommunication(repo, {
+      channel: 'voice', sender_phone: fromRaw,
+    }, now);
+    const matchStatus = match.match_status;
+    const matchingMethod = match.matching_method;
+    const matchScore = match.match_score;
+    const agencyId = match.agency_id;
+    const probeId = match.probe_id;
+    const probeTimestamp = match.probe_timestamp;
 
     // 3) The Communication Event. A phone call is, on its face, made by a
     // person — classifyCommunication defaults voice/SMS to human contact

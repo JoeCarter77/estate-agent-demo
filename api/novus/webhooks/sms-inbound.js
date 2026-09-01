@@ -11,15 +11,14 @@
 // AUTH: Twilio request signature, same as the voice webhooks.
 //
 // Flow: RAW_EVENTS (idempotent on provider+MessageSid) -> deterministic
-// Agency match by phone -> deterministic Probe match (only if Agency matched)
+// agency/property evidence extraction + reconciliation
 // -> COMMUNICATIONS -> automatic observation/intelligence recompute (only if
 // matched to an active probe) -> empty TwiML.
 
 import { getRepo } from '../../../lib/sheets.mjs';
 import { newRawEventId, newCommunicationId } from '../../../lib/ids.mjs';
 import { normalizePhone, canonicalTimestamp } from '../../../lib/normalize.mjs';
-import { matchAgencyByPhone, matchActiveProbe } from '../../../lib/phone-matching.mjs';
-import { matchAgencyByName } from '../../../lib/agency-content-matching.mjs';
+import { matchInboundCommunication } from '../../../lib/inbound-matching.mjs';
 import { classifyCommunication } from '../../../lib/classification.mjs';
 import { requireTwilioSignature, parseTwilioBody, sendTwiml } from '../../../lib/twilio-webhook.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
@@ -76,43 +75,17 @@ export default async function handler(req, res) {
       created_at: nowIso,
     });
 
-    // 2) Deterministic Agency match by phone, then (only if matched)
-    // deterministic Probe match. Never guessed.
-    let agencyResult = await matchAgencyByPhone(repo, fromRaw);
-
-    // Deterministic phone match found nothing — fall back to an explicit,
-    // unambiguous agency-name mention in the SMS body. Same conservative
-    // rule as email: never guessed, never used ahead of the phone match.
-    if (agencyResult.match_status === 'unmatched') {
-      const contentResult = await matchAgencyByName(repo, bodyText);
-      if (contentResult.match_status !== 'unmatched') {
-        agencyResult = contentResult;
-      }
-    }
-
-    let matchStatus = agencyResult.match_status;
-    let matchingMethod = agencyResult.matching_method;
-    let matchScore = agencyResult.match_score;
-    const agencyId = agencyResult.agency_id;
-    let probeId = '';
-    let probeTimestamp;
-
-    if (agencyResult.match_status === 'matched') {
-      const probeResult = await matchActiveProbe(repo, agencyId, new Date());
-      if (probeResult.status === 'matched') {
-        probeId = probeResult.probe_id;
-        probeTimestamp = probeResult.probe_timestamp;
-        matchStatus = 'matched';
-      } else if (probeResult.status === 'ambiguous') {
-        matchStatus = 'ambiguous';
-        matchingMethod = '';
-        matchScore = 0;
-      } else {
-        matchStatus = 'unmatched';
-        matchingMethod = '';
-        matchScore = 0;
-      }
-    }
+    // 2) The sender may be a number or an alphanumeric label. Reconcile
+    // external identity, embedded phones and property evidence in one pass.
+    const match = await matchInboundCommunication(repo, {
+      channel: 'sms', sender_phone: fromRaw, body_text: bodyText, raw_content: bodyText,
+    }, new Date());
+    const matchStatus = match.match_status;
+    const matchingMethod = match.matching_method;
+    const matchScore = match.match_score;
+    const agencyId = match.agency_id;
+    const probeId = match.probe_id;
+    const probeTimestamp = match.probe_timestamp;
 
     // 3) The Communication Event.
     const normalizedFrom = normalizePhone(fromRaw);

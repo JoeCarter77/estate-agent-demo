@@ -6,7 +6,7 @@
 // (or any adapter) never writes to Google Sheets directly.
 //
 // Flow: RAW_EVENTS (idempotent on provider+provider_event_id) → deterministic
-// Agency match → deterministic Probe match (only if Agency matched) →
+// agency/property evidence extraction + reconciliation →
 // COMMUNICATIONS → automatic observation/intelligence recompute (only if
 // matched to an active probe).
 //
@@ -32,8 +32,7 @@ import crypto from 'node:crypto';
 import { getRepo } from '../../../lib/sheets.mjs';
 import { newRawEventId, newCommunicationId } from '../../../lib/ids.mjs';
 import { normalizeEmail, canonicalTimestamp } from '../../../lib/normalize.mjs';
-import { matchAgency, matchProbe } from '../../../lib/matching.mjs';
-import { matchAgencyByName } from '../../../lib/agency-content-matching.mjs';
+import { matchInboundCommunication } from '../../../lib/inbound-matching.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 
 export const maxDuration = 20;
@@ -120,49 +119,23 @@ export default async function handler(req, res) {
       created_at: nowIso,
     });
 
-    // 2) Deterministic Agency match, then (only if matched) deterministic
-    // Probe match. Neither step ever guesses — ambiguous/unmatched stays that way.
+    // 2) Resolve deterministic agency and property evidence independently,
+    // then reconcile it. A unique active probe can establish its canonical
+    // agency; contradictory evidence remains pending manual review.
     const senderEmail = normalizeEmail(fromRaw);
-    let agencyResult = await matchAgency(repo, senderEmail);
+    const match = await matchInboundCommunication(repo, {
+      channel: 'email', sender_email: fromRaw,
+      display_name: body.display_name, subject: body.subject,
+      body_text: body.body_text, raw_content: body.raw_content,
+    }, now);
+    const matchStatus = match.match_status;
+    const matchingMethod = match.matching_method;
+    const matchScore = match.match_score;
+    const agencyId = match.agency_id;
+    const probeId = match.probe_id;
 
-    // Deterministic identifiers found nothing — fall back to looking for an
-    // explicit, unambiguous agency-name mention in the subject/body. Never
-    // used ahead of the identifier match, and never guessed: ambiguous/no
-    // mention stays unmatched for manual review (Source Master rule: AI must
-    // never guess Agency ID).
-    if (agencyResult.match_status === 'unmatched') {
-      const contentResult = await matchAgencyByName(repo, `${body.subject || ''}\n${body.body_text || ''}`);
-      if (contentResult.match_status !== 'unmatched') {
-        agencyResult = contentResult;
-      }
-    }
-
-    let matchStatus = agencyResult.match_status;
-    let matchingMethod = agencyResult.matching_method;
-    let matchScore = agencyResult.match_score;
-    const agencyId = agencyResult.agency_id;
-    let probeId = '';
-
-    if (agencyResult.match_status === 'matched') {
-      const probeResult = await matchProbe(repo, agencyId, now);
-      if (probeResult.status === 'matched') {
-        probeId = probeResult.probe_id;
-        matchStatus = 'matched';
-      } else if (probeResult.status === 'ambiguous') {
-        // Agency is unambiguous but the probe isn't — the communication as a
-        // whole is not fully resolved, so it is not reported as fully matched.
-        matchStatus = 'ambiguous';
-        matchingMethod = '';
-        matchScore = 0;
-      } else {
-        // Agency known, but no active probe to attach — never guessed.
-        matchStatus = 'unmatched';
-        matchingMethod = '';
-        matchScore = 0;
-      }
-    }
-
-    // 3) The Communication Event. Only exact-signal outcomes reach here.
+    // 3) The Communication Event. Unmatched/conflicting raw evidence is kept
+    // just as faithfully as a matched result.
     const communicationId = newCommunicationId();
     await repo.appendRecord('COMMUNICATIONS', {
       communication_id: communicationId,

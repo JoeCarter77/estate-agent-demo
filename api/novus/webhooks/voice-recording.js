@@ -26,8 +26,7 @@
 import { getRepo } from '../../../lib/sheets.mjs';
 import { newRawEventId } from '../../../lib/ids.mjs';
 import { classifyCommunication } from '../../../lib/classification.mjs';
-import { matchAgencyByName } from '../../../lib/agency-content-matching.mjs';
-import { matchActiveProbe } from '../../../lib/phone-matching.mjs';
+import { matchInboundCommunication } from '../../../lib/inbound-matching.mjs';
 import { requireTwilioSignature, parseTwilioBody } from '../../../lib/twilio-webhook.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 
@@ -110,38 +109,29 @@ export default async function handler(req, res) {
       patch.transcript = String(body.TranscriptionText || '');
 
       if (!isOverridden(comm)) {
-        // Deterministic phone matching found no agency at ringing time —
-        // now that a transcript exists, fall back to an explicit,
-        // unambiguous agency-name mention in it (e.g. "it's Kareena from
-        // Aspire Estate Agents..."). Same conservative rule as the other
-        // channels: never used ahead of the phone match, never guessed —
-        // an ambiguous or unrecognisable (e.g. garbled) transcript simply
-        // leaves the row unmatched for manual review.
-        if (comm.match_status === 'unmatched' && !comm.agency_id) {
-          const contentResult = await matchAgencyByName(repo, patch.transcript);
-          if (contentResult.match_status === 'matched') {
-            const probeResult = await matchActiveProbe(repo, contentResult.agency_id, new Date());
-            patch.agency_id = contentResult.agency_id;
-            if (probeResult.status === 'matched') {
-              patch.probe_id = probeResult.probe_id;
-              patch.match_status = 'matched';
-              patch.matching_method = contentResult.matching_method;
-              patch.match_score = contentResult.match_score;
-            } else if (probeResult.status === 'ambiguous') {
-              patch.match_status = 'ambiguous';
-              patch.matching_method = '';
-              patch.match_score = 0;
-            } else {
-              // Agency identified from content, but no active probe to
-              // attach — still not fully resolved, never guessed further.
-              patch.match_status = 'unmatched';
-              patch.matching_method = '';
-              patch.match_score = 0;
-            }
-            patch.manual_review_status = patch.match_status === 'matched' ? 'not_required' : 'pending';
-          }
-          // ambiguous/unmatched content result: leave the row exactly as it
-          // was — still unmatched, still pending manual review.
+        // Reconcile the original caller number with numbers/property/address
+        // evidence found in the transcript. Use the call time so a delayed
+        // transcription callback still sees the observation window that was
+        // active when the communication occurred.
+        const occurredAt = new Date(comm.occurred_at || nowIso);
+        const matchAt = Number.isNaN(occurredAt.getTime()) ? new Date() : occurredAt;
+        const match = await matchInboundCommunication(repo, {
+          channel: 'voice', sender_phone: comm.source_identifier_raw,
+          display_name: comm.display_name, transcript: patch.transcript,
+        }, matchAt);
+        // Never erase a safe match merely because the asynchronous transcript
+        // arrived after the probe window closed. New matched or conflicting
+        // evidence is still applied; an evidence-free downgrade is ignored.
+        const preserveExistingMatch = comm.match_status === 'matched'
+          && match.match_status !== 'matched'
+          && match.matching_method !== 'conflict';
+        if (!preserveExistingMatch) {
+          patch.agency_id = match.agency_id;
+          patch.probe_id = match.probe_id;
+          patch.match_status = match.match_status;
+          patch.matching_method = match.matching_method;
+          patch.match_score = match.match_score;
+          patch.manual_review_status = match.match_status === 'matched' ? 'not_required' : 'pending';
         }
 
         const linkedProbeId = patch.probe_id || comm.probe_id;
