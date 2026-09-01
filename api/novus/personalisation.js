@@ -300,14 +300,64 @@ async function handleInstantlyReplyPollDryRun(req, res) {
   }
 }
 
+// AUTOMATIC SEND_DEMO EXECUTION, run immediately after a live poll pass.
+//
+// Scope is deliberately narrow: only events THIS poll pass itself just
+// persisted — event.persisted === true, never a pre-existing/duplicate row,
+// which never reaches summary.events at all (see the duplicate-skip branch in
+// pollInstantlyReplies) — AND whose classification this same pass produced is
+// exactly POSITIVE_SEND_DEMO. No extra confidence/source check is needed:
+// classifyReply() can only return POSITIVE_SEND_DEMO via a genuine AI verdict
+// (source:'AI'), because every failure/low-confidence/fallback path in
+// lib/reply-classification.mjs is hardcoded to OTHER_UNCLEAR.
+//
+// Reuses executeSendDemo() from lib/reply-send-demo.mjs UNCHANGED — it
+// re-reads/re-derives the row, the OUTBOUND match and the Instantly thread
+// evidence itself, and runs the exact same gate the manual live send route
+// runs. This function only decides WHICH reply_event_ids to call it for; it
+// never evaluates eligibility itself and never touches REPLY_EVENTS directly.
+//
+// One event failing to send must never lose the fact that the reply was
+// ingested/classified: each call is isolated in its own try/catch, and a
+// thrown error becomes its own recorded result rather than aborting the pass.
+async function runAutoSendDemo({ repo, apiKey, events }) {
+  const candidates = (events || []).filter(
+    (event) => event.persisted === true && event.classification?.classification === 'POSITIVE_SEND_DEMO',
+  );
+
+  const results = [];
+  for (const event of candidates) {
+    const replyEventId = event.row?.reply_event_id;
+    try {
+      const result = await executeSendDemo({ repo, replyEventId, apiKey });
+      results.push({ reply_event_id: replyEventId, attempted: true, ...result });
+    } catch (err) {
+      // Never echo the API key, on any path.
+      console.error('auto-send-demo error:', err);
+      results.push({
+        reply_event_id: replyEventId,
+        attempted: true,
+        sent: false,
+        error: err?.message || 'auto-send execution failed',
+      });
+    }
+  }
+  return results;
+}
+
 // Inbound reply poll, LIVE —
 // POST /api/novus/personalisation?novus_operation=instantly-reply-poll
 // (also reachable via the /api/novus/instantly/reply-poll rewrite).
 //
-// The ONLY write this performs is APPENDING REPLY_EVENTS rows for confirmed
-// inbound replies that matched exactly one OUTBOUND row and were not already
-// processed. It changes no outbound_status, writes no suppression, sends
-// nothing, calls no AI, and calls no Instantly write endpoint.
+// The ONLY REPLY_EVENTS write this performs directly is APPENDING rows for
+// confirmed inbound replies that matched exactly one OUTBOUND row and were
+// not already processed; it changes no outbound_status, writes no
+// suppression, and calls no Instantly write endpoint itself. It DOES, after
+// that append+classify pass, invoke runAutoSendDemo() above for any row this
+// SAME pass just persisted and classified as POSITIVE_SEND_DEMO — which is the
+// one path in this function that can cause an Instantly send. See
+// runAutoSendDemo for the exact condition and lib/reply-send-demo.mjs for the
+// gate that still has to pass before anything is actually sent.
 //
 // POST, not GET, because it writes — the dry-run diagnostic stays on GET.
 //
@@ -333,10 +383,13 @@ async function handleInstantlyReplyPoll(req, res) {
 
   try {
     // Classification runs AFTER each raw row is appended, and updates only the
-    // derived classification columns on that same row. It still sends nothing,
-    // writes nothing to Instantly, and touches no OUTBOUND row.
+    // derived classification columns on that same row. It still writes
+    // nothing to Instantly and touches no OUTBOUND row itself — see
+    // runAutoSendDemo for the one thing that runs after it.
     const classify = process.env.ANTHROPIC_API_KEY ? req.query?.classify !== '0' : false;
-    const summary = await pollInstantlyReplies({ repo: getRepo(), apiKey, limit, dryRun: false, classify });
+    const repo = getRepo();
+    const summary = await pollInstantlyReplies({ repo, apiKey, limit, dryRun: false, classify });
+    const autoSend = await runAutoSendDemo({ repo, apiKey, events: summary.events });
     return res.status(200).json({
       success: true,
       dry_run: false,
@@ -354,6 +407,7 @@ async function handleInstantlyReplyPoll(req, res) {
       classification_updates: summary.classification_updates,
       events: summary.events,
       skipped: summary.skipped,
+      auto_send: autoSend,
     });
   } catch (err) {
     // Never echo the API key, on any path.
