@@ -134,5 +134,59 @@ await check('unknown voicemail caller resolves from transcript street + postcode
   assert.equal(result.probe_id, 'prb_1');
 });
 
-console.log(`\n✅ ${passed} deterministic inbound matching checks passed.`);
+const RACE_PROBE_TIMESTAMP = '2026-09-01T09:00:00.000Z';
+const raceProbe = (overrides = {}) => probe({
+  probe_timestamp: RACE_PROBE_TIMESTAMP,
+  observation_deadline: '2026-09-05T09:00:00.000Z',
+  property_url: 'https://www.rightmove.co.uk/properties/89887794',
+  ...overrides,
+});
 
+await check('exact Rightmove id one second before probe timestamp is eligible and matches', async () => {
+  const result = await matchInboundCommunication(repoFor({ agencies: [agency()], probes: [raceProbe()] }), {
+    channel: 'email', sender_email: 'automation@crm.invalid',
+    body_text: 'https://www.rightmove.co.uk/properties/89887794',
+  }, new Date('2026-09-01T08:59:59.000Z'));
+  assert.equal(result.match_status, 'matched');
+  assert.equal(result.probe_id, 'prb_1');
+  assert.equal(result.matching_method, 'rightmove_property_id_exact');
+});
+
+await check('strong property address 30 seconds before probe timestamp is eligible and matches', async () => {
+  const result = await matchInboundCommunication(repoFor({ agencies: [agency()], probes: [raceProbe()] }), {
+    channel: 'email', sender_email: 'automation@crm.invalid',
+    body_text: '9 Mill Lane, Colne Engaine, Colchester, CO6 2HY',
+  }, new Date('2026-09-01T08:59:30.000Z'));
+  assert.equal(result.match_status, 'matched');
+  assert.equal(result.probe_id, 'prb_1');
+  assert.equal(result.matching_method, 'property_address_exact');
+});
+
+await check('exact Rightmove id four minutes before probe timestamp is eligible and matches', async () => {
+  const result = await matchInboundCommunication(repoFor({ agencies: [agency()], probes: [raceProbe()] }), {
+    channel: 'email', body_text: 'https://www.rightmove.co.uk/properties/89887794',
+  }, new Date('2026-09-01T08:56:00.000Z'));
+  assert.equal(result.match_status, 'matched');
+  assert.equal(result.probe_id, 'prb_1');
+});
+
+await check('exact Rightmove id ten minutes before probe timestamp is outside tolerance', async () => {
+  const result = await matchInboundCommunication(repoFor({ agencies: [agency()], probes: [raceProbe()] }), {
+    channel: 'email', body_text: 'https://www.rightmove.co.uk/properties/89887794',
+  }, new Date('2026-09-01T08:50:00.000Z'));
+  assert.equal(result.match_status, 'unmatched');
+  assert.equal(result.probe_id, '');
+});
+
+await check('generic agency newsletter one minute before probe timestamp does not attach probe', async () => {
+  const result = await matchInboundCommunication(repoFor({ agencies: [agency()], probes: [raceProbe()] }), {
+    channel: 'email', sender_email: 'marketing@example.co.uk',
+    subject: 'September market newsletter', body_text: 'Local market news and company updates.',
+  }, new Date('2026-09-01T08:59:00.000Z'));
+  assert.equal(result.match_status, 'unmatched');
+  assert.equal(result.agency_id, 'ag_1');
+  assert.equal(result.probe_id, '');
+  assert.equal(result.matching_method, 'domain_exact');
+});
+
+console.log(`\n✅ ${passed} deterministic inbound matching checks passed.`);
