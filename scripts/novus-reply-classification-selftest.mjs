@@ -541,6 +541,15 @@ section('12. Relational classification: the real SEND_DEMO CTA regression');
     }
   }
 
+  // -- stacked affirmatives: atoms may only be peeled off when what remains is
+  // itself affirmative, so nothing is ever discarded to force a match.
+  check('a stacked affirmative is recognised', isSimpleAffirmative('yes sure thing'));
+  check('a three-deep stack is recognised', isSimpleAffirmative('yeah okay sure'));
+  check('an atom followed by a NON-affirmative is not affirmative',
+    !isSimpleAffirmative('sure call me'));
+  check('an atom followed by an instruction is not affirmative',
+    !isSimpleAffirmative('yes send me your pricing deck'));
+
   // -- the affirmative matcher itself
   check('a bare affirmative is recognised', isSimpleAffirmative('sure thing'));
   check('greeting and signature are set aside', isSimpleAffirmative('Hi Joe, Sure thing. Adam'));

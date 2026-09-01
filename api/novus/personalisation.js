@@ -405,6 +405,14 @@ async function handleInstantlyReplyPoll(req, res) {
       classified: summary.classified,
       classification_fallbacks: summary.classification_fallbacks,
       classification_updates: summary.classification_updates,
+      // Whether each reply's immediately preceding NOVUS message was actually
+      // resolved. A short reply cannot be classified confidently without it, so
+      // context_missing > 0 is the first thing to check when a plainly
+      // affirmative reply lands on MANUAL_REVIEW. Per-event detail (including
+      // context_source and previous_novus_cta_type) is on events[].thread_context.
+      context_resolved: summary.context_resolved,
+      context_missing: summary.context_missing,
+      context_error: summary.context_error,
       events: summary.events,
       skipped: summary.skipped,
       auto_send: autoSend,
