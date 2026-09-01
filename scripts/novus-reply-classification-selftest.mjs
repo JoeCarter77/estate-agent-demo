@@ -35,6 +35,7 @@ import {
   buildReplyEventRow,
   buildClassificationPatch,
   detectOptOut,
+  DEFAULT_NOVUS_MAILBOXES,
   updateReplyEventClassification,
   REPLY_EVENTS_HEADER,
   RAW_EVIDENCE_FIELDS,
@@ -53,12 +54,15 @@ import {
   OPT_OUT_CASES,
   NOT_OPT_OUT_CASES,
   REAL_CASE_C_REPLY,
+  LIVE_HTML_CASES,
+  liveGmailReplyBody,
 } from '../lib/reply-classification-fixtures.mjs';
 import {
   buildThreadIndex,
   selectThreadContext,
   buildContextSweepUrl,
   excerpt,
+  extractQuotedNovusParent,
 } from '../lib/reply-thread-context.mjs';
 
 let passed = 0;
@@ -761,6 +765,84 @@ section('17. The proposition is named for the model');
       to_address_email_list: LEAD, lead: LEAD, thread_id: 'th_1',
       timestamp: '2026-08-30T09:00:00Z', subject: 'x', body: { text: REAL_SEND_DEMO_CTA },
     }]), {}).previous_novus_cta_type === 'SEND_DEMO');
+}
+
+section('18. LIVE HTML-ish bodies — the real production format end to end');
+{
+  // The fake reproduces the live model answers (0.60 / 0.70). Anything that
+  // reaches 0.96 did so deterministically, from the recovered parent.
+  const liveModel = () => fakeAi('POSITIVE_SEND_DEMO', 0.60, 'reproduces the live fallthrough');
+
+  for (const { label, reply: replyText, eaccount, expectedCleaned, auto } of LIVE_HTML_CASES) {
+    const body = liveGmailReplyBody(replyText, eaccount);
+    const r = normalizeInstantlyEmail({
+      id: `live_${eaccount}_${replyText.slice(0, 6)}`, ue_type: 2, eaccount,
+      from_address_email: LEAD, to_address_email_list: eaccount, lead: LEAD,
+      thread_id: 'th_live', timestamp: '2026-09-01T15:00:00Z', subject: 'Re: Milton Road',
+      body: { text: body },
+    });
+
+    // The raw body is EVIDENCE and must survive untouched.
+    check(`${label}: raw body_text keeps the original markup`,
+      r.raw_body_text.includes('<br>') && r.raw_body_text === body);
+    // The interpreted view must be clean.
+    check(`${label}: cleaned_reply_text has no markup`,
+      r.cleaned_reply_text === expectedCleaned, JSON.stringify(r.cleaned_reply_text));
+
+    // The sweep misses this thread entirely — quoted-history recovery only.
+    const ctx = selectThreadContext(r, buildThreadIndex([]), {});
+    check(`${label}: context_source = QUOTED_HISTORY`,
+      ctx.context_source === 'QUOTED_HISTORY', ctx.context_source);
+    check(`${label}: previous_novus_cta_type = SEND_DEMO`,
+      ctx.previous_novus_cta_type === 'SEND_DEMO', String(ctx.previous_novus_cta_type));
+    check(`${label}: recovered parent is clean prose carrying the CTA`,
+      ctx.previous_novus_message.includes('Want me to send it over?')
+      && !ctx.previous_novus_message.includes('<br>')
+      && !ctx.previous_novus_message.includes('>'),
+      ctx.previous_novus_message);
+
+    const ai = liveModel();
+    const d = await classifyReply(r, { aiCall: ai, context: ctx });
+    if (auto) {
+      check(`${label}: -> POSITIVE_SEND_DEMO @ 0.96, deterministic`,
+        d.classification === 'POSITIVE_SEND_DEMO' && d.confidence >= 0.90
+        && d.source === 'DETERMINISTIC_CONTEXTUAL' && ai.calls.length === 0,
+        `${d.classification} @ ${d.confidence} src=${d.source}`);
+      check(`${label}: next_action = SEND_DEMO`, d.next_action === 'SEND_DEMO');
+    } else {
+      check(`${label}: never auto-sends`,
+        !(d.classification === 'POSITIVE_SEND_DEMO' && d.confidence >= 0.90
+          && d.source === 'DETERMINISTIC_CONTEXTUAL'),
+        `${d.classification} @ ${d.confidence} src=${d.source}`);
+    }
+  }
+
+  // Both live sending identities pass the authenticity gate even with no
+  // eaccount on the message, where the configured fallback list is all we have.
+  for (const address of ['joe@novushq.co.uk', 'joe@trynovus.co.uk']) {
+    const parent = extractQuotedNovusParent(liveGmailReplyBody('Yes', address),
+      { accounts: DEFAULT_NOVUS_MAILBOXES });
+    check(`configured fallback recognises ${address}`,
+      parent.includes('Want me to send it over?'), parent.slice(0, 60));
+  }
+  // ...and a non-NOVUS sender still cannot impersonate one.
+  check('an outsider quote is still refused in the live format',
+    extractQuotedNovusParent(liveGmailReplyBody('Yes', 'someone@elsewhere.com'),
+      { accounts: DEFAULT_NOVUS_MAILBOXES }) === '');
+
+  // The vocative strip is a closed list, not general trailing removal.
+  check('a vocative tail is set aside', isSimpleAffirmative('yeah sure thing mate'));
+  check('an instruction tail is NOT set aside', !isSimpleAffirmative('yes call me'));
+  check('a vocative cannot rescue a contradiction', !isSimpleAffirmative('yes mate, but call me first'));
+
+  // Markup normalisation must not invent an opt-out or lose one.
+  check('markup does not hide an opt-out',
+    routeReply(normalizeInstantlyEmail({
+      id: 'live_oo', ue_type: 2, eaccount: 'joe@novushq.co.uk',
+      from_address_email: LEAD, to_address_email_list: 'joe@novushq.co.uk', lead: LEAD,
+      thread_id: 'th_live', timestamp: '2026-09-01T15:00:00Z', subject: 'Re: x',
+      body: { text: liveGmailReplyBody('Please take us off your list', 'joe@novushq.co.uk') },
+    })).classification === 'OPT_OUT');
 }
 
 // ── Optional live run against the real model ────────────────────────────────
