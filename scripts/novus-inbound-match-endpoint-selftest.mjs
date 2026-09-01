@@ -62,10 +62,10 @@ const repo = {
   async batchUpdate() { throw new Error('WRITE ATTEMPT: batchUpdate'); },
 };
 
-function req({ password = 'test-pass', query = {} } = {}) {
+function req({ password = 'test-pass', query = {}, method = 'GET', action = 'inbound-match-dry-run' } = {}) {
   return {
-    method: 'GET', query: { action: 'inbound-match-dry-run', ...query },
-    url: '/api/novus/intelligence/rebuild-all?action=inbound-match-dry-run',
+    method, query: { action, ...query },
+    url: `/api/novus/intelligence/rebuild-all?action=${action}`,
     headers: { authorization: `Basic ${Buffer.from(`test-user:${password}`).toString('base64')}` },
   };
 }
@@ -88,6 +88,11 @@ const denied = res();
 await handler(req({ password: 'wrong' }), denied);
 assert.equal(denied.statusCode, 401);
 assert.equal(reads, 0, 'auth failure occurs before any Sheets read');
+
+const deniedBackfill = res();
+await handler(req({ password: 'wrong', method: 'POST', action: 'inbound-match-backfill' }), deniedBackfill);
+assert.equal(deniedBackfill.statusCode, 401);
+assert.equal(reads, 0, 'backfill auth failure occurs before any Sheets read or write');
 
 const ordinaryGet = res();
 await handler({ ...req(), query: {}, url: '/api/novus/intelligence/rebuild-all' }, ordinaryGet);

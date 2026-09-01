@@ -100,6 +100,7 @@ import {
 } from '../../../lib/instantly-outbound.mjs';
 import { requireAuth } from '../_auth.mjs';
 import { inboundMatchDryRunOptions, runInboundMatchDryRun } from '../../../lib/inbound-match-review.mjs';
+import { runInboundMatchBackfill } from '../../../lib/inbound-match-backfill.mjs';
 
 export const maxDuration = 60;
 
@@ -159,6 +160,21 @@ export default async function handler(req, res) {
     } catch (err) {
       console.error('inbound match dry-run error:', err?.message || String(err));
       return res.status(500).json({ error: err?.message || 'Failed to run inbound match dry-run' });
+    }
+  }
+
+  // Explicit write mode for the already-previewed recoverable rows. POST is
+  // required in addition to the exact action. The implementation fills blank
+  // IDs only and delegates downstream work to recomputeProbeObservation.
+  if (req.method === 'POST' && action === 'inbound-match-backfill') {
+    if (!requireAuth(req, res)) return;
+    res.setHeader('Cache-Control', 'no-store');
+    try {
+      const result = await runInboundMatchBackfill(getRepo(), inboundMatchDryRunOptions(req));
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error('inbound match backfill error:', err?.message || String(err));
+      return res.status(500).json({ error: err?.message || 'Failed to run inbound match backfill' });
     }
   }
 
