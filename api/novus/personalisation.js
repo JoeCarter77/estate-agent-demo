@@ -5,6 +5,8 @@
 //                                 GET  /api/novus/instantly/replies-test (via rewrite)
 //                                 GET  /api/novus/instantly/reply-poll-dry-run (via rewrite)
 //                                 POST /api/novus/instantly/reply-poll (via rewrite)
+//                                 GET  /api/novus/instantly/send-demo-dry-run (via rewrite)
+//                                 POST /api/novus/instantly/send-demo (via rewrite)
 //
 // Read-only lookup for the PERSONALISATION row lib/personalisation-rebuild.mjs
 // writes (via the existing /api/novus/intelligence/rebuild-all + cron finalize
@@ -28,6 +30,11 @@ import { NeverBounceError, verifyEmail } from '../../lib/neverbounce.mjs';
 import { resolveAgencyContact, listResolutionBacklog } from '../../lib/contact-resolution.mjs';
 import { requireAuth, requireReplyPollerSecret } from './_auth.mjs';
 import { pollInstantlyReplies } from '../../lib/instantly-reply-poll.mjs';
+import {
+  evaluateSendDemoDryRun,
+  executeSendDemo,
+  SEND_DEMO_LIVE_CONFIRMATION,
+} from '../../lib/reply-send-demo.mjs';
 import { classifyReply, CONFIDENCE_THRESHOLD } from '../../lib/reply-classification.mjs';
 import { _internal as aiClientInternal } from '../../lib/ai-client.mjs';
 import { normalizeInstantlyEmail } from '../../lib/reply-router.mjs';
@@ -499,6 +506,117 @@ async function handleReplyClassifierLiveTest(req, res) {
   });
 }
 
+// SEND_DEMO execution gate, DRY RUN —
+// GET /api/novus/personalisation?novus_operation=send-demo-dry-run&reply_event_id=...
+// (also reachable via the /api/novus/instantly/send-demo-dry-run rewrite).
+//
+// READ-ONLY. It evaluates whether ONE REPLY_EVENTS row is eligible for an
+// automatic in-thread demo reply and returns the exact request it WOULD make.
+// It performs Google Sheets reads (REPLY_EVENTS, OUTBOUND) and one Instantly
+// GET (the same bounded sweep the classifier uses — no new endpoint), and
+// writes nothing anywhere: no Instantly reply, no REPLY_EVENTS update, no
+// OUTBOUND write, no suppression.
+//
+// dryRun is not a query parameter. There is no request this operation can be
+// sent that causes a send. The live operation is a SEPARATE, POST-only,
+// secret-guarded operation and is not built yet.
+async function handleSendDemoDryRun(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+
+  const replyEventId = (req.query?.reply_event_id || '').trim();
+  if (!replyEventId) {
+    return res.status(400).json({ success: false, error: 'Missing reply_event_id' });
+  }
+
+  const apiKey = process.env.INSTANTLY_REPLY_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({
+      success: false,
+      error: 'INSTANTLY_REPLY_API_KEY is not set in this environment.',
+    });
+  }
+
+  try {
+    const result = await evaluateSendDemoDryRun({ repo: getRepo(), replyEventId, apiKey });
+    return res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    // Never echo the API key, on any path.
+    if (err?.instantly_status) {
+      return res.status(502).json({
+        success: false,
+        error: 'Instantly API returned an error',
+        instantly_status: err.instantly_status,
+        instantly_error: err.instantly_error,
+      });
+    }
+    console.error('send-demo-dry-run error:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Send-demo dry run failed' });
+  }
+}
+
+// SEND_DEMO execution, LIVE —
+// POST /api/novus/personalisation?novus_operation=send-demo&reply_event_id=...
+// (also reachable via the /api/novus/instantly/send-demo rewrite).
+//
+// THE ONLY OPERATION IN NOVUS THAT SENDS AN EMAIL TO A PROSPECT.
+//
+// It re-reads everything, re-runs the SAME execution gate the dry run runs, and
+// sends at most ONE reply — POST /api/v2/emails/reply — for exactly one
+// reply_event_id. A blocked event sends nothing and writes nothing.
+//
+// The only write is to the FOUR execution columns of that one REPLY_EVENTS row
+// (action_status, action_completed_at, error, notes). It changes no
+// outbound_status, writes no suppression, reclassifies nothing, touches no
+// OUTBOUND row, and cannot reach a raw evidence column.
+//
+// FOUR gates stand in front of it, all before any Instantly read, any Sheets
+// access and any send:
+//   1. POST only — a GET can never reach this function.
+//   2. The shared human Basic Auth.
+//   3. The dedicated X-NOVUS-REPLY-POLLER-SECRET machine-action secret.
+//   4. An explicit confirm=SEND_ONE_DEMO_REPLY, the same deliberate-action
+//      convention the live Instantly outbound handoff already uses.
+// 1-3 are enforced by the router before this function is entered.
+//
+// No other reply class is executable here: the gate refuses anything that is
+// not POSITIVE_SEND_DEMO, so POSITIVE_MEETING, QUESTION, NOT_NOW,
+// NOT_INTERESTED, OPT_OUT and OOO reach no send path at all.
+async function handleSendDemoLive(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+
+  const replyEventId = (req.query?.reply_event_id || req.body?.reply_event_id || '').trim();
+  if (!replyEventId) {
+    return res.status(400).json({ success: false, error: 'Missing reply_event_id' });
+  }
+
+  const confirm = (req.query?.confirm || req.body?.confirm || '').trim();
+  if (confirm !== SEND_DEMO_LIVE_CONFIRMATION) {
+    return res.status(400).json({
+      success: false,
+      error: `Missing or incorrect confirmation; expected confirm=${SEND_DEMO_LIVE_CONFIRMATION}`,
+    });
+  }
+
+  const apiKey = process.env.INSTANTLY_REPLY_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({
+      success: false,
+      error: 'INSTANTLY_REPLY_API_KEY is not set in this environment.',
+    });
+  }
+
+  try {
+    const result = await executeSendDemo({ repo: getRepo(), replyEventId, apiKey });
+    return res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    // Never echo the API key, on any path. A throw here means the send was
+    // never attempted (input gathering failed) — executeSendDemo classifies
+    // every send outcome internally rather than throwing.
+    console.error('send-demo error:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Send-demo execution failed' });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method === 'POST' && req.query?.novus_operation === 'verify-contact') {
@@ -525,12 +643,24 @@ export default async function handler(req, res) {
     if (!requireAuth(req, res)) return;
     return handleReplyClassifierLiveTest(req, res);
   }
+  if (req.method === 'GET' && req.query?.novus_operation === 'send-demo-dry-run') {
+    if (!requireAuth(req, res)) return;
+    return handleSendDemoDryRun(req, res);
+  }
   if (req.method === 'POST' && req.query?.novus_operation === 'instantly-reply-poll') {
     // TWO layers, in order, both before any Instantly or Sheets access: the
     // shared human Basic Auth, then the dedicated poller secret.
     if (!requireAuth(req, res)) return;
     if (!requireReplyPollerSecret(req, res)) return;
     return handleInstantlyReplyPoll(req, res);
+  }
+  if (req.method === 'POST' && req.query?.novus_operation === 'send-demo') {
+    // TWO layers, in order, both before any Instantly read, any Sheets access
+    // and any send: the shared human Basic Auth, then the dedicated machine
+    // secret. The dry-run operation is deliberately NOT secret-guarded.
+    if (!requireAuth(req, res)) return;
+    if (!requireReplyPollerSecret(req, res)) return;
+    return handleSendDemoLive(req, res);
   }
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   if (!requireAuth(req, res)) return;
