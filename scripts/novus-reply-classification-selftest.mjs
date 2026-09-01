@@ -24,6 +24,9 @@ import {
   buildContextBlock,
   CONFIDENCE_THRESHOLD,
   AI_CLASSIFICATIONS,
+  isSendDemoCta,
+  isSimpleAffirmative,
+  extractCtaRegion,
 } from '../lib/reply-classification.mjs';
 import {
   normalizeInstantlyEmail,
@@ -36,8 +39,21 @@ import {
   ROUTING_TABLE,
 } from '../lib/reply-router.mjs';
 import { pollInstantlyReplies } from '../lib/instantly-reply-poll.mjs';
-import { PHRASES, DETERMINISTIC_PHRASES, CONTEXTUAL_PHRASES } from '../lib/reply-classification-fixtures.mjs';
-import { buildThreadIndex, selectThreadContext, buildContextSweepUrl } from '../lib/reply-thread-context.mjs';
+import {
+  PHRASES,
+  DETERMINISTIC_PHRASES,
+  CONTEXTUAL_PHRASES,
+  REAL_SEND_DEMO_CTA,
+  REAL_REGRESSION_REPLY,
+  SEND_DEMO_CTA_CASES,
+  CROSS_CONTEXT_CASES,
+} from '../lib/reply-classification-fixtures.mjs';
+import {
+  buildThreadIndex,
+  selectThreadContext,
+  buildContextSweepUrl,
+  excerpt,
+} from '../lib/reply-thread-context.mjs';
 
 let passed = 0;
 const failures = [];
@@ -459,6 +475,146 @@ section('11. Phrase table — expected contract');
     new Set(sameTextDifferentMeaning.map((c) => c.expected)).size === 3);
   check('every contextual expectation is a class the model may return',
     CONTEXTUAL_PHRASES.every((c) => AI_CLASSIFICATIONS.includes(c.expected)));
+}
+
+section('12. Relational classification: the real SEND_DEMO CTA regression');
+{
+  // The model fake here would classify EVERYTHING as a low-confidence
+  // OTHER_UNCLEAR — reproducing the exact 0.55 production failure. Anything
+  // that reaches POSITIVE_SEND_DEMO below did so from the parent-message
+  // relationship, not from the model.
+  const reproduceFailure = () => fakeAi('POSITIVE_SEND_DEMO', 0.55, 'reproduces the live 0.55');
+
+  const ctaContext = { previous_novus_message: REAL_SEND_DEMO_CTA, demo_already_sent: false };
+
+  // -- the CTA itself is recognised, narrative "availability" notwithstanding
+  check('the real NOVUS email is recognised as a send-demo CTA', isSendDemoCta(REAL_SEND_DEMO_CTA));
+  check('the CTA region is the final question, not the whole body',
+    extractCtaRegion(REAL_SEND_DEMO_CTA).includes('Want me to send it over?')
+    && !extractCtaRegion(REAL_SEND_DEMO_CTA).includes('Milton Road'),
+    extractCtaRegion(REAL_SEND_DEMO_CTA));
+
+  // -- THE REAL REGRESSION
+  {
+    const ai = reproduceFailure();
+    const d = await classifyReply(reply(REAL_REGRESSION_REPLY), { aiCall: ai, context: ctaContext });
+    check('REAL CASE: "Hi Joe, Sure thing. Adam" -> POSITIVE_SEND_DEMO',
+      d.classification === 'POSITIVE_SEND_DEMO', `${d.classification} @ ${d.confidence}`);
+    check('REAL CASE: confidence >= 0.90 (auto-send eligible)', d.confidence >= 0.90, String(d.confidence));
+    check('REAL CASE: next_action is SEND_DEMO', d.next_action === 'SEND_DEMO');
+    check('REAL CASE: decided from context, the model was never consulted', ai.calls.length === 0);
+  }
+
+  // -- affirmatives against the real CTA
+  for (const { phrase, auto, label } of SEND_DEMO_CTA_CASES) {
+    const ai = reproduceFailure();
+    const d = await classifyReply(reply(phrase), { aiCall: ai, context: ctaContext });
+    const shown = (label || phrase).replace(/\n+/g, ' ');
+    if (auto) {
+      check(`send-CTA + "${shown}" -> POSITIVE_SEND_DEMO >= 0.90`,
+        d.classification === 'POSITIVE_SEND_DEMO' && d.confidence >= 0.90,
+        `${d.classification} @ ${d.confidence}`);
+    } else {
+      // Either the rule declined (model decides) or it never fired — what must
+      // never happen is an automatic SEND_DEMO.
+      const autoSendable = d.classification === 'POSITIVE_SEND_DEMO' && d.confidence >= 0.90;
+      check(`send-CTA + "${shown}" -> never auto-sends`, !autoSendable,
+        `${d.classification} @ ${d.confidence}`);
+    }
+  }
+
+  // -- the same words, a different question: must NOT become SEND_DEMO
+  for (const { label, parent, phrases } of CROSS_CONTEXT_CASES) {
+    for (const phrase of phrases) {
+      const ai = fakeAi('POSITIVE_MEETING', 0.93);
+      const context = parent ? { previous_novus_message: parent, demo_already_sent: false } : null;
+      const d = await classifyReply(reply(phrase), { aiCall: ai, context });
+      check(`${label} + "${phrase}" -> not a deterministic SEND_DEMO`,
+        d.source !== 'DETERMINISTIC_CONTEXTUAL', `source=${d.source}`);
+      check(`${label} + "${phrase}" -> the model decides`, ai.calls.length === 1);
+    }
+  }
+
+  // -- the affirmative matcher itself
+  check('a bare affirmative is recognised', isSimpleAffirmative('sure thing'));
+  check('greeting and signature are set aside', isSimpleAffirmative('Hi Joe, Sure thing. Adam'));
+  check('a redirection is not a bare affirmative', !isSimpleAffirmative('sure thing, but call me first'));
+  check('a trailing question is not a bare affirmative', !isSimpleAffirmative('sure thing, how much?'));
+  check('a one-word reply is never mistaken for a signature', isSimpleAffirmative('yep'));
+  check('an unrelated sentence is not an affirmative', !isSimpleAffirmative('we already use another provider'));
+
+  // -- the rule cannot outrank compliance
+  {
+    const ai = fakeAi('POSITIVE_SEND_DEMO', 0.99);
+    const optOut = await classifyReply(reply('unsubscribe'), { aiCall: ai, context: ctaContext });
+    check('OPT_OUT still beats the contextual rule', optOut.classification === 'OPT_OUT' && ai.calls.length === 0);
+    const ooo = await classifyReply(reply('sure thing', { is_auto_reply: true }), { aiCall: ai, context: ctaContext });
+    check('OOO still beats the contextual rule', ooo.classification === 'OOO_AUTOMATED');
+  }
+
+  // -- an already-sent demo is not re-sent on a positive reply
+  {
+    const ai = fakeAi('POSITIVE_MEETING', 0.93);
+    const d = await classifyReply(reply('sure thing'), {
+      aiCall: ai,
+      context: { previous_novus_message: REAL_SEND_DEMO_CTA, demo_already_sent: true },
+    });
+    check('demo already sent -> the rule declines, the model decides',
+      d.source !== 'DETERMINISTIC_CONTEXTUAL' && ai.calls.length === 1);
+  }
+}
+
+section('13. Quoted-history fallback recovers a parent the sweep missed');
+{
+  const QUOTED = `Sure thing.\n\nOn Mon, 1 Sep 2026 at 09:14, Joe Carter <${NOVUS}> wrote:\n> ${REAL_SEND_DEMO_CTA.replace(/\n/g, '\n> ')}`;
+
+  // The sweep window missed this thread entirely — the canonical path yields
+  // nothing, which is the exact production condition.
+  const emptyIndex = buildThreadIndex([]);
+  const ctx = selectThreadContext(reply(QUOTED, { id: 'qh_1' }), emptyIndex, {});
+  check('a sweep miss no longer yields blank context', ctx.previous_novus_message.length > 0);
+  check('the recovered parent carries the CTA', ctx.previous_novus_message.includes('Want me to send it over?'));
+  check('context_source names the fallback', ctx.context_source === 'QUOTED_HISTORY', ctx.context_source);
+  check('the recovered parent is enough to classify relationally',
+    isSendDemoCta(ctx.previous_novus_message));
+
+  // The canonical message still wins when it exists.
+  const canonical = buildThreadIndex([{
+    id: 'c1', ue_type: 1, eaccount: NOVUS,
+    from_address_email: NOVUS, to_address_email_list: LEAD,
+    lead: LEAD, thread_id: 'th_1', timestamp: '2026-08-30T11:00:00Z',
+    subject: 'Re: enquiry', body: { text: 'Canonical: want me to send it over?' },
+  }]);
+  const canonicalCtx = selectThreadContext(reply(QUOTED, { id: 'qh_2', timestamp: '2026-08-30T12:00:00Z' }), canonical, {});
+  check('canonical thread message outranks quoted history',
+    canonicalCtx.context_source === 'THREAD_SWEEP' && canonicalCtx.previous_novus_message.includes('Canonical'));
+
+  // AUTHENTICITY: a quote header naming someone else is not a NOVUS message.
+  const foreign = `Sure thing.\n\nOn Mon, 1 Sep 2026 at 09:14, Someone Else <someone@elsewhere.com> wrote:\n> Want me to send it over?`;
+  const foreignCtx = selectThreadContext(reply(foreign, { id: 'qh_3' }), emptyIndex, {});
+  check('a quote not attributed to NOVUS is ignored',
+    foreignCtx.previous_novus_message === '' && foreignCtx.context_source === 'NONE');
+
+  // End to end: sweep misses, fallback recovers, reply auto-classifies.
+  {
+    const ai = fakeAi('POSITIVE_SEND_DEMO', 0.55, 'reproduces the live 0.55');
+    const d = await classifyReply(reply(QUOTED, { id: 'qh_4' }), { aiCall: ai, context: ctx });
+    check('END TO END: sweep miss + quoted parent -> POSITIVE_SEND_DEMO >= 0.90',
+      d.classification === 'POSITIVE_SEND_DEMO' && d.confidence >= 0.90,
+      `${d.classification} @ ${d.confidence}`);
+  }
+}
+
+section('14. The CTA survives a long parent message');
+{
+  const padding = 'This is a long paragraph about how the enquiry was handled. '.repeat(20);
+  const longCta = `Hi Adam,\n\n${padding}\n\nWant me to send it over?\n\nJoe`;
+  check('the fixture really is longer than the excerpt budget', longCta.length > 600);
+  const trimmed = excerpt(longCta);
+  check('a long parent keeps its trailing CTA', trimmed.includes('Want me to send it over?'), trimmed.slice(-80));
+  check('a long parent keeps its opening too', trimmed.includes('Hi Adam'));
+  check('the excerpt stays bounded', trimmed.length <= 600 + 8);
+  check('a long CTA is still recognised after excerpting', isSendDemoCta(trimmed));
 }
 
 // ── Optional live run against the real model ────────────────────────────────
