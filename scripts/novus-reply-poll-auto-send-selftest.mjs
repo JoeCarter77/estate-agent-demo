@@ -18,6 +18,22 @@ import { REPLY_POLLER_SECRET_HEADER } from '../api/novus/_auth.mjs';
 import { REPLY_EVENTS_HEADER, EXECUTION_FIELDS } from '../lib/reply-router.mjs';
 import { OUTBOUND_HEADER } from '../lib/outbound.mjs';
 import { INSTANTLY_REPLY_URL, AMBIGUOUS_ERROR } from '../lib/reply-send-demo.mjs';
+import { createMemoryClaimStore, __setClaimStoreForTests } from '../lib/reply-claim.mjs';
+
+
+// The live poll and live SEND_DEMO now REQUIRE a cross-instance claim store and
+// fail closed without one (lib/reply-claim.mjs). This file tests other
+// behaviour, so it injects the offline in-memory store to satisfy that
+// dependency; contention itself is proven in
+// scripts/novus-reply-concurrency-selftest.mjs. A fresh store per scenario
+// keeps each case independent — a claim held from an earlier scenario in this
+// same file is not the race under test here.
+function freshClaims() {
+  const store = createMemoryClaimStore();
+  __setClaimStoreForTests(store);
+  return store;
+}
+freshClaims();
 
 const originalFetch = globalThis.fetch;
 

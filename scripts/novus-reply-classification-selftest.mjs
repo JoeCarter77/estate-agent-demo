@@ -42,6 +42,7 @@ import {
   ROUTING_TABLE,
 } from '../lib/reply-router.mjs';
 import { pollInstantlyReplies } from '../lib/instantly-reply-poll.mjs';
+import { createMemoryClaimStore, __setClaimStoreForTests } from '../lib/reply-claim.mjs';
 import {
   PHRASES,
   DETERMINISTIC_PHRASES,
@@ -64,6 +65,21 @@ import {
   excerpt,
   extractQuotedNovusParent,
 } from '../lib/reply-thread-context.mjs';
+
+
+// The live poll and live SEND_DEMO now REQUIRE a cross-instance claim store and
+// fail closed without one (lib/reply-claim.mjs). This file tests other
+// behaviour, so it injects the offline in-memory store to satisfy that
+// dependency; contention itself is proven in
+// scripts/novus-reply-concurrency-selftest.mjs. A fresh store per scenario
+// keeps each case independent — a claim held from an earlier scenario in this
+// same file is not the race under test here.
+function freshClaims() {
+  const store = createMemoryClaimStore();
+  __setClaimStoreForTests(store);
+  return store;
+}
+freshClaims();
 
 let passed = 0;
 const failures = [];
@@ -105,6 +121,11 @@ function fakeAi(classification, confidence = 0.95, reason = 'test') {
 // In-memory repo recording every operation, so "no second row" and "only
 // derived cells written" are assertions about actual calls, not intentions.
 function memRepo(rows = []) {
+  // Each scenario is an independent fixture, so it gets an independent claim
+  // store too — a claim left over from an earlier scenario in this file is not
+  // the race under test here. Real contention lives in
+  // scripts/novus-reply-concurrency-selftest.mjs.
+  freshClaims();
   const ops = [];
   const table = [REPLY_EVENTS_HEADER.slice(), ...rows];
   return {

@@ -50,6 +50,7 @@
     "novus:reply-router-selftest": "node scripts/novus-reply-router-selftest.mjs",
     "novus:reply-poll-selftest": "node scripts/novus-instantly-reply-poll-selftest.mjs",
     "novus:reply-poll-auto-send-selftest": "node scripts/novus-reply-poll-auto-send-selftest.mjs",
+    "novus:reply-concurrency-selftest": "node scripts/novus-reply-concurrency-selftest.mjs",
     "novus:reply-persistence-selftest": "node scripts/novus-reply-persistence-selftest.mjs",
     "novus:reply-poller-auth-selftest": "node scripts/novus-reply-poller-auth-selftest.mjs",
     "novus:reply-classification-selftest": "node scripts/novus-reply-classification-selftest.mjs",

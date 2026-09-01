@@ -402,6 +402,15 @@ async function handleInstantlyReplyPoll(req, res) {
       ambiguous: summary.ambiguous,
       persisted: summary.persisted,
       failed: summary.failed,
+      // CROSS-INSTANCE CONTENTION. claim_conflicts > 0 means another invocation
+      // held the claim for that inbound email — the guard worked and the reply
+      // is already being processed elsewhere, so this is informational, not an
+      // error. claim_errors > 0 means the KV store could not be reached at all:
+      // those replies were processed by NOBODY and are waiting for the next
+      // pass, which is the one number here worth alerting on. Per-email detail
+      // is in skipped[] under reason claim_conflict / claim_store_error.
+      claim_conflicts: summary.claim_conflicts,
+      claim_errors: summary.claim_errors,
       classified: summary.classified,
       classification_fallbacks: summary.classification_fallbacks,
       classification_updates: summary.classification_updates,
@@ -425,6 +434,15 @@ async function handleInstantlyReplyPoll(req, res) {
         error: 'Instantly API returned an error',
         instantly_status: err.instantly_status,
         instantly_error: err.instantly_error,
+      });
+    }
+    if (err?.claim_store_unavailable) {
+      // FAIL CLOSED, and say so precisely. The pass threw before the Instantly
+      // GET and before any Sheets access, so nothing was read, appended or
+      // sent. Never echoes the token.
+      return res.status(500).json({
+        success: false,
+        error: err.message,
       });
     }
     if (err?.header_mismatch) {

@@ -17,6 +17,22 @@ import {
   normalizeInstantlyEmail,
 } from '../lib/reply-router.mjs';
 import { OUTBOUND_HEADER } from '../lib/outbound.mjs';
+import { createMemoryClaimStore, __setClaimStoreForTests } from '../lib/reply-claim.mjs';
+
+
+// The live poll and live SEND_DEMO now REQUIRE a cross-instance claim store and
+// fail closed without one (lib/reply-claim.mjs). This file tests other
+// behaviour, so it injects the offline in-memory store to satisfy that
+// dependency; contention itself is proven in
+// scripts/novus-reply-concurrency-selftest.mjs. A fresh store per scenario
+// keeps each case independent — a claim held from an earlier scenario in this
+// same file is not the race under test here.
+function freshClaims() {
+  const store = createMemoryClaimStore();
+  __setClaimStoreForTests(store);
+  return store;
+}
+freshClaims();
 
 const originalFetch = globalThis.fetch;
 globalThis.fetch = () => { throw new Error('unstubbed network access is forbidden in this self-test'); };
@@ -68,6 +84,11 @@ const DUPLICATE_OUTBOUND = outboundRow({
 
 // --- Fakes ------------------------------------------------------------------
 function fakeRepo({ outbound = [], replyEvents = [], header = REPLY_EVENTS_HEADER, failAppends = 0 } = {}) {
+  // Each scenario is an independent fixture, so it gets an independent claim
+  // store too — a claim left over from an earlier scenario in this file is not
+  // the race under test here. Real contention lives in
+  // scripts/novus-reply-concurrency-selftest.mjs.
+  freshClaims();
   const rows = replyEvents.map((obj) => header.map((k) => obj[k] ?? ''));
   let remainingFailures = failAppends;
   return {

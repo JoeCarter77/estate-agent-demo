@@ -29,6 +29,22 @@ import {
   EXECUTION_FIELDS,
 } from '../lib/reply-router.mjs';
 import { OUTBOUND_HEADER } from '../lib/outbound.mjs';
+import { createMemoryClaimStore, __setClaimStoreForTests } from '../lib/reply-claim.mjs';
+
+
+// The live poll and live SEND_DEMO now REQUIRE a cross-instance claim store and
+// fail closed without one (lib/reply-claim.mjs). This file tests other
+// behaviour, so it injects the offline in-memory store to satisfy that
+// dependency; contention itself is proven in
+// scripts/novus-reply-concurrency-selftest.mjs. A fresh store per scenario
+// keeps each case independent — a claim held from an earlier scenario in this
+// same file is not the race under test here.
+function freshClaims() {
+  const store = createMemoryClaimStore();
+  __setClaimStoreForTests(store);
+  return store;
+}
+freshClaims();
 
 const originalFetch = globalThis.fetch;
 globalThis.fetch = (...args) => { throw new Error(`FORBIDDEN network access: ${args[0]}`); };
@@ -135,6 +151,11 @@ function outboundRecord(overrides = {}) {
 // --- The fake sheet ---------------------------------------------------------
 // One REPLY_EVENTS row, held as a live array so cell writes are observable.
 function makeRepo({ row = replyRow(), outbound = [outboundRecord()] } = {}) {
+  // Each scenario is an independent fixture, so it gets an independent claim
+  // store too — a claim left over from an earlier scenario in this file is not
+  // the race under test here. Real contention lives in
+  // scripts/novus-reply-concurrency-selftest.mjs.
+  freshClaims();
   const header = [...REPLY_EVENTS_HEADER];
   const data = [header.map((c) => String(row[c] ?? ''))];
   const writes = [];
@@ -292,6 +313,12 @@ console.log('--- 6. second execution of the same event: zero sends, ALREADY_EXEC
   await executeSendDemo({ repo, replyEventId: 'rev_test_1', apiKey: 'SECRET', fetchImpl: first.impl, now: NOW });
   check(() => assert.equal(first.posts().length, 1));
 
+  // The send claim from attempt 1 has lapsed (15-minute TTL; a real second
+  // attempt is far later). Refreshed on purpose so this case still proves what
+  // it was written to prove: the notes marker and action_completed_at block the
+  // duplicate WITHOUT any help from the claim.
+  freshClaims();
+
   // The sweep now also contains our own sent demo reply, exactly as Instantly
   // would report it on the next pass.
   const second = makeInstantly({ sweep: [RAW_REPLY, RAW_NOVUS_OUTBOUND, RAW_NOVUS_DEMO_SENT], reply: OK_RESPONSE });
@@ -367,6 +394,12 @@ console.log('--- 9. retry after an ambiguous result whose send ACTUALLY landed -
   check(() => assert.equal(attempt1.posts().length, 1));
   check(() => assert.equal(rowObject().action_status, 'FAILED'));
   check(() => assert.equal(rowObject().error.startsWith(AMBIGUOUS_ERROR), true));
+
+  // The claim held after the AMBIGUOUS attempt has lapsed (15-minute TTL).
+  // Refreshed deliberately: the point of this case is that the FRESH THREAD
+  // EVIDENCE alone stops the second send, so the claim must not be what blocks
+  // it here.
+  freshClaims();
 
   // Attempt 2: the row still says FAILED (retryable) and carries no marker —
   // the ONLY thing that stops a second send is the FRESH thread evidence.
