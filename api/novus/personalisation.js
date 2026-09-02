@@ -9,6 +9,7 @@
 //                                 POST /api/novus/instantly/send-demo (via rewrite)
 //                                 GET  /api/novus/operator/leads (via rewrite)
 //                                 GET  /api/novus/operator/conversation (via rewrite)
+//                                 POST /api/novus/operator/manual-reply-dry-run (op only)
 //
 // Read-only lookup for the PERSONALISATION row lib/personalisation-rebuild.mjs
 // writes (via the existing /api/novus/intelligence/rebuild-all + cron finalize
@@ -48,6 +49,16 @@ import {
   resolveSenderInbox,
 } from '../../lib/instantly-conversation.mjs';
 import { readSalesMessagesForOutreach } from '../../lib/sales-messages.mjs';
+// Phase 3A manual replies: the PURE gate, and the SHARED payload builder the
+// automatic send already uses. Neither can send; the only function in NOVUS
+// that POSTs a reply is executeSendDemo, imported separately above.
+import {
+  evaluateManualReplyGate,
+  MAX_MANUAL_REPLY_BODY_CHARS,
+  manualReplyClaimKey,
+} from '../../lib/manual-reply.mjs';
+import { buildInstantlyReplyPayload } from '../../lib/instantly-reply-send.mjs';
+import { novusMailboxes } from '../../lib/reply-router.mjs';
 
 // Contact resolution can run Hunter Domain Search, Finder and several Verifier
 // checks in one invocation; 20s was sized for the read-only
@@ -934,6 +945,234 @@ async function handleSendDemoLive(req, res) {
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// MANUAL REPLY, DRY RUN — POST /api/novus/personalisation
+//                              ?novus_operation=operator-manual-reply-dry-run
+//
+// PHASE 3A. It answers ONE question: WOULD this human-authored reply be safe to
+// send? It then shows the exact message that would go out, and stops.
+//
+// IT SENDS NOTHING, AND WRITES NOTHING. Structurally, not by convention:
+//   - the only Instantly call it can make is the lead-scoped GET in
+//     fetchLeadConversation; no reply/send import is reachable from this
+//     function at all
+//   - the only repo calls are findById/getRecords — reads
+//   - no AI module is touched, no classifier runs, nothing is reclassified
+//   - REPLY_EVENTS, OUTBOUND and SALES_MESSAGES are all read-only here
+//
+// WHY POST FOR A READ. The reply body is free text: it can contain newlines,
+// quoted material and thousands of characters, none of which belongs in a query
+// string or in a server log line. POST is the transport for the body and
+// nothing more — this operation is deliberately NOT guarded by the poller
+// secret, exactly like send-demo-dry-run, because it writes nothing.
+//
+// THE BROWSER SUPPLIES THREE VALUES AND NO MORE: reply_event_id, body, and an
+// optional expected_received_at. The agency, the lead address, the thread, the
+// campaign, the recipient and — above all — the SENDING INBOX are resolved
+// server-side from REPLY_EVENTS, OUTBOUND and the live Instantly conversation.
+// Anything else in the request is IGNORED rather than honoured, and named back
+// in ignored_request_fields so a caller cannot quietly believe it was used. A
+// browser-supplied sender or recipient is exactly the input a live manual send
+// must never trust, so it is refused now, before that path exists.
+// ---------------------------------------------------------------------------
+
+// Every field this operation reads off the request. Anything else is ignored.
+export const MANUAL_REPLY_DRY_RUN_FIELDS = ['reply_event_id', 'body', 'expected_received_at'];
+
+// Named explicitly so the ignore is a tested contract rather than an accident
+// of which keys the handler happens to destructure.
+export const MANUAL_REPLY_DRY_RUN_REJECTED_FIELDS = [
+  'outbound_id', 'agency_id', 'lead_email', 'sender', 'from', 'eaccount',
+  'thread_id', 'campaign_id', 'recipient', 'to', 'reply_to_uuid', 'subject',
+];
+
+async function handleOperatorManualReplyDryRun(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const replyEventId = String(body.reply_event_id ?? '').trim();
+  const replyText = String(body.body ?? '');
+  const expectedReceivedAt = String(body.expected_received_at ?? '').trim();
+
+  // Spoofable inputs are reported, never used.
+  const ignoredRequestFields = Object.keys(body).filter(
+    (key) => !MANUAL_REPLY_DRY_RUN_FIELDS.includes(key),
+  );
+
+  if (!replyEventId) {
+    return res.status(400).json({ success: false, error: 'Missing reply_event_id' });
+  }
+
+  const warnings = [];
+  const warn = (code, detail) => warnings.push({ code, detail });
+
+  try {
+    const repo = getRepo();
+
+    // READ 1 — the reply being answered.
+    const record = await repo.findById('REPLY_EVENTS', 'reply_event_id', replyEventId);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        eligible: false,
+        blocked_reason: 'REPLY_EVENT_NOT_FOUND',
+        blocked_reasons: ['REPLY_EVENT_NOT_FOUND'],
+        error: `No REPLY_EVENTS row for reply_event_id ${replyEventId}`,
+        ignored_request_fields: ignoredRequestFields,
+      });
+    }
+    const replyEvent = record.obj;
+    const outreachId = String(replyEvent.outreach_id ?? '').trim();
+
+    // READ 2 — the whole outreach journey, for the opt-out and staleness
+    // checks. Both are journey-scoped: a prospect who opted out in a LATER
+    // message has opted out of answering an earlier one too.
+    const allReplies = await repo.getRecords('REPLY_EVENTS', 'reply_event_id');
+    const outreachReplyEvents = outreachId
+      ? allReplies.map((r) => r.obj).filter((obj) => String(obj.outreach_id ?? '').trim() === outreachId)
+      : null;
+    if (!outreachReplyEvents) {
+      warn('no_outreach_id', 'This reply carries no outreach_id, so its journey history could not be loaded');
+    }
+
+    // READ 3 — OUTBOUND, re-resolved rather than trusted from the reply row.
+    const outboundRecords = await repo.getRecords('OUTBOUND', 'outbound_id');
+
+    // THE LEAD ADDRESS IS RESOLVED SERVER-SIDE. OUTBOUND carries the address
+    // actually uploaded to Instantly; the stored reply's address is the
+    // fallback. The browser's opinion is never consulted.
+    const outboundRow = outboundRecords
+      .map((r) => r.obj)
+      .find((obj) => String(obj.outbound_id ?? '').trim() === outreachId && outreachId) || null;
+    const leadEmail = String(outboundRow?.outreach_contact_email ?? '').trim()
+      || String(replyEvent.lead_email ?? '').trim();
+
+    // ONE lead-scoped Instantly GET. It supplies the live parent email and,
+    // with it, the eaccount — the only acceptable source for which inbox this
+    // reply would leave from.
+    let liveMessages = [];
+    let instantlyAvailable = false;
+    let instantlyError = null;
+    const apiKey = process.env.INSTANTLY_REPLY_API_KEY;
+
+    if (!leadEmail) {
+      instantlyError = { code: 'no_lead_email', message: 'No lead email to scope the conversation fetch to' };
+      warn('instantly_unavailable', instantlyError.message);
+    } else if (!apiKey) {
+      instantlyError = { code: 'no_api_key', message: 'INSTANTLY_REPLY_API_KEY is not set in this environment.' };
+      warn('instantly_unavailable', instantlyError.message);
+    } else {
+      try {
+        const fetched = await fetchLeadConversation({ apiKey, leadEmail });
+        liveMessages = fetched.messages;
+        instantlyAvailable = true;
+        fetched.warnings.forEach((w) => warnings.push(w));
+      } catch (err) {
+        // Never echo the API key, on any path.
+        instantlyError = err?.instantly_status
+          ? { code: 'instantly_error', instantly_status: err.instantly_status, message: String(err.instantly_error).slice(0, 500) }
+          : { code: 'instantly_unreachable', message: err?.message || 'Request to Instantly failed' };
+        warn('instantly_unavailable', `Live conversation unavailable: ${instantlyError.message}`);
+      }
+    }
+
+    // The live parent. An Instantly failure leaves this null, which BLOCKS
+    // (REPLY_NOT_FOUND) rather than proceeding on stored data alone.
+    const instantlyEmailId = String(replyEvent.instantly_email_id ?? '').trim();
+    const liveParent = instantlyEmailId
+      ? liveMessages.find((m) => String(m.instantly_email_id ?? '').trim() === instantlyEmailId) || null
+      : null;
+
+    // THE GATE. Pure, and the same function a live manual send would run.
+    const mailboxes = novusMailboxes();
+    const gate = evaluateManualReplyGate({
+      replyEvent,
+      outreachReplyEvents,
+      outboundRecords,
+      liveParent,
+      mailboxes,
+      body: replyText,
+      expectedReceivedAt,
+    });
+
+    // THE EXACT PAYLOAD, BUILT AND NOT SENT. Built with the SAME shared builder
+    // the live send uses, so the preview cannot drift from the real request.
+    // Only the two human-readable fields are exposed; reply_to_uuid and
+    // eaccount are reported under target, and no credential appears anywhere.
+    let payloadPreview = null;
+    let claimKeyPreview = null;
+    if (gate.eligible) {
+      const payload = buildInstantlyReplyPayload({
+        replyToUuid: gate.resolved.reply_to_uuid,
+        eaccount: gate.resolved.eaccount,
+        subject: replyEvent.subject,
+        body: gate.body,
+      });
+      payloadPreview = { subject: payload.subject, body_text: payload.body.text };
+      // Built to prove it is deterministic. NOT acquired: Phase 3A takes no
+      // claim because Phase 3A never sends.
+      claimKeyPreview = manualReplyClaimKey({ instantlyEmailId, body: gate.body.text });
+    }
+
+    // STATUS. A stale reply is a genuine conflict — the thing being answered
+    // moved underneath the human — so it gets 409. Every other block is a
+    // well-formed request that must not proceed: 422.
+    let status = 200;
+    if (!gate.eligible) status = gate.blocked_reason === 'STALE_REPLY_EVENT' ? 409 : 422;
+
+    return res.status(status).json({
+      success: gate.eligible,
+      dry_run: true,
+      // Explicit and unconditional, so this response can never be mistaken for
+      // a send by a human or by a client.
+      sent: false,
+      would_send: gate.would_send,
+      eligible: gate.eligible,
+      blocked_reason: gate.blocked_reason,
+      blocked_reasons: gate.blocked_reasons,
+      target: {
+        agency_id: gate.resolved.agency_id,
+        prospect_email: leadEmail,
+        sending_inbox: gate.resolved.eaccount,
+        reply_event_id: gate.resolved.reply_event_id,
+        outreach_id: gate.resolved.outreach_id,
+        thread_id: gate.resolved.thread_id,
+        received_at: gate.received_at,
+      },
+      payload_preview: payloadPreview,
+      // So a blocked-as-stale caller can refresh straight onto the message it
+      // should be answering instead.
+      newest_reply_event_id: gate.newest_reply_event_id,
+      newest_received_at: gate.newest_received_at,
+      body_length: gate.body_length,
+      max_body_length: MAX_MANUAL_REPLY_BODY_CHARS,
+      claim_key_preview: claimKeyPreview,
+      claim_acquired: false,
+      instantly: {
+        available: instantlyAvailable,
+        message_count: liveMessages.length,
+        error: instantlyError,
+      },
+      ignored_request_fields: ignoredRequestFields,
+      warnings,
+      generated_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    // Never echo the API key, on any path.
+    if (err?.instantly_status) {
+      return res.status(502).json({
+        success: false,
+        error: 'Instantly API returned an error',
+        instantly_status: err.instantly_status,
+        instantly_error: err.instantly_error,
+      });
+    }
+    console.error('operator-manual-reply-dry-run error:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Manual-reply dry run failed' });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method === 'POST' && req.query?.novus_operation === 'verify-contact') {
@@ -976,6 +1215,14 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && req.query?.novus_operation === 'send-demo-dry-run') {
     if (!requireAuth(req, res)) return;
     return handleSendDemoDryRun(req, res);
+  }
+  if (req.method === 'POST' && req.query?.novus_operation === 'operator-manual-reply-dry-run') {
+    // POST carries the free-text reply body and NOTHING else changes: this
+    // operation performs Sheets READS and one lead-scoped Instantly GET, and
+    // no send path, no writer and no AI module is reachable from it. It is
+    // deliberately NOT poller-secret guarded, exactly like send-demo-dry-run.
+    if (!requireAuth(req, res)) return;
+    return handleOperatorManualReplyDryRun(req, res);
   }
   if (req.method === 'POST' && req.query?.novus_operation === 'instantly-reply-poll') {
     // TWO layers, in order, both before any Instantly or Sheets access: the
