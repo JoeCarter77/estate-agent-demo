@@ -108,6 +108,27 @@
     .preview-link:hover{background:rgba(37,99,235,.14);}
     .note{font-size:.72rem;color:var(--text-3);line-height:1.5;margin-top:8px;}
 
+    /* sales conversation (Phase 2, read-only) */
+    .btn-mini{font-size:.7rem;font-weight:700;padding:5px 10px;border-radius:8px;}
+    .inbox-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.78rem;font-weight:600;color:var(--text-2);background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:9px 12px;margin-top:9px;}
+    .inbox-line .mono{font-weight:700;color:var(--text);}
+    .conv-status{font-size:.76rem;color:#92400E;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:9px;padding:9px 12px;margin-top:9px;}
+    .msg{border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-top:9px;background:#fff;}
+    .msg.outbound{background:var(--accent-lo);border-color:rgba(37,99,235,.28);border-left:3px solid var(--accent);}
+    .msg.inbound{background:var(--panel);border-left:3px solid var(--brand-navy);}
+    .msg.unknown{border-left:3px solid var(--amber);}
+    .msg.marker{background:var(--panel);border-style:dashed;border-left:3px dashed var(--border-hi);}
+    .msg-head{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;}
+    .msg-who{font-size:.66rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;}
+    .msg-who.novus{color:var(--accent);}
+    .msg-who.prospect{color:var(--brand-navy);}
+    .msg-who.neutral{color:var(--text-3);}
+    .msg-when{font-size:.72rem;color:var(--text-3);}
+    .msg-meta{font-size:.7rem;color:var(--text-3);margin-top:3px;}
+    .msg-subject{font-size:.8rem;font-weight:700;color:var(--text);margin-top:6px;}
+    .msg-body{font-size:.85rem;line-height:1.55;color:var(--text);white-space:pre-wrap;word-break:break-word;margin-top:5px;max-height:280px;overflow-y:auto;}
+    .msg-none{font-size:.8rem;color:var(--text-3);font-style:italic;margin-top:5px;}
+
     .warn-box{font-size:.78rem;color:#92400E;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:11px;padding:11px 14px;margin-bottom:18px;}
     .warn-box ul{margin:6px 0 0 18px;}
     .warn-box li{margin-top:3px;}
@@ -246,6 +267,10 @@
     const LEADS_URL = '/api/novus/personalisation?novus_operation=operator-leads';
     // READ-ONLY dry run. classify=0 keeps it zero-cost: no AI call, no write.
     const UNROUTED_URL = '/api/novus/personalisation?novus_operation=instantly-reply-poll-dry-run&classify=0&limit=50';
+    // READ-ONLY, and deliberately NOT part of the leads load: it calls Instantly
+    // once, for the ONE lead whose drawer is open. There is no prefetch and no
+    // polling — see PERFORMANCE below.
+    const CONVERSATION_URL = '/api/novus/personalisation?novus_operation=operator-conversation';
 
     let LEADS = [];
 
@@ -349,6 +374,126 @@
       return `<div class="block"><div class="block-head"><span class="block-title">${esc(title)}</span>${tagHtml}</div>${inner}</div>`;
     }
 
+    // ---- sales conversation (Phase 2, read-only) ---------------------------
+    //
+    // PERFORMANCE. One opened lead = at most one Instantly GET, made by the
+    // server for that lead alone. This is never called from load(), never
+    // batched across leads, and never polled. CONV_TOKEN discards the response
+    // of a drawer the operator has already moved on from, so a slow fetch can
+    // never paint itself into the wrong lead.
+    //
+    // VIEW ONLY. There is no textarea, no send control and no generate control
+    // on this page. Nothing here can send an email or write a row.
+    let CONV_TOKEN = 0;
+    let CONV_LEAD = null;
+
+    function senderInboxHtml(data) {
+      const inbox = data.sender_inbox || {};
+      if (inbox.status === 'CONFIRMED') {
+        return `<div class="inbox-line">Sending inbox: <span class="mono">${esc(inbox.eaccount)}</span></div>`;
+      }
+      if (inbox.status === 'AMBIGUOUS') {
+        return `<div class="conv-status"><strong>Sending inbox: ambiguous.</strong> This conversation involves more than
+          one Instantly inbox (${esc((inbox.candidates || []).join(', '))}), so none was chosen.</div>`;
+      }
+      return `<div class="inbox-line">Sending inbox: <span class="muted">not resolved from the live conversation</span></div>`;
+    }
+
+    // NOVUS outbound and prospect inbound are visually distinct, and a message
+    // whose direction the server could not establish is shown as exactly that
+    // rather than being guessed onto one side.
+    function messageHtml(message, agencyName) {
+      if (message.message_type === 'CAMPAIGN_ADDED') {
+        return `<div class="msg marker">
+          <div class="msg-head">
+            <span class="msg-who neutral">Added to Instantly campaign</span>
+            <span class="msg-when">${esc(when(message.at))}</span>
+          </div>
+          <div class="msg-none">NOVUS does not store the original campaign email text, and Instantly did not return it for this lead.</div>
+        </div>`;
+      }
+
+      let cls = 'unknown';
+      let who = 'Unattributed';
+      let whoCls = 'neutral';
+      if (message.direction === 'OUTBOUND') {
+        cls = 'outbound'; who = 'NOVUS'; whoCls = 'novus';
+      } else if (message.direction === 'INBOUND') {
+        cls = 'inbound'; who = agencyName || 'Prospect'; whoCls = 'prospect';
+      }
+
+      const meta = [];
+      if (message.direction === 'OUTBOUND' && message.eaccount) meta.push(`Sent from: ${esc(message.eaccount)}`);
+      if (message.direction === 'INBOUND' && message.from) meta.push(`From: ${esc(message.from)}`);
+      if (message.direction === 'UNKNOWN') {
+        meta.push(`From: ${dash(message.from)}`);
+        meta.push('Direction could not be established from the addresses');
+      }
+      if (message.classification) meta.push(`Classified: ${esc(message.classification)}`);
+      meta.push(message.source.replace(/_/g, ' ').toLowerCase());
+
+      return `<div class="msg ${cls}">
+        <div class="msg-head">
+          <span class="msg-who ${whoCls}">${esc(who)}</span>
+          <span class="msg-when">${esc(when(message.at)) || '&mdash;'}</span>
+        </div>
+        <div class="msg-meta">${meta.join(' &middot; ')}</div>
+        ${message.subject ? `<div class="msg-subject">${esc(message.subject)}</div>` : ''}
+        ${message.body_text
+          ? `<div class="msg-body">${esc(message.body_text)}</div>`
+          : '<div class="msg-none">No message text available.</div>'}
+      </div>`;
+    }
+
+    function conversationHtml(data, agencyName) {
+      const parts = [];
+
+      // The durable Phase 1 data is always rendered. A failed Instantly call
+      // degrades this section, it never empties the drawer.
+      if (!data.instantly?.available) {
+        parts.push('<div class="conv-status">Live conversation unavailable &mdash; showing stored NOVUS data.</div>');
+      }
+      parts.push(senderInboxHtml(data));
+
+      const messages = data.conversation?.messages || [];
+      if (!messages.length) {
+        parts.push('<div class="note">No messages on file for this lead yet.</div>');
+      } else {
+        parts.push(messages.map((m) => messageHtml(m, agencyName)).join(''));
+      }
+
+      if (!data.conversation?.original_campaign_emails_available) {
+        parts.push(`<div class="note">The original campaign email bodies are not stored by NOVUS. Where Instantly
+          returns them they are shown above; otherwise only the campaign handoff is marked.</div>`);
+      }
+      parts.push(`<button class="btn btn-ghost btn-mini" id="conv-refresh" type="button">Refresh conversation</button>`);
+      return parts.join('');
+    }
+
+    async function loadConversation(outboundId, agencyName) {
+      const token = ++CONV_TOKEN;
+      const body = $('conv-body');
+      if (!body) return;
+      body.innerHTML = '<div class="note"><span class="spinner"></span>Loading the live conversation&hellip;</div>';
+      try {
+        const res = await fetch(`${CONVERSATION_URL}&outbound_id=${encodeURIComponent(outboundId)}`,
+          { headers: { Accept: 'application/json' } });
+        const data = await res.json();
+        if (token !== CONV_TOKEN) return; // the operator has opened another lead
+        if (!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+        const target = $('conv-body');
+        if (target) target.innerHTML = conversationHtml(data, agencyName);
+      } catch (err) {
+        if (token !== CONV_TOKEN) return;
+        const target = $('conv-body');
+        if (target) {
+          target.innerHTML = '<div class="conv-status">Live conversation unavailable &mdash; showing stored NOVUS data.'
+            + `<div class="note">${esc(err.message || 'The conversation could not be loaded.')}</div></div>`
+            + '<button class="btn btn-ghost btn-mini" id="conv-refresh" type="button">Retry</button>';
+        }
+      }
+    }
+
     function openDrawer(outboundId) {
       const lead = LEADS.find((l) => l.outbound_id === outboundId);
       if (!lead) return;
@@ -394,6 +539,13 @@
           + (lead.reply.text ? `<div class="quote">${esc(lead.reply.text)}</div>` : '')));
       }
 
+      // SALES CONVERSATION — filled in by loadConversation() once the drawer is
+      // on screen. Deliberately its own block, well away from PROBE FINDING
+      // below: probe communications use a different identity and a different
+      // purpose, and the two threads must never read as one.
+      parts.push(block('Sales conversation', 'Sales', 'tag-sales',
+        '<div id="conv-body"></div>'));
+
       const demoLink = lead.demo.preview_url
         ? `<a class="preview-link" href="${esc(lead.demo.preview_url)}" target="_blank" rel="noopener">Open demo preview &#8599;</a>
            <div class="note">Preview links only. The normal demo URL counts a view, so opening it here would contaminate this lead's engagement data.</div>`
@@ -436,12 +588,19 @@
       $('drawer').classList.add('show');
       $('drawer').setAttribute('aria-hidden', 'false');
       $('scrim').classList.add('show');
+
+      // ONE conversation GET, for THIS lead, now that it is actually open.
+      CONV_LEAD = { outbound_id: lead.outbound_id, agency_name: lead.agency_name };
+      loadConversation(lead.outbound_id, lead.agency_name);
     }
 
     function closeDrawer() {
       $('drawer').classList.remove('show');
       $('drawer').setAttribute('aria-hidden', 'true');
       $('scrim').classList.remove('show');
+      // Invalidate any conversation fetch still in flight for the closed lead.
+      CONV_TOKEN += 1;
+      CONV_LEAD = null;
     }
 
     // ---- loading -----------------------------------------------------------
@@ -550,6 +709,12 @@
     $('scrim').addEventListener('click', closeDrawer);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
     document.addEventListener('click', (e) => {
+      // Manual, one-shot conversation re-read. Delegated because the button is
+      // re-rendered with the section. Nothing polls.
+      if (e.target.id === 'conv-refresh') {
+        if (CONV_LEAD) loadConversation(CONV_LEAD.outbound_id, CONV_LEAD.agency_name);
+        return;
+      }
       const row = e.target.closest('#tb-attention tr, #tb-system tr');
       if (row && row.dataset.id) openDrawer(row.dataset.id);
     });

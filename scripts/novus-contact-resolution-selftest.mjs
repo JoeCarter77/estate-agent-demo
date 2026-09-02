@@ -1,12 +1,12 @@
 // scripts/novus-contact-resolution-selftest.mjs — hermetic contact-resolution
-// tests (no network, no creds, no Hunter/AI calls).
+// tests (no network, no creds, no live provider calls).
 //
 // Exercises the REAL code paths — lib/contact-resolution.mjs and the
 // /api/novus/contacts/resolve handler inside api/novus/personalisation.js —
 // against an in-memory fake of the Google Sheets values API in the live
 // workbook's shape (row 1 = header, row 2 = SCHEMA NOTE, row 3+ = data).
 //
-// Hunter verification, Hunter finding and owner research are injected as fakes, so every
+// Hunter verification, domain search and email finding are injected as fakes, so every
 // assertion here is about the waterfall/persistence logic, never about a
 // provider. The counters those fakes keep are load-bearing: several tests
 // assert on how many times a provider WOULD have been called.
@@ -31,12 +31,15 @@ import {
   verifierProofNote,
   MAX_HUNTER_VERIFIER_CALLS_PER_AGENCY,
   HUNTER_HIGH_CONFIDENCE_SCORE,
+  rankHunterDecisionMaker,
+  selectHunterDecisionMaker,
   HARD_FAIL_STATUSES,
   INCONCLUSIVE_STATUSES,
   PRIORITY,
 } from '../lib/contact-resolution.mjs';
 import {
   normalizeHunterVerificationStatus,
+  findDomainDecisionMakers,
   findEmail as findHunterEmail,
   verifyEmail as verifyHunterEmail,
 } from '../lib/hunter.mjs';
@@ -180,14 +183,28 @@ function makeHunter(result) {
   impl.calls = calls;
   return impl;
 }
-const noResearch = async () => ({ found: false });
+function makeDomainSearch(result = []) {
+  const calls = [];
+  const impl = async (args) => {
+    calls.push(args);
+    if (result instanceof Error) throw result;
+    return result;
+  };
+  impl.calls = calls;
+  return impl;
+}
 const clock = () => '2026-08-26T12:00:00.000Z';
 
 function baseOptions(overrides = {}) {
   return {
     verifyEmailImpl: makeVerifier({}),
     findEmailImpl: makeHunter(null),
-    researchOwnerImpl: noResearch,
+    // Most legacy waterfall tests are not about identity discovery. Give them
+    // a Hunter-classified decision-maker without an address so they continue
+    // to exercise Finder/Verifier behavior; blank-owner miss tests override it.
+    findDomainDecisionMakersImpl: makeDomainSearch([{
+      full_name: 'Test Decision Maker', position: 'Director', decision_maker: true,
+    }]),
     hunterConfigured: () => true,
     now: clock,
     ...overrides,
@@ -616,32 +633,39 @@ await test('Hunter returning no match falls through to the generic inbox', async
 });
 
 // ── Flow 10: no owner known ─────────────────────────────────────────────────
-await test('blank owner_md still resolves from existing contacts', async () => {
+await test('blank owner_md and a failed Hunter decision-maker lookup stays unresolved', async () => {
   const { store, valuesApi } = makeFakeSheet();
   const repo = createRepo(valuesApi);
   seedAgency(store, {
     agency_id: 'ag_10', agency_name: 'Anon Estates', domain: 'anonestates.co.uk', probe_sent: 'YES',
     owner_md: '', primary_contact_email: 'info@anonestates.co.uk',
+    outreach_contact_name: 'Lucy Reed', outreach_contact_email: 'lucy.reed@anonestates.co.uk',
+    email_verification_status: 'VALID',
   });
   seedCommunication(store, {
     communication_id: 'com_10', agency_id: 'ag_10', channel: 'email', direction: 'inbound',
     source_identifier_normalized: 'lucy.reed@anonestates.co.uk', display_name: 'Lucy Reed',
     automated_or_human: 'human', occurred_at: '2026-08-02T09:00:00.000Z',
   });
-  const hunter = makeHunter({ email: 'never@used.co.uk' });
+  const finder = makeHunter({ email: 'never@used.co.uk' });
+  const domainSearch = makeDomainSearch([]);
   const result = await resolveAgencyContact(repo, 'ag_10', baseOptions({
     verifyEmailImpl: makeVerifier({ 'lucy.reed@anonestates.co.uk': 'VALID' }),
-    findEmailImpl: hunter,
-    researchOwnerImpl: noResearch,
+    findEmailImpl: finder,
+    findDomainDecisionMakersImpl: domainSearch,
   }));
 
-  // Research was inconclusive: no person invented, no Hunter lookup attempted.
+  // No external fallback: neither Email Finder nor Verifier is called.
   assert.equal(result.owner_md.value, '');
-  assert.equal(hunter.calls.length, 0);
-  assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
-  assert.equal(result.selected_contact.email, 'lucy.reed@anonestates.co.uk');
+  assert.deepEqual(domainSearch.calls, [{ domain: 'anonestates.co.uk' }]);
+  assert.equal(finder.calls.length, 0);
+  assert.equal(result.hunter_verifier.calls_made, 0);
+  assert.equal(result.contact_resolution_status, 'NEEDS_RESEARCH');
+  assert.equal(result.selected_contact, null);
   const agency = rowsAsObjects(store, 'AGENCIES', AGENCIES_HEADER)[0];
   assert.equal(agency.owner_md, '', 'inconclusive research must never write an owner');
+  assert.equal(agency.outreach_contact_email, 'lucy.reed@anonestates.co.uk', 'a Hunter miss must not erase existing outreach data');
+  assert.equal(agency.email_verification_status, 'VALID');
 });
 
 await test('blank owner_md with nothing usable is NEEDS_RESEARCH', async () => {
@@ -650,44 +674,55 @@ await test('blank owner_md with nothing usable is NEEDS_RESEARCH', async () => {
   seedAgency(store, {
     agency_id: 'ag_10b', agency_name: 'Empty Estates', domain: 'emptyestates.co.uk', probe_sent: 'YES',
   });
-  const result = await resolveAgencyContact(repo, 'ag_10b', baseOptions({ researchOwnerImpl: noResearch }));
+  const result = await resolveAgencyContact(repo, 'ag_10b', baseOptions());
   assert.equal(result.candidates_considered.length, 0);
   assert.equal(result.contact_resolution_status, 'NEEDS_RESEARCH');
   const agency = rowsAsObjects(store, 'AGENCIES', AGENCIES_HEADER)[0];
   assert.equal(agency.contact_resolution_status, 'NEEDS_RESEARCH');
 });
 
-// ── Flow 11: research finds an owner, then Hunter finds their address ───────
-await test('researched owner is saved with evidence and feeds the Hunter step', async () => {
+// ── Flow 11: Hunter Domain Search finds a decision-maker ────────────────────
+await test('Hunter Domain Search selects and resolves the preferred named decision-maker', async () => {
   const { store, valuesApi } = makeFakeSheet();
   const repo = createRepo(valuesApi);
   seedAgency(store, {
     agency_id: 'ag_11', agency_name: 'Kestrel & Co', domain: 'kestrelco.co.uk', probe_sent: 'YES',
     owner_md: '', primary_contact_email: 'info@kestrelco.co.uk', notes: 'Existing note.',
   });
-  const research = async () => ({
-    found: true, person_name: 'Helen Kestrel', role: 'MANAGING_DIRECTOR', role_title: 'Managing Director',
-    evidence: 'Named as Managing Director on the agency About page and at Companies House.',
-    source_url: 'https://kestrelco.co.uk/about', source_type: 'AGENCY_WEBSITE', confidence: 'HIGH',
-  });
-  const hunter = makeHunter({ email: 'helen.kestrel@kestrelco.co.uk', score: 88, position: 'Managing Director' });
+  const domainSearch = makeDomainSearch([
+    { full_name: 'Sam Senior', position: 'Chief Operating Officer', email: 'sam@kestrelco.co.uk', decision_maker: true, confidence: 99 },
+    { full_name: 'Helen Kestrel', position: 'Managing Director', email: 'helen.kestrel@kestrelco.co.uk', decision_maker: true, confidence: 88 },
+  ]);
+  const finder = makeHunter({ email: 'never@used.co.uk' });
   const result = await resolveAgencyContact(repo, 'ag_11', baseOptions({
     verifyEmailImpl: makeVerifier({ 'helen.kestrel@kestrelco.co.uk': 'VALID' }),
-    findEmailImpl: hunter,
-    researchOwnerImpl: research,
+    findEmailImpl: finder,
+    findDomainDecisionMakersImpl: domainSearch,
   }));
 
   assert.equal(result.owner_md.value, 'Helen Kestrel');
   assert.equal(result.owner_md.was_blank, true);
-  assert.equal(result.owner_md.research.source_type, 'AGENCY_WEBSITE');
-  assert.deepEqual(hunter.calls[0], { name: 'Helen Kestrel', domain: 'kestrelco.co.uk' });
+  assert.equal(result.owner_md.source, 'HUNTER_DOMAIN_SEARCH');
+  assert.equal(result.owner_md.research, null);
+  assert.equal(finder.calls.length, 0, 'Domain Search already supplied the address');
   assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
+  assert.equal(result.selected_contact.email_source, 'HUNTER_DOMAIN_SEARCH');
 
   const agency = rowsAsObjects(store, 'AGENCIES', AGENCIES_HEADER)[0];
-  assert.equal(agency.owner_md, 'Helen Kestrel');
+  assert.equal(agency.owner_md, '', 'contact resolution does not mutate owner_md');
   assert.match(agency.notes, /Existing note\./);
-  assert.match(agency.notes, /Helen Kestrel/);
-  assert.match(agency.notes, /kestrelco\.co\.uk\/about/);
+});
+
+await test('Hunter decision-maker roles follow the required preference order', () => {
+  const people = [
+    { full_name: 'P Principal', position: 'Principal', decision_maker: true },
+    { full_name: 'D Director', position: 'Director', decision_maker: true },
+    { full_name: 'F Founder', position: 'Co-Founder', decision_maker: true },
+    { full_name: 'O Owner', position: 'Owner', decision_maker: true },
+  ];
+  assert.equal(rankHunterDecisionMaker({ position: 'Branch Owner', decision_maker: true }), 7);
+  assert.equal(selectHunterDecisionMaker(people).full_name, 'O Owner');
+  assert.equal(selectHunterDecisionMaker([{ full_name: 'J Junior', position: 'Negotiator', decision_maker: false }]), null);
 });
 
 // ── Hunter verdict vocabulary ───────────────────────────────────────────────
@@ -741,6 +776,39 @@ await test('Hunter Finder exposes its embedded verdict and Email Verifier normal
     assert.equal(verifierUrl.pathname, '/v2/email-verifier');
     assert.equal(verified.verification_status, 'RISKY');
     assert.equal(verified.score, 82);
+  } finally {
+    if (originalKey === undefined) delete process.env.HUNTER_API_KEY;
+    else process.env.HUNTER_API_KEY = originalKey;
+  }
+});
+
+await test('Hunter Domain Search requests named personal decision-makers and normalises them', async () => {
+  const originalKey = process.env.HUNTER_API_KEY;
+  process.env.HUNTER_API_KEY = 'test-key';
+  try {
+    let requestedUrl;
+    const people = await findDomainDecisionMakers({ domain: 'Example.co.uk' }, {
+      fetchImpl: async (url) => {
+        requestedUrl = url;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ data: { emails: [{
+            value: 'alex.owner@example.co.uk', first_name: 'Alex', last_name: 'Owner',
+            position: 'Owner', decision_maker: true, confidence: 96,
+            verification: { status: 'valid', date: '2026-08-25' },
+          }] } }),
+        };
+      },
+    });
+    assert.equal(requestedUrl.pathname, '/v2/domain-search');
+    assert.equal(requestedUrl.searchParams.get('domain'), 'example.co.uk');
+    assert.equal(requestedUrl.searchParams.get('type'), 'personal');
+    assert.equal(requestedUrl.searchParams.get('decision_maker'), 'true');
+    assert.equal(requestedUrl.searchParams.get('required_field'), 'full_name,position');
+    assert.deepEqual(people.map(({ full_name, position, email, decision_maker }) => ({ full_name, position, email, decision_maker })), [{
+      full_name: 'Alex Owner', position: 'Owner', email: 'alex.owner@example.co.uk', decision_maker: true,
+    }]);
   } finally {
     if (originalKey === undefined) delete process.env.HUNTER_API_KEY;
     else process.env.HUNTER_API_KEY = originalKey;
@@ -999,25 +1067,20 @@ await test('a high-score senior director Accept All hit may be selected as RISKY
     agency_id: 'ag_dir', agency_name: 'Partner Estates', domain: 'partnerestates.co.uk',
     primary_contact_email: 'hello@partnerestates.co.uk',
   });
-  // Research identifies a DIRECTOR, not the owner/MD.
-  const research = async () => ({
-    found: true, person_name: 'Dana Reeve', role: 'DIRECTOR', role_title: 'Director',
-    evidence: 'Listed as a director at Companies House.',
-    source_url: 'https://find-and-update.company-information.service.gov.uk/x',
-    source_type: 'COMPANIES_HOUSE', confidence: 'HIGH',
-  });
   const verifier = makeVerifier({
     'dana.reeve@partnerestates.co.uk': 'RISKY',
     'hello@partnerestates.co.uk': 'VALID',
   });
   const result = await resolveAgencyContact(repo, 'ag_dir', baseOptions({
     verifyEmailImpl: verifier,
-    findEmailImpl: makeHunter({ email: 'dana.reeve@partnerestates.co.uk', score: 98, verification_status: 'RISKY' }),
-    researchOwnerImpl: research,
+    findDomainDecisionMakersImpl: makeDomainSearch([{
+      full_name: 'Dana Reeve', position: 'Director', email: 'dana.reeve@partnerestates.co.uk',
+      confidence: 98, decision_maker: true, verification_status: 'RISKY',
+    }]),
   }));
 
   assert.equal(result.hunter.high_confidence, true, 'the score itself is high');
-  assert.equal(result.hunter.caution_rule_applies, true, 'a researched director is clearly senior');
+  assert.equal(result.hunter.caution_rule_applies, true, 'a Hunter-identified director is clearly senior');
   assert.equal(result.selected_contact.email, 'dana.reeve@partnerestates.co.uk');
   assert.equal(result.selected_contact.verification_status, 'RISKY');
   // Verified explicitly before selection, and the generic inbox below it is not.
@@ -1361,6 +1424,7 @@ await test('past the cap, an unproven standing selection is reconciled, not blan
   const repo = createRepo(valuesApi);
   seedAgency(store, {
     agency_id: 'ag_cap_rec', agency_name: 'Cap Reconcile', domain: 'capreconcile.co.uk', probe_sent: 'YES',
+    owner_md: 'Casey Reconcile',
     primary_contact_email: 'a@capreconcile.co.uk',
     other_known_emails: 'b@capreconcile.co.uk, c@capreconcile.co.uk',
   });
@@ -1562,7 +1626,6 @@ await test('a missing outreach column is reported, not swallowed', async () => {
   backing.store.AGENCIES = store.AGENCIES;
   const result = await resolveAgencyContact(createRepo(backing.valuesApi), 'ag_nocols', baseOptions({
     verifyEmailImpl: makeVerifier({ 'hello@nocols.co.uk': 'VALID' }),
-    researchOwnerImpl: noResearch,
   }));
   assert.equal(result.selected_contact.email, 'hello@nocols.co.uk');
   assert.deepEqual(
@@ -1651,6 +1714,18 @@ await test('backlog listing covers probed-unresolved agencies only and resolves 
   assert.deepEqual(all.map((a) => a.agency_id), ['ag_p1', 'ag_p2']);
   // Nothing was written by listing.
   assert.equal(rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER).length, 0);
+});
+
+// ── Hard provider boundary ──────────────────────────────────────────────────
+await test('contact resolution has no owner-research, Anthropic or web-search dependency', () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const resolverSource = fs.readFileSync(path.join(root, 'lib/contact-resolution.mjs'), 'utf8');
+  const executableSource = resolverSource
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('//'))
+    .join('\n');
+  assert.doesNotMatch(executableSource, /owner-research|researchOwner|ai-client|Anthropic|Claude|web_search/i);
+  assert.match(executableSource, /from ['"]\.\/hunter\.mjs['"]/);
 });
 
 // ── Serverless Function count must not increase ─────────────────────────────
