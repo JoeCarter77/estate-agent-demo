@@ -379,19 +379,17 @@
     border:1px solid rgba(157,192,245,.18);
     background:linear-gradient(180deg, rgba(23,45,103,.42), rgba(9,20,44,.22));
     box-shadow:0 30px 80px rgba(2,7,20,.3), inset 0 1px 0 rgba(255,255,255,.05);
-    display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; }
-  .cta-eyebrow{ font-size:var(--t-label); font-weight:700; letter-spacing:.19em; text-transform:uppercase; color:var(--cyan); }
-  .cta-subline{ font-size:var(--t-sm); color:var(--ink-3); max-width:44ch; }
-  /* The agency's name is the variable in this line and can be long, so it is
-     balanced rather than left to break wherever it runs out. */
-  .cta-headline.long{ font-size:clamp(1.12rem,.92rem + .48vw,1.62rem); max-width:32ch; }
-  .cta-headline{ font-family:var(--serif); font-size:clamp(1.4rem,1.05rem + .78vw,2.25rem); font-weight:600; line-height:1.24; letter-spacing:-.016em; color:var(--ink); max-width:24ch; text-wrap:balance; }
-  .cta-btn{ display:inline-flex; align-items:center; gap:11px; margin-top:12px; background:#fff; color:#0B1B3F; border:none; border-radius:100px; padding:clamp(14px,1.4vw,18px) clamp(24px,2.6vw,34px); font-family:var(--sans); font-size:var(--t-body); font-weight:700; letter-spacing:-.005em; cursor:pointer; box-shadow:0 14px 36px rgba(2,7,20,.38); transition:transform .2s cubic-bezier(.34,1.4,.64,1), box-shadow .2s ease; }
+    display:flex; flex-direction:column; align-items:center; gap:11px; text-align:center; }
+  .cta-eyebrow{ font-size:clamp(.54rem,.52rem + .03vw,.6rem); font-weight:700; letter-spacing:.26em; text-transform:uppercase; color:rgba(125,211,252,.72); }
+  .cta-subline{ font-size:var(--t-sm); color:rgba(178,196,231,.74); max-width:38ch; }
+  .cta-headline{ font-family:var(--serif); font-size:clamp(1.22rem,.95rem + .62vw,1.92rem); font-weight:600; line-height:1.14; letter-spacing:-.016em; color:var(--ink); max-width:22ch; text-wrap:balance; margin-top:2px; }
+  .cta-headline .cta-accent{ color:var(--blue); }
+  .cta-btn{ display:inline-flex; align-items:center; gap:9px; margin-top:4px; background:#fff; color:#0B1B3F; border:none; border-radius:100px; padding:clamp(11px,1.15vw,15px) clamp(20px,2.15vw,28px); font-family:var(--sans); font-size:clamp(.79rem,.76rem + .08vw,.88rem); font-weight:700; letter-spacing:-.005em; cursor:pointer; box-shadow:0 14px 36px rgba(2,7,20,.38); transition:transform .2s cubic-bezier(.34,1.4,.64,1), box-shadow .2s ease; }
   .cta-btn:hover{ transform:translateY(-2px); box-shadow:0 20px 46px rgba(2,7,20,.44); }
   .cta-btn:active{ transform:translateY(0) scale(.99); }
-  .cta-btn svg{ width:13px; height:13px; transition:transform .2s cubic-bezier(.34,1.4,.64,1); }
+  .cta-btn svg{ width:11px; height:11px; transition:transform .2s cubic-bezier(.34,1.4,.64,1); }
   .cta-btn:hover svg{ transform:translateX(3px); }
-  .cta-support{ font-size:var(--t-sm); line-height:1.65; color:var(--ink-3); max-width:48ch; margin-top:2px; }
+  .cta-support{ font-size:var(--t-sm); line-height:1.58; color:rgba(178,196,231,.68); max-width:44ch; }
   .calendly-wrap{ width:100%; max-width:620px; margin-top:14px; display:none; }
   .calendly-wrap.show{ display:block; }
   .calendly-inline-widget{ min-width:280px; height:560px; border-radius:14px; overflow:hidden; border:1px solid var(--hair); background:#fff; }
@@ -734,13 +732,13 @@
 
         <!-- ONE obvious next action, in its own space. -->
         <div class="cta rv">
-          <span class="cta-eyebrow">We found this from one enquiry.</span>
-          <p class="cta-subline">And this is only the opportunity visible from the outside.</p>
-          <p class="cta-headline">Let&rsquo;s find what else is being missed.</p>
-          <button class="cta-btn" onclick="revealCalendly()">Find the opportunities
+          <span class="cta-eyebrow">One enquiry showed us this.</span>
+          <p class="cta-subline">What would the full agency show?</p>
+          <p class="cta-headline">How much opportunity is sitting <span class="cta-accent">inside your agency</span>?</p>
+          <button class="cta-btn" onclick="revealCalendly()">Show me the full picture
             <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow"/></svg>
           </button>
-          <p class="cta-support">Give me 30 minutes and we&rsquo;ll map the same intelligence across your agency &mdash; from new enquiries to applicants, past vendors and previous valuations.</p>
+          <p class="cta-support">Give me 30 minutes and we&rsquo;ll map the opportunities already sitting across your enquiries, applicants, past vendors and previous valuations.</p>
 
           <div class="calendly-wrap" id="calendly-wrap">
             <div class="calendly-inline-widget" data-url="https://calendly.com/joe-getnovus/10min?hide_gdpr_banner=1"></div>
