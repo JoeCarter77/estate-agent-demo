@@ -67,6 +67,7 @@ import crypto from 'node:crypto';
 import { getRepo } from '../../../lib/sheets.mjs';
 import { runRebuildPass } from '../../../lib/rebuild-pass.mjs';
 import { uploadEligibleOutboundLeads } from '../../../lib/instantly-outbound.mjs';
+import { reconcileActionEngine } from '../../../lib/action-engine.mjs';
 
 export const maxDuration = 60;
 
@@ -132,7 +133,16 @@ export default async function handler(req, res) {
         campaignId: process.env.INSTANTLY_CAMPAIGN_ID,
       },
     });
-    return res.status(200).json(summary);
+    // Periodic reconciliation is deliberately last and failure-isolated: it
+    // projects the evidence the existing nightly pipeline just wrote, but can
+    // never prevent probe finalisation or Instantly handoff.
+    let actions;
+    try { actions = await reconcileActionEngine(repo); }
+    catch (err) {
+      console.error('nightly action reconciliation failed:', err?.message || err);
+      actions = { available: false, error: err?.message || 'action reconciliation failed' };
+    }
+    return res.status(200).json({ ...summary, actions });
   } catch (err) {
     console.error('intelligence finalize (cron) error:', err);
     return res.status(500).json({ error: err.message || 'Failed to finalise expired probes' });

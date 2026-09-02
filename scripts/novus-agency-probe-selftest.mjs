@@ -70,6 +70,10 @@ function makeFakeSheet({ agenciesHeader = AGENCIES_HEADER } = {}) {
       });
       return {};
     },
+    async deleteRows(tab, rowNumbers) {
+      for (const rowNumber of [...rowNumbers].sort((a, b) => b - a)) store[tab].splice(rowNumber - 1, 1);
+      return {};
+    },
   }};
 }
 
@@ -205,12 +209,13 @@ async function run() {
     assert.strictEqual(store.PROBES.length, before, 'no PROBES row written for an unknown agency');
     ok('an unknown agency_id is rejected (400) and writes nothing');
 
-    // 6) Probes created without an agency (the pre-existing flow) still work.
+    // 6) Probes without a canonical agency are blocked: orphan evidence must
+    //    not enter the acquisition lifecycle.
     const noAgency = mockRes();
     await createHandler(mockReq({ body: { action: 'create', url: 'https://www.rightmove.co.uk/properties/2' } }), noAgency);
-    assert.strictEqual(noAgency.statusCode, 200);
-    assert.strictEqual(noAgency.body.probe.agency_id, '');
-    ok('creating a probe with no agency_id is unchanged (stays empty, no regression)');
+    assert.strictEqual(noAgency.statusCode, 400);
+    assert.match(noAgency.body.error, /Missing agency_id/);
+    ok('creating a probe with no agency_id is blocked and writes no orphan row');
 
     // 7) Rehydration returns the same probe, with its agency link intact.
     const probeId = cRes.body.probe.probe_id;
@@ -219,7 +224,7 @@ async function run() {
     assert.strictEqual(rRes.statusCode, 200);
     assert.strictEqual(rRes.body.probe.probe_id, probeId);
     assert.strictEqual(rRes.body.probe.agency_id, ANDREW_GRANGER_ID);
-    assert.strictEqual(store.PROBES.length, before + 1, 'rehydration created no new probe row');
+    assert.strictEqual(store.PROBES.length, before, 'rehydration created no new probe row');
     ok('?probe_id= rehydrates the existing probe (agency link intact, no new row)');
 
     __setRepoForTests(null);
@@ -361,15 +366,50 @@ async function run() {
     assert.strictEqual(store.AGENCIES[2].length, headerWithout.length, 'no stray cell appended');
     ok('a sheet with no probe_sent column still marks sent normally (no crash, no stray cell)');
 
-    // A probe with no agency at all.
+    // A probe with no agency is rejected before mark-sent can be reached.
     const noAgency = mockRes();
     await createHandler(mockReq({ body: { action: 'create', url: 'https://www.rightmove.co.uk/properties/2' } }), noAgency);
-    const m2 = mockRes();
-    await markHandler(mockReq({ body: { action: 'mark-sent', probe_id: noAgency.body.probe.probe_id } }), m2);
-    assert.strictEqual(m2.statusCode, 200);
-    assert.strictEqual(m2.body.probe.probe_status, 'observing');
-    ok('a probe with no agency_id marks sent normally, touching no agency row');
+    assert.strictEqual(noAgency.statusCode, 400);
+    assert.match(noAgency.body.error, /Missing agency_id/);
+    ok('a probe with no agency_id is rejected before it can be marked sent');
 
+    __setRepoForTests(null);
+  }
+
+  console.log('\nPart F — automatic selection and safe Skip Agency');
+  {
+    const { store, valuesApi } = makeFakeSheet();
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_probed', agency_name: 'Already Probed' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_delete', agency_name: 'Bad Upstream Lead', updated_at: '2026-09-03T10:00:00Z' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_history', agency_name: 'Has History' }));
+    store.PROBES.push(PROBES_HEADER.map((key) => ({ probe_id: 'prb_existing', agency_id: 'ag_probed', probe_status: 'closed' }[key] ?? '')));
+    store.PROBES.push(PROBES_HEADER.map((key) => ({ probe_id: 'prb_history', agency_id: 'ag_history', probe_status: 'closed' }[key] ?? '')));
+    __setRepoForTests(createRepo(valuesApi));
+    const { default: handler } = await import('../api/novus/probe.js');
+
+    const next = mockRes();
+    await handler(mockReq({ method: 'GET', query: { next: '1' } }), next);
+    assert.equal(next.statusCode, 200);
+    assert.equal(next.body.agency.agency_id, 'ag_delete');
+    ok('next=1 automatically skips agencies that already have any probe');
+
+    const noConfirm = mockRes();
+    await handler(mockReq({ body: { action: 'skip-agency', agency_id: 'ag_delete' } }), noConfirm);
+    assert.equal(noConfirm.statusCode, 400);
+    ok('hard deletion requires the exact server confirmation token');
+
+    const deleted = mockRes();
+    await handler(mockReq({ body: { action: 'skip-agency', agency_id: 'ag_delete', expected_updated_at: '2026-09-03T10:00:00Z', confirm: 'DELETE_UNWORKED_AGENCY' } }), deleted);
+    assert.equal(deleted.statusCode, 200);
+    assert.equal(store.AGENCIES.some((row) => row[0] === 'ag_delete'), false);
+    ok('confirmed upstream-only agency is physically deleted');
+
+    const protectedHistory = mockRes();
+    await handler(mockReq({ body: { action: 'skip-agency', agency_id: 'ag_history', confirm: 'DELETE_UNWORKED_AGENCY' } }), protectedHistory);
+    assert.equal(protectedHistory.statusCode, 409);
+    assert.equal(store.AGENCIES.some((row) => row[0] === 'ag_history'), true);
+    assert.equal(protectedHistory.body.dependencies[0].tab, 'PROBES');
+    ok('downstream probe history blocks deletion and is retained');
     __setRepoForTests(null);
   }
 

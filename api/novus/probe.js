@@ -13,15 +13,18 @@ import { getRepo } from '../../lib/sheets.mjs';
 import { newProbeId, newProbeReference } from '../../lib/ids.mjs';
 import { fetchListingMeta } from '../../lib/rightmove-meta.mjs';
 import { requireAuth } from './_auth.mjs';
+import { reconcileAgencyActionsBestEffort } from '../../lib/action-engine.mjs';
 
 export const maxDuration = 20;
 
 // ── GET (was probe-get.js) ──────────────────────────────────────────────────
 
-function isProbeEligible(agency) {
+export function isProbeEligible(agency, probedAgencyIds = new Set()) {
   const url = String(agency.rightmove_sales_branch_url ?? '').trim();
   if (!/^https?:\/\//i.test(url)) return false;
   if (String(agency.suppression_status ?? '').trim().toLowerCase() === 'suppressed') return false;
+  if (['closed', 'excluded', 'meeting_booked', 'not_interested'].includes(String(agency.current_pipeline_status ?? '').trim().toLowerCase())) return false;
+  if (probedAgencyIds.has(String(agency.agency_id ?? '').trim())) return false;
   return true;
 }
 
@@ -29,20 +32,24 @@ async function handleGet(req, res) {
   const probeId = (req.query?.probe_id || '').trim();
   const agencyId = (req.query?.agency_id || '').trim();
   const nextAfter = (req.query?.next_after || '').trim();
-  if (!probeId && !agencyId && !nextAfter) {
-    return res.status(400).json({ error: 'Missing probe_id, agency_id or next_after' });
+  const next = String(req.query?.next || '') === '1';
+  if (!probeId && !agencyId && !nextAfter && !next) {
+    return res.status(400).json({ error: 'Missing probe_id, agency_id, next_after or next=1' });
   }
 
   try {
     const repo = getRepo();
 
-    if (nextAfter) {
-      const agencies = await repo.getRecords('AGENCIES', 'agency_id');
-      const from = agencies.findIndex((r) => r.obj.agency_id === nextAfter);
-      if (from === -1) return res.status(404).json({ error: 'Agency not found' });
-      const next = agencies.slice(from + 1).find((r) => isProbeEligible(r.obj));
-      if (!next) return res.status(404).json({ error: 'No further eligible agency in the list' });
-      return res.status(200).json({ agency: next.obj });
+    if (nextAfter || next) {
+      const [agencies, probes] = await Promise.all([
+        repo.getRecords('AGENCIES', 'agency_id'), repo.getRecords('PROBES', 'probe_id'),
+      ]);
+      const probed = new Set(probes.map((record) => String(record.obj.agency_id || '').trim()).filter(Boolean));
+      const from = nextAfter ? agencies.findIndex((r) => String(r.obj.agency_id || '').trim() === nextAfter) : -1;
+      if (nextAfter && from === -1) return res.status(404).json({ error: 'Agency not found' });
+      const found = agencies.slice(from + 1).find((r) => isProbeEligible(r.obj, probed));
+      if (!found) return res.status(404).json({ error: nextAfter ? 'No further eligible agency in the list' : 'No eligible agency is ready to probe' });
+      return res.status(200).json({ agency: found.obj });
     }
 
     if (agencyId) {
@@ -179,10 +186,67 @@ async function handleMarkSent(body, res) {
       console.error('probe (mark-sent): could not set AGENCIES.probe_sent:', err);
     }
 
-    return res.status(200).json({ probe: updated, already_sent: false });
+    const actions = await reconcileAgencyActionsBestEffort(repo, record.obj.agency_id, 'probe sent');
+
+    return res.status(200).json({ probe: updated, already_sent: false, actions });
   } catch (err) {
     console.error('probe (mark-sent) error:', err);
     return res.status(500).json({ error: err.message || 'Failed to mark probe as sent' });
+  }
+}
+
+const DOWNSTREAM_TABS = [
+  ['PROBES', 'probe_id'], ['COMMUNICATIONS', 'communication_id'], ['INTELLIGENCE', 'intelligence_id'],
+  ['PERSONALISATION', 'probe_id'], ['DEMOS', 'demo_id'], ['OUTBOUND', 'outbound_id'],
+  ['REPLY_EVENTS', 'reply_event_id'], ['SALES_MESSAGES', 'sales_message_id'], ['ACTIONS', 'action_id'],
+];
+
+async function recordsOrEmpty(repo, tab, idColumn) {
+  try { return await repo.getRecords(tab, idColumn); } catch { return []; }
+}
+
+async function handleSkipAgency(body, res) {
+  const agencyId = String(body.agency_id || '').trim();
+  if (!agencyId) return res.status(400).json({ error: 'Missing agency_id' });
+  if (String(body.confirm || '').trim() !== 'DELETE_UNWORKED_AGENCY') {
+    return res.status(400).json({ error: 'Missing confirm=DELETE_UNWORKED_AGENCY' });
+  }
+  try {
+    const repo = getRepo();
+    const agency = await repo.findById('AGENCIES', 'agency_id', agencyId);
+    if (!agency) return res.status(404).json({ error: 'Agency not found' });
+    if (body.expected_updated_at && String(agency.obj.updated_at || '').trim() !== String(body.expected_updated_at).trim()) {
+      return res.status(409).json({ error: 'Agency changed since it was loaded; refresh before deleting' });
+    }
+    const [agencyRows, probeRows] = await Promise.all([
+      repo.getRecords('AGENCIES', 'agency_id'), repo.getRecords('PROBES', 'probe_id'),
+    ]);
+    const agencyIndex = agencyRows.findIndex((record) => String(record.obj.agency_id || '').trim() === agencyId);
+    const probed = new Set(probeRows.map((record) => String(record.obj.agency_id || '').trim()).filter(Boolean));
+    const nextAgency = agencyRows.slice(agencyIndex + 1).find((record) => isProbeEligible(record.obj, probed));
+    const dependencies = [];
+    for (const [tab, idColumn] of DOWNSTREAM_TABS) {
+      const rows = await recordsOrEmpty(repo, tab, idColumn);
+      const count = rows.filter((record) => String(record.obj.agency_id || '').trim() === agencyId).length;
+      if (count) dependencies.push({ tab, count });
+    }
+    if (dependencies.length) {
+      return res.status(409).json({
+        error: 'Agency cannot be hard-deleted because downstream history exists',
+        agency_id: agencyId, dependencies,
+      });
+    }
+    const contacts = (await recordsOrEmpty(repo, 'CONTACTS', 'contact_id'))
+      .filter((record) => String(record.obj.agency_id || '').trim() === agencyId);
+    // CONTACTS are agency-scoped in the existing schema, so these are the
+    // allowed exclusive upstream records. Delete bottom-up, then the agency.
+    if (contacts.length) await repo.deleteRows('CONTACTS', contacts.map((record) => record.rowNumber));
+    await repo.deleteRows('AGENCIES', [agency.rowNumber]);
+    console.info('probe skip: deleted unworked agency', { agency_id: agencyId, agency_name: agency.obj.agency_name, contacts_deleted: contacts.length });
+    return res.status(200).json({ deleted: true, agency_id: agencyId, contacts_deleted: contacts.length, next_agency_id: String(nextAgency?.obj?.agency_id || '').trim() });
+  } catch (err) {
+    console.error('probe skip agency error:', err);
+    return res.status(500).json({ error: err?.message || 'Failed to delete unworked agency' });
   }
 }
 
@@ -198,6 +262,7 @@ export default async function handler(req, res) {
     const body = typeof req.body === 'string' ? safeParse(req.body) : req.body || {};
     if (body.action === 'create') return handleCreate(body, res);
     if (body.action === 'mark-sent') return handleMarkSent(body, res);
+    if (body.action === 'skip-agency') return handleSkipAgency(body, res);
     return res.status(400).json({ error: 'Missing or unknown action — expected "create" or "mark-sent"' });
   }
 

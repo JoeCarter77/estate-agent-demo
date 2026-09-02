@@ -37,6 +37,8 @@
     .btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
     .btn-green{background:var(--green);color:#fff;box-shadow:0 6px 16px rgba(34,197,94,.28);}
     .btn-green:hover{filter:brightness(1.05);transform:translateY(-1px);}
+    .btn-danger{background:#fff;color:#B91C1C;border:1px solid rgba(239,68,68,.35);}
+    .btn-danger:hover{background:rgba(239,68,68,.06);}
     .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;}
     .mt{margin-top:14px;}
     .status-tag{display:inline-flex;align-items:center;gap:6px;font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:5px 11px;border-radius:100px;}
@@ -79,6 +81,7 @@
         <input id="agency-name" type="text" value="" readonly />
         <a id="rm-agent-link" class="btn btn-ghost mt hidden" href="#" target="_blank" rel="noopener"
            style="display:none;text-align:center;text-decoration:none;">Open Rightmove agent page ↗</a>
+        <button id="skip-btn" class="btn btn-danger mt" type="button">Skip agency</button>
         <div id="rm-popup-note" class="hint hidden">The agency's Rightmove page was blocked by your browser's popup blocker. Click the button above to open it, or allow popups for this site to have both pages open automatically from one click.</div>
       </div>
 
@@ -133,6 +136,7 @@
     const $ = (id) => document.getElementById(id);
     let currentProbe = null;
     let launchAgencyId = '';
+    let launchAgencyUpdatedAt = '';
 
     // Basic Auth is enforced by the edge middleware on this page load, so the
     // browser already holds credentials for this origin and attaches them to
@@ -234,10 +238,42 @@
       try {
         const data = await api('/api/novus/probe', { method: 'POST', body: JSON.stringify({ action: 'mark-sent', probe_id: currentProbe.probe_id }) });
         render(data.probe);
+        // A successful send starts observation; immediately hand the operator
+        // to the next genuinely unprobed eligible agency.
+        if (activeAgencyId()) {
+          try {
+            const next = await api('/api/novus/probe?next_after=' + encodeURIComponent(activeAgencyId()), { method: 'GET' });
+            window.location.href = '/novus/probe?agency_id=' + encodeURIComponent(next.agency.agency_id);
+          } catch (nextError) {
+            showErr($('mark-err'), 'Probe sent. ' + nextError.message);
+          }
+        }
       } catch (e) {
         showErr($('mark-err'), e.message);
       } finally {
         btn.disabled = false; btn.textContent = 'Mark as Sent';
+      }
+    });
+
+    $('skip-btn').addEventListener('click', async () => {
+      const agencyId = activeAgencyId();
+      if (!agencyId) return;
+      const name = $('agency-name').value || agencyId;
+      if (!window.confirm(`Permanently delete ${name} from the acquisition pool? This only succeeds when no downstream history exists.`)) return;
+      const btn = $('skip-btn');
+      btn.disabled = true; btn.textContent = 'Checking history…';
+      clearErr($('create-err'));
+      try {
+        const result = await api('/api/novus/probe', { method: 'POST', body: JSON.stringify({
+          action: 'skip-agency', agency_id: agencyId, expected_updated_at: launchAgencyUpdatedAt,
+          confirm: 'DELETE_UNWORKED_AGENCY',
+        }) });
+        window.location.href = result.next_agency_id
+          ? '/novus/probe?agency_id=' + encodeURIComponent(result.next_agency_id)
+          : '/novus/probe?next=1';
+      } catch (e) {
+        showErr($('create-err'), e.message);
+        btn.disabled = false; btn.textContent = 'Skip agency';
       }
     });
 
@@ -291,6 +327,20 @@
       const params = new URLSearchParams(window.location.search);
       const probeId = (params.get('probe_id') || '').trim();
       const agencyId = (params.get('agency_id') || '').trim();
+      const loadNext = (params.get('next') || '') === '1';
+
+      if (loadNext && !probeId && !agencyId) {
+        $('view-new').classList.add('hidden');
+        $('view-loading').classList.remove('hidden');
+        try {
+          const data = await api('/api/novus/probe?next=1', { method: 'GET' });
+          window.location.replace('/novus/probe?agency_id=' + encodeURIComponent(data.agency.agency_id));
+        } catch (e) {
+          $('view-loading').classList.add('hidden'); $('view-new').classList.remove('hidden');
+          showErr($('create-err'), e.message);
+        }
+        return;
+      }
 
       if (probeId) {
         $('view-new').classList.add('hidden');
@@ -316,6 +366,7 @@
         try {
           const data = await api('/api/novus/probe?agency_id=' + encodeURIComponent(agencyId), { method: 'GET' });
           $('agency-name').value = data.agency.agency_name || agencyId;
+          launchAgencyUpdatedAt = String(data.agency.updated_at || '');
 
           // ONE-CLICK LAUNCH — the agency's own Rightmove branch page, taken
           // from the existing AGENCIES.rightmove_sales_branch_url column

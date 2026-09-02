@@ -37,6 +37,9 @@
     .stat.alert .n{color:var(--red);}
     .stat.good{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.05);}
     .stat.good .n{color:#16A34A;}
+    .stat.link{cursor:pointer;text-decoration:none;color:inherit;}
+    .stat.link:hover{border-color:var(--accent);}
+    .action-bar{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 22px;}
 
     /* controls */
     .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px;}
@@ -187,11 +190,28 @@
     <div class="summary">
       <div class="stat alert"><div class="n" id="s-attention">&mdash;</div><div class="l">Needs attention</div></div>
       <div class="stat"><div class="n" id="s-total">&mdash;</div><div class="l">Active leads</div></div>
+      <a class="stat link" href="/novus/probe?next=1"><div class="n" id="s-probe">&mdash;</div><div class="l">Ready to probe</div></a>
+      <div class="stat"><div class="n" id="s-observing">&mdash;</div><div class="l">Probe observing</div></div>
+      <div class="stat"><div class="n" id="s-preparing">&mdash;</div><div class="l">Preparing outreach</div></div>
+      <div class="stat"><div class="n" id="s-first-email">&mdash;</div><div class="l">Waiting first email</div></div>
       <div class="stat"><div class="n" id="s-sequence">&mdash;</div><div class="l">Sequence running</div></div>
       <div class="stat"><div class="n" id="s-replied">&mdash;</div><div class="l">Replied</div></div>
-      <div class="stat"><div class="n" id="s-engaged">&mdash;</div><div class="l">Demo engaged</div></div>
+      <div class="stat"><div class="n" id="s-demo-sent">&mdash;</div><div class="l">Demos sent</div></div>
+      <div class="stat"><div class="n" id="s-engaged">&mdash;</div><div class="l">Demos opened</div></div>
+      <div class="stat alert"><div class="n" id="s-calls">&mdash;</div><div class="l">Calls due</div></div>
+      <div class="stat alert"><div class="n" id="s-exceptions">&mdash;</div><div class="l">Exceptions</div></div>
       <div class="stat good"><div class="n" id="s-meetings">&mdash;</div><div class="l">Meetings</div></div>
     </div>
+
+    <div class="action-bar">
+      <a class="btn btn-ghost" href="/novus/probe?next=1" style="text-decoration:none">Open Prober &rarr;</a>
+      <button id="reconcile" class="btn btn-ghost">Reconcile actions</button>
+    </div>
+
+    <section>
+      <div class="sec-head"><div class="sec-title">Funnel conversions</div><span class="sec-note">Numerator / denominator; blank when the denominator is zero.</span></div>
+      <div class="panel quiet"><table><thead><tr><th>Conversion</th><th>Rate</th><th>Volume</th></tr></thead><tbody id="tb-conversions"></tbody></table></div>
+    </section>
 
     <!-- D/E. SEARCH + FILTERS -->
     <div class="controls">
@@ -223,6 +243,21 @@
           <tbody id="tb-attention"></tbody>
         </table>
         <div id="empty-attention" class="empty hidden">Nothing is waiting on you.</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-head">
+        <div class="sec-title">Exceptions</div>
+        <span class="sec-count" id="c-exceptions">0</span>
+        <span class="sec-note">Missing checkpoints, failed actions, or incomplete acquisition evidence.</span>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Agency</th><th>Exception</th><th>Stage</th><th class="col-hide">Why</th></tr></thead>
+          <tbody id="tb-exceptions"></tbody>
+        </table>
+        <div id="empty-exceptions" class="empty hidden">No acquisition exceptions.</div>
       </div>
     </section>
 
@@ -261,7 +296,7 @@
       </div>
     </section>
 
-    <div class="foot">NOVUS Operating System &middot; Command Centre V0.2 &middot; manual human replies</div>
+    <div class="foot">NOVUS Operating System &middot; Acquisition Command Centre</div>
   </div>
 
   <!-- 12. DETAIL DRAWER -->
@@ -283,7 +318,10 @@
     // Basic Auth is enforced by the edge middleware on this page load, so the
     // browser already holds credentials for this origin and attaches them to
     // the same-origin API calls below automatically. No token handling here.
-    const LEADS_URL = '/api/novus/personalisation?novus_operation=operator-leads';
+    const LEADS_URL = '/api/novus/personalisation?novus_operation=operator-dashboard';
+    const RECONCILE_URL = '/api/novus/personalisation?novus_operation=operator-actions-reconcile';
+    const MEETING_URL = '/api/novus/personalisation?novus_operation=operator-mark-meeting-booked';
+    const CALL_URL = '/api/novus/personalisation?novus_operation=operator-call-outcome';
     // READ-ONLY dry run. classify=0 keeps it zero-cost: no AI call, no write.
     const UNROUTED_URL = '/api/novus/personalisation?novus_operation=instantly-reply-poll-dry-run&classify=0&limit=50';
     // READ-ONLY, and deliberately NOT part of the leads load: it calls Instantly
@@ -293,6 +331,7 @@
     const MANUAL_REPLY_URL = '/api/novus/personalisation?novus_operation=operator-manual-reply';
 
     let LEADS = [];
+    let GLOBAL_EXCEPTIONS = [];
 
     // ---- rendering helpers -------------------------------------------------
 
@@ -313,11 +352,25 @@
       return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
     }
 
+    function remaining(iso) {
+      const ms = Date.parse(iso || '') - Date.now();
+      if (!Number.isFinite(ms)) return '';
+      if (ms <= 0) return 'due now';
+      const hours = Math.ceil(ms / 3600000);
+      return hours < 48 ? `${hours}h remaining` : `${Math.ceil(hours / 24)}d remaining`;
+    }
+
     const STATE_TONE = {
       MEETING_BOOKED: 'p-green', DEMO_ENGAGED: 'p-green', DEMO_SENT: 'p-blue',
       REPLIED: 'p-blue', SEQUENCE_RUNNING: 'p-grey', READY: 'p-grey',
       REVIEW_REQUIRED: 'p-amber', NURTURE: 'p-amber',
       NOT_INTERESTED: 'p-grey', OPTED_OUT: 'p-red', UNKNOWN: 'p-red',
+      READY_TO_PROBE: 'p-blue', PROBE_OBSERVING: 'p-purple', PROBE_IN_PROGRESS: 'p-amber',
+      PROBE_COMPLETE: 'p-blue', PREPARING_OUTREACH: 'p-amber', READY_FOR_OUTREACH: 'p-blue',
+      WAITING_FOR_FIRST_EMAIL: 'p-grey', REPLIED_NEEDS_HUMAN: 'p-amber', DEMO_REQUESTED: 'p-blue',
+      DEMO_SENT_UNOPENED: 'p-grey', DEMO_OPENED: 'p-green', DEMO_FOLLOWUP_SENT: 'p-blue',
+      MANUAL_REPLY_SENT_WAITING: 'p-grey', CALL_DUE: 'p-red', MEETING_INTENT: 'p-green',
+      NO_NEXT_ACTION: 'p-red', ERROR: 'p-red', CLOSED: 'p-grey', LEAD_POOL: 'p-grey',
     };
     const PRIORITY_TONE = { CRITICAL: 'p-red', HIGH: 'p-amber', NORMAL: 'p-blue', LOW: 'p-grey' };
     const CONTACT_TONE = { OWNER_DIRECT: 'p-purple', NAMED_HUMAN: 'p-blue', GENERIC: 'p-grey', UNKNOWN: 'p-grey' };
@@ -329,12 +382,12 @@
 
     function rowHtml(lead) {
       const nextAction = lead.next_action.type
-        ? `${esc(lead.next_action.type.replace(/_/g, ' '))}<div class="cell-sub">${dash(lead.next_action.status)}</div>`
+        ? `${esc(lead.next_action.type.replace(/_/g, ' '))}<div class="cell-sub">${dash(lead.next_action.owner)} · ${dash(when(lead.next_action.due_at))}</div><div class="cell-sub">${dash(lead.next_action.reason)}</div>`
         : '<span class="cell-sub">&mdash;</span>';
       const latest = lead.latest_event.type
         ? `${esc(lead.latest_event.summary)}<div class="cell-sub">${esc(when(lead.latest_event.at))}</div>`
         : '<span class="cell-sub">&mdash;</span>';
-      return `<tr data-id="${esc(lead.outbound_id)}">
+      return `<tr data-id="${esc(lead.agency_id)}">
         <td>
           <div class="cell-primary">${dash(lead.agency_name)}</div>
           <div class="cell-sub">${dash(lead.probe_summary.property_street)}</div>
@@ -343,7 +396,7 @@
           <div>${dash(lead.contact.name)}</div>
           <div class="cell-sub mono">${dash(lead.contact.email)}</div>
         </td>
-        <td>${pill(lead.current_state, STATE_TONE[lead.current_state])}</td>
+        <td>${pill(lead.current_stage, STATE_TONE[lead.current_stage])}</td>
         <td class="col-hide">${latest}</td>
         <td>${nextAction}</td>
         <td>${lead.priority ? pill(lead.priority, PRIORITY_TONE[lead.priority]) : '<span class="cell-sub">&mdash;</span>'}</td>
@@ -362,7 +415,7 @@
       }
       if ($('f-attention').checked && !lead.needs_human) return false;
       const state = $('f-state').value;
-      if (state && lead.current_state !== state) return false;
+      if (state && lead.current_stage !== state) return false;
       const priority = $('f-priority').value;
       if (priority && lead.priority !== priority) return false;
       const contact = $('f-contact').value;
@@ -381,6 +434,15 @@
       $('c-system').textContent = String(system.length);
       $('empty-attention').classList.toggle('hidden', attention.length > 0);
       $('empty-system').classList.toggle('hidden', system.length > 0);
+      const exceptions = visible.filter((l) => (l.exceptions || []).length);
+      const globalRows = GLOBAL_EXCEPTIONS.map((item) => `<tr style="cursor:default"><td class="cell-primary">System</td><td>${pill(item.type, 'p-red')}</td><td>&mdash;</td><td class="col-hide">${dash(item.reason)}</td></tr>`).join('');
+      $('tb-exceptions').innerHTML = globalRows + exceptions.map((lead) => `<tr data-id="${esc(lead.agency_id)}">
+        <td class="cell-primary">${dash(lead.agency_name)}</td>
+        <td>${(lead.exceptions || []).map((e) => pill(e, 'p-red')).join(' ')}</td>
+        <td>${pill(lead.current_stage, STATE_TONE[lead.current_stage])}</td>
+        <td class="col-hide">${dash(lead.current_stage_reason)}</td></tr>`).join('');
+      $('c-exceptions').textContent = String(exceptions.length + GLOBAL_EXCEPTIONS.length);
+      $('empty-exceptions').classList.toggle('hidden', exceptions.length + GLOBAL_EXCEPTIONS.length > 0);
     }
 
     // ---- drawer ------------------------------------------------------------
@@ -708,8 +770,8 @@
       }
     }
 
-    function openDrawer(outboundId) {
-      const lead = LEADS.find((l) => l.outbound_id === outboundId);
+    function openDrawer(agencyId) {
+      const lead = LEADS.find((l) => l.agency_id === agencyId);
       if (!lead) return;
 
       $('d-agency').textContent = lead.agency_name || '(no agency name)';
@@ -720,6 +782,7 @@
       parts.push(block('Agency & contact', 'Sales', 'tag-sales', kv([
         ['Contact', dash(lead.contact.name)],
         ['Email', `<span class="mono">${dash(lead.contact.email)}</span>`],
+        ['Phone', `<span class="mono">${dash(lead.contact.phone)}</span>`],
         ['Contact type', pill(lead.contact.contact_type, CONTACT_TONE[lead.contact.contact_type])],
         ['Verification', dash(lead.contact.email_verification_status)],
         ['Resolution', dash(lead.contact.resolution_status)],
@@ -727,17 +790,32 @@
       ])));
 
       parts.push(block('Current status', 'Sales', 'tag-sales', kv([
-        ['State', pill(lead.current_state, STATE_TONE[lead.current_state])],
-        ['Why', `<span class="muted">${dash(lead.current_state_reason)}</span>`],
+        ['Stage', pill(lead.current_stage, STATE_TONE[lead.current_stage])],
+        ['Why', `<span class="muted">${dash(lead.current_stage_reason)}</span>`],
         ['Priority', lead.priority ? pill(lead.priority, PRIORITY_TONE[lead.priority]) : '&mdash;'],
         ['Next action', dash(lead.next_action.type)],
         ['Action status', dash(lead.next_action.status)],
+        ['Owner', dash(lead.next_action.owner)],
+        ['Due', dash(when(lead.next_action.due_at))],
+        ['Action reason', `<span class="muted">${dash(lead.next_action.reason)}</span>`],
         ['Needs a human', lead.needs_human ? pill('YES', 'p-red') : pill('NO', 'p-grey')],
         ['Campaign', lead.outreach.handed_to_instantly
           ? `In sequence <span class="cell-sub">since ${esc(when(lead.outreach.instantly_added_at))}</span>`
           : `<span class="muted">not handed to Instantly (${dash(lead.outreach.outbound_status)})</span>`],
         ['Last error', lead.outreach.last_error ? `<span class="mono">${esc(lead.outreach.last_error)}</span>` : '&mdash;'],
       ])));
+
+      const action = lead.current_action || {};
+      const callControls = ['CALL_PROSPECT', 'RETRY_CALL'].includes(action.action_type) && action.action_id
+        ? `<div class="action-bar" style="margin-top:12px">
+          ${['NO_ANSWER','SPOKE_CONTINUE','MEETING_BOOKED','NOT_INTERESTED','CALL_LATER'].map((value) => `<button class="btn btn-ghost btn-mini call-outcome" data-outcome="${value}" data-action="${esc(action.action_id)}">${value.replace(/_/g, ' ')}</button>`).join('')}
+        </div>` : '';
+      const meetingControl = lead.current_stage !== 'MEETING_BOOKED' && !['OPTED_OUT','NOT_INTERESTED','CLOSED'].includes(lead.current_stage)
+        ? `<button class="btn btn-ghost mt" id="mark-meeting" data-agency="${esc(lead.agency_id)}">Mark Meeting Booked</button>` : '';
+      parts.push(block('Actions', 'Workflow', 'tag-sales',
+        (lead.action_history || []).length ? kv(lead.action_history.slice(0, 12).map((a) => [
+          `${a.action_type} · ${a.action_status}`, `${dash(when(a.due_at))}<div class="cell-sub">${dash(a.reason)}</div>`,
+        ])) : '<div class="note">No durable action history yet.</div>') + callControls + meetingControl);
 
       if (lead.reply.reply_count > 0) {
         parts.push(block('Latest reply', 'Sales', 'tag-sales',
@@ -785,6 +863,9 @@
           ['Grade reason', `<span class="muted">${dash(lead.probe_summary.grade_reason)}</span>`],
           ['Human response', dash(lead.probe_summary.human_contact)],
           ['Response time', lead.probe_summary.response_hours ? `${esc(lead.probe_summary.response_hours)} hrs` : '&mdash;'],
+          ['Probe sent', dash(when(lead.probe?.sent_at))],
+          ['Observation closes', `${dash(when(lead.probe?.observation_deadline))}${lead.probe?.observation_deadline ? `<div class="cell-sub">${esc(remaining(lead.probe.observation_deadline))}</div>` : ''}`],
+          ['Observation status', dash(lead.probe?.status)],
         ])
         + (lead.probe_summary.main_finding ? `<div class="quote">${esc(lead.probe_summary.main_finding)}</div>` : '')
         + (lead.probe_summary.email_observation ? `<div class="quote">${esc(lead.probe_summary.email_observation)}</div>` : '')));
@@ -805,7 +886,8 @@
 
       // ONE conversation GET, for THIS lead, now that it is actually open.
       CONV_LEAD = { outbound_id: lead.outbound_id, agency_name: lead.agency_name };
-      loadConversation(lead.outbound_id, lead.agency_name);
+      if (lead.outbound_id) loadConversation(lead.outbound_id, lead.agency_name);
+      else $('conv-body').innerHTML = '<div class="note">No OUTBOUND journey yet; live Instantly conversation is not applicable.</div>';
     }
 
     function closeDrawer() {
@@ -853,15 +935,34 @@
         if (!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
 
         LEADS = data.leads || [];
+        GLOBAL_EXCEPTIONS = data.global_exceptions || [];
         const counts = data.counts || {};
         $('s-attention').textContent = counts.needs_attention ?? 0;
-        $('s-total').textContent = counts.total ?? 0;
+        $('s-total').textContent = counts.active ?? counts.total ?? 0;
+        $('s-probe').textContent = counts.ready_to_probe ?? 0;
+        $('s-observing').textContent = counts.probe_observing ?? 0;
+        $('s-preparing').textContent = counts.preparing_outreach ?? 0;
+        $('s-first-email').textContent = counts.waiting_first_email ?? 0;
         $('s-sequence').textContent = counts.sequence_running ?? 0;
         $('s-replied').textContent = counts.replied ?? 0;
-        $('s-engaged').textContent = counts.demo_engaged ?? 0;
+        $('s-demo-sent').textContent = counts.demos_sent ?? 0;
+        $('s-engaged').textContent = counts.demos_opened ?? 0;
+        $('s-calls').textContent = counts.calls_due ?? 0;
+        $('s-exceptions').textContent = counts.exceptions ?? 0;
         $('s-meetings').textContent = counts.meetings ?? 0;
+        const conversions = data.metrics?.conversions || {};
+        const labels = {
+          probe_to_outreach: 'Probe → Outreach', outreach_to_reply: 'Outreach → Reply',
+          reply_to_positive: 'Reply → Positive', positive_to_demo_sent: 'Positive → Demo Sent',
+          demo_sent_to_open: 'Demo Sent → Demo Open', demo_open_to_meeting: 'Demo Open → Meeting',
+          outreach_to_meeting: 'Outreach → Meeting',
+        };
+        $('tb-conversions').innerHTML = Object.entries(labels).map(([key, label]) => {
+          const item = conversions[key] || {};
+          return `<tr style="cursor:default"><td class="cell-primary">${label}</td><td>${item.percent == null ? '&mdash;' : `${item.percent}%`}</td><td>${item.numerator ?? 0} / ${item.denominator ?? 0}</td></tr>`;
+        }).join('');
 
-        fillFilter($('f-state'), [...new Set(LEADS.map((l) => l.current_state))].sort());
+        fillFilter($('f-state'), [...new Set(LEADS.map((l) => l.current_stage))].sort());
         fillFilter($('f-priority'), ['CRITICAL', 'HIGH', 'NORMAL', 'LOW']);
         fillFilter($('f-contact'), [...new Set(LEADS.map((l) => l.contact.contact_type))].sort());
 
@@ -912,6 +1013,50 @@
       }
     }
 
+    async function postWorkflow(url, body) {
+      const res = await fetch(url, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+      return data;
+    }
+
+    async function reconcileActions() {
+      const btn = $('reconcile');
+      btn.disabled = true; btn.textContent = 'Reconciling…';
+      try {
+        await postWorkflow(RECONCILE_URL, { confirm: 'RECONCILE_ACTIONS' });
+        await load(true);
+      } catch (err) {
+        $('load-err').textContent = `Action reconciliation failed: ${err.message}`;
+        $('load-err').classList.add('show');
+      } finally { btn.disabled = false; btn.textContent = 'Reconcile actions'; }
+    }
+
+    async function markMeetingBooked(agencyId) {
+      if (!window.confirm('Mark this agency as MEETING BOOKED and cancel all active acquisition chasing?')) return;
+      await postWorkflow(MEETING_URL, { agency_id: agencyId, confirm: 'MARK_MEETING_BOOKED' });
+      closeDrawer(); await load(true);
+    }
+
+    async function recordCallOutcome(actionId, outcome) {
+      let dueAt = '';
+      let nextActionType = '';
+      if (outcome === 'CALL_LATER' || outcome === 'SPOKE_CONTINUE') {
+        const entered = window.prompt('Future checkpoint date/time (for example 2026-09-05 10:00):');
+        if (!entered) return;
+        const parsed = new Date(entered);
+        if (Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()) { window.alert('Please enter a valid future date/time.'); return; }
+        dueAt = parsed.toISOString();
+      }
+      if (outcome === 'SPOKE_CONTINUE') {
+        nextActionType = (window.prompt('Next action: CALL_PROSPECT, FOLLOW_UP_CONVERSATION, or SET_NEXT_STEP', 'CALL_PROSPECT') || '').trim().toUpperCase();
+        if (!['CALL_PROSPECT','FOLLOW_UP_CONVERSATION','SET_NEXT_STEP'].includes(nextActionType)) { window.alert('Choose one of the listed next actions.'); return; }
+      }
+      if (!window.confirm(`Record call outcome: ${outcome.replace(/_/g, ' ')}?`)) return;
+      await postWorkflow(CALL_URL, { action_id: actionId, outcome, due_at: dueAt, next_action_type: nextActionType, confirm: 'RECORD_CALL_OUTCOME' });
+      closeDrawer(); await load(true);
+    }
+
     // ---- wiring ------------------------------------------------------------
 
     ['q', 'f-attention', 'f-state', 'f-priority', 'f-contact'].forEach((elId) => {
@@ -919,6 +1064,7 @@
       $(elId).addEventListener('change', render);
     });
     $('refresh').addEventListener('click', () => load(true));
+    $('reconcile').addEventListener('click', reconcileActions);
     $('unrouted').addEventListener('click', loadUnrouted);
     $('d-close').addEventListener('click', closeDrawer);
     $('scrim').addEventListener('click', closeDrawer);
@@ -937,7 +1083,15 @@
         sendManualReply();
         return;
       }
-      const row = e.target.closest('#tb-attention tr, #tb-system tr');
+      if (e.target.id === 'mark-meeting') {
+        markMeetingBooked(e.target.dataset.agency).catch((err) => window.alert(err.message));
+        return;
+      }
+      if (e.target.classList.contains('call-outcome')) {
+        recordCallOutcome(e.target.dataset.action, e.target.dataset.outcome).catch((err) => window.alert(err.message));
+        return;
+      }
+      const row = e.target.closest('#tb-attention tr, #tb-system tr, #tb-exceptions tr');
       if (row && row.dataset.id) openDrawer(row.dataset.id);
     });
     document.addEventListener('input', (e) => {

@@ -45,6 +45,13 @@ import { normalizeInstantlyEmail } from '../../lib/reply-router.mjs';
 import { PHRASES, DETERMINISTIC_PHRASES, CONTEXTUAL_PHRASES } from '../../lib/reply-classification-fixtures.mjs';
 import { buildOperatorLeads, OPERATOR_TABS } from '../../lib/operator-leads.mjs';
 import {
+  ACQUISITION_REQUIRED_TABS,
+  buildAcquisitionDashboard,
+} from '../../lib/operator-funnel.mjs';
+import { reconcileActionEngine } from '../../lib/action-engine.mjs';
+import { ACTIONS_HEADER, appendAction, patchAction, readActions } from '../../lib/actions-store.mjs';
+import { ACQUISITION_POLICY, addMs } from '../../lib/acquisition-policy.mjs';
+import {
   buildConversation,
   fetchLeadConversation,
   resolveSenderInbox,
@@ -421,6 +428,16 @@ async function handleInstantlyReplyPoll(req, res) {
     const repo = getRepo();
     const summary = await pollInstantlyReplies({ repo, apiKey, limit, dryRun: false, classify });
     const autoSend = await runAutoSendDemo({ repo, apiKey, events: summary.events });
+    if (summary.persisted > 0) invalidateOperatorCaches();
+    const affectedAgencyIds = [...new Set((summary.events || []).map((event) => String(event.row?.agency_id || '').trim()).filter(Boolean))];
+    let actionReconciliation = { available: true, agencies: 0 };
+    if (affectedAgencyIds.length) {
+      try { actionReconciliation = await reconcileActionEngine(repo, { agencyIds: affectedAgencyIds }); }
+      catch (err) {
+        console.error('reply-poll action reconciliation failed:', err?.message || err);
+        actionReconciliation = { available: false, error: err?.message || 'reconciliation failed' };
+      }
+    }
     return res.status(200).json({
       success: true,
       dry_run: false,
@@ -456,6 +473,7 @@ async function handleInstantlyReplyPoll(req, res) {
       events: summary.events,
       skipped: summary.skipped,
       auto_send: autoSend,
+      action_reconciliation: actionReconciliation,
     });
   } catch (err) {
     // Never echo the API key, on any path.
@@ -645,6 +663,11 @@ const OPERATOR_LEADS_CACHE_TTL_MS = 45_000;
 // not Redis/KV — a stale operator view for at most 45s is the correct trade,
 // and nothing downstream (live reply polling, the nightly rebuild) shares it.
 let operatorLeadsCache = null; // { at: epochMs, payload }
+let operatorDashboardCache = null;
+function invalidateOperatorCaches() {
+  operatorLeadsCache = null;
+  operatorDashboardCache = null;
+}
 
 async function loadOperatorTables(repo) {
   const loaded = await Promise.all(OPERATOR_TABS.map((tab) => repo.getTable(tab)));
@@ -683,6 +706,143 @@ async function handleOperatorLeads(req, res) {
   } catch (err) {
     console.error('operator-leads error:', err);
     return res.status(500).json({ success: false, error: err?.message || 'Failed to build operator leads' });
+  }
+}
+
+// Acquisition-wide canonical feed. Kept separate from operator-leads so the
+// established Phase 1 API remains backwards compatible for existing clients.
+async function handleOperatorDashboard(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  const refresh = String(req.query?.refresh || '') === '1';
+  const nowMs = Date.now();
+  if (!refresh && operatorDashboardCache && nowMs - operatorDashboardCache.at < OPERATOR_LEADS_CACHE_TTL_MS) {
+    return res.status(200).json({ ...operatorDashboardCache.payload, cached: true, cache_age_ms: nowMs - operatorDashboardCache.at });
+  }
+  try {
+    const repo = getRepo();
+    const entries = await Promise.all(ACQUISITION_REQUIRED_TABS.map(async (tab) => [tab, await repo.getTable(tab)]));
+    let actionsAvailable = false;
+    for (const tab of ['SALES_MESSAGES', 'ACTIONS']) {
+      try {
+        const table = await repo.getTable(tab);
+        entries.push([tab, table]);
+        if (tab === 'ACTIONS') actionsAvailable = table.header?.length === ACTIONS_HEADER.length
+          && ACTIONS_HEADER.every((key, i) => table.header[i] === key);
+      } catch {
+        entries.push([tab, { header: [], rows: [] }]);
+      }
+    }
+    const built = buildAcquisitionDashboard(Object.fromEntries(entries), {
+      now: new Date().toISOString(), actionsAvailable,
+    });
+    const payload = { success: true, ...built, cache_ttl_ms: OPERATOR_LEADS_CACHE_TTL_MS };
+    operatorDashboardCache = { at: Date.now(), payload };
+    return res.status(200).json({ ...payload, cached: false, cache_age_ms: 0 });
+  } catch (err) {
+    console.error('operator-dashboard error:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Failed to build acquisition dashboard' });
+  }
+}
+
+async function handleOperatorActionReconcile(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  if (String(req.body?.confirm || '').trim() !== 'RECONCILE_ACTIONS') {
+    return res.status(400).json({ success: false, error: 'Missing confirm=RECONCILE_ACTIONS' });
+  }
+  try {
+    const result = await reconcileActionEngine(getRepo());
+    invalidateOperatorCaches();
+    return res.status(result.available ? 200 : 409).json({ success: result.available, ...result });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err?.message || 'Action reconciliation failed' });
+  }
+}
+
+async function markAgencyTerminal(repo, agencyId, value, now) {
+  const agency = await repo.findById('AGENCIES', 'agency_id', agencyId);
+  if (!agency) return { ok: false, status: 404, error: 'Agency not found' };
+  const updated = await repo.updateCell('AGENCIES', 'agency_id', agencyId, 'current_pipeline_status', value);
+  if (!updated) return { ok: false, status: 409, error: 'AGENCIES has no current_pipeline_status column' };
+  await repo.updateCell('AGENCIES', 'agency_id', agencyId, 'updated_at', now);
+  return { ok: true, agency: agency.obj };
+}
+
+async function handleOperatorMarkMeetingBooked(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  const agencyId = String(req.body?.agency_id || '').trim();
+  if (!agencyId) return res.status(400).json({ success: false, error: 'Missing agency_id' });
+  if (String(req.body?.confirm || '').trim() !== 'MARK_MEETING_BOOKED') {
+    return res.status(400).json({ success: false, error: 'Missing confirm=MARK_MEETING_BOOKED' });
+  }
+  try {
+    const repo = getRepo();
+    const now = new Date().toISOString();
+    const marked = await markAgencyTerminal(repo, agencyId, 'MEETING_BOOKED', now);
+    if (!marked.ok) return res.status(marked.status).json({ success: false, error: marked.error });
+    let reconciliation;
+    try { reconciliation = await reconcileActionEngine(repo, { agencyId, now }); }
+    catch (err) {
+      console.error('meeting-booked action cancellation failed:', err?.message || err);
+      reconciliation = { available: false, error: err?.message || 'meeting persisted; action cancellation failed' };
+    }
+    invalidateOperatorCaches();
+    return res.status(200).json({ success: true, agency_id: agencyId, meeting_booked_at: now, reconciliation });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err?.message || 'Could not mark meeting booked' });
+  }
+}
+
+const CALL_OUTCOMES = new Set(['NO_ANSWER', 'SPOKE_CONTINUE', 'MEETING_BOOKED', 'NOT_INTERESTED', 'CALL_LATER']);
+async function handleOperatorCallOutcome(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  const actionId = String(req.body?.action_id || '').trim();
+  const outcome = String(req.body?.outcome || '').trim().toUpperCase();
+  const futureAt = String(req.body?.due_at || '').trim();
+  const requestedNextType = String(req.body?.next_action_type || '').trim().toUpperCase();
+  if (!actionId || !CALL_OUTCOMES.has(outcome)) return res.status(400).json({ success: false, error: 'Valid action_id and outcome are required' });
+  if (String(req.body?.confirm || '').trim() !== 'RECORD_CALL_OUTCOME') return res.status(400).json({ success: false, error: 'Missing confirm=RECORD_CALL_OUTCOME' });
+  if (['CALL_LATER', 'SPOKE_CONTINUE'].includes(outcome) && (!Number.isFinite(Date.parse(futureAt)) || Date.parse(futureAt) <= Date.now())) {
+    return res.status(400).json({ success: false, error: `${outcome} requires a future due_at` });
+  }
+  if (outcome === 'SPOKE_CONTINUE' && !['CALL_PROSPECT', 'FOLLOW_UP_CONVERSATION', 'SET_NEXT_STEP'].includes(requestedNextType)) {
+    return res.status(400).json({ success: false, error: 'SPOKE_CONTINUE requires next_action_type CALL_PROSPECT, FOLLOW_UP_CONVERSATION or SET_NEXT_STEP' });
+  }
+  try {
+    const repo = getRepo();
+    // Recompute from fresh evidence before accepting an outcome. A newly
+    // arrived reply cancels a no-reply call and makes this request stale.
+    const initial = await readActions(repo);
+    const initialAction = initial.rows.find((row) => String(row.action_id).trim() === actionId);
+    if (initialAction?.agency_id) await reconcileActionEngine(repo, { agencyId: initialAction.agency_id });
+    const read = await readActions(repo);
+    if (!read.available) return res.status(409).json({ success: false, error: read.error });
+    const action = read.rows.find((row) => String(row.action_id).trim() === actionId);
+    if (!action) return res.status(404).json({ success: false, error: 'Action not found' });
+    if (String(action.action_owner).toUpperCase() !== 'JOE' || !['CALL_PROSPECT', 'RETRY_CALL'].includes(String(action.action_type).toUpperCase())) {
+      return res.status(409).json({ success: false, error: 'Action is not a Joe-owned call action' });
+    }
+    if (!['PENDING', 'DUE', 'IN_PROGRESS'].includes(String(action.action_status).toUpperCase())) return res.status(409).json({ success: false, error: 'Action is no longer active' });
+    const now = new Date().toISOString();
+    await patchAction(repo, actionId, { action_status: 'COMPLETED', completed_at: now, updated_at: now, completion_reason: `CALL_OUTCOME:${outcome}`, metadata_json: JSON.stringify({ outcome, note: String(req.body?.note || '').trim(), due_at: futureAt }) });
+    if (outcome === 'MEETING_BOOKED' || outcome === 'NOT_INTERESTED') {
+      const marked = await markAgencyTerminal(repo, action.agency_id, outcome, now);
+      if (!marked.ok) return res.status(marked.status).json({ success: false, error: marked.error });
+      try { await reconcileActionEngine(repo, { agencyId: action.agency_id, now }); }
+      catch (err) { console.error('terminal call-outcome action cancellation failed:', err?.message || err); }
+    } else {
+      const type = outcome === 'NO_ANSWER' ? 'RETRY_CALL' : outcome === 'CALL_LATER' ? 'CALL_PROSPECT' : requestedNextType;
+      const dueAt = outcome === 'NO_ANSWER' ? addMs(now, ACQUISITION_POLICY.callNoAnswerRetryMs) : futureAt;
+      await appendAction(repo, {
+        agency_id: action.agency_id, outreach_id: action.outreach_id, probe_id: action.probe_id,
+        action_type: type, action_owner: 'JOE', action_status: 'PENDING', due_at: dueAt,
+        reason: outcome === 'NO_ANSWER' ? 'Call was not answered; retry after central 48-hour policy' : `Call outcome ${outcome} requires a future checkpoint`,
+        source_stage: 'CALL_DUE', dedupe_key: `${action.agency_id}:${type}:${actionId}:${dueAt}`, metadata_json: JSON.stringify({ parent_action_id: actionId, outcome }),
+      }, now);
+    }
+    invalidateOperatorCaches();
+    return res.status(200).json({ success: true, action_id: actionId, outcome });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err?.message || 'Could not record call outcome' });
   }
 }
 
@@ -1212,8 +1372,9 @@ async function handleOperatorManualReplyLive(req, res) {
   );
 
   try {
+    const repo = getRepo();
     const result = await executeManualReply({
-      repo: getRepo(),
+      repo,
       replyEventId,
       body: replyText,
       expectedReceivedAt,
@@ -1224,7 +1385,14 @@ async function handleOperatorManualReplyLive(req, res) {
     // A send may be irreversible even if a later local write failed. `sent`
     // therefore drives success, while the persistence fields carry the exact
     // warning the operator must act on.
-    if (result.sent) operatorLeadsCache = null;
+    if (result.sent) {
+      invalidateOperatorCaches();
+      try { result.action_reconciliation = await reconcileActionEngine(repo, { agencyId: result.target?.agency_id }); }
+      catch (err) {
+        console.error('manual-reply action reconciliation failed:', err?.message || err);
+        result.action_reconciliation = { available: false, error: err?.message || 'reconciliation failed' };
+      }
+    }
     let status = 200;
     if (result.blocked_reason === 'REPLY_EVENT_NOT_FOUND') status = 404;
     else if (result.blocked_reason === 'STALE_REPLY_EVENT') status = 409;
@@ -1281,6 +1449,10 @@ export default async function handler(req, res) {
     if (!requireAuth(req, res)) return;
     return handleOperatorLeads(req, res);
   }
+  if (req.method === 'GET' && req.query?.novus_operation === 'operator-dashboard') {
+    if (!requireAuth(req, res)) return;
+    return handleOperatorDashboard(req, res);
+  }
   if (req.method === 'GET' && req.query?.novus_operation === 'operator-conversation') {
     // GET-only by construction, exactly like operator-leads: this branch is
     // unreachable on any other method, the operation performs Sheets READS and
@@ -1311,6 +1483,18 @@ export default async function handler(req, res) {
     if (!requireAuth(req, res)) return;
     if (!requireReplyPollerSecret(req, res)) return;
     return handleOperatorManualReplyLive(req, res);
+  }
+  if (req.method === 'POST' && req.query?.novus_operation === 'operator-actions-reconcile') {
+    if (!requireAuth(req, res)) return;
+    return handleOperatorActionReconcile(req, res);
+  }
+  if (req.method === 'POST' && req.query?.novus_operation === 'operator-mark-meeting-booked') {
+    if (!requireAuth(req, res)) return;
+    return handleOperatorMarkMeetingBooked(req, res);
+  }
+  if (req.method === 'POST' && req.query?.novus_operation === 'operator-call-outcome') {
+    if (!requireAuth(req, res)) return;
+    return handleOperatorCallOutcome(req, res);
   }
   if (req.method === 'POST' && req.query?.novus_operation === 'instantly-reply-poll') {
     // TWO layers, in order, both before any Instantly or Sheets access: the
