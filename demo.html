@@ -130,7 +130,7 @@
   /* ── ACTS ── */
   .stage{ position:relative; }
   .act{ position:relative; width:100%; padding:var(--act-y) var(--gutter); display:flex; justify-content:center; scroll-margin-top:64px; }
-  .act:first-child{ padding-top:calc(var(--act-y) + 34px); }
+  .act:first-child{ padding-top:calc(var(--act-y) + 44px); }
   .act:last-child{ padding-bottom:calc(var(--act-y) + 18px); }
   .wrap{ width:100%; max-width:var(--col); display:flex; flex-direction:column; align-items:center; text-align:center; gap:clamp(13px,1.3vw,20px); }
   .wrap.wide{ max-width:var(--col-wide); }
@@ -147,7 +147,7 @@
   /* ── SHARED TYPE ── */
   .eyebrow{ font-size:var(--t-label); font-weight:700; letter-spacing:.19em; text-transform:uppercase; color:var(--cyan); line-height:1.5; display:inline-flex; align-items:flex-start; gap:10px; }
   .eyebrow::before{ content:''; width:20px; height:1px; margin-top:.72em; background:currentColor; opacity:.7; flex-shrink:0; }
-  h1.headline{ font-family:var(--serif); font-size:var(--t-hero); font-weight:600; line-height:1.14; letter-spacing:-.018em; color:var(--ink); text-wrap:balance; }
+  h1.headline{ font-family:var(--serif); font-size:clamp(1.66rem,1.32rem + .68vw,2.32rem); font-weight:600; line-height:1.1; letter-spacing:-.018em; color:var(--ink); max-width:32ch; text-wrap:balance; }
   h2.headline{ font-family:var(--serif); font-size:var(--t-h2); font-weight:600; line-height:1.22; letter-spacing:-.012em; color:var(--ink); max-width:26ch; text-wrap:balance; }
   .wrap.wide h2.headline{ max-width:34ch; }
   p.lede{ font-size:var(--t-lede); line-height:1.6; color:var(--ink-2); max-width:58ch; }
@@ -166,9 +166,12 @@
      anchors on the right. On a laptop that is the difference between the hero
      filling the viewport and the hero plus the beginning of the evidence
      being visible at once. */
-  .hero{ display:grid; grid-template-columns:minmax(0,1.06fr) minmax(0,.94fr); gap:clamp(30px,4.4vw,72px); align-items:center; text-align:left; }
-  .hero-copy{ display:flex; flex-direction:column; align-items:flex-start; gap:clamp(12px,1.2vw,18px); min-width:0; }
-  .hero-copy .lede{ max-width:36ch; }
+  .hero{ display:grid; grid-template-columns:minmax(0,1.06fr) minmax(0,.94fr); gap:clamp(34px,4.8vw,80px); align-items:center; text-align:left; }
+  .hero-copy{ display:flex; flex-direction:column; align-items:flex-start; gap:clamp(9px,1vw,14px); min-width:0; }
+  .hero-copy .eyebrow{ font-size:clamp(.6rem,.58rem + .03vw,.68rem); letter-spacing:.15em; color:rgba(125,211,252,.82); background:rgba(125,211,252,.07); border:1px solid rgba(125,211,252,.16); border-radius:100px; padding:6px 13px 6px 11px; align-items:center; gap:8px; margin-bottom:2px; }
+  .hero-copy .eyebrow::before{ display:none; }
+  .hero-copy h1.headline{ margin-top:2px; }
+  .hero-copy .lede{ max-width:31ch; color:rgba(214,226,250,.86); }
   .hero-visual{ min-width:0; }
 
   .property-card{ width:100%; max-width:clamp(420px,34vw,560px); margin-left:auto; border-radius:17px; overflow:hidden; text-align:left;
@@ -198,7 +201,7 @@
 
   /* Said EARLY, not buried at the end: it is the line that turns "marketing
      page" into "that is genuinely our enquiry". */
-  .provenance{ font-size:var(--t-xs); line-height:1.6; color:var(--ink-4); max-width:46ch; padding-left:13px; border-left:1px solid var(--hair); }
+  .provenance{ font-size:var(--t-xs); line-height:1.6; color:rgba(196,210,240,.72); max-width:42ch; padding-left:14px; border-left:2px solid rgba(125,211,252,.3); }
 
   /* ═══ ACT 2 — WHAT ACTUALLY HAPPENED ═══
      An evidence section, not a dashboard. Three facts that read as a verdict,
@@ -419,8 +422,9 @@
        letterbox, and the photo gets back its proportions. */
     .property-card{ margin:0; max-width:min(100%,520px); }
     .property-visual{ height:clamp(180px,28vw,250px); }
-    .provenance{ max-width:66ch; }
-    .hero-copy .lede{ max-width:52ch; }
+    .provenance{ max-width:58ch; }
+    .hero-copy .lede{ max-width:46ch; }
+    .hero-copy h1.headline{ max-width:36ch; }
 
     /* One spine, top to bottom: the same three stages, turned. */
     .stages{ grid-template-columns:minmax(0,1fr); }
@@ -453,7 +457,7 @@
 
   @media (max-width:640px){
     :root{ --gutter:16px; --act-y:44px; }
-    .act:first-child{ padding-top:78px; }
+    .act:first-child{ padding-top:86px; }
     .chrome{ height:48px; }
     .wrap{ gap:12px; }
 
