@@ -8,6 +8,7 @@
 //                                 GET  /api/novus/instantly/send-demo-dry-run (via rewrite)
 //                                 POST /api/novus/instantly/send-demo (via rewrite)
 //                                 GET  /api/novus/operator/leads (via rewrite)
+//                                 GET  /api/novus/operator/conversation (via rewrite)
 //
 // Read-only lookup for the PERSONALISATION row lib/personalisation-rebuild.mjs
 // writes (via the existing /api/novus/intelligence/rebuild-all + cron finalize
@@ -41,6 +42,12 @@ import { _internal as aiClientInternal } from '../../lib/ai-client.mjs';
 import { normalizeInstantlyEmail } from '../../lib/reply-router.mjs';
 import { PHRASES, DETERMINISTIC_PHRASES, CONTEXTUAL_PHRASES } from '../../lib/reply-classification-fixtures.mjs';
 import { buildOperatorLeads, OPERATOR_TABS } from '../../lib/operator-leads.mjs';
+import {
+  buildConversation,
+  fetchLeadConversation,
+  resolveSenderInbox,
+} from '../../lib/instantly-conversation.mjs';
+import { readSalesMessagesForOutreach } from '../../lib/sales-messages.mjs';
 
 // Contact resolution can run Hunter Domain Search, Finder and several Verifier
 // checks in one invocation; 20s was sized for the read-only
@@ -662,6 +669,160 @@ async function handleOperatorLeads(req, res) {
   }
 }
 
+// OPERATOR CONVERSATION — GET
+// /api/novus/personalisation?novus_operation=operator-conversation&outbound_id=...
+// (also reachable via the /api/novus/operator/conversation rewrite).
+//
+// Phase 2 of the Acquisition Command Centre: the sales thread for ONE lead,
+// fetched only when Joe opens that lead's drawer.
+//
+// READ ONLY, structurally rather than by convention: GET-only, no writer is
+// imported into this branch, no AI runs, the only Instantly call is a
+// lead-scoped GET, and no send path is reachable. It does not touch
+// REPLY_EVENTS' schema, does not call the poller or rebuild, and writes nothing
+// anywhere.
+//
+// THE BROWSER SUPPLIES ONE VALUE: outbound_id, the stable journey identity.
+// The lead address, the campaign id, the thread id and — above all — the
+// sending inbox are resolved SERVER-SIDE from stored data and from the live
+// conversation. A browser-supplied sender or recipient would be exactly the
+// input a later manual-send path must never trust, so it is not accepted now.
+//
+// COST DISCIPLINE: one opened lead = at most one Instantly GET, lead-scoped.
+// There is no prefetch, no polling and no workspace-wide sweep here; the leads
+// list itself stays Sheets-only and cached.
+//
+// It lives here, as another operation on an already-protected function, for the
+// same Hobby-plan reason as verify-contact above: /api/novus/* is at Vercel's
+// 12 Serverless Function ceiling, so a new protected NOVUS action becomes an
+// operation, never a thirteenth file.
+async function handleOperatorConversation(req, res) {
+  // Private, authenticated data, and deliberately never cached: this is the
+  // live view of one conversation, opened on demand.
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+
+  const outboundId = (req.query?.outbound_id || '').trim();
+  if (!outboundId) {
+    return res.status(400).json({ success: false, error: 'Missing outbound_id' });
+  }
+
+  const warnings = [];
+  const warn = (code, detail) => warnings.push({ code, detail });
+
+  try {
+    const repo = getRepo();
+
+    const outboundRecord = await repo.findById('OUTBOUND', 'outbound_id', outboundId);
+    if (!outboundRecord) {
+      return res.status(404).json({ success: false, error: `No OUTBOUND row for outbound_id ${outboundId}` });
+    }
+    const outbound = outboundRecord.obj;
+
+    // REPLY_EVENTS joins on outreach_id, which stores OUTBOUND.outbound_id.
+    // Read-only, and the tab's schema is not touched.
+    const replyRecords = await repo.getRecords('REPLY_EVENTS', 'reply_event_id');
+    const replyEvents = replyRecords
+      .map((record) => record.obj)
+      .filter((obj) => String(obj.outreach_id ?? '').trim() === outboundId);
+
+    // SALES_MESSAGES does not exist yet. The reader treats that as "not
+    // available" rather than an error, so this drawer works unchanged either
+    // way (see lib/sales-messages.mjs).
+    const sales = await readSalesMessagesForOutreach(repo, outboundId);
+    if (!sales.available) {
+      warn('sales_messages_unavailable', `SALES_MESSAGES not read (${sales.error}); NOVUS-sent messages come from Instantly only`);
+    }
+
+    // The lead address is resolved SERVER-SIDE, never accepted from the
+    // browser. OUTBOUND carries the address actually uploaded to Instantly and
+    // is therefore the one this conversation is keyed on; a REPLY_EVENTS
+    // lead_email is used only if OUTBOUND has none.
+    let leadEmail = String(outbound.outreach_contact_email ?? '').trim();
+    if (!leadEmail) {
+      const fromReply = replyEvents.map((row) => String(row.lead_email ?? '').trim()).find(Boolean) || '';
+      if (fromReply) {
+        leadEmail = fromReply;
+        warn('lead_email_from_reply_events', 'OUTBOUND has no outreach_contact_email; used the address on the stored reply');
+      } else {
+        warn('lead_email_missing', 'OUTBOUND has no outreach_contact_email and no stored reply carries one; the live conversation was not fetched');
+      }
+    }
+
+    // ONE lead-scoped Instantly GET, and only when there is an address to scope
+    // it to. Every failure below degrades to the durable data rather than
+    // failing the request.
+    let instantlyMessages = [];
+    let instantlyAvailable = false;
+    let instantlyError = null;
+    const apiKey = process.env.INSTANTLY_REPLY_API_KEY;
+
+    if (!leadEmail) {
+      instantlyError = { code: 'no_lead_email', message: 'No lead email to scope the conversation fetch to' };
+    } else if (!apiKey) {
+      instantlyError = { code: 'no_api_key', message: 'INSTANTLY_REPLY_API_KEY is not set in this environment.' };
+      warn('instantly_unavailable', instantlyError.message);
+    } else {
+      try {
+        const fetched = await fetchLeadConversation({ apiKey, leadEmail });
+        instantlyMessages = fetched.messages;
+        instantlyAvailable = true;
+        fetched.warnings.forEach((w) => warnings.push(w));
+      } catch (err) {
+        // Never echo the API key, on any path.
+        instantlyError = err?.instantly_status
+          ? { code: 'instantly_error', instantly_status: err.instantly_status, message: String(err.instantly_error).slice(0, 500) }
+          : { code: 'instantly_unreachable', message: err?.message || 'Request to Instantly failed' };
+        warn('instantly_unavailable', `Live conversation unavailable: ${instantlyError.message}`);
+      }
+    }
+
+    // WHICH INBOX — from the live conversation only. Never a domain guess,
+    // never a browser value, never a default.
+    const sender = resolveSenderInbox(instantlyMessages);
+    if (sender.sender_status === 'AMBIGUOUS') {
+      warn('ambiguous_sender_inbox',
+        `This lead's conversation involves more than one Instantly sending inbox (${sender.candidates.join(', ')}); no single sender was chosen`);
+    }
+
+    const conversation = buildConversation({
+      instantlyMessages,
+      replyEvents,
+      salesMessages: sales.rows,
+      outbound,
+    });
+    conversation.warnings.forEach((w) => warnings.push(w));
+
+    return res.status(200).json({
+      success: true,
+      outbound_id: outboundId,
+      agency_id: String(outbound.agency_id ?? '').trim(),
+      probe_id: String(outbound.probe_id ?? '').trim(),
+      lead_email: leadEmail,
+      sender_inbox: {
+        status: sender.sender_status,
+        eaccount: sender.eaccount,
+        candidates: sender.candidates,
+      },
+      instantly: {
+        available: instantlyAvailable,
+        message_count: instantlyMessages.length,
+        error: instantlyError,
+      },
+      sales_messages: { available: sales.available, count: sales.rows.length },
+      reply_events: { count: replyEvents.length },
+      conversation: {
+        messages: conversation.messages,
+        original_campaign_emails_available: conversation.original_campaign_emails_available,
+      },
+      warnings,
+      generated_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('operator-conversation error:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Failed to build the lead conversation' });
+  }
+}
+
 // SEND_DEMO execution gate, DRY RUN —
 // GET /api/novus/personalisation?novus_operation=send-demo-dry-run&reply_event_id=...
 // (also reachable via the /api/novus/instantly/send-demo-dry-run rewrite).
@@ -800,6 +961,13 @@ export default async function handler(req, res) {
     // method, and the operation performs Sheets READS only.
     if (!requireAuth(req, res)) return;
     return handleOperatorLeads(req, res);
+  }
+  if (req.method === 'GET' && req.query?.novus_operation === 'operator-conversation') {
+    // GET-only by construction, exactly like operator-leads: this branch is
+    // unreachable on any other method, the operation performs Sheets READS and
+    // one lead-scoped Instantly GET, and no send path is reachable from it.
+    if (!requireAuth(req, res)) return;
+    return handleOperatorConversation(req, res);
   }
   if (req.method === 'GET' && req.query?.novus_operation === 'reply-classifier-live-test') {
     if (!requireAuth(req, res)) return;
