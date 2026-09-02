@@ -381,6 +381,7 @@
     box-shadow:0 30px 80px rgba(2,7,20,.3), inset 0 1px 0 rgba(255,255,255,.05);
     display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; }
   .cta-eyebrow{ font-size:var(--t-label); font-weight:700; letter-spacing:.19em; text-transform:uppercase; color:var(--cyan); }
+  .cta-subline{ font-size:var(--t-sm); color:var(--ink-3); max-width:44ch; }
   /* The agency's name is the variable in this line and can be long, so it is
      balanced rather than left to break wherever it runs out. */
   .cta-headline.long{ font-size:clamp(1.12rem,.92rem + .48vw,1.62rem); max-width:32ch; }
@@ -672,9 +673,9 @@
          the way of the CTA. -->
     <section class="act" data-act="4">
       <div class="wrap wide">
-        <div class="eyebrow">Across your entire agency</div>
-        <h2 class="headline">One combined intelligence and execution layer <span class="hl">across your agency.</span></h2>
-        <p class="lede">NOVUS continuously identifies what needs progressing, decides what should happen next, and either acts - or brings your team in when they're needed.</p>
+        <div class="eyebrow">Now multiply that across your agency</div>
+        <h2 class="headline">The same intelligence, working across <span class="hl">every opportunity in your agency.</span></h2>
+        <p class="lede">NOVUS continuously identifies what needs progressing, decides what should happen next, and either acts — or brings your team in when they're needed.</p>
 
         <div class="map rv">
           <div class="src-grid">
@@ -734,11 +735,12 @@
         <!-- ONE obvious next action, in its own space. -->
         <div class="cta rv">
           <span class="cta-eyebrow">We found this from one enquiry.</span>
-          <p class="cta-headline" id="cta-headline"></p>
-          <button class="cta-btn" onclick="revealCalendly()">See how NOVUS would fit your agency
+          <p class="cta-subline">And this is only the opportunity visible from the outside.</p>
+          <p class="cta-headline">Let&rsquo;s find what else is being missed.</p>
+          <button class="cta-btn" onclick="revealCalendly()">Find the opportunities
             <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow"/></svg>
           </button>
-          <p class="cta-support">15 minutes. We'll map NOVUS against your actual enquiry flow and show you exactly where it would sit.</p>
+          <p class="cta-support">Give me 30 minutes and we&rsquo;ll map the same intelligence across your agency &mdash; from new enquiries to applicants, past vendors and previous valuations.</p>
 
           <div class="calendly-wrap" id="calendly-wrap">
             <div class="calendly-inline-widget" data-url="https://calendly.com/joe-getnovus/10min?hide_gdpr_banner=1"></div>
@@ -880,10 +882,10 @@
   // BOTH CTAs LAND HERE — the closing button and the compact one in the top
   // chrome. One booking flow, one telemetry signal.
   //
-  // KNOWN MISMATCH, DELIBERATE FOR NOW: the supporting copy says "15 minutes"
+  // KNOWN MISMATCH, DELIBERATE FOR NOW: the supporting copy says "30 minutes"
   // and the link is the existing, known-live /10min event type. Kept this way
-  // on purpose rather than pointing at a /15min slug nobody has created - a
-  // calendar that 404s costs every booking on the page. Create a 15-minute
+  // on purpose rather than pointing at a /30min slug nobody has created - a
+  // calendar that 404s costs every booking on the page. Create a 30-minute
   // event type and swap the slug here to close it.
   function revealCalendly() {
     const wrap = document.getElementById('calendly-wrap');
@@ -1123,17 +1125,9 @@
     [...document.querySelectorAll('#stages .stage-num')].forEach((el, i) => { el.textContent = String(i + 1); });
 
     // ── ACT 4 ──
-    // The closing line is composed here rather than printed from the row: the
-    // section carries "we found this from one enquiry" as its own eyebrow, so
-    // the headline is the ask alone, with the agency's name as the one
-    // coloured word in it. The row's own cta_headline says the same thing in
-    // one sentence and is left unused by the shell rather than printed twice.
+    // The CTA copy is fixed, not composed from the row: it stays the same ask
+    // on every demo. The row's own cta_headline is left unused by the shell.
     setField('systemic-bridge', demo.systemic_bridge);
-    const ctaEl = document.getElementById('cta-headline');
-    const ctaName = agency || 'your agency';
-    ctaEl.classList.toggle('long', ctaName.length > 44);
-    ctaEl.innerHTML = 'See what NOVUS could be finding across <span class="hl">' +
-      esc(ctaName) + '</span>.';
 
     document.getElementById('boot').classList.add('hide');
     document.getElementById('stage').classList.remove('hidden');
