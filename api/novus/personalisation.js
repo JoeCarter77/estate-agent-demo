@@ -10,6 +10,7 @@
 //                                 GET  /api/novus/operator/leads (via rewrite)
 //                                 GET  /api/novus/operator/conversation (via rewrite)
 //                                 POST /api/novus/operator/manual-reply-dry-run (op only)
+//                                 POST /api/novus/operator/manual-reply (op only)
 //
 // Read-only lookup for the PERSONALISATION row lib/personalisation-rebuild.mjs
 // writes (via the existing /api/novus/intelligence/rebuild-all + cron finalize
@@ -49,9 +50,9 @@ import {
   resolveSenderInbox,
 } from '../../lib/instantly-conversation.mjs';
 import { readSalesMessagesForOutreach } from '../../lib/sales-messages.mjs';
-// Phase 3A manual replies: the PURE gate, and the SHARED payload builder the
-// automatic send already uses. Neither can send; the only function in NOVUS
-// that POSTs a reply is executeSendDemo, imported separately above.
+// The Phase 3A pure gate remains shared by dry-run and live manual replies.
+// Phase 3B execution is kept in a separate module below so policy, transport,
+// claim and persistence ordering stay hermetically testable.
 import {
   evaluateManualReplyGate,
   MAX_MANUAL_REPLY_BODY_CHARS,
@@ -59,6 +60,11 @@ import {
 } from '../../lib/manual-reply.mjs';
 import { buildInstantlyReplyPayload } from '../../lib/instantly-reply-send.mjs';
 import { novusMailboxes } from '../../lib/reply-router.mjs';
+import { evaluateManualReplyRequest } from '../../lib/manual-reply-context.mjs';
+import {
+  executeManualReply,
+  MANUAL_REPLY_LIVE_CONFIRMATION,
+} from '../../lib/manual-reply-execution.mjs';
 
 // Contact resolution can run Hunter Domain Search, Finder and several Verifier
 // checks in one invocation; 20s was sized for the read-only
@@ -723,7 +729,10 @@ async function handleOperatorConversation(req, res) {
   try {
     const repo = getRepo();
 
-    const outboundRecord = await repo.findById('OUTBOUND', 'outbound_id', outboundId);
+    const outboundRecords = await repo.getRecords('OUTBOUND', 'outbound_id');
+    const outboundRecord = outboundRecords.find(
+      (record) => String(record.obj?.outbound_id ?? '').trim() === outboundId,
+    ) || null;
     if (!outboundRecord) {
       return res.status(404).json({ success: false, error: `No OUTBOUND row for outbound_id ${outboundId}` });
     }
@@ -803,6 +812,35 @@ async function handleOperatorConversation(req, res) {
     });
     conversation.warnings.forEach((w) => warnings.push(w));
 
+    // A read-only preview of whether the newest stored inbound reply is safe
+    // to compose against. The live POST runs this same gate again over fresh
+    // reads; this value exists only to disable an obviously unsafe composer.
+    const latestReply = replyEvents.reduce((latest, row) => {
+      if (!latest) return row;
+      const a = Date.parse(String(latest.received_at ?? ''));
+      const b = Date.parse(String(row.received_at ?? ''));
+      return Number.isFinite(b) && (!Number.isFinite(a) || b > a) ? row : latest;
+    }, null);
+    const latestInstantlyEmailId = String(latestReply?.instantly_email_id ?? '').trim();
+    const liveParent = latestInstantlyEmailId
+      ? instantlyMessages.find((message) => String(message.instantly_email_id ?? '').trim() === latestInstantlyEmailId) || null
+      : null;
+    const manualGate = evaluateManualReplyGate({
+      replyEvent: latestReply,
+      outreachReplyEvents: replyEvents,
+      outboundRecords,
+      liveParent,
+      mailboxes: novusMailboxes(),
+      body: 'composer eligibility probe',
+      expectedReceivedAt: String(latestReply?.received_at ?? '').trim(),
+    });
+    let composerBlockedReason = manualGate.blocked_reason;
+    if (manualGate.eligible && sender.sender_status !== 'CONFIRMED') {
+      composerBlockedReason = sender.sender_status === 'AMBIGUOUS'
+        ? 'SENDER_INBOX_AMBIGUOUS'
+        : 'SENDER_INBOX_UNKNOWN';
+    }
+
     return res.status(200).json({
       success: true,
       outbound_id: outboundId,
@@ -821,6 +859,14 @@ async function handleOperatorConversation(req, res) {
       },
       sales_messages: { available: sales.available, count: sales.rows.length },
       reply_events: { count: replyEvents.length },
+      manual_reply: {
+        eligible: manualGate.eligible && sender.sender_status === 'CONFIRMED',
+        blocked_reason: composerBlockedReason,
+        blocked_reasons: manualGate.blocked_reasons,
+        reply_event_id: manualGate.resolved.reply_event_id,
+        received_at: manualGate.received_at || '',
+        prospect_opted_out: manualGate.blocked_reasons.includes('PROSPECT_OPTED_OUT'),
+      },
       conversation: {
         messages: conversation.messages,
         original_campaign_emails_available: conversation.original_campaign_emails_available,
@@ -846,8 +892,8 @@ async function handleOperatorConversation(req, res) {
 // OUTBOUND write, no suppression.
 //
 // dryRun is not a query parameter. There is no request this operation can be
-// sent that causes a send. The live operation is a SEPARATE, POST-only,
-// secret-guarded operation and is not built yet.
+// sent that causes a send. The live manual operation is a separate POST-only
+// route with its own explicit confirmation.
 async function handleSendDemoDryRun(req, res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
 
@@ -886,7 +932,8 @@ async function handleSendDemoDryRun(req, res) {
 // POST /api/novus/personalisation?novus_operation=send-demo&reply_event_id=...
 // (also reachable via the /api/novus/instantly/send-demo rewrite).
 //
-// THE ONLY OPERATION IN NOVUS THAT SENDS AN EMAIL TO A PROSPECT.
+// The automatic SEND_DEMO operation. Manual human replies use the same generic
+// transport through the separate operator-manual-reply operation below.
 //
 // It re-reads everything, re-runs the SAME execution gate the dry run runs, and
 // sends at most ONE reply — POST /api/v2/emails/reply — for exactly one
@@ -1005,14 +1052,21 @@ async function handleOperatorManualReplyDryRun(req, res) {
   }
 
   const warnings = [];
-  const warn = (code, detail) => warnings.push({ code, detail });
 
   try {
     const repo = getRepo();
+    const apiKey = process.env.INSTANTLY_REPLY_API_KEY;
+    const { inputs, gate } = await evaluateManualReplyRequest({
+      repo,
+      replyEventId,
+      body: replyText,
+      expectedReceivedAt,
+      apiKey,
+      mailboxes: novusMailboxes(),
+    });
+    warnings.push(...inputs.warnings);
 
-    // READ 1 — the reply being answered.
-    const record = await repo.findById('REPLY_EVENTS', 'reply_event_id', replyEventId);
-    if (!record) {
+    if (!inputs.record) {
       return res.status(404).json({
         success: false,
         eligible: false,
@@ -1022,79 +1076,7 @@ async function handleOperatorManualReplyDryRun(req, res) {
         ignored_request_fields: ignoredRequestFields,
       });
     }
-    const replyEvent = record.obj;
-    const outreachId = String(replyEvent.outreach_id ?? '').trim();
-
-    // READ 2 — the whole outreach journey, for the opt-out and staleness
-    // checks. Both are journey-scoped: a prospect who opted out in a LATER
-    // message has opted out of answering an earlier one too.
-    const allReplies = await repo.getRecords('REPLY_EVENTS', 'reply_event_id');
-    const outreachReplyEvents = outreachId
-      ? allReplies.map((r) => r.obj).filter((obj) => String(obj.outreach_id ?? '').trim() === outreachId)
-      : null;
-    if (!outreachReplyEvents) {
-      warn('no_outreach_id', 'This reply carries no outreach_id, so its journey history could not be loaded');
-    }
-
-    // READ 3 — OUTBOUND, re-resolved rather than trusted from the reply row.
-    const outboundRecords = await repo.getRecords('OUTBOUND', 'outbound_id');
-
-    // THE LEAD ADDRESS IS RESOLVED SERVER-SIDE. OUTBOUND carries the address
-    // actually uploaded to Instantly; the stored reply's address is the
-    // fallback. The browser's opinion is never consulted.
-    const outboundRow = outboundRecords
-      .map((r) => r.obj)
-      .find((obj) => String(obj.outbound_id ?? '').trim() === outreachId && outreachId) || null;
-    const leadEmail = String(outboundRow?.outreach_contact_email ?? '').trim()
-      || String(replyEvent.lead_email ?? '').trim();
-
-    // ONE lead-scoped Instantly GET. It supplies the live parent email and,
-    // with it, the eaccount — the only acceptable source for which inbox this
-    // reply would leave from.
-    let liveMessages = [];
-    let instantlyAvailable = false;
-    let instantlyError = null;
-    const apiKey = process.env.INSTANTLY_REPLY_API_KEY;
-
-    if (!leadEmail) {
-      instantlyError = { code: 'no_lead_email', message: 'No lead email to scope the conversation fetch to' };
-      warn('instantly_unavailable', instantlyError.message);
-    } else if (!apiKey) {
-      instantlyError = { code: 'no_api_key', message: 'INSTANTLY_REPLY_API_KEY is not set in this environment.' };
-      warn('instantly_unavailable', instantlyError.message);
-    } else {
-      try {
-        const fetched = await fetchLeadConversation({ apiKey, leadEmail });
-        liveMessages = fetched.messages;
-        instantlyAvailable = true;
-        fetched.warnings.forEach((w) => warnings.push(w));
-      } catch (err) {
-        // Never echo the API key, on any path.
-        instantlyError = err?.instantly_status
-          ? { code: 'instantly_error', instantly_status: err.instantly_status, message: String(err.instantly_error).slice(0, 500) }
-          : { code: 'instantly_unreachable', message: err?.message || 'Request to Instantly failed' };
-        warn('instantly_unavailable', `Live conversation unavailable: ${instantlyError.message}`);
-      }
-    }
-
-    // The live parent. An Instantly failure leaves this null, which BLOCKS
-    // (REPLY_NOT_FOUND) rather than proceeding on stored data alone.
-    const instantlyEmailId = String(replyEvent.instantly_email_id ?? '').trim();
-    const liveParent = instantlyEmailId
-      ? liveMessages.find((m) => String(m.instantly_email_id ?? '').trim() === instantlyEmailId) || null
-      : null;
-
-    // THE GATE. Pure, and the same function a live manual send would run.
-    const mailboxes = novusMailboxes();
-    const gate = evaluateManualReplyGate({
-      replyEvent,
-      outreachReplyEvents,
-      outboundRecords,
-      liveParent,
-      mailboxes,
-      body: replyText,
-      expectedReceivedAt,
-    });
+    const replyEvent = inputs.replyEvent;
 
     // THE EXACT PAYLOAD, BUILT AND NOT SENT. Built with the SAME shared builder
     // the live send uses, so the preview cannot drift from the real request.
@@ -1112,7 +1094,10 @@ async function handleOperatorManualReplyDryRun(req, res) {
       payloadPreview = { subject: payload.subject, body_text: payload.body.text };
       // Built to prove it is deterministic. NOT acquired: Phase 3A takes no
       // claim because Phase 3A never sends.
-      claimKeyPreview = manualReplyClaimKey({ instantlyEmailId, body: gate.body.text });
+      claimKeyPreview = manualReplyClaimKey({
+        instantlyEmailId: gate.resolved.reply_to_uuid,
+        body: gate.body.text,
+      });
     }
 
     // STATUS. A stale reply is a genuine conflict — the thing being answered
@@ -1133,7 +1118,7 @@ async function handleOperatorManualReplyDryRun(req, res) {
       blocked_reasons: gate.blocked_reasons,
       target: {
         agency_id: gate.resolved.agency_id,
-        prospect_email: leadEmail,
+        prospect_email: inputs.leadEmail,
         sending_inbox: gate.resolved.eaccount,
         reply_event_id: gate.resolved.reply_event_id,
         outreach_id: gate.resolved.outreach_id,
@@ -1150,9 +1135,9 @@ async function handleOperatorManualReplyDryRun(req, res) {
       claim_key_preview: claimKeyPreview,
       claim_acquired: false,
       instantly: {
-        available: instantlyAvailable,
-        message_count: liveMessages.length,
-        error: instantlyError,
+        available: inputs.instantlyAvailable,
+        message_count: inputs.liveMessages.length,
+        error: inputs.instantlyError,
       },
       ignored_request_fields: ignoredRequestFields,
       warnings,
@@ -1173,8 +1158,103 @@ async function handleOperatorManualReplyDryRun(req, res) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// MANUAL REPLY, LIVE — POST /api/novus/personalisation
+//                         ?novus_operation=operator-manual-reply
+//
+// Human-authored only. The browser supplies no delivery identity: the reply
+// event, current body, optimistic received_at token and an explicit one-send
+// confirmation are the entire accepted contract. Every sender, recipient,
+// thread and parent identifier is freshly resolved server-side.
+// ---------------------------------------------------------------------------
+export const MANUAL_REPLY_LIVE_FIELDS = [
+  'reply_event_id', 'body', 'expected_received_at', 'confirm',
+];
+
+async function handleOperatorManualReplyLive(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  const requestBody = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+    ? req.body
+    : null;
+  if (!requestBody) {
+    return res.status(400).json({ success: false, sent: false, error: 'Request body must be a JSON object' });
+  }
+
+  const replyEventId = String(requestBody.reply_event_id ?? '').trim();
+  if (!replyEventId) {
+    return res.status(400).json({ success: false, sent: false, error: 'Missing reply_event_id' });
+  }
+  if (typeof requestBody.body !== 'string') {
+    return res.status(400).json({ success: false, sent: false, error: 'body must be plain text' });
+  }
+  const replyText = requestBody.body.trim();
+  const expectedReceivedAt = String(requestBody.expected_received_at ?? '').trim();
+  const confirm = String(requestBody.confirm ?? '').trim();
+  if (confirm !== MANUAL_REPLY_LIVE_CONFIRMATION) {
+    return res.status(400).json({
+      success: false,
+      sent: false,
+      error: `Missing or incorrect confirmation; expected confirm=${MANUAL_REPLY_LIVE_CONFIRMATION}`,
+    });
+  }
+
+  const apiKey = process.env.INSTANTLY_REPLY_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({
+      success: false,
+      sent: false,
+      error: 'INSTANTLY_REPLY_API_KEY is not set in this environment.',
+    });
+  }
+
+  const ignoredRequestFields = Object.keys(requestBody).filter(
+    (key) => !MANUAL_REPLY_LIVE_FIELDS.includes(key),
+  );
+
+  try {
+    const result = await executeManualReply({
+      repo: getRepo(),
+      replyEventId,
+      body: replyText,
+      expectedReceivedAt,
+      apiKey,
+      mailboxes: novusMailboxes(),
+    });
+
+    // A send may be irreversible even if a later local write failed. `sent`
+    // therefore drives success, while the persistence fields carry the exact
+    // warning the operator must act on.
+    if (result.sent) operatorLeadsCache = null;
+    let status = 200;
+    if (result.blocked_reason === 'REPLY_EVENT_NOT_FOUND') status = 404;
+    else if (result.blocked_reason === 'STALE_REPLY_EVENT') status = 409;
+    else if (result.blocked_reason === 'DUPLICATE_MANUAL_REPLY') status = 409;
+    else if (result.blocked_reason === 'CLAIM_STORE_UNAVAILABLE') status = 503;
+    else if (result.blocked_reason) status = 422;
+
+    return res.status(status).json({
+      success: result.sent,
+      ...result,
+      ignored_request_fields: ignoredRequestFields,
+      generated_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('operator-manual-reply error:', err);
+    return res.status(500).json({
+      success: false,
+      sent: false,
+      error: err?.message || 'Manual-reply execution failed before send',
+      ignored_request_fields: ignoredRequestFields,
+    });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.query?.novus_operation === 'operator-manual-reply' && req.method !== 'POST') {
+    if (!requireAuth(req, res)) return;
+    return res.status(405).json({ success: false, sent: false, error: 'Method not allowed' });
+  }
   if (req.method === 'POST' && req.query?.novus_operation === 'verify-contact') {
     if (!requireAuth(req, res)) return;
     return handleContactVerification(req, res);
@@ -1223,6 +1303,14 @@ export default async function handler(req, res) {
     // deliberately NOT poller-secret guarded, exactly like send-demo-dry-run.
     if (!requireAuth(req, res)) return;
     return handleOperatorManualReplyDryRun(req, res);
+  }
+  if (req.method === 'POST' && req.query?.novus_operation === 'operator-manual-reply') {
+    // The live manual write gets the same two auth layers as SEND_DEMO: human
+    // Basic Auth and the dedicated machine-action secret. The explicit
+    // confirmation token is then checked inside the handler.
+    if (!requireAuth(req, res)) return;
+    if (!requireReplyPollerSecret(req, res)) return;
+    return handleOperatorManualReplyLive(req, res);
   }
   if (req.method === 'POST' && req.query?.novus_operation === 'instantly-reply-poll') {
     // TWO layers, in order, both before any Instantly or Sheets access: the

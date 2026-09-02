@@ -108,7 +108,7 @@
     .preview-link:hover{background:rgba(37,99,235,.14);}
     .note{font-size:.72rem;color:var(--text-3);line-height:1.5;margin-top:8px;}
 
-    /* sales conversation (Phase 2, read-only) */
+    /* sales conversation (Phase 2 read + Phase 3B human reply) */
     .btn-mini{font-size:.7rem;font-weight:700;padding:5px 10px;border-radius:8px;}
     .inbox-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.78rem;font-weight:600;color:var(--text-2);background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:9px 12px;margin-top:9px;}
     .inbox-line .mono{font-weight:700;color:var(--text);}
@@ -128,6 +128,25 @@
     .msg-subject{font-size:.8rem;font-weight:700;color:var(--text);margin-top:6px;}
     .msg-body{font-size:.85rem;line-height:1.55;color:var(--text);white-space:pre-wrap;word-break:break-word;margin-top:5px;max-height:280px;overflow-y:auto;}
     .msg-none{font-size:.8rem;color:var(--text-3);font-style:italic;margin-top:5px;}
+
+    /* Phase 3B human reply composer */
+    .reply-box{margin-top:14px;padding:14px;border:1px solid var(--border-hi);border-radius:11px;background:#fff;}
+    .reply-label{font-size:.66rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);}
+    .reply-target{font-size:.76rem;line-height:1.5;color:var(--text-2);margin-top:7px;}
+    .reply-target .mono{color:var(--text);font-weight:700;}
+    .reply-box textarea{width:100%;min-height:145px;resize:vertical;margin-top:10px;padding:11px 12px;border:1px solid var(--border-hi);border-radius:9px;background:#fff;color:var(--text);font:400 .86rem/1.5 'Inter',sans-serif;}
+    .reply-box textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lo);}
+    .reply-box textarea:disabled{background:var(--panel);color:var(--text-3);cursor:not-allowed;}
+    .reply-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:9px;}
+    .reply-count{font-size:.7rem;color:var(--text-3);}
+    .btn-send{background:var(--accent);color:#fff;min-width:112px;}
+    .btn-send:hover{background:var(--accent-hi);}
+    .btn-send:disabled{opacity:.45;cursor:not-allowed;}
+    .reply-outcome{display:none;font-size:.76rem;line-height:1.45;border-radius:9px;padding:9px 11px;margin-top:10px;}
+    .reply-outcome.show{display:block;}
+    .reply-outcome.success{color:#15803D;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);}
+    .reply-outcome.warning{color:#92400E;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);}
+    .reply-outcome.error{color:#B91C1C;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.28);}
 
     .warn-box{font-size:.78rem;color:#92400E;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:11px;padding:11px 14px;margin-bottom:18px;}
     .warn-box ul{margin:6px 0 0 18px;}
@@ -154,7 +173,7 @@
     <div class="logo"><div class="logo-mark">N</div><div class="logo-word">NOVUS</div></div>
     <div class="head-right">
       <span class="stamp" id="stamp">Loading&hellip;</span>
-      <span class="ro-pill">Read only</span>
+      <span class="ro-pill">Human replies enabled</span>
       <span class="env-pill">Internal &middot; Command Centre</span>
     </div>
   </header>
@@ -242,7 +261,7 @@
       </div>
     </section>
 
-    <div class="foot">NOVUS Operating System &middot; Command Centre V0.1 &middot; read-only</div>
+    <div class="foot">NOVUS Operating System &middot; Command Centre V0.2 &middot; manual human replies</div>
   </div>
 
   <!-- 12. DETAIL DRAWER -->
@@ -271,6 +290,7 @@
     // once, for the ONE lead whose drawer is open. There is no prefetch and no
     // polling — see PERFORMANCE below.
     const CONVERSATION_URL = '/api/novus/personalisation?novus_operation=operator-conversation';
+    const MANUAL_REPLY_URL = '/api/novus/personalisation?novus_operation=operator-manual-reply';
 
     let LEADS = [];
 
@@ -374,7 +394,7 @@
       return `<div class="block"><div class="block-head"><span class="block-title">${esc(title)}</span>${tagHtml}</div>${inner}</div>`;
     }
 
-    // ---- sales conversation (Phase 2, read-only) ---------------------------
+    // ---- sales conversation + Phase 3B human reply -------------------------
     //
     // PERFORMANCE. One opened lead = at most one Instantly GET, made by the
     // server for that lead alone. This is never called from load(), never
@@ -382,10 +402,14 @@
     // of a drawer the operator has already moved on from, so a slow fetch can
     // never paint itself into the wrong lead.
     //
-    // VIEW ONLY. There is no textarea, no send control and no generate control
-    // on this page. Nothing here can send an email or write a row.
     let CONV_TOKEN = 0;
     let CONV_LEAD = null;
+    let CONV_DATA = null;
+    let SEND_IN_FLIGHT = false;
+    let SEND_OUTBOUND_ID = null;
+    let MANUAL_REPLY_ACTION_SECRET = '';
+    const REPLY_DRAFTS = new Map();
+    const AMBIGUOUS_LOCKS = new Set();
 
     function senderInboxHtml(data) {
       const inbox = data.sender_inbox || {};
@@ -430,6 +454,10 @@
         meta.push('Direction could not be established from the addresses');
       }
       if (message.classification) meta.push(`Classified: ${esc(message.classification)}`);
+      if (message.send_outcome === 'AMBIGUOUS') {
+        cls = 'unknown'; who = 'NOVUS send unconfirmed'; whoCls = 'neutral';
+        meta.push('Send outcome: may have sent');
+      }
       meta.push(message.source.replace(/_/g, ' ').toLowerCase());
 
       return `<div class="msg ${cls}">
@@ -445,7 +473,58 @@
       </div>`;
     }
 
-    function conversationHtml(data, agencyName) {
+    const REPLY_BLOCK_TEXT = {
+      PROSPECT_OPTED_OUT: 'This prospect has opted out. A reply cannot be sent.',
+      STALE_REPLY_EVENT: 'A newer reply has arrived. Refresh the conversation before replying.',
+      SENDER_INBOX_AMBIGUOUS: 'The sending inbox is ambiguous. Resolve the conversation before replying.',
+      SENDER_INBOX_UNKNOWN: 'The sending inbox could not be resolved from the live conversation.',
+      REPLY_NOT_FOUND: 'The latest stored reply is not available in the live Instantly conversation.',
+      REPLY_NOT_CONFIRMED_INBOUND: 'The latest message is not confirmed as an inbound prospect reply.',
+      THREAD_ID_MISMATCH: 'The stored reply and live Instantly thread do not match.',
+      EACCOUNT_NOT_ALLOWLISTED: 'The resolved sending inbox is not allowlisted.',
+      OUTBOUND_MATCH_MISSING: 'The outreach journey could not be resolved safely.',
+      OUTBOUND_MATCH_AMBIGUOUS: 'The outreach journey is ambiguous.',
+      OUTBOUND_LEAD_EMAIL_MISMATCH: 'The prospect email no longer matches the outreach journey.',
+      REPLY_EVENT_NOT_FOUND: 'There is no stored prospect reply to answer.',
+    };
+
+    function replyComposerHtml(data, agencyName, notice) {
+      const candidate = data.manual_reply || {};
+      const inbox = data.sender_inbox || {};
+      const outboundId = data.outbound_id || '';
+      const draft = REPLY_DRAFTS.get(outboundId) || '';
+      const ambiguousLocked = AMBIGUOUS_LOCKS.has(outboundId);
+      const eligible = candidate.eligible === true && inbox.status === 'CONFIRMED' && !ambiguousLocked;
+      const inFlight = SEND_IN_FLIGHT && SEND_OUTBOUND_ID === outboundId;
+      const disabled = !eligible || !draft.trim() || inFlight;
+      let reason = '';
+      if (ambiguousLocked) {
+        reason = 'This may have sent. Refresh/check the conversation before any further action.';
+      } else if (!candidate.eligible) {
+        reason = REPLY_BLOCK_TEXT[candidate.blocked_reason]
+          || (candidate.blocked_reason ? `Reply unavailable: ${candidate.blocked_reason.replace(/_/g, ' ').toLowerCase()}.` : 'No eligible latest reply is available.');
+      }
+      const noticeHtml = notice?.text
+        ? `<div id="reply-outcome" class="reply-outcome show ${esc(notice.type || 'warning')}">${esc(notice.text)}</div>`
+        : '<div id="reply-outcome" class="reply-outcome"></div>';
+
+      return `<div class="reply-box">
+        <div class="reply-label">Reply</div>
+        <div class="reply-target">Replying to: <strong>${esc(agencyName || data.lead_email || 'Prospect')}</strong>
+          <span class="mono">${esc(data.lead_email || '')}</span>, ${esc(when(candidate.received_at)) || 'timestamp unavailable'}<br/>
+          From: <span class="mono">${inbox.status === 'CONFIRMED' ? esc(inbox.eaccount) : 'not resolved'}</span>
+        </div>
+        <textarea id="reply-body" maxlength="5000" placeholder="Type or paste Joe's reply" ${eligible ? '' : 'disabled'}>${esc(draft)}</textarea>
+        <div class="reply-actions">
+          <span class="reply-count" id="reply-count">${draft.length} / 5000</span>
+          <button class="btn btn-send" id="send-reply" type="button" ${disabled ? 'disabled' : ''}>${inFlight ? 'Sending…' : 'Send Reply'}</button>
+        </div>
+        ${reason ? `<div class="note">${esc(reason)}</div>` : ''}
+        ${noticeHtml}
+      </div>`;
+    }
+
+    function conversationHtml(data, agencyName, notice) {
       const parts = [];
 
       // The durable Phase 1 data is always rendered. A failed Instantly call
@@ -466,11 +545,12 @@
         parts.push(`<div class="note">The original campaign email bodies are not stored by NOVUS. Where Instantly
           returns them they are shown above; otherwise only the campaign handoff is marked.</div>`);
       }
+      parts.push(replyComposerHtml(data, agencyName, notice));
       parts.push(`<button class="btn btn-ghost btn-mini" id="conv-refresh" type="button">Refresh conversation</button>`);
       return parts.join('');
     }
 
-    async function loadConversation(outboundId, agencyName) {
+    async function loadConversation(outboundId, agencyName, notice) {
       const token = ++CONV_TOKEN;
       const body = $('conv-body');
       if (!body) return;
@@ -481,8 +561,9 @@
         const data = await res.json();
         if (token !== CONV_TOKEN) return; // the operator has opened another lead
         if (!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+        CONV_DATA = data;
         const target = $('conv-body');
-        if (target) target.innerHTML = conversationHtml(data, agencyName);
+        if (target) target.innerHTML = conversationHtml(data, agencyName, notice);
       } catch (err) {
         if (token !== CONV_TOKEN) return;
         const target = $('conv-body');
@@ -491,6 +572,139 @@
             + `<div class="note">${esc(err.message || 'The conversation could not be loaded.')}</div></div>`
             + '<button class="btn btn-ghost btn-mini" id="conv-refresh" type="button">Retry</button>';
         }
+      }
+    }
+
+    function syncReplyControls() {
+      const textarea = $('reply-body');
+      const button = $('send-reply');
+      if (!textarea || !button || !CONV_DATA) return;
+      const outboundId = CONV_DATA.outbound_id;
+      REPLY_DRAFTS.set(outboundId, textarea.value);
+      const count = $('reply-count');
+      if (count) count.textContent = `${textarea.value.length} / 5000`;
+      const canSend = CONV_DATA.manual_reply?.eligible === true
+        && CONV_DATA.sender_inbox?.status === 'CONFIRMED'
+        && !AMBIGUOUS_LOCKS.has(outboundId)
+        && textarea.value.trim().length > 0
+        && !(SEND_IN_FLIGHT && SEND_OUTBOUND_ID === outboundId);
+      button.disabled = !canSend;
+      button.textContent = SEND_IN_FLIGHT && SEND_OUTBOUND_ID === outboundId ? 'Sending…' : 'Send Reply';
+    }
+
+    function showReplyOutcome(type, message) {
+      const box = $('reply-outcome');
+      if (!box) return;
+      box.className = `reply-outcome show ${type}`;
+      box.textContent = message;
+    }
+
+    function manualReplyActionSecret() {
+      if (!MANUAL_REPLY_ACTION_SECRET) {
+        MANUAL_REPLY_ACTION_SECRET = (window.prompt('Enter the NOVUS action secret to authorise live replies:') || '').trim();
+      }
+      return MANUAL_REPLY_ACTION_SECRET;
+    }
+
+    async function sendManualReply() {
+      const textarea = $('reply-body');
+      const data = CONV_DATA;
+      if (!textarea || !data || SEND_IN_FLIGHT) return;
+      const candidate = data.manual_reply || {};
+      const inbox = data.sender_inbox || {};
+      const replyText = textarea.value.trim();
+      if (!replyText || !candidate.eligible || inbox.status !== 'CONFIRMED') return;
+
+      SEND_IN_FLIGHT = true;
+      SEND_OUTBOUND_ID = data.outbound_id;
+      syncReplyControls();
+      const confirmed = window.confirm(`You’re about to send this reply from ${inbox.eaccount} to ${data.lead_email}. Send it?`);
+      if (!confirmed) {
+        SEND_IN_FLIGHT = false;
+        SEND_OUTBOUND_ID = null;
+        syncReplyControls();
+        return;
+      }
+      const actionSecret = manualReplyActionSecret();
+      if (!actionSecret) {
+        SEND_IN_FLIGHT = false;
+        SEND_OUTBOUND_ID = null;
+        syncReplyControls();
+        showReplyOutcome('error', 'Live reply authorisation was cancelled. Nothing was sent.');
+        return;
+      }
+
+      showReplyOutcome('warning', 'Sending one manual reply…');
+      try {
+        const response = await fetch(MANUAL_REPLY_URL, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-NOVUS-REPLY-POLLER-SECRET': actionSecret,
+          },
+          body: JSON.stringify({
+            reply_event_id: candidate.reply_event_id,
+            body: replyText,
+            expected_received_at: candidate.received_at,
+            confirm: 'SEND_ONE_MANUAL_REPLY',
+          }),
+        });
+        const result = await response.json();
+
+        if (result.send_outcome === 'SENT' || result.sent === true) {
+          REPLY_DRAFTS.delete(data.outbound_id);
+          let notice = { type: 'success', text: 'Reply sent.' };
+          if (result.persistence_error) {
+            notice = { type: 'warning', text: `Reply sent, but local audit persistence failed: ${result.persistence_error}. Do not resend.` };
+          } else if (result.action_update_error) {
+            notice = { type: 'warning', text: `Reply sent and recorded, but the pending action could not be completed: ${result.action_update_error}. Do not resend.` };
+          } else if (result.thread_continuity === 'DIFFERENT') {
+            notice = { type: 'warning', text: 'Reply sent, but Instantly reported a different thread. Check the conversation.' };
+          }
+          SEND_IN_FLIGHT = false;
+          SEND_OUTBOUND_ID = null;
+          await load(true);
+          if (CONV_LEAD?.outbound_id === data.outbound_id) {
+            await loadConversation(data.outbound_id, CONV_LEAD.agency_name, notice);
+          }
+          return;
+        }
+
+        if (result.send_outcome === 'AMBIGUOUS') {
+          AMBIGUOUS_LOCKS.add(data.outbound_id);
+          const auditWarning = result.persistence_error
+            ? ` Local audit persistence also failed: ${result.persistence_error}.`
+            : '';
+          showReplyOutcome('warning', `This may have sent.${auditWarning} Do not resend yet. Refresh/check the conversation first.`);
+        } else if (result.blocked_reason === 'STALE_REPLY_EVENT') {
+          SEND_IN_FLIGHT = false;
+          SEND_OUTBOUND_ID = null;
+          await loadConversation(data.outbound_id, CONV_LEAD?.agency_name || '', {
+            type: 'warning',
+            text: 'A newer reply has arrived. Refresh the conversation before replying.',
+          });
+          return;
+        } else if (result.send_outcome === 'REJECTED') {
+          showReplyOutcome('error', result.error || 'Instantly rejected the reply. Correct the issue and try again.');
+        } else if (result.blocked_reason === 'DUPLICATE_MANUAL_REPLY') {
+          showReplyOutcome('warning', 'That exact reply is already in progress or was recently submitted. Check the conversation before retrying.');
+        } else {
+          if (response.status === 403) {
+            MANUAL_REPLY_ACTION_SECRET = '';
+          }
+          showReplyOutcome('error', result.error || REPLY_BLOCK_TEXT[result.blocked_reason]
+            || `Reply was not sent${result.blocked_reason ? ` (${result.blocked_reason})` : ''}.`);
+        }
+      } catch (err) {
+        // Failure before a classified response is not proof the send failed.
+        // Keep the draft, and make the operator verify the conversation.
+        AMBIGUOUS_LOCKS.add(data.outbound_id);
+        showReplyOutcome('warning', 'The send result could not be confirmed. Do not resend yet. Refresh/check the conversation first.');
+      } finally {
+        SEND_IN_FLIGHT = false;
+        SEND_OUTBOUND_ID = null;
+        syncReplyControls();
       }
     }
 
@@ -601,6 +815,7 @@
       // Invalidate any conversation fetch still in flight for the closed lead.
       CONV_TOKEN += 1;
       CONV_LEAD = null;
+      CONV_DATA = null;
     }
 
     // ---- loading -----------------------------------------------------------
@@ -712,11 +927,21 @@
       // Manual, one-shot conversation re-read. Delegated because the button is
       // re-rendered with the section. Nothing polls.
       if (e.target.id === 'conv-refresh') {
-        if (CONV_LEAD) loadConversation(CONV_LEAD.outbound_id, CONV_LEAD.agency_name);
+        if (CONV_LEAD) {
+          AMBIGUOUS_LOCKS.delete(CONV_LEAD.outbound_id);
+          loadConversation(CONV_LEAD.outbound_id, CONV_LEAD.agency_name);
+        }
+        return;
+      }
+      if (e.target.id === 'send-reply') {
+        sendManualReply();
         return;
       }
       const row = e.target.closest('#tb-attention tr, #tb-system tr');
       if (row && row.dataset.id) openDrawer(row.dataset.id);
+    });
+    document.addEventListener('input', (e) => {
+      if (e.target.id === 'reply-body') syncReplyControls();
     });
 
     load(false);

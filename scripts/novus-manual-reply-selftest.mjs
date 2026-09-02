@@ -33,6 +33,7 @@ import {
   SALES_MESSAGE_TYPES,
   SALES_MESSAGE_DIRECTIONS,
   buildSalesMessageRow,
+  appendSalesMessage,
   buildSalesMessagesSetupPlan,
   validateSalesMessageRow,
   parseSalesMessageRecords,
@@ -587,14 +588,20 @@ part('F. SALES_MESSAGES: schema, validation, parser, setup plan');
   assert.equal((await readSalesMessagesForOutreach(liveRepo, 'out_OTHER')).rows.length, 0);
   ok('a populated tab reads back, filtered to the one outreach journey');
 
-  // -- NO WRITER EXISTS -----------------------------------------------------
-  const salesModule = await import('../lib/sales-messages.mjs');
-  for (const name of Object.keys(salesModule)) {
-    assert.ok(!/^(append|write|persist|save|insert|create)/i.test(name), `${name} is not a writer`);
-  }
-  const salesCode = codeOf('lib/sales-messages.mjs');
-  assert.ok(!/appendRecord|appendRowsBatch|updateById|updateCell|writeRowsBatch|writeCellsBatch/.test(salesCode));
-  ok('lib/sales-messages.mjs exports no writer and calls no repo write method');
+  // -- PHASE 3B append helper ----------------------------------------------
+  const appended = [];
+  await appendSalesMessage({
+    async getTable() { return { header: SALES_MESSAGES_HEADER.slice(), rows: [] }; },
+    async appendRowsBatch(tab, rows) { appended.push({ tab, rows }); },
+  }, valid);
+  assert.equal(appended.length, 1);
+  assert.equal(appended[0].tab, SALES_MESSAGES_TAB);
+  assert.deepEqual(appended[0].rows[0], buildSalesMessageRow(valid));
+  await assert.rejects(() => appendSalesMessage({
+    async getTable() { return { header: SALES_MESSAGES_HEADER.slice().reverse(), rows: [] }; },
+    async appendRowsBatch() { throw new Error('must not append'); },
+  }, valid), /audited 20-column schema/);
+  ok('the Phase 3B append helper writes one validated row and fails closed on header drift');
 }
 
 // ---------------------------------------------------------------------------
@@ -1058,17 +1065,17 @@ async function dryRun(body, { auth = AUTH, method = 'POST' } = {}) {
   }
   ok('the dry-run handler names no send, no writer, no poller and no AI call');
 
-  assert.ok(fn.includes('fetchLeadConversation'), 'the one live read it does make');
-  assert.ok(fn.includes('evaluateManualReplyGate'));
+  assert.ok(fn.includes('evaluateManualReplyRequest'), 'the shared read + gate boundary');
   assert.ok(fn.includes('buildInstantlyReplyPayload'), 'the payload is BUILT, not sent');
-  ok('it builds the payload with the shared builder and evaluates the shared gate');
+  ok('it builds the payload with the shared builder and evaluates the shared read/gate path');
 
-  // The operator page is still view-only. Phase 3A adds no send control.
+  // Phase 3B adds the deliberate human-only composer; no AI control exists.
   const html = readFileSync('novus/operator.html', 'utf8');
-  assert.ok(!/<textarea/i.test(html), 'no textarea');
-  assert.ok(!/manual-reply/i.test(html), 'the page does not call the dry run');
-  assert.ok(!/method:\s*'POST'/i.test(html), 'the page issues no POST');
-  ok('the operator page is unchanged and still view-only: no reply box, no send button');
+  assert.ok(/<textarea[^>]*maxlength="5000"/i.test(html), 'bounded textarea');
+  assert.ok(/operator-manual-reply/i.test(html), 'the page calls the live manual operation');
+  assert.ok(/method:\s*'POST'/i.test(html), 'the page issues the deliberate POST');
+  assert.ok(!/Generate Response/i.test(html), 'no AI generation control');
+  ok('the operator page has the bounded manual composer and no Generate Response control');
 }
 
 __setRepoForTests(null);

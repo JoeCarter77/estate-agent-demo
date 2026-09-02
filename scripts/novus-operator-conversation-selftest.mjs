@@ -718,20 +718,21 @@ const AUTHED = { method: 'GET', headers: { authorization: authHeader } };
 }
 
 // ---------------------------------------------------------------------------
-part('G. no send, no AI and no classifier change is reachable from Phase 2');
+part('G. conversation read stays isolated; Phase 3B UI has no AI');
 // ---------------------------------------------------------------------------
 
 {
   const fs = await import('node:fs/promises');
   const html = await fs.readFile('novus/operator.html', 'utf8');
-  assert.ok(!/<textarea/i.test(html), 'no textarea');
+  assert.ok(/<textarea[^>]*maxlength="5000"/i.test(html), 'bounded manual textarea');
   assert.ok(!/send-demo/.test(html), 'the send-demo operation is not reachable from the page');
   assert.ok(!/novus_operation=instantly-reply-poll(?!-dry-run)/.test(html), 'the live poller is not reachable from the page');
-  assert.ok(!/method:\s*'POST'/i.test(html), 'the page issues no POST');
+  assert.ok(/novus_operation=operator-manual-reply/.test(html), 'only the manual human reply operation is wired');
+  assert.ok(!/Generate Response|callAi/i.test(html), 'no AI generation path');
   assert.ok(html.includes('operator-conversation'), 'the page does call the read-only conversation operation');
   assert.ok(html.includes('SALES CONVERSATION') || html.includes('Sales conversation'), 'the section exists');
   assert.ok(html.includes('Probe finding'), 'the probe section is still present and separate');
-  ok('the operator page is view-only: no textarea, no POST, no send or generate control');
+  ok('the operator page adds only the bounded human reply composer, with no AI or SEND_DEMO path');
 
   const api = await fs.readFile('api/novus/personalisation.js', 'utf8');
   const handler = api.slice(api.indexOf('async function handleOperatorConversation'),

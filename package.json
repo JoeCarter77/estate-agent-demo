@@ -59,6 +59,7 @@
     "novus:operator-leads-selftest": "node scripts/novus-operator-leads-selftest.mjs",
     "novus:operator-conversation-selftest": "node scripts/novus-operator-conversation-selftest.mjs",
     "novus:manual-reply-selftest": "node scripts/novus-manual-reply-selftest.mjs",
+    "novus:manual-reply-live-selftest": "node scripts/novus-manual-reply-live-selftest.mjs",
     "novus:sales-messages-setup": "node scripts/novus-sales-messages-setup.mjs",
     "novus:historical-replay": "node scripts/novus-historical-replay.mjs",
     "novus:probe-rerun": "node scripts/novus-probe-rerun.mjs"
