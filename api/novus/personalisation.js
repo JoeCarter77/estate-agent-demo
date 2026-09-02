@@ -98,10 +98,15 @@ async function handleContactResolution(req, res) {
 }
 
 // Read-only: what the later backlog run WOULD process. Resolves nothing.
+//
+// require_probe_sent defaults to true (original behaviour: probed-and-
+// unresolved only). Pass require_probe_sent=false for the separate blank-
+// contact_resolution_status bulk run, which deliberately ignores probe_sent.
 async function handleResolutionBacklog(req, res) {
   try {
     const includeResolved = String(req.query?.include_resolved || '') === 'true';
-    const agencies = await listResolutionBacklog(getRepo(), { includeResolved });
+    const requireProbeSent = String(req.query?.require_probe_sent ?? 'true') !== 'false';
+    const agencies = await listResolutionBacklog(getRepo(), { includeResolved, requireProbeSent });
     return res.status(200).json({ count: agencies.length, agencies });
   } catch (err) {
     console.error('contacts/resolution-backlog error:', err);
