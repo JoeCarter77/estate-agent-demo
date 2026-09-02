@@ -56,6 +56,7 @@
     "novus:reply-classification-selftest": "node scripts/novus-reply-classification-selftest.mjs",
     "novus:send-demo-selftest": "node scripts/novus-send-demo-selftest.mjs",
     "novus:send-demo-live-selftest": "node scripts/novus-send-demo-live-selftest.mjs",
+    "novus:operator-leads-selftest": "node scripts/novus-operator-leads-selftest.mjs",
     "novus:historical-replay": "node scripts/novus-historical-replay.mjs",
     "novus:probe-rerun": "node scripts/novus-probe-rerun.mjs"
   },

@@ -7,6 +7,7 @@
 //                                 POST /api/novus/instantly/reply-poll (via rewrite)
 //                                 GET  /api/novus/instantly/send-demo-dry-run (via rewrite)
 //                                 POST /api/novus/instantly/send-demo (via rewrite)
+//                                 GET  /api/novus/operator/leads (via rewrite)
 //
 // Read-only lookup for the PERSONALISATION row lib/personalisation-rebuild.mjs
 // writes (via the existing /api/novus/intelligence/rebuild-all + cron finalize
@@ -39,9 +40,10 @@ import { classifyReply, CONFIDENCE_THRESHOLD } from '../../lib/reply-classificat
 import { _internal as aiClientInternal } from '../../lib/ai-client.mjs';
 import { normalizeInstantlyEmail } from '../../lib/reply-router.mjs';
 import { PHRASES, DETERMINISTIC_PHRASES, CONTEXTUAL_PHRASES } from '../../lib/reply-classification-fixtures.mjs';
+import { buildOperatorLeads, OPERATOR_TABS } from '../../lib/operator-leads.mjs';
 
-// Contact resolution can run owner web research, a Hunter Finder lookup and
-// several Hunter Verifier checks in one invocation; 20s was sized for the read-only
+// Contact resolution can run Hunter Domain Search, Finder and several Verifier
+// checks in one invocation; 20s was sized for the read-only
 // Personalisation GET alone. This is a ceiling, not a reservation — the GET
 // path is unaffected.
 export const maxDuration = 60;
@@ -591,6 +593,75 @@ async function handleReplyClassifierLiveTest(req, res) {
   });
 }
 
+// OPERATOR LEADS — GET /api/novus/personalisation?novus_operation=operator-leads
+// (also reachable via the /api/novus/operator/leads rewrite).
+//
+// The read-only feed behind novus/operator.html — the Acquisition Command
+// Centre. Phase 1 is a VIEW and nothing else.
+//
+// WHAT THIS BRANCH DOES: seven Google Sheets READS in parallel, then one call
+// into the pure lib/operator-leads.mjs aggregator.
+//
+// WHAT IT CANNOT DO, structurally rather than by convention: it is GET-only,
+// it calls no writer, it runs no AI, it touches no Instantly endpoint, it does
+// not call GET /api/demo (which would count a view), and it never invokes
+// rebuildOutbound, runRebuildPass or the reply poller. The only repo methods it
+// reaches are getTable() reads.
+//
+// It lives here, as another operation on an already-protected function, for the
+// same Hobby-plan reason as verify-contact above: /api/novus/* is at Vercel's
+// 12 Serverless Function ceiling, so a new protected NOVUS action becomes an
+// operation, never a thirteenth file.
+const OPERATOR_LEADS_CACHE_TTL_MS = 45_000;
+
+// Module-scope, in-process, single-entry cache. Scoped to THIS branch alone:
+// no other operation reads or writes it, it holds only data the caller is
+// already authorised to see, and a cold lambda simply misses. It exists so a
+// UI refresh does not re-read seven full tabs every few seconds. Deliberately
+// not Redis/KV — a stale operator view for at most 45s is the correct trade,
+// and nothing downstream (live reply polling, the nightly rebuild) shares it.
+let operatorLeadsCache = null; // { at: epochMs, payload }
+
+async function loadOperatorTables(repo) {
+  const loaded = await Promise.all(OPERATOR_TABS.map((tab) => repo.getTable(tab)));
+  return Object.fromEntries(OPERATOR_TABS.map((tab, i) => [tab, loaded[i]]));
+}
+
+async function handleOperatorLeads(req, res) {
+  // Private, authenticated data: never shared-cacheable, never stored by a
+  // proxy. The in-process cache above is the only caching layer.
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+
+  const refresh = String(req.query?.refresh || '') === '1';
+  const nowMs = Date.now();
+
+  if (!refresh && operatorLeadsCache && nowMs - operatorLeadsCache.at < OPERATOR_LEADS_CACHE_TTL_MS) {
+    return res.status(200).json({
+      ...operatorLeadsCache.payload,
+      cached: true,
+      cache_age_ms: nowMs - operatorLeadsCache.at,
+    });
+  }
+
+  try {
+    const tables = await loadOperatorTables(getRepo());
+    const built = buildOperatorLeads(tables, { now: new Date().toISOString() });
+    const payload = {
+      success: true,
+      generated_at: built.generated_at,
+      cache_ttl_ms: OPERATOR_LEADS_CACHE_TTL_MS,
+      counts: built.counts,
+      warnings: built.warnings,
+      leads: built.leads,
+    };
+    operatorLeadsCache = { at: Date.now(), payload };
+    return res.status(200).json({ ...payload, cached: false, cache_age_ms: 0 });
+  } catch (err) {
+    console.error('operator-leads error:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Failed to build operator leads' });
+  }
+}
+
 // SEND_DEMO execution gate, DRY RUN —
 // GET /api/novus/personalisation?novus_operation=send-demo-dry-run&reply_event_id=...
 // (also reachable via the /api/novus/instantly/send-demo-dry-run rewrite).
@@ -723,6 +794,12 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && req.query?.novus_operation === 'instantly-reply-poll-dry-run') {
     if (!requireAuth(req, res)) return;
     return handleInstantlyReplyPollDryRun(req, res);
+  }
+  if (req.method === 'GET' && req.query?.novus_operation === 'operator-leads') {
+    // GET-only by construction: this branch is unreachable on any other
+    // method, and the operation performs Sheets READS only.
+    if (!requireAuth(req, res)) return;
+    return handleOperatorLeads(req, res);
   }
   if (req.method === 'GET' && req.query?.novus_operation === 'reply-classifier-live-test') {
     if (!requireAuth(req, res)) return;

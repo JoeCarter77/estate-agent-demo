@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NOVUS - Command Centre</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%2711%2016%2080%2080%27%3E%3Crect%20x%3D%2711%27%20y%3D%2716%27%20width%3D%2780%27%20height%3D%2780%27%20rx%3D%2716%27%20fill%3D%27%23172D67%27/%3E%3Cpath%20d%3D%27M29%2082%20L29%2046%20C29%2030%2050%2030%2050%2046%20L73%2082%20L73%2030%27%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%2711%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --page:#FFFFFF; --panel:#F8FAFC; --panel-2:#F1F5F9; --border:#E2E8F0; --border-hi:#CBD5E1;
+      --brand-navy:#172D67; --accent:#2563EB; --accent-hi:#3B82F6; --accent-lo:rgba(37,99,235,0.08);
+      --text:#0F172A; --text-2:#475569; --text-3:#64748B; --green:#22C55E; --amber:#F59E0B; --red:#EF4444;
+      --purple:#7C3AED;
+      --radius:14px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--panel-2);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
+    header{position:sticky;top:0;z-index:30;height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:rgba(255,255,255,0.92);backdrop-filter:blur(18px);border-bottom:1px solid var(--border);}
+    .logo{display:flex;align-items:center;gap:9px;}
+    .logo-mark{width:26px;height:26px;border-radius:7px;background:var(--brand-navy);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:.9rem;}
+    .logo-word{font-size:1.05rem;font-weight:800;letter-spacing:.02em;color:var(--brand-navy);}
+    .head-right{display:flex;align-items:center;gap:12px;}
+    .env-pill{font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border:1px solid rgba(37,99,235,.35);background:var(--accent-lo);padding:5px 11px;border-radius:100px;}
+    .ro-pill{font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);border:1px solid var(--border-hi);background:var(--panel);padding:5px 11px;border-radius:100px;}
+    .stamp{font-size:.7rem;color:var(--text-3);}
+
+    .wrap{max-width:1360px;margin:0 auto;padding:26px 24px 90px;}
+
+    /* summary */
+    .summary{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:22px;}
+    .stat{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:15px 16px;box-shadow:0 6px 18px rgba(15,23,42,.04);}
+    .stat .n{font-size:1.7rem;font-weight:800;letter-spacing:-.02em;line-height:1.1;}
+    .stat .l{font-size:.66rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);margin-top:5px;}
+    .stat.alert{border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.04);}
+    .stat.alert .n{color:var(--red);}
+    .stat.good{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.05);}
+    .stat.good .n{color:#16A34A;}
+
+    /* controls */
+    .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px;}
+    .search{flex:1 1 300px;min-width:240px;position:relative;}
+    .search input{width:100%;font-family:'Inter',sans-serif;font-size:.9rem;color:var(--text);background:#fff;border:1px solid var(--border-hi);border-radius:11px;padding:11px 13px 11px 36px;}
+    .search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lo);}
+    .search .ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:.9rem;}
+    select{font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:var(--text-2);background:#fff;border:1px solid var(--border-hi);border-radius:11px;padding:10px 12px;cursor:pointer;}
+    select:focus{outline:none;border-color:var(--accent);}
+    .btn{font-family:'Inter',sans-serif;font-weight:700;font-size:.82rem;border:none;border-radius:11px;padding:10px 15px;cursor:pointer;transition:background .15s,border-color .15s,color .15s,opacity .15s;}
+    .btn-ghost{background:#fff;color:var(--brand-navy);border:1px solid var(--border-hi);}
+    .btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+    .btn-ghost:disabled{opacity:.5;cursor:not-allowed;}
+    .toggle{display:inline-flex;align-items:center;gap:7px;font-size:.82rem;font-weight:600;color:var(--text-2);background:#fff;border:1px solid var(--border-hi);border-radius:11px;padding:10px 13px;cursor:pointer;user-select:none;}
+    .toggle input{accent-color:var(--accent);cursor:pointer;}
+
+    /* sections */
+    section{margin-bottom:26px;}
+    .sec-head{display:flex;align-items:baseline;gap:10px;margin-bottom:11px;}
+    .sec-title{font-size:.95rem;font-weight:800;letter-spacing:-.01em;}
+    .sec-note{font-size:.76rem;color:var(--text-3);}
+    .sec-count{font-size:.66rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);background:var(--panel);border:1px solid var(--border);border-radius:100px;padding:3px 9px;}
+
+    .panel{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:0 6px 18px rgba(15,23,42,.04);}
+    .panel.quiet{background:var(--panel);box-shadow:none;}
+    table{width:100%;border-collapse:collapse;}
+    th{text-align:left;font-size:.63rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);padding:11px 14px;border-bottom:1px solid var(--border);background:var(--panel);white-space:nowrap;}
+    td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:.85rem;vertical-align:top;}
+    tbody tr{cursor:pointer;transition:background .12s;}
+    tbody tr:hover{background:var(--accent-lo);}
+    tbody tr:last-child td{border-bottom:none;}
+    .cell-primary{font-weight:700;color:var(--text);}
+    .cell-sub{font-size:.75rem;color:var(--text-3);margin-top:2px;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;}
+    .empty{padding:26px 16px;text-align:center;font-size:.84rem;color:var(--text-3);}
+
+    /* pills */
+    .pill{display:inline-flex;align-items:center;gap:5px;font-size:.63rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:4px 9px;border-radius:100px;white-space:nowrap;}
+    .p-grey{color:var(--text-3);background:var(--panel-2);border:1px solid var(--border);}
+    .p-blue{color:var(--accent);background:var(--accent-lo);border:1px solid rgba(37,99,235,.28);}
+    .p-green{color:#15803D;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);}
+    .p-amber{color:#B45309;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);}
+    .p-red{color:#B91C1C;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.28);}
+    .p-purple{color:#6D28D9;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.28);}
+
+    /* drawer */
+    .scrim{position:fixed;inset:0;background:rgba(15,23,42,.35);opacity:0;pointer-events:none;transition:opacity .18s;z-index:40;}
+    .scrim.show{opacity:1;pointer-events:auto;}
+    .drawer{position:fixed;top:0;right:0;height:100vh;width:min(560px,100vw);background:#fff;border-left:1px solid var(--border);box-shadow:-18px 0 44px rgba(15,23,42,.14);transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);z-index:50;display:flex;flex-direction:column;}
+    .drawer.show{transform:translateX(0);}
+    .drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:20px 22px 16px;border-bottom:1px solid var(--border);}
+    .drawer-title{font-size:1.15rem;font-weight:800;letter-spacing:-.02em;}
+    .drawer-sub{font-size:.78rem;color:var(--text-3);margin-top:3px;}
+    .close{background:none;border:none;font-size:1.4rem;line-height:1;color:var(--text-3);cursor:pointer;padding:0 4px;}
+    .close:hover{color:var(--text);}
+    .drawer-body{overflow-y:auto;padding:6px 22px 40px;flex:1;}
+    .block{margin-top:20px;}
+    .block-head{display:flex;align-items:center;gap:8px;margin-bottom:2px;}
+    .block-title{font-size:.68rem;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--text-3);}
+    .block-tag{font-size:.58rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:100px;}
+    .tag-sales{color:var(--accent);background:var(--accent-lo);border:1px solid rgba(37,99,235,.28);}
+    .tag-probe{color:#6D28D9;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.28);}
+    .kv{display:grid;grid-template-columns:145px 1fr;gap:0 14px;}
+    .kv dt{font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);padding:9px 0;border-top:1px solid var(--border);}
+    .kv dd{font-size:.86rem;color:var(--text);padding:9px 0;border-top:1px solid var(--border);word-break:break-word;}
+    .kv dd.muted{color:var(--text-3);}
+    .quote{font-size:.86rem;line-height:1.55;color:var(--text);background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--border-hi);border-radius:8px;padding:12px 14px;margin-top:10px;white-space:pre-wrap;}
+    .preview-link{display:inline-block;font-size:.8rem;font-weight:700;color:var(--accent);text-decoration:none;border:1px solid rgba(37,99,235,.3);background:var(--accent-lo);border-radius:9px;padding:8px 12px;margin-top:10px;}
+    .preview-link:hover{background:rgba(37,99,235,.14);}
+    .note{font-size:.72rem;color:var(--text-3);line-height:1.5;margin-top:8px;}
+
+    .warn-box{font-size:.78rem;color:#92400E;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:11px;padding:11px 14px;margin-bottom:18px;}
+    .warn-box ul{margin:6px 0 0 18px;}
+    .warn-box li{margin-top:3px;}
+    .err{display:none;font-size:.84rem;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:11px;padding:12px 14px;margin-bottom:18px;}
+    .err.show{display:block;}
+    .hidden{display:none !important;}
+    .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(15,23,42,.15);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:7px;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    .foot{text-align:center;font-size:.72rem;color:var(--text-3);margin-top:32px;}
+
+    @media (max-width:1100px){
+      .summary{grid-template-columns:repeat(3,1fr);}
+      .col-hide{display:none;}
+    }
+    @media (max-width:640px){
+      .summary{grid-template-columns:repeat(2,1fr);}
+      .wrap{padding:18px 14px 70px;}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo"><div class="logo-mark">N</div><div class="logo-word">NOVUS</div></div>
+    <div class="head-right">
+      <span class="stamp" id="stamp">Loading&hellip;</span>
+      <span class="ro-pill">Read only</span>
+      <span class="env-pill">Internal &middot; Command Centre</span>
+    </div>
+  </header>
+
+  <div class="wrap">
+
+    <div id="load-err" class="err"></div>
+    <div id="warn-box" class="warn-box hidden"></div>
+
+    <!-- A. HEADER / SUMMARY -->
+    <div class="summary">
+      <div class="stat alert"><div class="n" id="s-attention">&mdash;</div><div class="l">Needs attention</div></div>
+      <div class="stat"><div class="n" id="s-total">&mdash;</div><div class="l">Active leads</div></div>
+      <div class="stat"><div class="n" id="s-sequence">&mdash;</div><div class="l">Sequence running</div></div>
+      <div class="stat"><div class="n" id="s-replied">&mdash;</div><div class="l">Replied</div></div>
+      <div class="stat"><div class="n" id="s-engaged">&mdash;</div><div class="l">Demo engaged</div></div>
+      <div class="stat good"><div class="n" id="s-meetings">&mdash;</div><div class="l">Meetings</div></div>
+    </div>
+
+    <!-- D/E. SEARCH + FILTERS -->
+    <div class="controls">
+      <div class="search">
+        <span class="ic">&#9906;</span>
+        <input id="q" type="search" placeholder="Search agency, contact, email or property street" autocomplete="off" spellcheck="false" />
+      </div>
+      <label class="toggle"><input id="f-attention" type="checkbox" /> Needs attention only</label>
+      <select id="f-state"><option value="">All states</option></select>
+      <select id="f-priority"><option value="">All priorities</option></select>
+      <select id="f-contact"><option value="">All contact types</option></select>
+      <button id="refresh" class="btn btn-ghost">Refresh</button>
+      <button id="unrouted" class="btn btn-ghost">Check unrouted replies</button>
+    </div>
+
+    <!-- B. NEEDS YOUR ATTENTION -->
+    <section>
+      <div class="sec-head">
+        <div class="sec-title">Needs your attention</div>
+        <span class="sec-count" id="c-attention">0</span>
+        <span class="sec-note">A reply is waiting on a human, or an action failed.</span>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr>
+            <th>Agency</th><th>Contact</th><th>State</th>
+            <th class="col-hide">Latest event</th><th>Next action</th><th>Priority</th>
+          </tr></thead>
+          <tbody id="tb-attention"></tbody>
+        </table>
+        <div id="empty-attention" class="empty hidden">Nothing is waiting on you.</div>
+      </div>
+    </section>
+
+    <!-- C. SYSTEM HANDLING -->
+    <section>
+      <div class="sec-head">
+        <div class="sec-title">System handling</div>
+        <span class="sec-count" id="c-system">0</span>
+        <span class="sec-note">Running without you. Listed for visibility only.</span>
+      </div>
+      <div class="panel quiet">
+        <table>
+          <thead><tr>
+            <th>Agency</th><th>Contact</th><th>State</th>
+            <th class="col-hide">Latest event</th><th>Next action</th><th>Priority</th>
+          </tr></thead>
+          <tbody id="tb-system"></tbody>
+        </table>
+        <div id="empty-system" class="empty hidden">No leads match these filters.</div>
+      </div>
+    </section>
+
+    <!-- 10. UNROUTED REPLIES (manual, read-only) -->
+    <section id="sec-unrouted" class="hidden">
+      <div class="sec-head">
+        <div class="sec-title">Unrouted replies</div>
+        <span class="sec-count" id="c-unrouted">0</span>
+        <span class="sec-note">Inbound replies the live poller skipped because they matched no single OUTBOUND row. Read only: nothing here is classified, stored or answered.</span>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Lead email</th><th>Reason</th><th>Match method</th><th class="col-hide">Candidates</th></tr></thead>
+          <tbody id="tb-unrouted"></tbody>
+        </table>
+        <div id="empty-unrouted" class="empty hidden">No skipped inbound replies in the last sweep.</div>
+      </div>
+    </section>
+
+    <div class="foot">NOVUS Operating System &middot; Command Centre V0.1 &middot; read-only</div>
+  </div>
+
+  <!-- 12. DETAIL DRAWER -->
+  <div id="scrim" class="scrim"></div>
+  <aside id="drawer" class="drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div>
+        <div class="drawer-title" id="d-agency">&mdash;</div>
+        <div class="drawer-sub" id="d-sub">&mdash;</div>
+      </div>
+      <button class="close" id="d-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="drawer-body" id="d-body"></div>
+  </aside>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    // Basic Auth is enforced by the edge middleware on this page load, so the
+    // browser already holds credentials for this origin and attaches them to
+    // the same-origin API calls below automatically. No token handling here.
+    const LEADS_URL = '/api/novus/personalisation?novus_operation=operator-leads';
+    // READ-ONLY dry run. classify=0 keeps it zero-cost: no AI call, no write.
+    const UNROUTED_URL = '/api/novus/personalisation?novus_operation=instantly-reply-poll-dry-run&classify=0&limit=50';
+
+    let LEADS = [];
+
+    // ---- rendering helpers -------------------------------------------------
+
+    function esc(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+      ));
+    }
+
+    function dash(value) { return (value == null || value === '') ? '&mdash;' : esc(value); }
+
+    // Short, unambiguous local time. An unparseable stored value is shown
+    // verbatim rather than silently turned into a wrong date.
+    function when(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return String(iso);
+      return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+
+    const STATE_TONE = {
+      MEETING_BOOKED: 'p-green', DEMO_ENGAGED: 'p-green', DEMO_SENT: 'p-blue',
+      REPLIED: 'p-blue', SEQUENCE_RUNNING: 'p-grey', READY: 'p-grey',
+      REVIEW_REQUIRED: 'p-amber', NURTURE: 'p-amber',
+      NOT_INTERESTED: 'p-grey', OPTED_OUT: 'p-red', UNKNOWN: 'p-red',
+    };
+    const PRIORITY_TONE = { CRITICAL: 'p-red', HIGH: 'p-amber', NORMAL: 'p-blue', LOW: 'p-grey' };
+    const CONTACT_TONE = { OWNER_DIRECT: 'p-purple', NAMED_HUMAN: 'p-blue', GENERIC: 'p-grey', UNKNOWN: 'p-grey' };
+
+    function pill(value, tone) {
+      if (!value) return '<span class="pill p-grey">&mdash;</span>';
+      return `<span class="pill ${tone || 'p-grey'}">${esc(String(value).replace(/_/g, ' '))}</span>`;
+    }
+
+    function rowHtml(lead) {
+      const nextAction = lead.next_action.type
+        ? `${esc(lead.next_action.type.replace(/_/g, ' '))}<div class="cell-sub">${dash(lead.next_action.status)}</div>`
+        : '<span class="cell-sub">&mdash;</span>';
+      const latest = lead.latest_event.type
+        ? `${esc(lead.latest_event.summary)}<div class="cell-sub">${esc(when(lead.latest_event.at))}</div>`
+        : '<span class="cell-sub">&mdash;</span>';
+      return `<tr data-id="${esc(lead.outbound_id)}">
+        <td>
+          <div class="cell-primary">${dash(lead.agency_name)}</div>
+          <div class="cell-sub">${dash(lead.probe_summary.property_street)}</div>
+        </td>
+        <td>
+          <div>${dash(lead.contact.name)}</div>
+          <div class="cell-sub mono">${dash(lead.contact.email)}</div>
+        </td>
+        <td>${pill(lead.current_state, STATE_TONE[lead.current_state])}</td>
+        <td class="col-hide">${latest}</td>
+        <td>${nextAction}</td>
+        <td>${lead.priority ? pill(lead.priority, PRIORITY_TONE[lead.priority]) : '<span class="cell-sub">&mdash;</span>'}</td>
+      </tr>`;
+    }
+
+    // ---- filtering ---------------------------------------------------------
+
+    function matches(lead) {
+      const q = $('q').value.trim().toLowerCase();
+      if (q) {
+        const haystack = [
+          lead.agency_name, lead.contact.name, lead.contact.email, lead.probe_summary.property_street,
+        ].join(' ').toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      if ($('f-attention').checked && !lead.needs_human) return false;
+      const state = $('f-state').value;
+      if (state && lead.current_state !== state) return false;
+      const priority = $('f-priority').value;
+      if (priority && lead.priority !== priority) return false;
+      const contact = $('f-contact').value;
+      if (contact && lead.contact.contact_type !== contact) return false;
+      return true;
+    }
+
+    function render() {
+      const visible = LEADS.filter(matches);
+      const attention = visible.filter((l) => l.needs_human);
+      const system = visible.filter((l) => !l.needs_human);
+
+      $('tb-attention').innerHTML = attention.map(rowHtml).join('');
+      $('tb-system').innerHTML = system.map(rowHtml).join('');
+      $('c-attention').textContent = String(attention.length);
+      $('c-system').textContent = String(system.length);
+      $('empty-attention').classList.toggle('hidden', attention.length > 0);
+      $('empty-system').classList.toggle('hidden', system.length > 0);
+    }
+
+    // ---- drawer ------------------------------------------------------------
+
+    function kv(pairs) {
+      return `<dl class="kv">${pairs.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>`;
+    }
+
+    function block(title, tag, tagClass, inner) {
+      const tagHtml = tag ? `<span class="block-tag ${tagClass}">${esc(tag)}</span>` : '';
+      return `<div class="block"><div class="block-head"><span class="block-title">${esc(title)}</span>${tagHtml}</div>${inner}</div>`;
+    }
+
+    function openDrawer(outboundId) {
+      const lead = LEADS.find((l) => l.outbound_id === outboundId);
+      if (!lead) return;
+
+      $('d-agency').textContent = lead.agency_name || '(no agency name)';
+      $('d-sub').innerHTML = `${dash(lead.probe_summary.property_street)} &middot; <span class="mono">${esc(lead.outbound_id)}</span>`;
+
+      const parts = [];
+
+      parts.push(block('Agency & contact', 'Sales', 'tag-sales', kv([
+        ['Contact', dash(lead.contact.name)],
+        ['Email', `<span class="mono">${dash(lead.contact.email)}</span>`],
+        ['Contact type', pill(lead.contact.contact_type, CONTACT_TONE[lead.contact.contact_type])],
+        ['Verification', dash(lead.contact.email_verification_status)],
+        ['Resolution', dash(lead.contact.resolution_status)],
+        ['Decision maker', pill(lead.contact.decision_maker_confidence, lead.contact.decision_maker_confidence === 'HIGH' ? 'p-green' : 'p-grey')],
+      ])));
+
+      parts.push(block('Current status', 'Sales', 'tag-sales', kv([
+        ['State', pill(lead.current_state, STATE_TONE[lead.current_state])],
+        ['Why', `<span class="muted">${dash(lead.current_state_reason)}</span>`],
+        ['Priority', lead.priority ? pill(lead.priority, PRIORITY_TONE[lead.priority]) : '&mdash;'],
+        ['Next action', dash(lead.next_action.type)],
+        ['Action status', dash(lead.next_action.status)],
+        ['Needs a human', lead.needs_human ? pill('YES', 'p-red') : pill('NO', 'p-grey')],
+        ['Campaign', lead.outreach.handed_to_instantly
+          ? `In sequence <span class="cell-sub">since ${esc(when(lead.outreach.instantly_added_at))}</span>`
+          : `<span class="muted">not handed to Instantly (${dash(lead.outreach.outbound_status)})</span>`],
+        ['Last error', lead.outreach.last_error ? `<span class="mono">${esc(lead.outreach.last_error)}</span>` : '&mdash;'],
+      ])));
+
+      if (lead.reply.reply_count > 0) {
+        parts.push(block('Latest reply', 'Sales', 'tag-sales',
+          kv([
+            ['Received', dash(when(lead.reply.received_at))],
+            ['Classification', dash(lead.reply.classification)],
+            ['Confidence', dash(lead.reply.confidence)],
+            ['Replies on file', String(lead.reply.reply_count)],
+            ['Classifier reason', `<span class="muted">${dash(lead.reply.classifier_reason)}</span>`],
+            ['Suppression', dash(lead.reply.suppression_type)],
+            ['Error', lead.reply.error ? `<span class="mono">${esc(lead.reply.error)}</span>` : '&mdash;'],
+          ])
+          + (lead.reply.text ? `<div class="quote">${esc(lead.reply.text)}</div>` : '')));
+      }
+
+      const demoLink = lead.demo.preview_url
+        ? `<a class="preview-link" href="${esc(lead.demo.preview_url)}" target="_blank" rel="noopener">Open demo preview &#8599;</a>
+           <div class="note">Preview links only. The normal demo URL counts a view, so opening it here would contaminate this lead's engagement data.</div>`
+        : '<div class="note">No demo link on this journey yet.</div>';
+
+      parts.push(block('Demo', 'Sales', 'tag-sales',
+        kv([
+          ['Engagement', pill(lead.demo.engagement, lead.demo.engagement === 'NONE' ? 'p-grey' : 'p-green')],
+          ['Demo status', dash(lead.demo.status)],
+          ['Slug', `<span class="mono">${dash(lead.demo.slug)}</span>`],
+          ['First viewed', dash(when(lead.demo.first_viewed_at))],
+          ['Last viewed', dash(when(lead.demo.last_viewed_at))],
+          ['View count', `${lead.demo.view_count} <span class="cell-sub">soft signal</span>`],
+          ['CTA clicked', dash(when(lead.demo.cta_clicked_at))],
+          ['Meeting booked', dash(when(lead.demo.meeting_booked_at))],
+        ]) + demoLink));
+
+      parts.push(block('Probe finding', 'Probe evidence', 'tag-probe',
+        kv([
+          ['Probe ref', `<span class="mono">${dash(lead.probe_summary.probe_reference)}</span>`],
+          ['Property', dash(lead.probe_summary.property_street)],
+          ['Grade', dash(lead.probe_summary.grade)],
+          ['Grade reason', `<span class="muted">${dash(lead.probe_summary.grade_reason)}</span>`],
+          ['Human response', dash(lead.probe_summary.human_contact)],
+          ['Response time', lead.probe_summary.response_hours ? `${esc(lead.probe_summary.response_hours)} hrs` : '&mdash;'],
+        ])
+        + (lead.probe_summary.main_finding ? `<div class="quote">${esc(lead.probe_summary.main_finding)}</div>` : '')
+        + (lead.probe_summary.email_observation ? `<div class="quote">${esc(lead.probe_summary.email_observation)}</div>` : '')));
+
+      if (lead.other_journeys.length) {
+        parts.push(block('Other journeys for this agency', 'Sales', 'tag-sales',
+          kv(lead.other_journeys.map((j) => [
+            j.outbound_id,
+            `${dash(j.property_street)} &middot; ${dash(j.outbound_status)}${j.instantly_lead_id ? ' &middot; in sequence' : ''}`,
+          ]))
+          + '<div class="note">Shown so nothing is hidden. Only the primary journey above drives this lead’s state.</div>'));
+      }
+
+      $('d-body').innerHTML = parts.join('');
+      $('drawer').classList.add('show');
+      $('drawer').setAttribute('aria-hidden', 'false');
+      $('scrim').classList.add('show');
+    }
+
+    function closeDrawer() {
+      $('drawer').classList.remove('show');
+      $('drawer').setAttribute('aria-hidden', 'true');
+      $('scrim').classList.remove('show');
+    }
+
+    // ---- loading -----------------------------------------------------------
+
+    function fillFilter(select, values) {
+      const current = select.value;
+      const first = select.options[0];
+      select.innerHTML = '';
+      select.appendChild(first);
+      values.forEach((v) => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v.replace(/_/g, ' ');
+        select.appendChild(opt);
+      });
+      select.value = current;
+    }
+
+    function showWarnings(warnings) {
+      const box = $('warn-box');
+      if (!warnings || !warnings.length) { box.classList.add('hidden'); return; }
+      box.innerHTML = `<strong>${warnings.length} data note${warnings.length === 1 ? '' : 's'} from this read</strong>`
+        + `<ul>${warnings.slice(0, 12).map((w) => `<li>${esc(w.detail)}</li>`).join('')}</ul>`;
+      box.classList.remove('hidden');
+    }
+
+    async function load(force) {
+      const btn = $('refresh');
+      btn.disabled = true;
+      $('stamp').innerHTML = '<span class="spinner"></span>Loading';
+      $('load-err').classList.remove('show');
+      try {
+        const res = await fetch(LEADS_URL + (force ? '&refresh=1' : ''), { headers: { Accept: 'application/json' } });
+        const data = await res.json();
+        if (!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+
+        LEADS = data.leads || [];
+        const counts = data.counts || {};
+        $('s-attention').textContent = counts.needs_attention ?? 0;
+        $('s-total').textContent = counts.total ?? 0;
+        $('s-sequence').textContent = counts.sequence_running ?? 0;
+        $('s-replied').textContent = counts.replied ?? 0;
+        $('s-engaged').textContent = counts.demo_engaged ?? 0;
+        $('s-meetings').textContent = counts.meetings ?? 0;
+
+        fillFilter($('f-state'), [...new Set(LEADS.map((l) => l.current_state))].sort());
+        fillFilter($('f-priority'), ['CRITICAL', 'HIGH', 'NORMAL', 'LOW']);
+        fillFilter($('f-contact'), [...new Set(LEADS.map((l) => l.contact.contact_type))].sort());
+
+        showWarnings(data.warnings);
+        render();
+
+        const age = data.cached ? ` (cached ${Math.round((data.cache_age_ms || 0) / 1000)}s)` : '';
+        $('stamp').textContent = `Read ${when(data.generated_at)}${age}`;
+      } catch (err) {
+        $('load-err').textContent = err.message || 'Failed to load the operator feed.';
+        $('load-err').classList.add('show');
+        $('stamp').textContent = 'Load failed';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // The unrouted-replies sweep is a MANUAL action, deliberately not part of
+    // the page load: it calls Instantly, and the operator view must not put
+    // external API load behind every refresh. It is the existing dry run with
+    // classify=0 - it reads, and writes nothing anywhere.
+    async function loadUnrouted() {
+      const btn = $('unrouted');
+      btn.disabled = true;
+      btn.textContent = 'Checking…';
+      try {
+        const res = await fetch(UNROUTED_URL, { headers: { Accept: 'application/json' } });
+        const data = await res.json();
+        if (!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+
+        const wanted = new Set(['no_outbound_match', 'ambiguous_outbound_match']);
+        const rows = (data.skipped || []).filter((s) => wanted.has(s.reason));
+        $('tb-unrouted').innerHTML = rows.map((s) => `<tr style="cursor:default">
+          <td class="mono">${dash(s.lead_email)}</td>
+          <td>${pill(s.reason, s.reason === 'ambiguous_outbound_match' ? 'p-amber' : 'p-grey')}</td>
+          <td>${dash(s.match_method)}</td>
+          <td class="col-hide mono">${dash((s.candidates || []).map((c) => c.outbound_id || c).join(', '))}</td>
+        </tr>`).join('');
+        $('c-unrouted').textContent = String(rows.length);
+        $('empty-unrouted').classList.toggle('hidden', rows.length > 0);
+        $('sec-unrouted').classList.remove('hidden');
+      } catch (err) {
+        $('load-err').textContent = `Unrouted reply check failed: ${err.message}`;
+        $('load-err').classList.add('show');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Check unrouted replies';
+      }
+    }
+
+    // ---- wiring ------------------------------------------------------------
+
+    ['q', 'f-attention', 'f-state', 'f-priority', 'f-contact'].forEach((elId) => {
+      $(elId).addEventListener('input', render);
+      $(elId).addEventListener('change', render);
+    });
+    $('refresh').addEventListener('click', () => load(true));
+    $('unrouted').addEventListener('click', loadUnrouted);
+    $('d-close').addEventListener('click', closeDrawer);
+    $('scrim').addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+    document.addEventListener('click', (e) => {
+      const row = e.target.closest('#tb-attention tr, #tb-system tr');
+      if (row && row.dataset.id) openDrawer(row.dataset.id);
+    });
+
+    load(false);
+  </script>
+</body>
+</html>

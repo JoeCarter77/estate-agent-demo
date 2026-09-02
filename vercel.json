@@ -16,6 +16,7 @@
     { "source": "/api/novus/instantly/reply-poll", "destination": "/api/novus/personalisation?novus_operation=instantly-reply-poll" },
     { "source": "/api/novus/instantly/send-demo-dry-run", "destination": "/api/novus/personalisation?novus_operation=send-demo-dry-run" },
     { "source": "/api/novus/instantly/send-demo", "destination": "/api/novus/personalisation?novus_operation=send-demo" },
+    { "source": "/api/novus/operator/leads", "destination": "/api/novus/personalisation?novus_operation=operator-leads" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/d/(.*)", "destination": "/index.html" },
     { "source": "/:demo_slug((?!api$|demo$|novus$|capture$|d$)[^/]+)", "destination": "/demo.html" }
