@@ -40,9 +40,18 @@ import {
 import {
   normalizeHunterVerificationStatus,
   findDomainDecisionMakers,
+  findDomainGenericEmails,
   findEmail as findHunterEmail,
   verifyEmail as verifyHunterEmail,
 } from '../lib/hunter.mjs';
+import {
+  CONFIRMATION as RECHECK_CONFIRMATION,
+  isEligibleAgency as isRecheckEligible,
+  main as runNeedsResearchRecheck,
+  parseArgs as parseRecheckArgs,
+  partitionNeedsResearch,
+  requestJson as recheckRequestJson,
+} from './novus-contact-resolution-blank-status-run.mjs';
 
 const AGENCIES_HEADER = [
   'agency_id','agency_name','website','domain','location','branch_count','main_phone',
@@ -205,6 +214,7 @@ function baseOptions(overrides = {}) {
     findDomainDecisionMakersImpl: makeDomainSearch([{
       full_name: 'Test Decision Maker', position: 'Director', decision_maker: true,
     }]),
+    findDomainGenericEmailsImpl: makeDomainSearch(),
     hunterConfigured: () => true,
     now: clock,
     ...overrides,
@@ -437,7 +447,7 @@ await test('UNKNOWN moves to the next candidate; a RISKY owner-direct then outra
 });
 
 // ── Flow 6: everything fails ────────────────────────────────────────────────
-await test('all candidates failing gives NO_VALID_EMAIL and no selected contact', async () => {
+await test('all direct and generic candidates failing gives NEEDS_RESEARCH and no selected contact', async () => {
   const { store, valuesApi } = makeFakeSheet();
   const repo = createRepo(valuesApi);
   seedAgency(store, {
@@ -448,10 +458,10 @@ await test('all candidates failing gives NO_VALID_EMAIL and no selected contact'
   const verifier = makeVerifier({}, { defaultStatus: 'INVALID' });
   const result = await resolveAgencyContact(repo, 'ag_6', baseOptions({ verifyEmailImpl: verifier }));
 
-  assert.equal(result.contact_resolution_status, 'NO_VALID_EMAIL');
+  assert.equal(result.contact_resolution_status, 'NEEDS_RESEARCH');
   assert.equal(result.selected_contact, null);
   const agency = rowsAsObjects(store, 'AGENCIES', AGENCIES_HEADER)[0];
-  assert.equal(agency.contact_resolution_status, 'NO_VALID_EMAIL');
+  assert.equal(agency.contact_resolution_status, 'NEEDS_RESEARCH');
   assert.equal(agency.outreach_contact_email, '');
   assert.equal(agency.email_verification_status, '');
   const contacts = rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER);
@@ -633,39 +643,61 @@ await test('Hunter returning no match falls through to the generic inbox', async
 });
 
 // ── Flow 10: no owner known ─────────────────────────────────────────────────
-await test('blank owner_md and a failed Hunter decision-maker lookup stays unresolved', async () => {
+await test('no Hunter named contact plus a valid stored generic resolves generically', async () => {
   const { store, valuesApi } = makeFakeSheet();
   const repo = createRepo(valuesApi);
   seedAgency(store, {
     agency_id: 'ag_10', agency_name: 'Anon Estates', domain: 'anonestates.co.uk', probe_sent: 'YES',
     owner_md: '', primary_contact_email: 'info@anonestates.co.uk',
-    outreach_contact_name: 'Lucy Reed', outreach_contact_email: 'lucy.reed@anonestates.co.uk',
-    email_verification_status: 'VALID',
-  });
-  seedCommunication(store, {
-    communication_id: 'com_10', agency_id: 'ag_10', channel: 'email', direction: 'inbound',
-    source_identifier_normalized: 'lucy.reed@anonestates.co.uk', display_name: 'Lucy Reed',
-    automated_or_human: 'human', occurred_at: '2026-08-02T09:00:00.000Z',
   });
   const finder = makeHunter({ email: 'never@used.co.uk' });
   const domainSearch = makeDomainSearch([]);
+  const genericSearch = makeDomainSearch([]);
+  const verifier = makeVerifier({ 'info@anonestates.co.uk': 'VALID' });
   const result = await resolveAgencyContact(repo, 'ag_10', baseOptions({
-    verifyEmailImpl: makeVerifier({ 'lucy.reed@anonestates.co.uk': 'VALID' }),
+    verifyEmailImpl: verifier,
     findEmailImpl: finder,
     findDomainDecisionMakersImpl: domainSearch,
+    findDomainGenericEmailsImpl: genericSearch,
   }));
 
-  // No external fallback: neither Email Finder nor Verifier is called.
+  // No external fallback research: the existing generic goes through Hunter
+  // Verifier and is persisted as the second-stage winner.
   assert.equal(result.owner_md.value, '');
   assert.deepEqual(domainSearch.calls, [{ domain: 'anonestates.co.uk' }]);
   assert.equal(finder.calls.length, 0);
-  assert.equal(result.hunter_verifier.calls_made, 0);
-  assert.equal(result.contact_resolution_status, 'NEEDS_RESEARCH');
-  assert.equal(result.selected_contact, null);
+  assert.deepEqual(genericSearch.calls, [{ domain: 'anonestates.co.uk' }]);
+  assert.deepEqual(verifier.calls, ['info@anonestates.co.uk']);
+  assert.equal(result.hunter_verifier.calls_made, 1);
+  assert.equal(result.contact_resolution_status, 'RESOLVED_GENERIC');
+  assert.equal(result.selected_contact.email, 'info@anonestates.co.uk');
+  assert.equal(result.selected_contact.contact_name, '');
   const agency = rowsAsObjects(store, 'AGENCIES', AGENCIES_HEADER)[0];
-  assert.equal(agency.owner_md, '', 'inconclusive research must never write an owner');
-  assert.equal(agency.outreach_contact_email, 'lucy.reed@anonestates.co.uk', 'a Hunter miss must not erase existing outreach data');
+  assert.equal(agency.owner_md, '');
+  assert.equal(agency.outreach_contact_name, '');
+  assert.equal(agency.outreach_contact_email, 'info@anonestates.co.uk');
   assert.equal(agency.email_verification_status, 'VALID');
+});
+
+await test('no Hunter named contact plus a Hunter generic result resolves generically', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_hunter_generic', agency_name: 'Hunter Generic', domain: 'huntergeneric.co.uk',
+  });
+  const verifier = makeVerifier({ 'sales@huntergeneric.co.uk': 'VALID' });
+  const result = await resolveAgencyContact(repo, 'ag_hunter_generic', baseOptions({
+    verifyEmailImpl: verifier,
+    findDomainDecisionMakersImpl: makeDomainSearch([]),
+    findDomainGenericEmailsImpl: makeDomainSearch([{
+      email: 'sales@huntergeneric.co.uk', confidence: 91, verification_status: 'VALID',
+    }]),
+  }));
+  assert.equal(result.contact_resolution_status, 'RESOLVED_GENERIC');
+  assert.equal(result.selected_contact.email, 'sales@huntergeneric.co.uk');
+  assert.equal(result.selected_contact.email_source, 'HUNTER_DOMAIN_SEARCH');
+  assert.equal(result.selected_contact.contact_name, '');
+  assert.deepEqual(verifier.calls, ['sales@huntergeneric.co.uk']);
 });
 
 await test('blank owner_md with nothing usable is NEEDS_RESEARCH', async () => {
@@ -674,11 +706,47 @@ await test('blank owner_md with nothing usable is NEEDS_RESEARCH', async () => {
   seedAgency(store, {
     agency_id: 'ag_10b', agency_name: 'Empty Estates', domain: 'emptyestates.co.uk', probe_sent: 'YES',
   });
-  const result = await resolveAgencyContact(repo, 'ag_10b', baseOptions());
+  const verifier = makeVerifier({});
+  const result = await resolveAgencyContact(repo, 'ag_10b', baseOptions({
+    verifyEmailImpl: verifier,
+    findDomainDecisionMakersImpl: makeDomainSearch([]),
+    findDomainGenericEmailsImpl: makeDomainSearch([]),
+  }));
   assert.equal(result.candidates_considered.length, 0);
+  assert.equal(verifier.calls.length, 0);
   assert.equal(result.contact_resolution_status, 'NEEDS_RESEARCH');
   const agency = rowsAsObjects(store, 'AGENCIES', AGENCIES_HEADER)[0];
   assert.equal(agency.contact_resolution_status, 'NEEDS_RESEARCH');
+});
+
+await test('an existing valid direct contact is not downgraded to generic when Hunter names nobody', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  const repo = createRepo(valuesApi);
+  seedAgency(store, {
+    agency_id: 'ag_existing_direct', agency_name: 'Existing Direct', domain: 'existingdirect.co.uk',
+    primary_contact_email: 'info@existingdirect.co.uk',
+  });
+  seedCommunication(store, {
+    communication_id: 'com_existing_direct', agency_id: 'ag_existing_direct', channel: 'email', direction: 'inbound',
+    source_identifier_normalized: 'alex.senior@existingdirect.co.uk', display_name: 'Alex Senior, Director',
+    automated_or_human: 'human', occurred_at: '2026-08-02T09:00:00.000Z',
+  });
+  const verifier = makeVerifier({
+    'alex.senior@existingdirect.co.uk': 'VALID',
+    'info@existingdirect.co.uk': 'VALID',
+  });
+  const genericSearch = makeDomainSearch([{ email: 'sales@existingdirect.co.uk' }]);
+  const result = await resolveAgencyContact(repo, 'ag_existing_direct', baseOptions({
+    verifyEmailImpl: verifier,
+    findDomainDecisionMakersImpl: makeDomainSearch([]),
+    findDomainGenericEmailsImpl: genericSearch,
+  }));
+  assert.equal(result.contact_resolution_status, 'RESOLVED_DIRECT');
+  assert.equal(result.selected_contact.email, 'alex.senior@existingdirect.co.uk');
+  assert.deepEqual(verifier.calls, ['alex.senior@existingdirect.co.uk']);
+  assert.equal(genericSearch.calls.length, 0, 'generic discovery is not reached after a direct winner');
+  const agency = rowsAsObjects(store, 'AGENCIES', AGENCIES_HEADER)[0];
+  assert.equal(agency.outreach_contact_email, 'alex.senior@existingdirect.co.uk');
 });
 
 // ── Flow 11: Hunter Domain Search finds a decision-maker ────────────────────
@@ -809,6 +877,31 @@ await test('Hunter Domain Search requests named personal decision-makers and nor
     assert.deepEqual(people.map(({ full_name, position, email, decision_maker }) => ({ full_name, position, email, decision_maker })), [{
       full_name: 'Alex Owner', position: 'Owner', email: 'alex.owner@example.co.uk', decision_maker: true,
     }]);
+  } finally {
+    if (originalKey === undefined) delete process.env.HUNTER_API_KEY;
+    else process.env.HUNTER_API_KEY = originalKey;
+  }
+});
+
+await test('Hunter generic Domain Search requests generic addresses only', async () => {
+  const originalKey = process.env.HUNTER_API_KEY;
+  process.env.HUNTER_API_KEY = 'test-key';
+  try {
+    let requestedUrl;
+    const emails = await findDomainGenericEmails({ domain: 'Example.co.uk' }, {
+      fetchImpl: async (url) => {
+        requestedUrl = url;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ data: { emails: [{ value: 'sales@example.co.uk', type: 'generic', confidence: 90 }] } }),
+        };
+      },
+    });
+    assert.equal(requestedUrl.pathname, '/v2/domain-search');
+    assert.equal(requestedUrl.searchParams.get('type'), 'generic');
+    assert.equal(requestedUrl.searchParams.has('decision_maker'), false);
+    assert.equal(emails[0].email, 'sales@example.co.uk');
   } finally {
     if (originalKey === undefined) delete process.env.HUNTER_API_KEY;
     else process.env.HUNTER_API_KEY = originalKey;
@@ -1710,17 +1803,105 @@ await test('backlog listing covers probed-unresolved agencies only and resolves 
 
   const backlog = await listResolutionBacklog(repo);
   assert.deepEqual(backlog.map((a) => a.agency_id), ['ag_p1']);
+  assert.equal(backlog[0].sheet_row_number, 3, 'row 1 header + row 2 schema note means first data row is physical row 3');
   const all = await listResolutionBacklog(repo, { includeResolved: true });
   assert.deepEqual(all.map((a) => a.agency_id), ['ag_p1', 'ag_p2']);
+  assert.deepEqual(all.map((a) => a.sheet_row_number), [3, 4]);
   // Nothing was written by listing.
   assert.equal(rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER).length, 0);
 });
 
+await test('NEEDS_RESEARCH recheck targets exact status only on physical rows after 180', () => {
+  const rows = [
+    { sheet_row_number: 179, agency_id: 'ag_179', contact_resolution_status: 'NEEDS_RESEARCH' },
+    { sheet_row_number: 180, agency_id: 'ag_180', contact_resolution_status: 'NEEDS_RESEARCH' },
+    { sheet_row_number: 181, agency_id: 'ag_181', contact_resolution_status: 'NEEDS_RESEARCH' },
+    { sheet_row_number: 182, agency_id: 'ag_direct', contact_resolution_status: 'RESOLVED_DIRECT' },
+    { sheet_row_number: 183, agency_id: 'ag_generic', contact_resolution_status: 'RESOLVED_GENERIC' },
+    { sheet_row_number: 184, agency_id: 'ag_blank', contact_resolution_status: '' },
+    { sheet_row_number: 185, agency_id: 'ag_other', contact_resolution_status: 'NO_VALID_EMAIL' },
+  ];
+  const partitioned = partitionNeedsResearch(rows);
+  assert.deepEqual(partitioned.needsResearch.map((row) => row.agency_id), ['ag_179', 'ag_180', 'ag_181']);
+  assert.deepEqual(partitioned.excluded.map((row) => row.agency_id), ['ag_179', 'ag_180']);
+  assert.deepEqual(partitioned.eligible.map((row) => row.agency_id), ['ag_181']);
+  assert.equal(isRecheckEligible(rows[1]), false, 'physical row 180 is excluded');
+  assert.equal(isRecheckEligible(rows[2]), true, 'physical row 181 is eligible');
+});
+
+await test('NEEDS_RESEARCH runner accepts both --limit 5 and --limit=5', () => {
+  assert.equal(parseRecheckArgs(['--limit', '5']).limit, '5');
+  assert.equal(parseRecheckArgs(['--limit=5']).limit, '5');
+});
+
+await test('NEEDS_RESEARCH runner retries HTTP 429 with bounded exponential backoff', async () => {
+  let calls = 0;
+  const delays = [];
+  const { response, result } = await recheckRequestJson('https://example.test', {}, {
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls < 3) return { status: 429, ok: false, headers: { get: () => null }, json: async () => ({}) };
+      return { status: 200, ok: true, headers: { get: () => null }, json: async () => ({ ok: true }) };
+    },
+    sleepImpl: async (ms) => { delays.push(ms); },
+  });
+  assert.equal(response.ok, true);
+  assert.deepEqual(result, { ok: true });
+  assert.equal(calls, 3);
+  assert.deepEqual(delays, [1000, 2000]);
+});
+
+await test('NEEDS_RESEARCH runner rechecks physical row and status immediately before each resolve', async () => {
+  const initial = [
+    { sheet_row_number: 180, agency_id: 'ag_excluded', agency_name: 'Excluded', contact_resolution_status: 'NEEDS_RESEARCH' },
+    { sheet_row_number: 181, agency_id: 'ag_moved', agency_name: 'Moved', contact_resolution_status: 'NEEDS_RESEARCH' },
+    { sheet_row_number: 182, agency_id: 'ag_live', agency_name: 'Live', contact_resolution_status: 'NEEDS_RESEARCH' },
+    { sheet_row_number: 183, agency_id: 'ag_blank', agency_name: 'Blank', contact_resolution_status: '' },
+  ];
+  let getCount = 0;
+  const posted = [];
+  const logs = [];
+  const originalLog = console.log;
+  const originalError = console.error;
+  console.log = (...args) => { logs.push(args.join(' ')); };
+  console.error = (...args) => { logs.push(args.join(' ')); };
+  try {
+    const summary = await runNeedsResearchRecheck([
+      '--confirm', RECHECK_CONFIRMATION, '--limit=2', '--throttle-ms=1', '--user=test', '--pass=test', '--base=https://example.test',
+    ], {
+      sleepImpl: async () => {},
+      fetchImpl: async (url, init = {}) => {
+        if (String(url).includes('resolution-backlog')) {
+          getCount += 1;
+          const rows = getCount === 1
+            ? initial
+            : getCount === 2
+              ? initial.map((row) => row.agency_id === 'ag_moved' ? { ...row, sheet_row_number: 180 } : row)
+              : initial;
+          return { ok: true, status: 200, json: async () => ({ agencies: rows }) };
+        }
+        posted.push(JSON.parse(init.body));
+        return { ok: true, status: 200, json: async () => ({ contact_resolution_status: 'RESOLVED_GENERIC', selected_contact: { email: 'info@example.test' } }) };
+      },
+    });
+    assert.deepEqual(posted, [{ agency_id: 'ag_live', dry_run: false }]);
+    assert.deepEqual(summary, { processed: 1, skipped_recheck: 1, failed: 0, targeted: 2, eligible_at_start: 2 });
+    assert.ok(logs.includes('Total NEEDS_RESEARCH rows: 3'));
+    assert.ok(logs.includes('Excluded at sheet row <= 180: 1'));
+    assert.ok(logs.includes('Eligible at sheet row > 180: 2'));
+    assert.ok(logs.some((line) => line.includes('row 181  ag_moved  Moved  NEEDS_RESEARCH')));
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+});
+
 // ── Hard provider boundary ──────────────────────────────────────────────────
-await test('contact resolution has no owner-research, Anthropic or web-search dependency', () => {
+await test('all resolver paths have no owner-research, Anthropic or web-search dependency', () => {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const resolverSource = fs.readFileSync(path.join(root, 'lib/contact-resolution.mjs'), 'utf8');
-  const executableSource = resolverSource
+  const hunterSource = fs.readFileSync(path.join(root, 'lib/hunter.mjs'), 'utf8');
+  const executableSource = `${resolverSource}\n${hunterSource}`
     .split('\n')
     .filter((line) => !line.trim().startsWith('//'))
     .join('\n');
