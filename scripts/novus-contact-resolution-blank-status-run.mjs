@@ -12,8 +12,8 @@
 // backward-compatible) opt-out added for this run — it does not change the
 // default listing behaviour any other caller relies on.
 //
-// resolveAgencyContact() itself is completely untouched: this script only
-// decides which agency_id to POST next, one per call, exactly the endpoint's
+// The script only decides which agency_id to POST next, one per call, exactly
+// the endpoint's
 // existing one-agency-per-call contract. The 3-call Hunter Verifier cap per
 // agency is enforced inside resolveAgencyContact, not here.
 //
@@ -23,7 +23,7 @@
 // is no longer blank — resolved earlier in this same run, or by anything else
 // since the list was built — it is skipped, never reprocessed.
 //
-// This is a REAL run: it spends Hunter (and possibly AI) credits and writes
+// This is a REAL run: it spends Hunter credits and writes
 // to AGENCIES/CONTACTS. It never touches Instantly and never runs
 // personalisation/rebuild jobs — it only calls the two routes above.
 //
@@ -76,7 +76,7 @@ async function fetchBacklog(cfg, { includeResolved }) {
 async function main() {
   const flags = parseArgs(process.argv.slice(2));
   if (flags.confirm !== CONFIRMATION) {
-    throw new Error(`This spends live Hunter/AI credits and writes to AGENCIES/CONTACTS. Re-run with --confirm ${CONFIRMATION}`);
+    throw new Error(`This spends live Hunter credits and writes to AGENCIES/CONTACTS. Re-run with --confirm ${CONFIRMATION}`);
   }
   const limit = numericFlag(flags, 'limit', Infinity);
   const cfg = httpConfig(flags);
