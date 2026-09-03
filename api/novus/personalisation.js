@@ -1477,11 +1477,9 @@ export default async function handler(req, res) {
     return handleOperatorManualReplyDryRun(req, res);
   }
   if (req.method === 'POST' && req.query?.novus_operation === 'operator-manual-reply') {
-    // The live manual write gets the same two auth layers as SEND_DEMO: human
-    // Basic Auth and the dedicated machine-action secret. The explicit
-    // confirmation token is then checked inside the handler.
+    // This is a deliberate human action from the Basic-Auth-protected Command
+    // Centre. The explicit confirmation token is checked inside the handler.
     if (!requireAuth(req, res)) return;
-    if (!requireReplyPollerSecret(req, res)) return;
     return handleOperatorManualReplyLive(req, res);
   }
   if (req.method === 'POST' && req.query?.novus_operation === 'operator-actions-reconcile') {

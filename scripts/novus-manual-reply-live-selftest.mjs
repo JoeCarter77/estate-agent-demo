@@ -282,12 +282,11 @@ console.log('\nF. HTTP and browser contracts');
   process.env.NOVUS_BASIC_AUTH_PASS = 'secret';
   process.env.INSTANTLY_REPLY_API_KEY = 'test-key';
   process.env.NOVUS_SENDING_MAILBOXES = EACCOUNT;
+  // The machine secret is configured, but the human manual route deliberately
+  // does not receive it. SEND_DEMO below proves its own route still does.
   process.env.NOVUS_REPLY_POLLER_SECRET = 'action-secret';
   const auth = `Basic ${Buffer.from('joe:secret').toString('base64')}`;
-  const authorisedHeaders = {
-    authorization: auth,
-    'x-novus-reply-poller-secret': 'action-secret',
-  };
+  const authorisedHeaders = { authorization: auth };
   const call = async ({ method = 'POST', headers = authorisedHeaders, body = {} } = {}) => {
     const req = { method, query: { novus_operation: 'operator-manual-reply' }, headers, body };
     const res = fakeRes();
@@ -298,15 +297,12 @@ console.log('\nF. HTTP and browser contracts');
   let response = await call({ headers: {}, body: {} });
   assert.equal(response.statusCode, 401);
   assert.equal(transport.log.length, 0);
-  response = await call({ headers: { authorization: auth }, body: {} });
-  assert.equal(response.statusCode, 403);
-  assert.equal(transport.log.length, 0);
   response = await call({ method: 'GET', body: {} });
   assert.equal(response.statusCode, 405);
   response = await call({ body: { reply_event_id: 'rpl_1', body: BODY, confirm: 'wrong' } });
   assert.equal(response.statusCode, 400);
   assert.equal(transport.log.length, 0);
-  ok('live operation is POST-only and requires Basic Auth, the action secret, and exact confirmation');
+  ok('live operation is POST-only and requires Basic Auth plus exact confirmation, without a poller-secret header');
 
   response = await call({ body: {
     reply_event_id: 'rpl_1', body: BODY, expected_received_at: REPLY.received_at,
@@ -323,11 +319,19 @@ console.log('\nF. HTTP and browser contracts');
   assert.ok(!JSON.stringify(post.body).includes('evil'));
   ok('spoofed browser identity fields are ignored; sender, parent and subject are server-resolved');
 
+  const sendDemoReq = {
+    method: 'POST', query: { novus_operation: 'send-demo' }, headers: { authorization: auth },
+    body: { reply_event_id: 'rpl_1', confirm: 'SEND_ONE_DEMO_REPLY' },
+  };
+  const sendDemoRes = fakeRes();
+  await handler(sendDemoReq, sendDemoRes);
+  assert.equal(sendDemoRes.statusCode, 403);
+  assert.equal(transport.log.filter((call) => call.method === 'POST').length, 1);
+  ok('SEND_DEMO still requires the reply-poller secret');
+
   const html = readFileSync('novus/operator.html', 'utf8');
   assert.match(html, /<textarea id="reply-body" maxlength="5000"/);
   assert.match(html, /window\.confirm\(/);
-  assert.match(html, /X-NOVUS-REPLY-POLLER-SECRET/);
-  assert.match(html, /MANUAL_REPLY_ACTION_SECRET/);
   assert.match(html, /SEND_ONE_MANUAL_REPLY/);
   assert.match(html, /SEND_IN_FLIGHT/);
   assert.match(html, /textarea\.value\.trim\(\)\.length > 0/);
@@ -336,6 +340,7 @@ console.log('\nF. HTTP and browser contracts');
   assert.match(html, /Do not resend yet\. Refresh\/check the conversation first\./);
   assert.match(html, /Reply sent\./);
   assert.ok(!/<select[^>]*(sender|eaccount|reply)/i.test(html));
+  assert.ok(!/NOVUS_REPLY_POLLER_SECRET|X-NOVUS-REPLY-POLLER-SECRET|action secret/i.test(html));
   assert.ok(!/Generate Response/i.test(html));
   assert.ok(!/callAi|model invocation|openai/i.test(html));
   ok('composer is bounded, confirmed, single-flight, outcome-aware, sender-read-only and has no AI control');
