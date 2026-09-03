@@ -10,6 +10,7 @@
     "novus:selftest": "node scripts/novus-selftest.mjs",
     "novus:agency-probe-selftest": "node scripts/novus-agency-probe-selftest.mjs",
     "novus:comms-selftest": "node scripts/novus-comms-selftest.mjs",
+    "novus:comms-delete-selftest": "node scripts/novus-comms-delete-selftest.mjs",
     "novus:agency-content-classification-selftest": "node scripts/novus-agency-content-classification-selftest.mjs",
     "novus:observation-selftest": "node scripts/novus-observation-selftest.mjs",
     "novus:rebuild-all-selftest": "node scripts/novus-rebuild-all-selftest.mjs",
