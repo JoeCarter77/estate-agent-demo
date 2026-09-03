@@ -16,10 +16,10 @@
 .frame--wide{ max-width:var(--frame-wide); }
 
 /* TWO RHYTHMS, deliberately.
-     --lg  showpiece chapters: hero, intelligence layer, product, example,
-           command centre. These breathe.
-     --sm  supporting chapters: problem, outcomes, human+novus, levels, close.
-           These are tight, and the contrast between the two is the pacing. */
+     --lg  showpiece chapters: hero, thesis, what NOVUS is, proof, command
+           centre. These breathe.
+     --sm  supporting chapters: outcome, levels, close. These are tight, and
+           the contrast between the two is the pacing. */
 .section{ position:relative; padding-block:var(--sec-y); }
 .section--lg{ padding-block:var(--sec-y-lg); }
 .section--sm{ padding-block:var(--sec-y-sm); }
@@ -81,6 +81,9 @@
   max-width:var(--measure);
 }
 .head p + p{ margin-top:1.05em; }
+/* A second line inside a head, stepped back so the pair reads as one
+   statement rather than a headline and a whisper. */
+.head h2 .soft{ display:block; color:rgba(241,237,230,.52); }
 
 /* Copy blocks that sit below a head at body scale. */
 .copy{ color:var(--ink-2); max-width:var(--measure); }
@@ -122,8 +125,7 @@
 
 /* ── THE MARK ────────────────────────────────────────────────────────────────
    The canonical NOVUS symbol. ONE implementation, one file, referenced
-   everywhere — header, field, strata, product UI, command centre, footer,
-   favicon. It is never redrawn and never distorted: the box is derived from
+   everywhere — header, field, the cycle, command centre, footer, favicon. It is never redrawn and never distorted: the box is derived from
    the asset's own 384 × 360 pixel ratio, so setting font-size (or width) is
    the only way to change its size.
 
