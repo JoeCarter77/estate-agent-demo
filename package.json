@@ -65,6 +65,7 @@
     "novus:actions-setup": "node scripts/novus-actions-setup.mjs",
     "novus:acquisition-selftest": "node scripts/novus-acquisition-selftest.mjs",
     "novus:command-centre-selftest": "node scripts/novus-command-centre-selftest.mjs",
+    "novus:outreach-execution-selftest": "node scripts/novus-outreach-execution-selftest.mjs",
     "novus:historical-replay": "node scripts/novus-historical-replay.mjs",
     "novus:probe-rerun": "node scripts/novus-probe-rerun.mjs"
   },

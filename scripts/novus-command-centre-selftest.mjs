@@ -22,7 +22,7 @@ const HTML = fs.readFileSync(path.join(ROOT, '..', 'novus', 'operator.html'), 'u
 
 let passed = 0;
 const ok = (msg) => { passed += 1; console.log(`  ✓ ${msg}`); };
-const check = (msg, fn) => { fn(); ok(msg); };
+const check = (msg, fn) => { const out = fn(); if(out && typeof out.then === 'function') return out.then(() => ok(msg)); ok(msg); return undefined; };
 
 // ── minimal DOM shim ───────────────────────────────────────────────────────
 // Just enough of the DOM for the page's render functions: ids, classes,
@@ -73,6 +73,10 @@ function makeDom(){
 
   const document = {
     _els: byId,
+    // fillFilter() builds <option> elements. Without this the whole load()
+    // path threw before renderAll(), so the sidebar badges were never
+    // exercised at all — the split counts below depend on them.
+    createElement(tag){ return new El(tag); },
     getElementById(id){
       if(!byId.has(id)){
         const el = new El(id.startsWith('f-') || id === 'q' ? 'select' : 'div');
@@ -166,7 +170,7 @@ function bootPage(payload){
     return { ok:true, status:200, json: async () => ({ success:true }) };
   };
   const api = new Function('document','window','fetch','Date','console','encodeURIComponent','exportBridge',
-    script + '\n;exportBridge({ showView:()=>VIEW, go:showView, load, renderAll, manualActions, exceptionItems, openDrawer, closeDrawer, renderDrawerPane, setPane:(p)=>{DRAWER_PANE=p;}, setStage:(s)=>{PIPELINE_STAGE=s;}, setActionTab:(t)=>{ACTION_TAB=t;}, renderPipeline, renderActions, renderProber, renderLeads, renderAnalytics, renderExceptions, renderOverview, stageLabel, actionLabel, getLeads:()=>LEADS });');
+    script + '\n;exportBridge({ showView:()=>VIEW, go:showView, load, renderAll, manualActions, exceptionItems, openDrawer, closeDrawer, renderDrawerPane, setPane:(p)=>{DRAWER_PANE=p;}, setStage:(s)=>{PIPELINE_STAGE=s;}, setActionTab:(t)=>{ACTION_TAB=t;}, dueActions, futureActions, renderFuture, renderPipeline, renderActions, renderProber, renderLeads, renderAnalytics, renderExceptions, renderOverview, stageLabel, actionLabel, getLeads:()=>LEADS });');
   let bridge = null;
   api(dom.document, dom.window, fakeFetch, Date, { error(){}, warn(){}, log(){} }, encodeURIComponent, (b) => { bridge = b; });
   return { dom, bridge, fetchCalls, mutations, text: (id) => dom.stripTags(dom.document.getElementById(id).innerHTML || dom.document.getElementById(id).textContent) };
@@ -250,14 +254,70 @@ check('system-owned work never enters the Actions view', () => {
   assert.ok(!html.includes('Observation running'));
 });
 
+console.log('\nActions vs Future actions — the split is a timestamp, not a wording');
+// A second app instance whose payload carries one due action and one action
+// scheduled for a real future time. Both are canonical manual sales actions;
+// only due_at separates them.
+const splitPayload = (() => {
+  const clone = structuredClone(payload);
+  const future = clone.leads.find((l) => l.agency_id === 'ag_call');
+  const ahead = new Date(Date.now() + 36 * 3600000).toISOString();
+  future.next_action.due_at = ahead;
+  future.next_action.status = 'PENDING';
+  if(future.current_action) future.current_action.due_at = ahead;
+  return clone;
+})();
+const split = bootPage(splitPayload);
+await split.bridge.load(false);
+
+check('a future-dated action is absent from the current Actions queue', () => {
+  split.bridge.go('actions');
+  const html = split.dom.document.getElementById('ac-list').innerHTML;
+  assert.ok(html.includes('Henton Kirkman Residential'), 'the due reply is still here');
+  assert.ok(!html.includes('Period Homes Essex'), 'the future-dated call must not appear in Actions');
+});
+check('the same action appears in Future actions', () => {
+  split.bridge.go('future');
+  const html = split.dom.document.getElementById('fu-list').innerHTML;
+  assert.ok(html.includes('Period Homes Essex'));
+  assert.ok(!html.includes('Henton Kirkman Residential'), 'due work must not be duplicated into Future');
+});
+check('no manual action is lost or double counted across the two queues', () => {
+  const all = split.bridge.manualActions().map((l) => l.agency_id).sort();
+  const due = split.bridge.dueActions().map((l) => l.agency_id);
+  const later = split.bridge.futureActions().map((l) => l.agency_id);
+  assert.deepEqual([...due, ...later].sort(), all);
+  assert.equal(due.filter((id) => later.includes(id)).length, 0);
+});
+await check('an action with no schedule at all is treated as actionable now', () => {
+  const noSchedule = structuredClone(splitPayload);
+  const lead = noSchedule.leads.find((l) => l.agency_id === 'ag_call');
+  lead.next_action.due_at = '';
+  const page = bootPage(noSchedule);
+  return page.bridge.load(false).then(() => {
+    assert.ok(page.bridge.dueActions().some((l) => l.agency_id === 'ag_call'));
+    assert.ok(!page.bridge.futureActions().some((l) => l.agency_id === 'ag_call'));
+  });
+});
+check('the sidebar counts due work and scheduled work separately', () => {
+  assert.equal(split.dom.document.getElementById('b-actions').textContent, '1');
+  assert.equal(split.dom.document.getElementById('b-future').textContent, '1');
+});
+check('Future actions is visually calmer than the live queue', () => {
+  // The container carries the modifier the stylesheet quietens.
+  assert.ok(HTML.includes('class="tasks future" id="fu-list"'));
+  assert.ok(HTML.includes('.tasks.future .task{opacity'));
+});
+
 console.log('\nOverview');
 app.bridge.go('overview');
 check('KPI cards render from canonical counts', () => {
   const html = app.dom.document.getElementById('ov-kpis').innerHTML;
   assert.ok(html.includes('Active agencies'));
-  assert.ok(html.includes('Need you today'));
+  assert.ok(html.includes('Need you now'));
   assert.ok(html.includes('Meetings booked'));
-  assert.ok(html.includes('>2<'), 'the "need you today" figure is the manual queue size');
+  assert.ok(html.includes('Emails sent'), 'the send figure is a first-class headline metric');
+  assert.ok(html.includes('>2<'), 'the "need you now" figure is the due manual queue size');
 });
 check('the human preview excludes probing', () => {
   const html = app.dom.document.getElementById('ov-tasks').innerHTML;
@@ -270,7 +330,7 @@ check('the system summary uses NOVUS/system states', () => {
 });
 check('the funnel renders a count for every step', () => {
   const html = app.dom.document.getElementById('ov-funnel').innerHTML;
-  for(const label of ['Lead pool','Probed','Outreach','Replied','Demo sent','Demo open','Meeting']) {
+  for(const label of ['Lead pool','Probed','Outreach','Emailed','Replied','Demo sent','Demo open','Meeting']) {
     assert.ok(html.includes(label), label);
   }
 });
@@ -404,6 +464,34 @@ check('conversions match the canonical metric values exactly', () => {
     assert.ok(html.includes(`${item.percent}%`), `${key} = ${item.percent}%`);
     assert.ok(html.includes(`${item.numerator} of ${item.denominator}`), key);
   }
+});
+check('a handoff count is never presented as an email-send count', () => {
+  split.bridge.go('analytics');
+  const html = split.dom.document.getElementById('an-emails').innerHTML;
+  // With no execution read in the fixture the section must SAY so, and must
+  // not fall back to reporting leads-added as emails-sent.
+  assert.ok(html.includes('Email execution unavailable'));
+  assert.ok(split.dom.document.getElementById('an-prov').innerHTML.includes('Email figures unavailable'));
+  assert.ok(split.dom.document.getElementById('an-funnel').innerHTML.includes('&mdash;'),
+    'the Emailed funnel step is a dash, not a zero and not the handoff count');
+});
+await check('with real execution state the email metrics are separate facts', async () => {
+  const withSends = structuredClone(payload);
+  withSends.outreach_execution = { available:true, source:'INSTANTLY', cached:false, cache_age_ms:0,
+    pages:2, truncated:false, emails_scanned:214, leads_with_evidence:100 };
+  withSends.counts = { ...withSends.counts, leads_added_to_outreach:100, waiting_first_email:51,
+    first_emails_sent:49, followup_emails_sent:0, total_emails_sent:49, outreach_execution_available:true };
+  withSends.metrics = { ...withSends.metrics, first_emails_sent:49 };
+  const page = bootPage(withSends);
+  await page.bridge.load(false);
+  page.bridge.go('analytics');
+  const html = page.dom.stripTags(page.dom.document.getElementById('an-emails').innerHTML);
+  assert.ok(/Leads added to outreach 100/.test(html), html);
+  assert.ok(/Total emails sent 49/.test(html), html);
+  assert.ok(/Waiting for first email 51/.test(html), html);
+  assert.ok(!/Total emails sent 100/.test(html), 'the handoff count must never be the send count');
+  page.bridge.go('overview');
+  assert.ok(page.dom.document.getElementById('ov-kpis').innerHTML.includes('>49<'));
 });
 check('the bottleneck is the lowest measurable single-step rate', () => {
   const conv = payload.metrics.conversions;
