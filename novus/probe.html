@@ -4,201 +4,204 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NOVUS — New Probe</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%2711%2016%2080%2080%27%3E%3Crect%20x%3D%2711%27%20y%3D%2716%27%20width%3D%2780%27%20height%3D%2780%27%20rx%3D%2716%27%20fill%3D%27%23172D67%27/%3E%3Cpath%20d%3D%27M29%2082%20L29%2046%20C29%2030%2050%2030%2050%2046%20L73%2082%20L73%2030%27%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%2711%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/novus/assets/novus-mark-32.png" />
+  <link rel="apple-touch-icon" href="/novus/assets/novus-mark-128.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <style>
-    /* Shares the Command Centre token set so the Prober is the same product. */
-    :root {
-      --page:#FFFFFF; --panel:#F8FAFC; --panel-2:#F6F8FC; --border:#E6EAF2; --border-hi:#D5DCE8;
-      --brand-navy:#172D67; --accent:#2563EB; --accent-hi:#3B82F6; --accent-lo:rgba(37,99,235,0.07);
-      --text:#0B1220; --text-2:#475569; --text-3:#7387A0; --green:#16A34A; --amber:#D97706; --red:#DC2626;
-      --radius:16px;
-    }
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-    body{background:var(--panel-2);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-      min-height:100vh;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-feature-settings:'cv02','cv03','cv04','tnum';}
-    header{position:sticky;top:0;z-index:10;height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:rgba(255,255,255,0.9);backdrop-filter:blur(18px);border-bottom:1px solid var(--border);}
-    .logo{display:flex;align-items:center;gap:9px;}
-    .logo-mark{width:26px;height:26px;border-radius:7px;background:var(--brand-navy);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:.9rem;}
-    .logo-word{font-size:1.05rem;font-weight:800;letter-spacing:.02em;color:var(--brand-navy);}
-    .env-pill{font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent-bd,rgba(37,99,235,.35));background:var(--accent-lo);padding:5px 11px;border-radius:100px;}
-    .wrap{max-width:640px;margin:0 auto;padding:40px 24px 80px;}
-    .card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 10px 30px rgba(15,23,42,.05);padding:28px;}
-    .eyebrow{font-size:.66rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;}
-    h1{font-size:1.6rem;font-weight:800;letter-spacing:-.02em;margin-bottom:6px;}
-    .sub{font-size:.86rem;color:var(--text-2);line-height:1.5;margin-bottom:22px;}
-    label{display:block;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px;}
-    input[type=url],input[type=text]{width:100%;font-family:'Inter',sans-serif;font-size:.95rem;color:var(--text);background:var(--panel);border:1px solid var(--border-hi);border-radius:11px;padding:13px 14px;transition:border-color .15s,box-shadow .15s;}
-    input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lo);background:#fff;}
-    .btn{font-family:'Inter',sans-serif;font-weight:700;font-size:.92rem;border:none;border-radius:11px;padding:13px 18px;cursor:pointer;width:100%;transition:transform .12s cubic-bezier(.34,1.56,.64,1),box-shadow .15s,background .15s,opacity .15s;}
-    .btn-primary{background:var(--accent);color:#fff;box-shadow:0 6px 16px rgba(37,99,235,.28);}
-    .btn-primary:hover{background:var(--accent-hi);transform:translateY(-1px);}
-    .btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none;}
-    .btn-ghost{background:#fff;color:var(--brand-navy);border:1px solid var(--border-hi);}
-    .btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
-    .btn-green{background:var(--green);color:#fff;box-shadow:0 6px 16px rgba(34,197,94,.28);}
-    .btn-green:hover{filter:brightness(1.05);transform:translateY(-1px);}
-    .btn-danger{background:#fff;color:#B91C1C;border:1px solid rgba(239,68,68,.35);}
-    .btn-danger:hover{background:rgba(239,68,68,.06);}
-    .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;}
-    .mt{margin-top:14px;}
-    .status-tag{display:inline-flex;align-items:center;gap:6px;font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:5px 11px;border-radius:100px;}
-    .st-draft{color:var(--amber);background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);}
-    .st-observing{color:var(--green);background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);}
-    .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
-    .kv{display:grid;grid-template-columns:130px 1fr;gap:2px 16px;margin-top:18px;}
-    .kv dt{font-size:.7rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);padding:9px 0;border-top:1px solid var(--border);}
-    .kv dd{font-size:.9rem;color:var(--text);padding:9px 0;border-top:1px solid var(--border);word-break:break-word;}
-    .kv dd.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.84rem;}
-    .kv dd.muted{color:var(--text-3);font-style:italic;}
-    .ref-chip{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;color:var(--brand-navy);background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:3px 9px;font-size:.86rem;}
-    .hint{font-size:.78rem;color:var(--text-2);line-height:1.5;margin-top:16px;background:var(--accent-lo);border:1px solid rgba(37,99,235,.18);border-radius:10px;padding:12px 14px;}
-    .err{display:none;font-size:.82rem;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:11px 13px;margin-top:14px;}
-    .err.show{display:block;}
-    .spinner{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:7px;}
-    @keyframes spin{to{transform:rotate(360deg);}}
-    .hidden{display:none !important;}
-    .foot{text-align:center;font-size:.72rem;color:var(--text-3);margin-top:26px;}
-    .banner{display:flex;align-items:center;gap:10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:11px;padding:13px 15px;margin-bottom:20px;}
-    .banner .em{font-size:.86rem;color:var(--text);font-weight:600;}
-    header{gap:16px;}
-    .logo{text-decoration:none;flex:none;}
-    .logo-mark svg{display:block;}
-    .shellnav{display:flex;gap:2px;margin-right:auto;margin-left:14px;}
-    .shellnav a{font-size:.8rem;font-weight:600;color:var(--text-3);padding:6px 11px;border-radius:8px;
-      text-decoration:none;transition:background .14s,color .14s;}
-    .shellnav a:hover{background:var(--panel);color:var(--text);}
-    .shellnav a.on{background:var(--accent-lo);color:var(--accent);}
-    .head-right{display:flex;align-items:center;gap:10px;}
-    .queue-chip{font-size:.72rem;font-weight:600;color:var(--text-3);background:var(--panel);
-      border:1px solid var(--border);border-radius:100px;padding:5px 11px;}
-    .queue-chip b{color:var(--text);font-weight:800;font-variant-numeric:tabular-nums;}
-    .queue-chip.hidden{display:none;}
-    .progress{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--border);
-      border-radius:var(--radius);padding:14px 18px;margin-bottom:18px;box-shadow:0 1px 2px rgba(11,18,32,.04);}
-    .progress .n{font-size:1.5rem;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1;}
-    .progress .l{font-size:.72rem;font-weight:600;color:var(--text-3);margin-top:3px;}
-    .progress .sep{width:1px;align-self:stretch;background:var(--border);}
-    .skip-reason{margin-top:12px;}
-    .skip-reason label{margin-bottom:6px;}
-    .skip-reason select{width:100%;font-family:'Inter',sans-serif;font-size:.9rem;color:var(--text);
-      background:var(--panel);border:1px solid var(--border-hi);border-radius:11px;padding:12px 13px;cursor:pointer;}
-    .skip-reason select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lo);}
-    .skip-note{font-size:.72rem;color:var(--text-3);margin-top:7px;line-height:1.5;}
-    @media (max-width:720px){ .shellnav{display:none;} }
-  </style>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <meta name="theme-color" content="#0A0B0E" />
+  <meta name="color-scheme" content="dark" />
+
+  <!-- THEME, BEFORE FIRST PAINT — see the same snippet in operator.html. -->
+  <script data-theme-boot>
+    (function(){var t='dark';try{var v=localStorage.getItem('novus.theme');if(v==='light'||v==='dark')t=v;}catch(e){}
+    document.documentElement.setAttribute('data-theme',t);})();
+  </script>
+
+  <!-- The Prober has NO stylesheet of its own. It is the same product as the
+       Command Centre and therefore the same design system, loaded from the
+       same file. Anything it needs that the shell did not already have was
+       added to novus-ui.css as a shared primitive, never inlined here. -->
+  <link rel="stylesheet" href="/novus/novus-ui.css" />
+  <script src="/novus/novus-ui.js" defer></script>
 </head>
 <body>
-  <header>
-    <a class="logo" href="/novus/operator#prober" title="Back to the Command Centre">
-      <div class="logo-mark">
-        <svg viewBox="11 16 80 80" width="16" height="16" aria-hidden="true"><path d="M29 82 L29 46 C29 30 50 30 50 46 L73 82 L73 30" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<div class="app solo">
+  <main class="main">
+
+    <!-- ── GLOBAL CHROME ────────────────────────────────────────────────── -->
+    <div class="topbar">
+      <a class="brandline" href="/novus/operator#prober" title="Back to the Command Centre">
+        <img class="brand-mark" src="/novus/assets/novus-mark-512.png" width="28" height="28" alt="NOVUS" />
+        <span class="brand-word">NOVUS</span>
+      </a>
+      <nav class="shellnav">
+        <a href="/novus/operator#overview">Overview</a>
+        <a href="/novus/operator#actions">Actions</a>
+        <a href="/novus/operator#pipeline">Pipeline</a>
+        <a class="on" href="/novus/operator#prober">Prober</a>
+        <a href="/novus/operator#leads">Leads</a>
+      </nav>
+      <div class="topbar-right">
+        <span class="chip hidden" id="queue-chip">Queue &middot; <b id="queue-remaining">&mdash;</b> left</span>
+        <span class="pill t-blue env-pill">Internal &middot; Probe</span>
+        <button class="btn btn-quiet btn-sm themebtn" data-theme-toggle type="button"
+          title="Switch to light theme" aria-label="Switch to light theme" aria-pressed="false">
+          <svg class="ic-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+          <svg class="ic-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1111.2 3a6.6 6.6 0 009.8 9.8z"/></svg>
+        </button>
       </div>
-      <div class="logo-word">NOVUS</div>
-    </a>
-    <nav class="shellnav">
-      <a href="/novus/operator#overview">Overview</a>
-      <a href="/novus/operator#actions">Actions</a>
-      <a href="/novus/operator#pipeline">Pipeline</a>
-      <a class="on" href="/novus/operator#prober">Prober</a>
-      <a href="/novus/operator#leads">Leads</a>
-    </nav>
-    <div class="head-right">
-      <span class="queue-chip" id="queue-chip">Queue &middot; <b id="queue-remaining">&mdash;</b> left</span>
-      <span class="env-pill">Internal &middot; Probe</span>
     </div>
-  </header>
 
-  <div class="wrap">
+    <div class="page narrow">
 
-    <!-- ── NEW PROBE ─────────────────────────────────────────────── -->
-    <section id="view-new" class="card">
-      <div class="eyebrow">New Probe</div>
-      <h1>Create a probe</h1>
-      <p class="sub">Paste a Rightmove property URL. NOVUS creates a draft probe, generates the reference and attaches the probe email &amp; phone. You'll submit the genuine enquiry manually in the next step.</p>
+      <!-- ══ NEW PROBE ═══════════════════════════════════════════════════════
+           ORDER IS THE WORKFLOW. Agency, then the agency's Rightmove page,
+           then the property URL, then Create probe — the four things the
+           operator touches on every single probe, in the order they touch
+           them, all above the fold.
 
-      <div id="progress" class="progress hidden">
-        <div><div class="n" id="p-remaining">&mdash;</div><div class="l">Remaining</div></div>
-        <div class="sep"></div>
-        <div><div class="n" id="p-today">&mdash;</div><div class="l">Sent today</div></div>
-        <div class="sep"></div>
-        <div style="flex:1"><div class="l" style="margin-top:0">Queue rule</div>
-          <div style="font-size:.78rem;color:var(--text-2);margin-top:3px;line-height:1.45;">
-            First agency in sheet order whose <code>probe_sent</code> is blank.</div></div>
-      </div>
-
-      <div id="agency-field" class="hidden">
-        <label>Agency</label>
-        <input id="agency-name" type="text" value="" readonly />
-        <a id="rm-agent-link" class="btn btn-ghost mt hidden" href="#" target="_blank" rel="noopener"
-           style="display:none;text-align:center;text-decoration:none;">Open Rightmove agent page ↗</a>
-        <div class="skip-reason">
-          <label for="skip-reason">Skip reason</label>
-          <select id="skip-reason">
-            <option value="">Choose a reason…</option>
-            <option>Lettings only</option>
-            <option>Bad Rightmove listing</option>
-            <option>Unavailable / closed</option>
-            <option>Duplicate</option>
-            <option>Poor lead</option>
-            <option>Wrong match</option>
-            <option>Other</option>
-          </select>
-          <div class="skip-note">Recorded in the server audit log only. Skipping hard-deletes the AGENCIES row,
-            so there is no column left to store the reason in.</div>
+           SKIPPING IS THE EXCEPTION AND SITS BELOW ALL OF IT. It is a
+           hard delete, so it must never occupy the prime part of the screen
+           and must never be the control nearest the operator's hand. Its
+           reason select, its note and its button are one block under a rule,
+           and its semantics — reason, confirmation, audit, hard delete,
+           optimistic-concurrency guard — are untouched.
+           ═══════════════════════════════════════════════════════════════════ -->
+      <section id="view-new">
+        <div class="page-head">
+          <h1 class="page-title">Create a probe</h1>
+          <p class="page-sub">Paste a Rightmove property URL. NOVUS creates a draft probe, generates the
+            reference and attaches the probe email &amp; phone. You submit the genuine enquiry manually in
+            the next step.</p>
         </div>
-        <button id="skip-btn" class="btn btn-danger mt" type="button">Skip agency</button>
-        <div id="rm-popup-note" class="hint hidden">The agency's Rightmove page was blocked by your browser's popup blocker. Click the button above to open it, or allow popups for this site to have both pages open automatically from one click.</div>
-      </div>
 
-      <label for="url" class="mt">Rightmove URL</label>
-      <input id="url" type="url" placeholder="https://www.rightmove.co.uk/properties/123456789" autocomplete="off" spellcheck="false" />
+        <div id="progress" class="section hidden">
+          <div class="probe-stats">
+            <div class="probe-stat"><div class="n" id="p-remaining">&mdash;</div><div class="l">Remaining in queue</div></div>
+            <div class="probe-stat"><div class="n" id="p-today">&mdash;</div><div class="l">Probes sent today</div></div>
+          </div>
+          <p class="field-note">Queue rule — the first agency in sheet order whose
+            <span class="mono">probe_sent</span> is blank.</p>
+        </div>
 
-      <button id="create-btn" class="btn btn-primary mt">Create Probe</button>
-      <div id="create-err" class="err"></div>
-    </section>
+        <div class="card">
+          <div class="card-body">
 
-    <!-- ── LOADING (probe_id rehydration) ──────────────────────────── -->
-    <section id="view-loading" class="card hidden">
-      <p class="sub"><span class="spinner" style="border-color:rgba(15,23,42,.15);border-top-color:var(--accent);"></span>Loading probe…</p>
-    </section>
+            <!-- 1 · AGENCY, and 2 · its Rightmove page -->
+            <div id="agency-field" class="hidden">
+              <div class="field">
+                <label class="field-l" for="agency-name">Agency</label>
+                <input class="input block" id="agency-name" type="text" value="" readonly />
+              </div>
+              <a id="rm-agent-link" class="btn btn-secondary block hidden" href="#" target="_blank" rel="noopener"
+                 style="margin-top:12px;">Open Rightmove agent page &nearr;</a>
+              <div id="rm-popup-note" class="hintbox hidden">The agency's Rightmove page was blocked by your
+                browser's popup blocker. Use the button above to open it, or allow popups for this site to have
+                both pages open automatically from one click.</div>
+            </div>
 
-    <!-- ── PROBE READY ───────────────────────────────────────────── -->
-    <section id="view-ready" class="card hidden">
-      <div id="ready-banner" class="banner hidden"><span class="em">✓ Probe ready — submit the enquiry, then mark it as sent.</span></div>
+            <!-- 3 · PROPERTY URL, 4 · CREATE -->
+            <div class="field">
+              <label class="field-l" for="url">Rightmove URL</label>
+              <input class="input block" id="url" type="url"
+                placeholder="https://www.rightmove.co.uk/properties/123456789"
+                autocomplete="off" spellcheck="false" />
+            </div>
 
-      <div class="eyebrow">Probe <span id="ready-ref-inline"></span></div>
-      <h1 id="ready-title">Probe ready</h1>
-      <div style="margin-top:6px;"><span id="status-tag" class="status-tag st-draft"><span class="dot"></span><span id="status-text">Draft</span></span></div>
+            <div class="field">
+              <button id="create-btn" class="btn btn-primary block" type="button">Create probe</button>
+            </div>
+            <div id="create-err" class="formerr"></div>
+          </div>
+        </div>
 
-      <dl class="kv">
-        <dt>Agency</dt><dd id="f-agency" class="muted">—</dd>
-        <dt>Property</dt><dd id="f-address" class="muted">—</dd>
-        <dt>Price</dt><dd id="f-price" class="muted">—</dd>
-        <dt>Portal</dt><dd id="f-portal">—</dd>
-        <dt>Probe Ref</dt><dd><span id="f-ref" class="ref-chip">—</span></dd>
-        <dt>Email</dt><dd id="f-email" class="mono">—</dd>
-        <dt>Phone</dt><dd id="f-phone" class="mono">—</dd>
-        <dt id="dt-sent" class="hidden">Sent at</dt><dd id="f-sent" class="mono hidden">—</dd>
-        <dt id="dt-deadline" class="hidden">Observe until</dt><dd id="f-deadline" class="mono hidden">—</dd>
-      </dl>
+        <!-- 5 · SKIP — below the whole workflow, on purpose. -->
+        <div class="dangerzone hidden" id="skip-field">
+          <div class="section-head">
+            <div class="section-title">Skip agency</div>
+            <div class="section-note">Only when this agency should never be probed.</div>
+          </div>
+          <div class="card flat">
+            <div class="card-body">
+              <div class="field">
+                <label class="field-l" for="skip-reason">Skip reason</label>
+                <select class="input block" id="skip-reason">
+                  <option value="">Choose a reason&hellip;</option>
+                  <option>Lettings only</option>
+                  <option>Bad Rightmove listing</option>
+                  <option>Unavailable / closed</option>
+                  <option>Duplicate</option>
+                  <option>Poor lead</option>
+                  <option>Wrong match</option>
+                  <option>Other</option>
+                </select>
+                <div class="field-note">Recorded in the server audit log only. Skipping
+                  <b>hard-deletes the AGENCIES row</b>, so there is no column left to store the reason in, and
+                  it only succeeds when no downstream history exists.</div>
+              </div>
+              <div class="field">
+                <button id="skip-btn" class="btn btn-danger block" type="button">Skip agency</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <div id="ready-actions" class="btn-row">
-        <button id="open-btn" class="btn btn-ghost">Open Rightmove ↗</button>
-        <button id="sent-btn" class="btn btn-green">Mark as Sent</button>
-      </div>
+      <!-- ══ LOADING (probe_id rehydration) ═══════════════════════════════ -->
+      <section id="view-loading" class="card hidden">
+        <div class="card-body">
+          <p class="page-sub" style="margin-top:0;"><span class="spinner"></span>Loading probe&hellip;</p>
+        </div>
+      </section>
 
-      <div id="observing-note" class="hint hidden"></div>
-      <p class="hint" id="draft-hint">Open the listing, submit the genuine enquiry using the probe email &amp; phone above, then return here and click <strong>Mark as Sent</strong>. NOVUS records the exact server timestamp and starts a 4-day observation window.</p>
-      <div id="mark-err" class="err"></div>
+      <!-- ══ PROBE READY ══════════════════════════════════════════════════ -->
+      <section id="view-ready" class="hidden">
+        <div id="ready-banner" class="banner info hidden">
+          <span>Probe ready — submit the enquiry, then mark it as sent.</span></div>
 
-      <button id="another-btn" class="btn btn-ghost mt">+ New probe</button>
-    </section>
+        <div class="page-head">
+          <div class="section-title" style="margin-bottom:10px;">Probe <span id="ready-ref-inline"></span></div>
+          <h1 class="page-title" id="ready-title">Probe ready</h1>
+          <div style="margin-top:12px;"><span id="status-tag" class="pill t-amber"><span id="status-text">Draft</span></span></div>
+        </div>
 
-    <div class="foot"><a href="/novus/operator#prober" style="color:var(--text-3);text-decoration:none;">&larr; Back to the Command Centre</a></div>
-  </div>
+        <div class="card">
+          <div class="card-body">
+            <dl class="kv">
+              <dt>Agency</dt><dd id="f-agency" class="muted">&mdash;</dd>
+              <dt>Property</dt><dd id="f-address" class="muted">&mdash;</dd>
+              <dt>Price</dt><dd id="f-price" class="muted">&mdash;</dd>
+              <dt>Portal</dt><dd id="f-portal">&mdash;</dd>
+              <dt>Probe ref</dt><dd><span id="f-ref" class="chipmono">&mdash;</span></dd>
+              <dt>Email</dt><dd id="f-email" class="mono">&mdash;</dd>
+              <dt>Phone</dt><dd id="f-phone" class="mono">&mdash;</dd>
+              <dt id="dt-sent" class="hidden">Sent at</dt><dd id="f-sent" class="mono hidden">&mdash;</dd>
+              <dt id="dt-deadline" class="hidden">Observe until</dt><dd id="f-deadline" class="mono hidden">&mdash;</dd>
+            </dl>
 
+            <div id="ready-actions" class="btnrow split">
+              <button id="open-btn" class="btn btn-secondary" type="button">Open Rightmove &nearr;</button>
+              <button id="sent-btn" class="btn btn-primary" type="button">Mark as sent</button>
+            </div>
+
+            <div id="observing-note" class="hintbox hidden"></div>
+            <div class="hintbox" id="draft-hint">Open the listing, submit the genuine enquiry using the probe
+              email &amp; phone above, then return here and click <strong>Mark as sent</strong>. NOVUS records
+              the exact server timestamp and starts a 4-day observation window.</div>
+            <div id="mark-err" class="formerr"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <button id="another-btn" class="btn btn-secondary block" type="button">+ New probe</button>
+        </div>
+      </section>
+
+      <div class="pagefoot"><a href="/novus/operator#prober">&larr; Back to the Command Centre</a></div>
+    </div>
+  </main>
+</div>
   <script>
     const $ = (id) => document.getElementById(id);
     let currentProbe = null;
@@ -263,10 +266,10 @@
       // Status tag
       const tag = $('status-tag'), txt = $('status-text');
       if (observing) {
-        tag.className = 'status-tag st-observing'; txt.textContent = 'Observing';
+        tag.className = 'pill t-green'; txt.textContent = 'Observing';
         $('ready-title').textContent = 'Observation running';
       } else {
-        tag.className = 'status-tag st-draft'; txt.textContent = 'Draft';
+        tag.className = 'pill t-amber'; txt.textContent = 'Draft';
         $('ready-title').textContent = 'Probe ready';
       }
 
@@ -308,7 +311,7 @@
       } catch (e) {
         showErr($('create-err'), e.message);
       } finally {
-        btn.disabled = false; btn.textContent = 'Create Probe';
+        btn.disabled = false; btn.textContent = 'Create probe';
       }
     });
     $('url').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('create-btn').click(); });
@@ -335,7 +338,7 @@
       } catch (e) {
         showErr($('mark-err'), e.message);
       } finally {
-        btn.disabled = false; btn.textContent = 'Mark as Sent';
+        btn.disabled = false; btn.textContent = 'Mark as sent';
       }
     });
 
@@ -394,7 +397,7 @@
       // is opened by the page's own init.
       const btn = $('another-btn');
       clearErr($('mark-err'));
-      btn.disabled = true; btn.innerHTML = '<span class="spinner" style="border-color:rgba(15,23,42,.15);border-top-color:var(--accent);"></span>Finding next agency…';
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Finding next agency…';
       try {
         const data = await api('/api/novus/probe?next_after=' + encodeURIComponent(agencyId), { method: 'GET' });
         window.location.href = '/novus/probe?agency_id=' + encodeURIComponent(data.agency.agency_id);
@@ -449,6 +452,8 @@
         launchAgencyId = agencyId;
         updateAnotherBtn();
         $('agency-field').classList.remove('hidden');
+        // The skip block is only meaningful once there IS an agency in play.
+        $('skip-field').classList.remove('hidden');
         $('agency-name').value = agencyId; // shown immediately; replaced by the real name below if found
         try {
           const data = await api('/api/novus/probe?agency_id=' + encodeURIComponent(agencyId), { method: 'GET' });
@@ -465,7 +470,6 @@
             const link = $('rm-agent-link');
             link.href = rmUrl;
             link.classList.remove('hidden');
-            link.style.display = 'block';
             const opened = window.open(rmUrl, '_blank', 'noopener');
             if (!opened) $('rm-popup-note').classList.remove('hidden');
           }
