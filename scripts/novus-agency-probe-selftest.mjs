@@ -16,6 +16,7 @@
 import assert from 'node:assert';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { extractListingAddress } from '../lib/rightmove-meta.mjs';
+import { isProbeQueueEligible } from '../lib/acquisition-stage.mjs';
 
 const AGENCIES_HEADER = [
   'agency_id','agency_name','website','domain','location','branch_count','main_phone',
@@ -379,7 +380,7 @@ async function run() {
   console.log('\nPart F — automatic selection and safe Skip Agency');
   {
     const { store, valuesApi } = makeFakeSheet();
-    store.AGENCIES.push(agencyRow({ agency_id: 'ag_probed', agency_name: 'Already Probed' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_probed', agency_name: 'Already Probed', probe_sent: 'YES' }));
     store.AGENCIES.push(agencyRow({ agency_id: 'ag_delete', agency_name: 'Bad Upstream Lead', updated_at: '2026-09-03T10:00:00Z' }));
     store.AGENCIES.push(agencyRow({ agency_id: 'ag_history', agency_name: 'Has History' }));
     store.PROBES.push(PROBES_HEADER.map((key) => ({ probe_id: 'prb_existing', agency_id: 'ag_probed', probe_status: 'closed' }[key] ?? '')));
@@ -391,7 +392,7 @@ async function run() {
     await handler(mockReq({ method: 'GET', query: { next: '1' } }), next);
     assert.equal(next.statusCode, 200);
     assert.equal(next.body.agency.agency_id, 'ag_delete');
-    ok('next=1 automatically skips agencies that already have any probe');
+    ok('next=1 automatically skips agencies whose physical probe_sent is not blank');
 
     const noConfirm = mockRes();
     await handler(mockReq({ body: { action: 'skip-agency', agency_id: 'ag_delete' } }), noConfirm);
@@ -410,6 +411,83 @@ async function run() {
     assert.equal(store.AGENCIES.some((row) => row[0] === 'ag_history'), true);
     assert.equal(protectedHistory.body.dependencies[0].tab, 'PROBES');
     ok('downstream probe history blocks deletion and is retained');
+    __setRepoForTests(null);
+  }
+
+  // ── Part G: the canonical Prober queue rule is the physical probe_sent cell ──
+  console.log('\nPart G — Prober queue is gated on a genuinely blank AGENCIES.probe_sent');
+  {
+    // Pure predicate first: the rule itself, independent of any transport.
+    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '' }), true);
+    ok('blank probe_sent is eligible');
+    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '   ' }), true);
+    ok('whitespace-only probe_sent counts as blank and stays eligible');
+    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: 'YES' }), false);
+    ok('probe_sent = "YES" is not eligible');
+    for (const value of ['NO', 'yes', '2026-09-01T10:00:00.000Z', 'sent by hand', '0']) {
+      assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: value }), false, value);
+    }
+    ok('ANY non-empty probe_sent value is not eligible (including "NO", "0" and free text)');
+    // PROBES history must not influence the queue in either direction.
+    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '', current_pipeline_status: 'PROBE_COMPLETE' }), true);
+    ok('downstream lifecycle state does not override a blank probe_sent');
+    // Normal exclusions still apply on top of the blank gate.
+    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: '', probe_sent: '' }), false);
+    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '', suppression_status: 'suppressed' }), false);
+    for (const status of ['CLOSED', 'EXCLUDED', 'MEETING_BOOKED', 'NOT_INTERESTED']) {
+      assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '', current_pipeline_status: status }), false, status);
+    }
+    ok('blank probe_sent still respects suppressed / closed / excluded / meeting / not-interested exclusions');
+
+    // Now the same rule end-to-end through the live queue routes.
+    const { store, valuesApi } = makeFakeSheet();
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_sent', agency_name: 'Probed YES', probe_sent: 'YES' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_stray', agency_name: 'Probed out of band', probe_sent: '2026-08-30T09:00:00.000Z' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_first', agency_name: 'First Blank' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_second', agency_name: 'Second Blank', updated_at: '2026-09-03T10:00:00Z' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_third', agency_name: 'Third Blank' }));
+    // ag_q_first has probe history but a blank cell: the sheet is the gate, so
+    // it must STILL be served. This is the inverted half of the same bug.
+    store.PROBES.push(PROBES_HEADER.map((key) => ({ probe_id: 'prb_q1', agency_id: 'ag_q_first', probe_status: 'closed', probe_timestamp: new Date().toISOString() }[key] ?? '')));
+    __setRepoForTests(createRepo(valuesApi));
+    const { default: handler } = await import('../api/novus/probe.js');
+
+    const first = mockRes();
+    await handler(mockReq({ method: 'GET', query: { next: '1' } }), first);
+    assert.equal(first.statusCode, 200);
+    assert.equal(first.body.agency.agency_id, 'ag_q_first');
+    ok('next=1 returns the FIRST sheet row with a blank probe_sent, skipping "YES" and timestamped rows');
+
+    assert.equal(first.body.queue.remaining, 3);
+    ok('queue telemetry counts only blank-probe_sent eligible rows (3 remaining)');
+
+    // Auto-advance after a send uses the identical rule.
+    const advanced = mockRes();
+    await handler(mockReq({ method: 'GET', query: { next_after: 'ag_q_first' } }), advanced);
+    assert.equal(advanced.body.agency.agency_id, 'ag_q_second');
+    ok('auto-advance (next_after) applies the same blank-probe_sent rule');
+
+    // Skip then advance uses the identical rule too.
+    const skipped = mockRes();
+    await handler(mockReq({ body: { action: 'skip-agency', agency_id: 'ag_q_second',
+      expected_updated_at: '2026-09-03T10:00:00Z', reason: 'Lettings only', confirm: 'DELETE_UNWORKED_AGENCY' } }), skipped);
+    assert.equal(skipped.statusCode, 200, skipped.body?.error);
+    assert.equal(skipped.body.next_agency_id, 'ag_q_third');
+    assert.equal(skipped.body.reason, 'Lettings only');
+    assert.equal(skipped.body.reason_persisted, false);
+    ok('Skip Agency advances by the same rule and reports the (unpersisted) reason');
+
+    // A sheet with no probe_sent column cannot silently re-serve probed rows.
+    const { store: bare, valuesApi: bareApi } = makeFakeSheet({ agenciesHeader: AGENCIES_HEADER.filter((h) => h !== 'probe_sent') });
+    bare.AGENCIES.push(AGENCIES_HEADER.filter((h) => h !== 'probe_sent').map((k) => ({
+      agency_id: 'ag_bare', agency_name: 'No Column', rightmove_sales_branch_url: ANDREW_GRANGER_RM }[k] ?? '')));
+    __setRepoForTests(createRepo(bareApi));
+    const bareRes = mockRes();
+    await handler(mockReq({ method: 'GET', query: { next: '1' } }), bareRes);
+    assert.equal(bareRes.statusCode, 409);
+    assert.match(bareRes.body.error, /no probe_sent column/);
+    ok('a sheet with no probe_sent column fails loudly instead of re-serving probed agencies');
+
     __setRepoForTests(null);
   }
 

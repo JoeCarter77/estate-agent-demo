@@ -8,14 +8,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
+    /* Shares the Command Centre token set so the Prober is the same product. */
     :root {
-      --page:#FFFFFF; --panel:#F8FAFC; --panel-2:#F1F5F9; --border:#E2E8F0; --border-hi:#CBD5E1;
-      --brand-navy:#172D67; --accent:#2563EB; --accent-hi:#3B82F6; --accent-lo:rgba(37,99,235,0.08);
-      --text:#0F172A; --text-2:#475569; --text-3:#64748B; --green:#22C55E; --amber:#F59E0B; --red:#EF4444;
-      --radius:14px;
+      --page:#FFFFFF; --panel:#F8FAFC; --panel-2:#F6F8FC; --border:#E6EAF2; --border-hi:#D5DCE8;
+      --brand-navy:#172D67; --accent:#2563EB; --accent-hi:#3B82F6; --accent-lo:rgba(37,99,235,0.07);
+      --text:#0B1220; --text-2:#475569; --text-3:#7387A0; --green:#16A34A; --amber:#D97706; --red:#DC2626;
+      --radius:16px;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-    body{background:var(--panel-2);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
+    body{background:var(--panel-2);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+      min-height:100vh;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-feature-settings:'cv02','cv03','cv04','tnum';}
     header{position:sticky;top:0;z-index:10;height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:rgba(255,255,255,0.9);backdrop-filter:blur(18px);border-bottom:1px solid var(--border);}
     .logo{display:flex;align-items:center;gap:9px;}
     .logo-mark{width:26px;height:26px;border-radius:7px;background:var(--brand-navy);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:.9rem;}
@@ -56,16 +58,56 @@
     .err.show{display:block;}
     .spinner{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:7px;}
     @keyframes spin{to{transform:rotate(360deg);}}
-    .hidden{display:none;}
+    .hidden{display:none !important;}
     .foot{text-align:center;font-size:.72rem;color:var(--text-3);margin-top:26px;}
     .banner{display:flex;align-items:center;gap:10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:11px;padding:13px 15px;margin-bottom:20px;}
     .banner .em{font-size:.86rem;color:var(--text);font-weight:600;}
+    header{gap:16px;}
+    .logo{text-decoration:none;flex:none;}
+    .logo-mark svg{display:block;}
+    .shellnav{display:flex;gap:2px;margin-right:auto;margin-left:14px;}
+    .shellnav a{font-size:.8rem;font-weight:600;color:var(--text-3);padding:6px 11px;border-radius:8px;
+      text-decoration:none;transition:background .14s,color .14s;}
+    .shellnav a:hover{background:var(--panel);color:var(--text);}
+    .shellnav a.on{background:var(--accent-lo);color:var(--accent);}
+    .head-right{display:flex;align-items:center;gap:10px;}
+    .queue-chip{font-size:.72rem;font-weight:600;color:var(--text-3);background:var(--panel);
+      border:1px solid var(--border);border-radius:100px;padding:5px 11px;}
+    .queue-chip b{color:var(--text);font-weight:800;font-variant-numeric:tabular-nums;}
+    .queue-chip.hidden{display:none;}
+    .progress{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--border);
+      border-radius:var(--radius);padding:14px 18px;margin-bottom:18px;box-shadow:0 1px 2px rgba(11,18,32,.04);}
+    .progress .n{font-size:1.5rem;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1;}
+    .progress .l{font-size:.72rem;font-weight:600;color:var(--text-3);margin-top:3px;}
+    .progress .sep{width:1px;align-self:stretch;background:var(--border);}
+    .skip-reason{margin-top:12px;}
+    .skip-reason label{margin-bottom:6px;}
+    .skip-reason select{width:100%;font-family:'Inter',sans-serif;font-size:.9rem;color:var(--text);
+      background:var(--panel);border:1px solid var(--border-hi);border-radius:11px;padding:12px 13px;cursor:pointer;}
+    .skip-reason select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lo);}
+    .skip-note{font-size:.72rem;color:var(--text-3);margin-top:7px;line-height:1.5;}
+    @media (max-width:720px){ .shellnav{display:none;} }
   </style>
 </head>
 <body>
   <header>
-    <div class="logo"><div class="logo-mark">N</div><div class="logo-word">NOVUS</div></div>
-    <div class="env-pill">Internal · Probe</div>
+    <a class="logo" href="/novus/operator#prober" title="Back to the Command Centre">
+      <div class="logo-mark">
+        <svg viewBox="11 16 80 80" width="16" height="16" aria-hidden="true"><path d="M29 82 L29 46 C29 30 50 30 50 46 L73 82 L73 30" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="logo-word">NOVUS</div>
+    </a>
+    <nav class="shellnav">
+      <a href="/novus/operator#overview">Overview</a>
+      <a href="/novus/operator#actions">Actions</a>
+      <a href="/novus/operator#pipeline">Pipeline</a>
+      <a class="on" href="/novus/operator#prober">Prober</a>
+      <a href="/novus/operator#leads">Leads</a>
+    </nav>
+    <div class="head-right">
+      <span class="queue-chip" id="queue-chip">Queue &middot; <b id="queue-remaining">&mdash;</b> left</span>
+      <span class="env-pill">Internal &middot; Probe</span>
+    </div>
   </header>
 
   <div class="wrap">
@@ -76,11 +118,36 @@
       <h1>Create a probe</h1>
       <p class="sub">Paste a Rightmove property URL. NOVUS creates a draft probe, generates the reference and attaches the probe email &amp; phone. You'll submit the genuine enquiry manually in the next step.</p>
 
+      <div id="progress" class="progress hidden">
+        <div><div class="n" id="p-remaining">&mdash;</div><div class="l">Remaining</div></div>
+        <div class="sep"></div>
+        <div><div class="n" id="p-today">&mdash;</div><div class="l">Sent today</div></div>
+        <div class="sep"></div>
+        <div style="flex:1"><div class="l" style="margin-top:0">Queue rule</div>
+          <div style="font-size:.78rem;color:var(--text-2);margin-top:3px;line-height:1.45;">
+            First agency in sheet order whose <code>probe_sent</code> is blank.</div></div>
+      </div>
+
       <div id="agency-field" class="hidden">
         <label>Agency</label>
         <input id="agency-name" type="text" value="" readonly />
         <a id="rm-agent-link" class="btn btn-ghost mt hidden" href="#" target="_blank" rel="noopener"
            style="display:none;text-align:center;text-decoration:none;">Open Rightmove agent page ↗</a>
+        <div class="skip-reason">
+          <label for="skip-reason">Skip reason</label>
+          <select id="skip-reason">
+            <option value="">Choose a reason…</option>
+            <option>Lettings only</option>
+            <option>Bad Rightmove listing</option>
+            <option>Unavailable / closed</option>
+            <option>Duplicate</option>
+            <option>Poor lead</option>
+            <option>Wrong match</option>
+            <option>Other</option>
+          </select>
+          <div class="skip-note">Recorded in the server audit log only. Skipping hard-deletes the AGENCIES row,
+            so there is no column left to store the reason in.</div>
+        </div>
         <button id="skip-btn" class="btn btn-danger mt" type="button">Skip agency</button>
         <div id="rm-popup-note" class="hint hidden">The agency's Rightmove page was blocked by your browser's popup blocker. Click the button above to open it, or allow popups for this site to have both pages open automatically from one click.</div>
       </div>
@@ -129,7 +196,7 @@
       <button id="another-btn" class="btn btn-ghost mt">+ New probe</button>
     </section>
 
-    <div class="foot">NOVUS Operating System · V1</div>
+    <div class="foot"><a href="/novus/operator#prober" style="color:var(--text-3);text-decoration:none;">&larr; Back to the Command Centre</a></div>
   </div>
 
   <script>
@@ -147,6 +214,23 @@
       try { data = await res.json(); } catch (e) {}
       if (!res.ok) throw new Error(data.error || ('Request failed (' + res.status + ')'));
       return data;
+    }
+
+    // QUEUE TELEMETRY. One read of AGENCIES (+PROBES for today's figure).
+    // Creates, advances and sends nothing.
+    function paintQueue(queue) {
+      if (!queue) return;
+      const remaining = queue.remaining;
+      if (typeof remaining === 'number') {
+        $('queue-remaining').textContent = String(remaining);
+        $('p-remaining').textContent = String(remaining);
+        $('queue-chip').classList.remove('hidden');
+        $('progress').classList.remove('hidden');
+      }
+      if (typeof queue.completed_today === 'number') $('p-today').textContent = String(queue.completed_today);
+    }
+    async function loadQueue() {
+      try { paintQueue((await api('/api/novus/probe?queue=1', { method: 'GET' })).queue); } catch (e) { /* non-blocking */ }
     }
 
     function showErr(el, msg) { el.textContent = msg; el.classList.add('show'); }
@@ -266,6 +350,7 @@
       try {
         const result = await api('/api/novus/probe', { method: 'POST', body: JSON.stringify({
           action: 'skip-agency', agency_id: agencyId, expected_updated_at: launchAgencyUpdatedAt,
+          reason: ($('skip-reason') && $('skip-reason').value) || '',
           confirm: 'DELETE_UNWORKED_AGENCY',
         }) });
         window.location.href = result.next_agency_id
@@ -323,6 +408,8 @@
     // ?probe_id=...  rehydrates an existing probe (no new probe created).
     // ?agency_id=... preselects the agency for a new probe; the field is
     //   read-only and never needs to be re-entered.
+    loadQueue();
+
     (async function init() {
       const params = new URLSearchParams(window.location.search);
       const probeId = (params.get('probe_id') || '').trim();

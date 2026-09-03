@@ -14,18 +14,46 @@ import { newProbeId, newProbeReference } from '../../lib/ids.mjs';
 import { fetchListingMeta } from '../../lib/rightmove-meta.mjs';
 import { requireAuth } from './_auth.mjs';
 import { reconcileAgencyActionsBestEffort } from '../../lib/action-engine.mjs';
+import { isProbeQueueEligible } from '../../lib/acquisition-stage.mjs';
 
 export const maxDuration = 20;
 
 // ── GET (was probe-get.js) ──────────────────────────────────────────────────
 
-export function isProbeEligible(agency, probedAgencyIds = new Set()) {
-  const url = String(agency.rightmove_sales_branch_url ?? '').trim();
-  if (!/^https?:\/\//i.test(url)) return false;
-  if (String(agency.suppression_status ?? '').trim().toLowerCase() === 'suppressed') return false;
-  if (['closed', 'excluded', 'meeting_booked', 'not_interested'].includes(String(agency.current_pipeline_status ?? '').trim().toLowerCase())) return false;
-  if (probedAgencyIds.has(String(agency.agency_id ?? '').trim())) return false;
-  return true;
+// PROBER QUEUE ELIGIBILITY.
+//
+// The hard gate is the physical AGENCIES.probe_sent cell being blank. Any
+// non-blank value ("YES", a timestamp, a stray note) means the row is already
+// probed and is skipped. This deliberately does NOT consult PROBES history:
+// that inference is what handed already-probed agencies back to the operator
+// whenever a PROBES row was missing, deleted or logged out of band.
+//
+// The normal exclusions (no Rightmove sales branch URL, suppressed, closed,
+// excluded, meeting booked, not interested) still apply on top.
+export function isProbeEligible(agency) {
+  return isProbeQueueEligible(agency);
+}
+
+// The gate is a real column. If AGENCIES has no probe_sent column at all, every
+// row would read as blank and the queue would silently re-serve probed
+// agencies — exactly the failure being fixed. Say so instead of guessing.
+export function hasProbeSentColumn(records) {
+  return (records || []).some((record) => Object.prototype.hasOwnProperty.call(record.obj || {}, 'probe_sent'));
+}
+
+// Cheap queue telemetry for the Prober header. AGENCIES is already in memory
+// for the next-agency lookup; PROBES is only read for the "today" figure.
+export function queueStats(agencies, probes = null, now = new Date()) {
+  const remaining = (agencies || []).filter((record) => isProbeEligible(record.obj)).length;
+  const stats = { remaining, completed_today: null };
+  if (probes) {
+    const dayStart = Date.parse(`${now.toISOString().slice(0, 10)}T00:00:00.000Z`);
+    stats.completed_today = probes.filter((record) => {
+      const sentAt = Date.parse(String(record.obj.probe_timestamp || '').trim());
+      return Number.isFinite(sentAt) && sentAt >= dayStart;
+    }).length;
+  }
+  return stats;
 }
 
 async function handleGet(req, res) {
@@ -33,23 +61,34 @@ async function handleGet(req, res) {
   const agencyId = (req.query?.agency_id || '').trim();
   const nextAfter = (req.query?.next_after || '').trim();
   const next = String(req.query?.next || '') === '1';
-  if (!probeId && !agencyId && !nextAfter && !next) {
-    return res.status(400).json({ error: 'Missing probe_id, agency_id, next_after or next=1' });
+  const queueOnly = String(req.query?.queue || '') === '1';
+  if (!probeId && !agencyId && !nextAfter && !next && !queueOnly) {
+    return res.status(400).json({ error: 'Missing probe_id, agency_id, next_after, next=1 or queue=1' });
   }
 
   try {
     const repo = getRepo();
 
-    if (nextAfter || next) {
+    // Queue telemetry only — no probe is created, advanced or sent.
+    if (queueOnly) {
       const [agencies, probes] = await Promise.all([
-        repo.getRecords('AGENCIES', 'agency_id'), repo.getRecords('PROBES', 'probe_id'),
+        repo.getRecords('AGENCIES', 'agency_id'),
+        repo.getRecords('PROBES', 'probe_id').catch(() => []),
       ]);
-      const probed = new Set(probes.map((record) => String(record.obj.agency_id || '').trim()).filter(Boolean));
+      return res.status(200).json({ queue: queueStats(agencies, probes) });
+    }
+
+    if (nextAfter || next) {
+      const agencies = await repo.getRecords('AGENCIES', 'agency_id');
+      if (!hasProbeSentColumn(agencies)) {
+        return res.status(409).json({ error: 'AGENCIES has no probe_sent column — the Prober queue cannot verify which agencies were already probed. Add the column before probing.' });
+      }
       const from = nextAfter ? agencies.findIndex((r) => String(r.obj.agency_id || '').trim() === nextAfter) : -1;
       if (nextAfter && from === -1) return res.status(404).json({ error: 'Agency not found' });
-      const found = agencies.slice(from + 1).find((r) => isProbeEligible(r.obj, probed));
+      // Sheet order, first row whose probe_sent is genuinely blank.
+      const found = agencies.slice(from + 1).find((r) => isProbeEligible(r.obj));
       if (!found) return res.status(404).json({ error: nextAfter ? 'No further eligible agency in the list' : 'No eligible agency is ready to probe' });
-      return res.status(200).json({ agency: found.obj });
+      return res.status(200).json({ agency: found.obj, queue: queueStats(agencies) });
     }
 
     if (agencyId) {
@@ -218,12 +257,10 @@ async function handleSkipAgency(body, res) {
     if (body.expected_updated_at && String(agency.obj.updated_at || '').trim() !== String(body.expected_updated_at).trim()) {
       return res.status(409).json({ error: 'Agency changed since it was loaded; refresh before deleting' });
     }
-    const [agencyRows, probeRows] = await Promise.all([
-      repo.getRecords('AGENCIES', 'agency_id'), repo.getRecords('PROBES', 'probe_id'),
-    ]);
+    const agencyRows = await repo.getRecords('AGENCIES', 'agency_id');
     const agencyIndex = agencyRows.findIndex((record) => String(record.obj.agency_id || '').trim() === agencyId);
-    const probed = new Set(probeRows.map((record) => String(record.obj.agency_id || '').trim()).filter(Boolean));
-    const nextAgency = agencyRows.slice(agencyIndex + 1).find((record) => isProbeEligible(record.obj, probed));
+    // Skip advances through the identical blank-probe_sent rule as Send & Next.
+    const nextAgency = agencyRows.slice(agencyIndex + 1).find((record) => isProbeEligible(record.obj));
     const dependencies = [];
     for (const [tab, idColumn] of DOWNSTREAM_TABS) {
       const rows = await recordsOrEmpty(repo, tab, idColumn);
@@ -242,8 +279,20 @@ async function handleSkipAgency(body, res) {
     // allowed exclusive upstream records. Delete bottom-up, then the agency.
     if (contacts.length) await repo.deleteRows('CONTACTS', contacts.map((record) => record.rowNumber));
     await repo.deleteRows('AGENCIES', [agency.rowNumber]);
-    console.info('probe skip: deleted unworked agency', { agency_id: agencyId, agency_name: agency.obj.agency_name, contacts_deleted: contacts.length });
-    return res.status(200).json({ deleted: true, agency_id: agencyId, contacts_deleted: contacts.length, next_agency_id: String(nextAgency?.obj?.agency_id || '').trim() });
+    // The skip reason is operator context for the audit log only. There is no
+    // safe place to persist it: skipping hard-deletes the AGENCIES row, so any
+    // column that could hold it disappears with the record.
+    const skipReason = String(body.reason || '').trim().slice(0, 120);
+    console.info('probe skip: deleted unworked agency', {
+      agency_id: agencyId, agency_name: agency.obj.agency_name,
+      contacts_deleted: contacts.length, reason: skipReason || 'unspecified',
+    });
+    return res.status(200).json({
+      deleted: true, agency_id: agencyId, contacts_deleted: contacts.length,
+      reason: skipReason, reason_persisted: false,
+      next_agency_id: String(nextAgency?.obj?.agency_id || '').trim(),
+      queue: queueStats(agencyRows.filter((record) => String(record.obj.agency_id || '').trim() !== agencyId)),
+    });
   } catch (err) {
     console.error('probe skip agency error:', err);
     return res.status(500).json({ error: err?.message || 'Failed to delete unworked agency' });

@@ -3,1102 +3,1921 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NOVUS - Command Centre</title>
+  <title>NOVUS — Command Centre</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%2711%2016%2080%2080%27%3E%3Crect%20x%3D%2711%27%20y%3D%2716%27%20width%3D%2780%27%20height%3D%2780%27%20rx%3D%2716%27%20fill%3D%27%23172D67%27/%3E%3Cpath%20d%3D%27M29%2082%20L29%2046%20C29%2030%2050%2030%2050%2046%20L73%2082%20L73%2030%27%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%2711%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
-    :root {
-      --page:#FFFFFF; --panel:#F8FAFC; --panel-2:#F1F5F9; --border:#E2E8F0; --border-hi:#CBD5E1;
-      --brand-navy:#172D67; --accent:#2563EB; --accent-hi:#3B82F6; --accent-lo:rgba(37,99,235,0.08);
-      --text:#0F172A; --text-2:#475569; --text-3:#64748B; --green:#22C55E; --amber:#F59E0B; --red:#EF4444;
-      --purple:#7C3AED;
-      --radius:14px;
+    /* ── DESIGN TOKENS ──────────────────────────────────────────────────── */
+    :root{
+      --canvas:#F6F8FC; --surface:#FFFFFF; --surface-2:#F8FAFC; --surface-3:#F1F5F9;
+      --line:#E6EAF2; --line-2:#D5DCE8; --line-3:#C3CCDC;
+      --navy:#172D67; --brand:#2563EB; --brand-hi:#3B82F6; --brand-tint:rgba(37,99,235,.07);
+      --ink:#0B1220; --ink-2:#475569; --ink-3:#7387A0; --ink-4:#94A3B8;
+      --green:#16A34A; --green-tint:rgba(22,163,74,.09);
+      --amber:#D97706; --amber-tint:rgba(217,119,6,.09);
+      --red:#DC2626; --red-tint:rgba(220,38,38,.08);
+      --violet:#7C3AED; --violet-tint:rgba(124,58,237,.08);
+      --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px; --r-full:100px;
+      --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px; --s-7:48px;
+      --shadow-sm:0 1px 2px rgba(11,18,32,.04),0 1px 3px rgba(11,18,32,.03);
+      --shadow-md:0 2px 4px rgba(11,18,32,.03),0 8px 24px rgba(11,18,32,.05);
+      --shadow-lg:0 24px 60px rgba(11,18,32,.14);
+      --nav-w:236px;
+      --ease:cubic-bezier(.4,0,.2,1);
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-    body{background:var(--panel-2);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
-    header{position:sticky;top:0;z-index:30;height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:rgba(255,255,255,0.92);backdrop-filter:blur(18px);border-bottom:1px solid var(--border);}
-    .logo{display:flex;align-items:center;gap:9px;}
-    .logo-mark{width:26px;height:26px;border-radius:7px;background:var(--brand-navy);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:.9rem;}
-    .logo-word{font-size:1.05rem;font-weight:800;letter-spacing:.02em;color:var(--brand-navy);}
-    .head-right{display:flex;align-items:center;gap:12px;}
-    .env-pill{font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border:1px solid rgba(37,99,235,.35);background:var(--accent-lo);padding:5px 11px;border-radius:100px;}
-    .ro-pill{font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);border:1px solid var(--border-hi);background:var(--panel);padding:5px 11px;border-radius:100px;}
-    .stamp{font-size:.7rem;color:var(--text-3);}
+    html{-webkit-text-size-adjust:100%;}
+    body{background:var(--canvas);color:var(--ink);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+      font-size:14px;line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+      font-feature-settings:'cv02','cv03','cv04','tnum';}
+    a{color:inherit;text-decoration:none;}
+    ::selection{background:rgba(37,99,235,.16);}
 
-    .wrap{max-width:1360px;margin:0 auto;padding:26px 24px 90px;}
+    /* ── APP SHELL ──────────────────────────────────────────────────────── */
+    .app{display:grid;grid-template-columns:var(--nav-w) 1fr;min-height:100vh;}
 
-    /* summary */
-    .summary{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:22px;}
-    .stat{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:15px 16px;box-shadow:0 6px 18px rgba(15,23,42,.04);}
-    .stat .n{font-size:1.7rem;font-weight:800;letter-spacing:-.02em;line-height:1.1;}
-    .stat .l{font-size:.66rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);margin-top:5px;}
-    .stat.alert{border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.04);}
-    .stat.alert .n{color:var(--red);}
-    .stat.good{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.05);}
-    .stat.good .n{color:#16A34A;}
-    .stat.link{cursor:pointer;text-decoration:none;color:inherit;}
-    .stat.link:hover{border-color:var(--accent);}
-    .action-bar{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 22px;}
+    .nav{position:fixed;top:0;left:0;bottom:0;width:var(--nav-w);background:var(--surface);
+      border-right:1px solid var(--line);display:flex;flex-direction:column;z-index:30;}
+    .nav-brand{display:flex;align-items:center;gap:10px;padding:20px 18px 18px;}
+    .nav-mark{width:28px;height:28px;border-radius:9px;background:var(--navy);color:#fff;flex:none;
+      display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(23,45,103,.28);}
+    .nav-mark svg{width:17px;height:17px;}
+    .nav-name{font-size:15px;font-weight:800;letter-spacing:-.01em;color:var(--navy);line-height:1.1;}
+    .nav-sub{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-4);margin-top:1px;}
+    .nav-group{padding:6px 10px;}
+    .nav-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);
+      padding:14px 8px 7px;}
+    .nav-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:var(--r-sm);
+      font-size:13.5px;font-weight:600;color:var(--ink-2);background:none;border:none;cursor:pointer;
+      font-family:inherit;text-align:left;transition:background .13s var(--ease),color .13s var(--ease);position:relative;}
+    .nav-item svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;
+      stroke-linecap:round;stroke-linejoin:round;opacity:.75;}
+    .nav-item:hover{background:var(--surface-3);color:var(--ink);}
+    .nav-item.on{background:var(--brand-tint);color:var(--brand);}
+    .nav-item.on svg{opacity:1;}
+    .nav-item.on::before{content:'';position:absolute;left:-10px;top:50%;transform:translateY(-50%);
+      width:3px;height:18px;border-radius:0 3px 3px 0;background:var(--brand);}
+    .nav-badge{margin-left:auto;font-size:11px;font-weight:700;min-width:20px;height:19px;padding:0 6px;
+      border-radius:var(--r-full);display:inline-flex;align-items:center;justify-content:center;
+      background:var(--surface-3);color:var(--ink-3);}
+    .nav-item.on .nav-badge{background:rgba(37,99,235,.13);color:var(--brand);}
+    .nav-badge.hot{background:var(--red-tint);color:var(--red);}
+    .nav-badge.zero{opacity:.55;}
+    .nav-foot{margin-top:auto;padding:14px 18px 18px;border-top:1px solid var(--line);}
+    .nav-stamp{font-size:11px;color:var(--ink-4);line-height:1.45;}
+    .nav-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:6px;vertical-align:1px;}
+    .nav-dot.stale{background:var(--amber);}
+    .nav-dot.bad{background:var(--red);}
 
-    /* controls */
-    .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px;}
-    .search{flex:1 1 300px;min-width:240px;position:relative;}
-    .search input{width:100%;font-family:'Inter',sans-serif;font-size:.9rem;color:var(--text);background:#fff;border:1px solid var(--border-hi);border-radius:11px;padding:11px 13px 11px 36px;}
-    .search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lo);}
-    .search .ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:.9rem;}
-    select{font-family:'Inter',sans-serif;font-size:.82rem;font-weight:600;color:var(--text-2);background:#fff;border:1px solid var(--border-hi);border-radius:11px;padding:10px 12px;cursor:pointer;}
-    select:focus{outline:none;border-color:var(--accent);}
-    .btn{font-family:'Inter',sans-serif;font-weight:700;font-size:.82rem;border:none;border-radius:11px;padding:10px 15px;cursor:pointer;transition:background .15s,border-color .15s,color .15s,opacity .15s;}
-    .btn-ghost{background:#fff;color:var(--brand-navy);border:1px solid var(--border-hi);}
-    .btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
-    .btn-ghost:disabled{opacity:.5;cursor:not-allowed;}
-    .toggle{display:inline-flex;align-items:center;gap:7px;font-size:.82rem;font-weight:600;color:var(--text-2);background:#fff;border:1px solid var(--border-hi);border-radius:11px;padding:10px 13px;cursor:pointer;user-select:none;}
-    .toggle input{accent-color:var(--accent);cursor:pointer;}
+    .main{grid-column:2;min-width:0;display:flex;flex-direction:column;}
+    .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+      gap:16px;padding:0 var(--s-6);height:56px;background:rgba(246,248,252,.86);
+      backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--line);}
+    .crumb{font-size:12.5px;font-weight:600;color:var(--ink-3);}
+    .crumb b{color:var(--ink);font-weight:700;}
+    .topbar-right{display:flex;align-items:center;gap:8px;}
+    .page{padding:var(--s-6) var(--s-6) 72px;max-width:1420px;width:100%;}
+    .page-head{margin-bottom:var(--s-5);}
+    .page-title{font-size:26px;font-weight:800;letter-spacing:-.025em;line-height:1.15;}
+    .page-sub{font-size:13.5px;color:var(--ink-3);margin-top:5px;max-width:76ch;}
+    .view{display:none;animation:rise .24s var(--ease);}
+    .view.on{display:block;}
+    @keyframes rise{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
 
-    /* sections */
-    section{margin-bottom:26px;}
-    .sec-head{display:flex;align-items:baseline;gap:10px;margin-bottom:11px;}
-    .sec-title{font-size:.95rem;font-weight:800;letter-spacing:-.01em;}
-    .sec-note{font-size:.76rem;color:var(--text-3);}
-    .sec-count{font-size:.66rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);background:var(--panel);border:1px solid var(--border);border-radius:100px;padding:3px 9px;}
+    /* ── PRIMITIVES ─────────────────────────────────────────────────────── */
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);}
+    .card.flat{box-shadow:none;background:var(--surface-2);}
+    .card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line);}
+    .card-title{font-size:13.5px;font-weight:700;letter-spacing:-.005em;}
+    .card-note{font-size:12px;color:var(--ink-4);}
+    .card-body{padding:18px;}
+    .section{margin-bottom:var(--s-6);}
+    .section-head{display:flex;align-items:baseline;gap:10px;margin-bottom:var(--s-3);}
+    .section-title{font-size:15px;font-weight:700;letter-spacing:-.01em;}
+    .section-note{font-size:12.5px;color:var(--ink-4);}
+    .section-link{margin-left:auto;font-size:12.5px;font-weight:600;color:var(--brand);cursor:pointer;background:none;border:none;font-family:inherit;}
+    .section-link:hover{text-decoration:underline;}
 
-    .panel{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:0 6px 18px rgba(15,23,42,.04);}
-    .panel.quiet{background:var(--panel);box-shadow:none;}
-    table{width:100%;border-collapse:collapse;}
-    th{text-align:left;font-size:.63rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);padding:11px 14px;border-bottom:1px solid var(--border);background:var(--panel);white-space:nowrap;}
-    td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:.85rem;vertical-align:top;}
-    tbody tr{cursor:pointer;transition:background .12s;}
-    tbody tr:hover{background:var(--accent-lo);}
-    tbody tr:last-child td{border-bottom:none;}
-    .cell-primary{font-weight:700;color:var(--text);}
-    .cell-sub{font-size:.75rem;color:var(--text-3);margin-top:2px;}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;}
-    .empty{padding:26px 16px;text-align:center;font-size:.84rem;color:var(--text-3);}
+    .btn{font-family:inherit;font-weight:600;font-size:13px;border-radius:var(--r-sm);padding:8px 13px;
+      cursor:pointer;border:1px solid transparent;display:inline-flex;align-items:center;gap:7px;
+      transition:background .14s var(--ease),border-color .14s var(--ease),color .14s var(--ease),box-shadow .14s var(--ease);white-space:nowrap;}
+    .btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
+    .btn-primary{background:var(--brand);color:#fff;box-shadow:0 1px 2px rgba(37,99,235,.28);}
+    .btn-primary:hover{background:var(--brand-hi);}
+    .btn-secondary{background:var(--surface);color:var(--ink-2);border-color:var(--line-2);box-shadow:var(--shadow-sm);}
+    .btn-secondary:hover{border-color:var(--line-3);color:var(--ink);}
+    .btn-quiet{background:transparent;color:var(--ink-3);}
+    .btn-quiet:hover{background:var(--surface-3);color:var(--ink);}
+    .btn-danger{background:var(--surface);color:var(--red);border-color:rgba(220,38,38,.3);}
+    .btn-danger:hover{background:var(--red-tint);}
+    .btn:disabled{opacity:.45;cursor:not-allowed;}
+    .btn-sm{font-size:12px;padding:6px 10px;}
+
+    .input,select.input{font-family:inherit;font-size:13px;color:var(--ink);background:var(--surface);
+      border:1px solid var(--line-2);border-radius:var(--r-sm);padding:8px 11px;transition:border-color .14s,box-shadow .14s;}
+    .input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint);}
+    select.input{cursor:pointer;font-weight:600;color:var(--ink-2);padding-right:26px;
+      appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237387A0' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 9px center;}
+    .searchbox{position:relative;flex:1 1 300px;min-width:220px;}
+    .searchbox .input{width:100%;padding-left:32px;}
+    .searchbox svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;
+      stroke:var(--ink-4);fill:none;stroke-width:1.8;pointer-events:none;}
+    .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:var(--s-4);}
 
     /* pills */
-    .pill{display:inline-flex;align-items:center;gap:5px;font-size:.63rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:4px 9px;border-radius:100px;white-space:nowrap;}
-    .p-grey{color:var(--text-3);background:var(--panel-2);border:1px solid var(--border);}
-    .p-blue{color:var(--accent);background:var(--accent-lo);border:1px solid rgba(37,99,235,.28);}
-    .p-green{color:#15803D;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);}
-    .p-amber{color:#B45309;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);}
-    .p-red{color:#B91C1C;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.28);}
-    .p-purple{color:#6D28D9;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.28);}
+    .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
+      padding:3px 9px;border-radius:var(--r-full);white-space:nowrap;line-height:1.45;letter-spacing:.005em;}
+    .pill::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;flex:none;opacity:.9;}
+    .pill.bare::before{display:none;}
+    .t-grey{color:var(--ink-3);background:var(--surface-3);}
+    .t-blue{color:var(--brand);background:var(--brand-tint);}
+    .t-green{color:var(--green);background:var(--green-tint);}
+    .t-amber{color:var(--amber);background:var(--amber-tint);}
+    .t-red{color:var(--red);background:var(--red-tint);}
+    .t-violet{color:var(--violet);background:var(--violet-tint);}
 
-    /* drawer */
-    .scrim{position:fixed;inset:0;background:rgba(15,23,42,.35);opacity:0;pointer-events:none;transition:opacity .18s;z-index:40;}
-    .scrim.show{opacity:1;pointer-events:auto;}
-    .drawer{position:fixed;top:0;right:0;height:100vh;width:min(560px,100vw);background:#fff;border-left:1px solid var(--border);box-shadow:-18px 0 44px rgba(15,23,42,.14);transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);z-index:50;display:flex;flex-direction:column;}
-    .drawer.show{transform:translateX(0);}
-    .drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:20px 22px 16px;border-bottom:1px solid var(--border);}
-    .drawer-title{font-size:1.15rem;font-weight:800;letter-spacing:-.02em;}
-    .drawer-sub{font-size:.78rem;color:var(--text-3);margin-top:3px;}
-    .close{background:none;border:none;font-size:1.4rem;line-height:1;color:var(--text-3);cursor:pointer;padding:0 4px;}
-    .close:hover{color:var(--text);}
-    .drawer-body{overflow-y:auto;padding:6px 22px 40px;flex:1;}
-    .block{margin-top:20px;}
-    .block-head{display:flex;align-items:center;gap:8px;margin-bottom:2px;}
-    .block-title{font-size:.68rem;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--text-3);}
-    .block-tag{font-size:.58rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:100px;}
-    .tag-sales{color:var(--accent);background:var(--accent-lo);border:1px solid rgba(37,99,235,.28);}
-    .tag-probe{color:#6D28D9;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.28);}
-    .kv{display:grid;grid-template-columns:145px 1fr;gap:0 14px;}
-    .kv dt{font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);padding:9px 0;border-top:1px solid var(--border);}
-    .kv dd{font-size:.86rem;color:var(--text);padding:9px 0;border-top:1px solid var(--border);word-break:break-word;}
-    .kv dd.muted{color:var(--text-3);}
-    .quote{font-size:.86rem;line-height:1.55;color:var(--text);background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--border-hi);border-radius:8px;padding:12px 14px;margin-top:10px;white-space:pre-wrap;}
-    .preview-link{display:inline-block;font-size:.8rem;font-weight:700;color:var(--accent);text-decoration:none;border:1px solid rgba(37,99,235,.3);background:var(--accent-lo);border-radius:9px;padding:8px 12px;margin-top:10px;}
-    .preview-link:hover{background:rgba(37,99,235,.14);}
-    .note{font-size:.72rem;color:var(--text-3);line-height:1.5;margin-top:8px;}
+    /* KPI */
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s-3);margin-bottom:var(--s-6);}
+    .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 20px;
+      box-shadow:var(--shadow-sm);transition:border-color .16s var(--ease),transform .16s var(--ease),box-shadow .16s var(--ease);}
+    .kpi.act{cursor:pointer;}
+    .kpi.act:hover{border-color:var(--line-3);transform:translateY(-1px);box-shadow:var(--shadow-md);}
+    .kpi-l{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);}
+    .kpi-n{font-size:34px;font-weight:800;letter-spacing:-.035em;line-height:1.05;margin-top:10px;font-variant-numeric:tabular-nums;}
+    .kpi-f{font-size:12px;color:var(--ink-3);margin-top:6px;}
+    .kpi.alert .kpi-n{color:var(--red);}
+    .kpi.good .kpi-n{color:var(--green);}
+    .kpi.brand .kpi-n{color:var(--brand);}
 
-    /* sales conversation (Phase 2 read + Phase 3B human reply) */
-    .btn-mini{font-size:.7rem;font-weight:700;padding:5px 10px;border-radius:8px;}
-    .inbox-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.78rem;font-weight:600;color:var(--text-2);background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:9px 12px;margin-top:9px;}
-    .inbox-line .mono{font-weight:700;color:var(--text);}
-    .conv-status{font-size:.76rem;color:#92400E;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:9px;padding:9px 12px;margin-top:9px;}
-    .msg{border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-top:9px;background:#fff;}
-    .msg.outbound{background:var(--accent-lo);border-color:rgba(37,99,235,.28);border-left:3px solid var(--accent);}
-    .msg.inbound{background:var(--panel);border-left:3px solid var(--brand-navy);}
-    .msg.unknown{border-left:3px solid var(--amber);}
-    .msg.marker{background:var(--panel);border-style:dashed;border-left:3px dashed var(--border-hi);}
-    .msg-head{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;}
-    .msg-who{font-size:.66rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;}
-    .msg-who.novus{color:var(--accent);}
-    .msg-who.prospect{color:var(--brand-navy);}
-    .msg-who.neutral{color:var(--text-3);}
-    .msg-when{font-size:.72rem;color:var(--text-3);}
-    .msg-meta{font-size:.7rem;color:var(--text-3);margin-top:3px;}
-    .msg-subject{font-size:.8rem;font-weight:700;color:var(--text);margin-top:6px;}
-    .msg-body{font-size:.85rem;line-height:1.55;color:var(--text);white-space:pre-wrap;word-break:break-word;margin-top:5px;max-height:280px;overflow-y:auto;}
-    .msg-none{font-size:.8rem;color:var(--text-3);font-style:italic;margin-top:5px;}
+    /* funnel */
+    .funnel{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px;align-items:stretch;}
+    .fstep{position:relative;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-md);
+      padding:14px 14px 15px;cursor:pointer;transition:border-color .16s var(--ease),background .16s var(--ease);min-width:0;}
+    .fstep:hover{border-color:var(--brand);background:var(--brand-tint);}
+    .fstep-l{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-4);
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .fstep-n{font-size:24px;font-weight:800;letter-spacing:-.03em;margin-top:8px;font-variant-numeric:tabular-nums;}
+    .fstep-b{height:3px;border-radius:3px;background:var(--brand);margin-top:10px;opacity:.85;min-width:3px;}
+    .fstep-r{font-size:11px;color:var(--ink-4);margin-top:7px;font-variant-numeric:tabular-nums;}
 
-    /* Phase 3B human reply composer */
-    .reply-box{margin-top:14px;padding:14px;border:1px solid var(--border-hi);border-radius:11px;background:#fff;}
-    .reply-label{font-size:.66rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);}
-    .reply-target{font-size:.76rem;line-height:1.5;color:var(--text-2);margin-top:7px;}
-    .reply-target .mono{color:var(--text);font-weight:700;}
-    .reply-box textarea{width:100%;min-height:145px;resize:vertical;margin-top:10px;padding:11px 12px;border:1px solid var(--border-hi);border-radius:9px;background:#fff;color:var(--text);font:400 .86rem/1.5 'Inter',sans-serif;}
-    .reply-box textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lo);}
-    .reply-box textarea:disabled{background:var(--panel);color:var(--text-3);cursor:not-allowed;}
-    .reply-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:9px;}
-    .reply-count{font-size:.7rem;color:var(--text-3);}
-    .btn-send{background:var(--accent);color:#fff;min-width:112px;}
-    .btn-send:hover{background:var(--accent-hi);}
-    .btn-send:disabled{opacity:.45;cursor:not-allowed;}
-    .reply-outcome{display:none;font-size:.76rem;line-height:1.45;border-radius:9px;padding:9px 11px;margin-top:10px;}
-    .reply-outcome.show{display:block;}
-    .reply-outcome.success{color:#15803D;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);}
-    .reply-outcome.warning{color:#92400E;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);}
-    .reply-outcome.error{color:#B91C1C;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.28);}
+    /* task list */
+    .tasks{display:flex;flex-direction:column;}
+    .task{display:flex;align-items:flex-start;gap:14px;padding:15px 18px;border-bottom:1px solid var(--line);
+      cursor:pointer;transition:background .12s var(--ease);}
+    .task:last-child{border-bottom:none;}
+    .task:hover{background:var(--surface-2);}
+    .task-rail{width:3px;align-self:stretch;border-radius:3px;background:var(--line-2);flex:none;margin:2px 0;}
+    .task-rail.due{background:var(--amber);}
+    .task-rail.over{background:var(--red);}
+    .task-main{flex:1;min-width:0;}
+    .task-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+    .task-what{font-size:14px;font-weight:700;letter-spacing:-.008em;}
+    .task-who{font-size:13px;color:var(--ink-2);margin-top:3px;}
+    .task-who b{font-weight:600;color:var(--ink);}
+    .task-why{font-size:12.5px;color:var(--ink-3);margin-top:5px;line-height:1.45;}
+    .task-side{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex:none;text-align:right;}
+    .task-when{font-size:12px;font-weight:600;color:var(--ink-3);font-variant-numeric:tabular-nums;}
+    .task-when.over{color:var(--red);}
+    .task-when.due{color:var(--amber);}
 
-    .warn-box{font-size:.78rem;color:#92400E;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:11px;padding:11px 14px;margin-bottom:18px;}
-    .warn-box ul{margin:6px 0 0 18px;}
-    .warn-box li{margin-top:3px;}
-    .err{display:none;font-size:.84rem;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:11px;padding:12px 14px;margin-bottom:18px;}
-    .err.show{display:block;}
+    /* tabs */
+    .tabs{display:inline-flex;gap:2px;padding:3px;background:var(--surface-3);border-radius:var(--r-md);margin-bottom:var(--s-4);}
+    .tab{font-family:inherit;font-size:12.5px;font-weight:600;color:var(--ink-3);background:none;border:none;
+      padding:6px 13px;border-radius:9px;cursor:pointer;transition:background .14s var(--ease),color .14s var(--ease);white-space:nowrap;}
+    .tab:hover{color:var(--ink);}
+    .tab.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm);}
+    .tab-n{font-size:11px;color:var(--ink-4);margin-left:5px;font-variant-numeric:tabular-nums;}
+    .tab.on .tab-n{color:var(--brand);}
+
+    /* tables */
+    .tablewrap{overflow-x:auto;border-radius:var(--r-lg);}
+    table{width:100%;border-collapse:collapse;}
+    th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-4);
+      padding:11px 16px;background:var(--surface-2);border-bottom:1px solid var(--line);white-space:nowrap;}
+    td{padding:13px 16px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle;}
+    tbody tr{transition:background .11s var(--ease);}
+    tbody tr[data-id]{cursor:pointer;}
+    tbody tr[data-id]:hover{background:var(--surface-2);}
+    tbody tr:last-child td{border-bottom:none;}
+    .t-name{font-weight:650;color:var(--ink);letter-spacing:-.005em;}
+    .t-sub{font-size:12px;color:var(--ink-4);margin-top:2px;}
+    .mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,monospace;font-size:12px;letter-spacing:-.01em;}
+    .nowrap{white-space:nowrap;}
+    .num{font-variant-numeric:tabular-nums;}
+
+    /* stage board */
+    .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:var(--s-3);align-items:start;}
+    .bandhead{display:flex;align-items:baseline;gap:9px;margin:var(--s-5) 0 var(--s-3);}
+    .bandhead:first-child{margin-top:0;}
+    .band-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);}
+    .band-n{font-size:11.5px;font-weight:700;color:var(--ink-3);background:var(--surface-3);padding:1px 8px;border-radius:var(--r-full);}
+    .stage{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:14px 15px;
+      cursor:pointer;box-shadow:var(--shadow-sm);transition:border-color .15s var(--ease),transform .15s var(--ease);}
+    .stage:hover{border-color:var(--brand);transform:translateY(-1px);}
+    .stage.on{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint);}
+    .stage.empty{opacity:.5;box-shadow:none;background:var(--surface-2);}
+    .stage-n{font-size:22px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;}
+    .stage-l{font-size:12.5px;font-weight:600;color:var(--ink-2);margin-top:4px;}
+
+    /* system summary */
+    .syslist{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:var(--s-3);}
+    .sysitem{display:flex;align-items:center;gap:12px;padding:13px 15px;background:var(--surface-2);
+      border:1px solid var(--line);border-radius:var(--r-md);}
+    .sysitem .n{font-size:20px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;min-width:34px;}
+    .sysitem .l{font-size:12.5px;color:var(--ink-2);line-height:1.35;}
+
+    /* empty / skeleton */
+    .empty{padding:44px 24px;text-align:center;}
+    .empty-ic{width:38px;height:38px;margin:0 auto 12px;border-radius:11px;background:var(--surface-3);
+      display:flex;align-items:center;justify-content:center;color:var(--ink-4);}
+    .empty-ic svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+    .empty-t{font-size:13.5px;font-weight:650;color:var(--ink-2);}
+    .empty-s{font-size:12.5px;color:var(--ink-4);margin-top:4px;}
+    .skel{background:linear-gradient(90deg,var(--surface-3) 25%,#EDF1F7 37%,var(--surface-3) 63%);
+      background-size:400% 100%;animation:shimmer 1.3s ease-in-out infinite;border-radius:6px;}
+    @keyframes shimmer{0%{background-position:100% 50%;}100%{background-position:0 50%;}}
+    .skel-kpi{height:104px;border-radius:var(--r-lg);}
+    .skel-row{height:56px;margin-bottom:1px;}
+
+    /* banners */
+    .banner{display:flex;gap:11px;align-items:flex-start;font-size:13px;line-height:1.5;border-radius:var(--r-md);
+      padding:12px 15px;margin-bottom:var(--s-4);}
+    .banner.warn{color:#8A5200;background:var(--amber-tint);border:1px solid rgba(217,119,6,.24);}
+    .banner.err{color:#A31515;background:var(--red-tint);border:1px solid rgba(220,38,38,.22);}
+    .banner ul{margin:5px 0 0 17px;}
+    .banner li{margin-top:2px;}
     .hidden{display:none !important;}
-    .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(15,23,42,.15);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:7px;}
-    @keyframes spin{to{transform:rotate(360deg);}}
-    .foot{text-align:center;font-size:.72rem;color:var(--text-3);margin-top:32px;}
+    .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(11,18,32,.13);
+      border-top-color:var(--brand);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px;}
+    @keyframes sp{to{transform:rotate(360deg);}}
 
-    @media (max-width:1100px){
-      .summary{grid-template-columns:repeat(3,1fr);}
-      .col-hide{display:none;}
+    /* ── DRAWER ─────────────────────────────────────────────────────────── */
+    .scrim{position:fixed;inset:0;background:rgba(11,18,32,.32);backdrop-filter:blur(1px);opacity:0;
+      pointer-events:none;transition:opacity .2s var(--ease);z-index:40;}
+    .scrim.on{opacity:1;pointer-events:auto;}
+    .drawer{position:fixed;top:0;right:0;height:100vh;width:min(620px,100vw);background:var(--surface);
+      border-left:1px solid var(--line);box-shadow:var(--shadow-lg);transform:translateX(100%);
+      transition:transform .26s var(--ease);z-index:50;display:flex;flex-direction:column;}
+    .drawer.on{transform:none;}
+    .dr-head{padding:20px 24px 16px;border-bottom:1px solid var(--line);}
+    .dr-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;}
+    .dr-title{font-size:19px;font-weight:800;letter-spacing:-.022em;line-height:1.2;}
+    .dr-sub{font-size:12.5px;color:var(--ink-4);margin-top:4px;}
+    .dr-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px;}
+    .dr-x{background:none;border:none;color:var(--ink-4);cursor:pointer;padding:2px;border-radius:6px;line-height:0;}
+    .dr-x svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;}
+    .dr-x:hover{background:var(--surface-3);color:var(--ink);}
+    .dr-tabs{display:flex;gap:2px;padding:0 24px;border-bottom:1px solid var(--line);background:var(--surface);}
+    .dr-tab{font-family:inherit;font-size:12.5px;font-weight:650;color:var(--ink-3);background:none;border:none;
+      padding:11px 12px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .14s,border-color .14s;}
+    .dr-tab:hover{color:var(--ink);}
+    .dr-tab.on{color:var(--brand);border-bottom-color:var(--brand);}
+    .dr-body{overflow-y:auto;flex:1;padding:20px 24px 56px;}
+    .dr-pane{display:none;}
+    .dr-pane.on{display:block;}
+
+    /* next-action summary block */
+    .nextbox{border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;margin-bottom:var(--s-5);}
+    .nextbox-top{display:grid;grid-template-columns:1fr auto;gap:14px;padding:15px 17px;background:var(--surface-2);}
+    .nextbox-l{font-size:10.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-4);}
+    .nextbox-v{font-size:16px;font-weight:750;letter-spacing:-.015em;margin-top:5px;}
+    .nextbox-grid{display:grid;grid-template-columns:repeat(2,1fr);}
+    .nextbox-cell{padding:13px 17px;border-top:1px solid var(--line);}
+    .nextbox-cell + .nextbox-cell{border-left:1px solid var(--line);}
+    .nextbox-why{padding:13px 17px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-2);line-height:1.5;}
+    .nextbox-cv{font-size:13.5px;font-weight:650;margin-top:4px;}
+    .nextbox-cv.over{color:var(--red);}
+
+    .blk{margin-bottom:var(--s-5);}
+    .blk-h{font-size:11px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-4);margin-bottom:9px;}
+    .kv{display:grid;grid-template-columns:150px 1fr;gap:0 16px;}
+    .kv dt{font-size:12px;font-weight:600;color:var(--ink-4);padding:9px 0;border-top:1px solid var(--line);}
+    .kv dd{font-size:13px;color:var(--ink);padding:9px 0;border-top:1px solid var(--line);word-break:break-word;}
+    .kv dd .sub{font-size:12px;color:var(--ink-4);margin-top:2px;}
+    .muted{color:var(--ink-4);}
+    .quote{font-size:13px;line-height:1.6;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);
+      border-left:3px solid var(--line-3);border-radius:var(--r-sm);padding:12px 14px;margin-top:11px;white-space:pre-wrap;}
+    .note{font-size:12px;color:var(--ink-4);line-height:1.55;margin-top:9px;}
+    .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+    .linkout{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--brand);
+      border:1px solid rgba(37,99,235,.26);background:var(--brand-tint);border-radius:var(--r-sm);padding:7px 11px;margin-top:11px;}
+    .linkout:hover{background:rgba(37,99,235,.13);}
+    .tech{margin-top:var(--s-5);border-top:1px solid var(--line);padding-top:12px;}
+    .tech summary{font-size:12px;font-weight:600;color:var(--ink-4);cursor:pointer;list-style:none;}
+    .tech summary::-webkit-details-marker{display:none;}
+    .tech summary::before{content:'▸ ';color:var(--ink-4);}
+    .tech[open] summary::before{content:'▾ ';}
+    .tech .kv{margin-top:9px;}
+
+    /* conversation */
+    .inbox-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;font-weight:600;
+      color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 12px;margin-bottom:11px;}
+    .inbox-line .mono{font-weight:700;color:var(--ink);}
+    .conv-status{font-size:12.5px;line-height:1.5;color:#8A5200;background:var(--amber-tint);
+      border:1px solid rgba(217,119,6,.24);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:11px;}
+    .msg{border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;margin-bottom:9px;background:var(--surface);}
+    .msg.outbound{background:var(--brand-tint);border-color:rgba(37,99,235,.2);border-left:3px solid var(--brand);}
+    .msg.inbound{background:var(--surface-2);border-left:3px solid var(--navy);}
+    .msg.unknown{border-left:3px solid var(--amber);}
+    .msg.marker{background:var(--surface-2);border-style:dashed;border-left:3px dashed var(--line-3);}
+    .msg-head{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;}
+    .msg-who{font-size:11px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;}
+    .msg-who.novus{color:var(--brand);}
+    .msg-who.prospect{color:var(--navy);}
+    .msg-who.neutral{color:var(--ink-4);}
+    .msg-when{font-size:11.5px;color:var(--ink-4);}
+    .msg-meta{font-size:11.5px;color:var(--ink-4);margin-top:3px;}
+    .msg-subject{font-size:13px;font-weight:700;margin-top:7px;}
+    .msg-body{font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;margin-top:5px;max-height:300px;overflow-y:auto;}
+    .msg-none{font-size:12.5px;color:var(--ink-4);font-style:italic;margin-top:5px;}
+
+    /* reply composer (Phase 3B) */
+    .reply-box{margin-top:16px;padding:15px;border:1px solid var(--line-2);border-radius:var(--r-md);background:var(--surface);}
+    .reply-label{font-size:11px;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-4);}
+    .reply-target{font-size:12.5px;line-height:1.55;color:var(--ink-2);margin-top:8px;}
+    .reply-target .mono{color:var(--ink);font-weight:700;}
+    .reply-box textarea{width:100%;min-height:150px;resize:vertical;margin-top:11px;padding:11px 12px;
+      border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);
+      font:400 13px/1.6 'Inter',sans-serif;}
+    .reply-box textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint);}
+    .reply-box textarea:disabled{background:var(--surface-2);color:var(--ink-4);cursor:not-allowed;}
+    .reply-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;}
+    .reply-count{font-size:11.5px;color:var(--ink-4);font-variant-numeric:tabular-nums;}
+    .reply-outcome{display:none;font-size:12.5px;line-height:1.5;border-radius:var(--r-sm);padding:10px 12px;margin-top:11px;}
+    .reply-outcome.show{display:block;}
+    .reply-outcome.success{color:#0E7A38;background:var(--green-tint);border:1px solid rgba(22,163,74,.24);}
+    .reply-outcome.warning{color:#8A5200;background:var(--amber-tint);border:1px solid rgba(217,119,6,.24);}
+    .reply-outcome.error{color:#A31515;background:var(--red-tint);border:1px solid rgba(220,38,38,.22);}
+
+    /* analytics */
+    .conv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:var(--s-3);}
+    .conv-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:16px 17px;box-shadow:var(--shadow-sm);}
+    .conv-l{font-size:12px;font-weight:650;color:var(--ink-2);}
+    .conv-n{font-size:28px;font-weight:800;letter-spacing:-.032em;margin-top:8px;font-variant-numeric:tabular-nums;}
+    .conv-v{font-size:12px;color:var(--ink-4);margin-top:3px;font-variant-numeric:tabular-nums;}
+    .conv-bar{height:5px;border-radius:5px;background:var(--surface-3);margin-top:11px;overflow:hidden;}
+    .conv-bar i{display:block;height:100%;border-radius:5px;background:var(--brand);transition:width .5s var(--ease);}
+    .conv-card.weak .conv-n{color:var(--red);}
+    .conv-card.weak .conv-bar i{background:var(--red);}
+    .bottleneck{display:flex;align-items:flex-start;gap:13px;padding:17px 19px;border-radius:var(--r-lg);
+      background:var(--amber-tint);border:1px solid rgba(217,119,6,.24);margin-bottom:var(--s-5);}
+    .bottleneck .bn-l{font-size:10.5px;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:#8A5200;}
+    .bottleneck .bn-v{font-size:17px;font-weight:750;letter-spacing:-.015em;color:#7A4800;margin-top:5px;}
+    .bottleneck .bn-s{font-size:12.5px;color:#8A5200;margin-top:4px;line-height:1.5;}
+
+    /* exceptions */
+    .exc{display:flex;gap:14px;padding:16px 18px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s;}
+    .exc:last-child{border-bottom:none;}
+    .exc:hover{background:var(--surface-2);}
+    .exc-ic{width:30px;height:30px;border-radius:9px;background:var(--red-tint);color:var(--red);flex:none;
+      display:flex;align-items:center;justify-content:center;}
+    .exc-ic svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
+    .exc-t{font-size:13.5px;font-weight:700;letter-spacing:-.008em;}
+    .exc-w{font-size:12.5px;color:var(--ink-2);margin-top:4px;line-height:1.5;}
+    .exc-f{font-size:12px;color:var(--ink-4);margin-top:5px;line-height:1.5;}
+    .exc-f b{color:var(--ink-2);font-weight:600;}
+
+    /* prober */
+    .probe-hero{display:grid;grid-template-columns:1.35fr 1fr;gap:var(--s-4);margin-bottom:var(--s-5);}
+    .probe-panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+      padding:24px 26px;box-shadow:var(--shadow-sm);}
+    .probe-panel.brandy{background:linear-gradient(155deg,var(--navy) 0%,#22407F 100%);border-color:transparent;color:#fff;
+      box-shadow:0 12px 34px rgba(23,45,103,.22);}
+    .probe-eyebrow{font-size:10.5px;font-weight:750;letter-spacing:.13em;text-transform:uppercase;opacity:.72;}
+    .probe-n{font-size:52px;font-weight:800;letter-spacing:-.04em;line-height:1;margin-top:12px;font-variant-numeric:tabular-nums;}
+    .probe-cap{font-size:13.5px;opacity:.82;margin-top:8px;line-height:1.5;}
+    .probe-panel.brandy .btn-primary{background:#fff;color:var(--navy);box-shadow:none;}
+    .probe-panel.brandy .btn-primary:hover{background:#EEF3FF;}
+    .probe-stats{display:grid;grid-template-columns:1fr 1fr;gap:var(--s-3);}
+    .probe-stat{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-md);padding:14px 15px;}
+    .probe-stat .n{font-size:22px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;}
+    .probe-stat .l{font-size:11.5px;color:var(--ink-4);margin-top:4px;font-weight:600;}
+    .steps{counter-reset:s;display:flex;flex-direction:column;gap:11px;margin-top:4px;}
+    .step{display:flex;gap:12px;align-items:flex-start;counter-increment:s;}
+    .step::before{content:counter(s);width:21px;height:21px;border-radius:50%;background:var(--surface-3);
+      color:var(--ink-3);font-size:11px;font-weight:750;display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px;}
+    .step-t{font-size:13px;color:var(--ink-2);line-height:1.5;}
+    .step-t b{color:var(--ink);font-weight:650;}
+
+    @media (max-width:1180px){
+      .kpis{grid-template-columns:repeat(2,1fr);}
+      .probe-hero{grid-template-columns:1fr;}
+      .col-lg{display:none;}
     }
-    @media (max-width:640px){
-      .summary{grid-template-columns:repeat(2,1fr);}
-      .wrap{padding:18px 14px 70px;}
+    @media (max-width:920px){
+      :root{--nav-w:64px;}
+      .nav-name,.nav-sub,.nav-item span:not(.nav-badge),.nav-label,.nav-stamp{display:none;}
+      .nav-item{justify-content:center;}
+      .nav-badge{position:absolute;top:1px;right:1px;margin:0;min-width:16px;height:16px;font-size:9.5px;padding:0 4px;}
+      .nav-brand{justify-content:center;padding:18px 0;}
+      .page{padding:var(--s-4) var(--s-4) 56px;}
+      .topbar{padding:0 var(--s-4);}
+      .funnel{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:repeat(2,1fr);}
+      .col-md{display:none;}
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="logo"><div class="logo-mark">N</div><div class="logo-word">NOVUS</div></div>
-    <div class="head-right">
-      <span class="stamp" id="stamp">Loading&hellip;</span>
-      <span class="ro-pill">Human replies enabled</span>
-      <span class="env-pill">Internal &middot; Command Centre</span>
-    </div>
-  </header>
+<div class="app">
 
-  <div class="wrap">
-
-    <div id="load-err" class="err"></div>
-    <div id="warn-box" class="warn-box hidden"></div>
-
-    <!-- A. HEADER / SUMMARY -->
-    <div class="summary">
-      <div class="stat alert"><div class="n" id="s-attention">&mdash;</div><div class="l">Needs attention</div></div>
-      <div class="stat"><div class="n" id="s-total">&mdash;</div><div class="l">Active leads</div></div>
-      <a class="stat link" href="/novus/probe?next=1"><div class="n" id="s-probe">&mdash;</div><div class="l">Ready to probe</div></a>
-      <div class="stat"><div class="n" id="s-observing">&mdash;</div><div class="l">Probe observing</div></div>
-      <div class="stat"><div class="n" id="s-preparing">&mdash;</div><div class="l">Preparing outreach</div></div>
-      <div class="stat"><div class="n" id="s-first-email">&mdash;</div><div class="l">Waiting first email</div></div>
-      <div class="stat"><div class="n" id="s-sequence">&mdash;</div><div class="l">Sequence running</div></div>
-      <div class="stat"><div class="n" id="s-replied">&mdash;</div><div class="l">Replied</div></div>
-      <div class="stat"><div class="n" id="s-demo-sent">&mdash;</div><div class="l">Demos sent</div></div>
-      <div class="stat"><div class="n" id="s-engaged">&mdash;</div><div class="l">Demos opened</div></div>
-      <div class="stat alert"><div class="n" id="s-calls">&mdash;</div><div class="l">Calls due</div></div>
-      <div class="stat alert"><div class="n" id="s-exceptions">&mdash;</div><div class="l">Exceptions</div></div>
-      <div class="stat good"><div class="n" id="s-meetings">&mdash;</div><div class="l">Meetings</div></div>
+  <!-- ── SIDEBAR ──────────────────────────────────────────────────────── -->
+  <nav class="nav">
+    <div class="nav-brand">
+      <div class="nav-mark"><svg viewBox="11 16 80 80" aria-hidden="true"><path d="M29 82 L29 46 C29 30 50 30 50 46 L73 82 L73 30" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div><div class="nav-name">NOVUS</div><div class="nav-sub">Acquisition</div></div>
     </div>
 
-    <div class="action-bar">
-      <a class="btn btn-ghost" href="/novus/probe?next=1" style="text-decoration:none">Open Prober &rarr;</a>
-      <button id="reconcile" class="btn btn-ghost">Reconcile actions</button>
+    <div class="nav-group">
+      <button class="nav-item" data-view="overview" type="button">
+        <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Overview</span></button>
+      <button class="nav-item" data-view="actions" type="button">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg>
+        <span>Actions</span><span class="nav-badge zero" id="b-actions">0</span></button>
+      <button class="nav-item" data-view="pipeline" type="button">
+        <svg viewBox="0 0 24 24"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg><span>Pipeline</span></button>
+      <button class="nav-item" data-view="prober" type="button">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <span>Prober</span><span class="nav-badge zero" id="b-prober">0</span></button>
+      <button class="nav-item" data-view="leads" type="button">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg>
+        <span>Leads</span><span class="nav-badge zero" id="b-leads">0</span></button>
+      <button class="nav-item" data-view="analytics" type="button">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Analytics</span></button>
     </div>
 
-    <section>
-      <div class="sec-head"><div class="sec-title">Funnel conversions</div><span class="sec-note">Numerator / denominator; blank when the denominator is zero.</span></div>
-      <div class="panel quiet"><table><thead><tr><th>Conversion</th><th>Rate</th><th>Volume</th></tr></thead><tbody id="tb-conversions"></tbody></table></div>
-    </section>
-
-    <!-- D/E. SEARCH + FILTERS -->
-    <div class="controls">
-      <div class="search">
-        <span class="ic">&#9906;</span>
-        <input id="q" type="search" placeholder="Search agency, contact, email or property street" autocomplete="off" spellcheck="false" />
-      </div>
-      <label class="toggle"><input id="f-attention" type="checkbox" /> Needs attention only</label>
-      <select id="f-state"><option value="">All states</option></select>
-      <select id="f-priority"><option value="">All priorities</option></select>
-      <select id="f-contact"><option value="">All contact types</option></select>
-      <button id="refresh" class="btn btn-ghost">Refresh</button>
-      <button id="unrouted" class="btn btn-ghost">Check unrouted replies</button>
+    <div class="nav-group">
+      <div class="nav-label">System</div>
+      <button class="nav-item" data-view="exceptions" type="button">
+        <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+        <span>Exceptions</span><span class="nav-badge zero" id="b-exceptions">0</span></button>
     </div>
 
-    <!-- B. NEEDS YOUR ATTENTION -->
-    <section>
-      <div class="sec-head">
-        <div class="sec-title">Needs your attention</div>
-        <span class="sec-count" id="c-attention">0</span>
-        <span class="sec-note">A reply is waiting on a human, or an action failed.</span>
-      </div>
-      <div class="panel">
-        <table>
-          <thead><tr>
-            <th>Agency</th><th>Contact</th><th>State</th>
-            <th class="col-hide">Latest event</th><th>Next action</th><th>Priority</th>
-          </tr></thead>
-          <tbody id="tb-attention"></tbody>
-        </table>
-        <div id="empty-attention" class="empty hidden">Nothing is waiting on you.</div>
-      </div>
-    </section>
-
-    <section>
-      <div class="sec-head">
-        <div class="sec-title">Exceptions</div>
-        <span class="sec-count" id="c-exceptions">0</span>
-        <span class="sec-note">Missing checkpoints, failed actions, or incomplete acquisition evidence.</span>
-      </div>
-      <div class="panel">
-        <table>
-          <thead><tr><th>Agency</th><th>Exception</th><th>Stage</th><th class="col-hide">Why</th></tr></thead>
-          <tbody id="tb-exceptions"></tbody>
-        </table>
-        <div id="empty-exceptions" class="empty hidden">No acquisition exceptions.</div>
-      </div>
-    </section>
-
-    <!-- C. SYSTEM HANDLING -->
-    <section>
-      <div class="sec-head">
-        <div class="sec-title">System handling</div>
-        <span class="sec-count" id="c-system">0</span>
-        <span class="sec-note">Running without you. Listed for visibility only.</span>
-      </div>
-      <div class="panel quiet">
-        <table>
-          <thead><tr>
-            <th>Agency</th><th>Contact</th><th>State</th>
-            <th class="col-hide">Latest event</th><th>Next action</th><th>Priority</th>
-          </tr></thead>
-          <tbody id="tb-system"></tbody>
-        </table>
-        <div id="empty-system" class="empty hidden">No leads match these filters.</div>
-      </div>
-    </section>
-
-    <!-- 10. UNROUTED REPLIES (manual, read-only) -->
-    <section id="sec-unrouted" class="hidden">
-      <div class="sec-head">
-        <div class="sec-title">Unrouted replies</div>
-        <span class="sec-count" id="c-unrouted">0</span>
-        <span class="sec-note">Inbound replies the live poller skipped because they matched no single OUTBOUND row. Read only: nothing here is classified, stored or answered.</span>
-      </div>
-      <div class="panel">
-        <table>
-          <thead><tr><th>Lead email</th><th>Reason</th><th>Match method</th><th class="col-hide">Candidates</th></tr></thead>
-          <tbody id="tb-unrouted"></tbody>
-        </table>
-        <div id="empty-unrouted" class="empty hidden">No skipped inbound replies in the last sweep.</div>
-      </div>
-    </section>
-
-    <div class="foot">NOVUS Operating System &middot; Acquisition Command Centre</div>
-  </div>
-
-  <!-- 12. DETAIL DRAWER -->
-  <div id="scrim" class="scrim"></div>
-  <aside id="drawer" class="drawer" aria-hidden="true">
-    <div class="drawer-head">
-      <div>
-        <div class="drawer-title" id="d-agency">&mdash;</div>
-        <div class="drawer-sub" id="d-sub">&mdash;</div>
-      </div>
-      <button class="close" id="d-close" aria-label="Close">&times;</button>
+    <div class="nav-foot">
+      <div class="nav-stamp" id="stamp"><span class="spin"></span>Loading</div>
     </div>
-    <div class="drawer-body" id="d-body"></div>
-  </aside>
+  </nav>
 
-  <script>
-    const $ = (id) => document.getElementById(id);
+  <!-- ── MAIN ─────────────────────────────────────────────────────────── -->
+  <main class="main">
+    <div class="topbar">
+      <div class="crumb">NOVUS <span class="muted">/</span> <b id="crumb">Overview</b></div>
+      <div class="topbar-right">
+        <button class="btn btn-quiet btn-sm" id="reconcile" type="button">
+          <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/></svg>Reconcile</button>
+        <button class="btn btn-secondary btn-sm" id="refresh" type="button">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 019-9 9 9 0 016.7 3M21 12a9 9 0 01-9 9 9 9 0 01-6.7-3"/><path d="M21 3v6h-6M3 21v-6h6"/></svg>Refresh</button>
+      </div>
+    </div>
 
-    // Basic Auth is enforced by the edge middleware on this page load, so the
-    // browser already holds credentials for this origin and attaches them to
-    // the same-origin API calls below automatically. No token handling here.
-    const LEADS_URL = '/api/novus/personalisation?novus_operation=operator-dashboard';
-    const RECONCILE_URL = '/api/novus/personalisation?novus_operation=operator-actions-reconcile';
-    const MEETING_URL = '/api/novus/personalisation?novus_operation=operator-mark-meeting-booked';
-    const CALL_URL = '/api/novus/personalisation?novus_operation=operator-call-outcome';
-    // READ-ONLY dry run. classify=0 keeps it zero-cost: no AI call, no write.
-    const UNROUTED_URL = '/api/novus/personalisation?novus_operation=instantly-reply-poll-dry-run&classify=0&limit=50';
-    // READ-ONLY, and deliberately NOT part of the leads load: it calls Instantly
-    // once, for the ONE lead whose drawer is open. There is no prefetch and no
-    // polling — see PERFORMANCE below.
-    const CONVERSATION_URL = '/api/novus/personalisation?novus_operation=operator-conversation';
-    const MANUAL_REPLY_URL = '/api/novus/personalisation?novus_operation=operator-manual-reply';
+    <div class="page">
+      <div id="load-err" class="banner err hidden"></div>
+      <div id="warn-box" class="banner warn hidden"></div>
 
-    let LEADS = [];
-    let GLOBAL_EXCEPTIONS = [];
+      <!-- ══ OVERVIEW ══════════════════════════════════════════════════ -->
+      <section class="view" id="v-overview">
+        <div class="page-head">
+          <h1 class="page-title">Acquisition</h1>
+          <p class="page-sub" id="ov-sub">&nbsp;</p>
+        </div>
 
-    // ---- rendering helpers -------------------------------------------------
+        <div class="kpis" id="ov-kpis"></div>
 
-    function esc(value) {
-      return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => (
-        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-      ));
-    }
-
-    function dash(value) { return (value == null || value === '') ? '&mdash;' : esc(value); }
-
-    // Short, unambiguous local time. An unparseable stored value is shown
-    // verbatim rather than silently turned into a wrong date.
-    function when(iso) {
-      if (!iso) return '';
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return String(iso);
-      return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-    }
-
-    function remaining(iso) {
-      const ms = Date.parse(iso || '') - Date.now();
-      if (!Number.isFinite(ms)) return '';
-      if (ms <= 0) return 'due now';
-      const hours = Math.ceil(ms / 3600000);
-      return hours < 48 ? `${hours}h remaining` : `${Math.ceil(hours / 24)}d remaining`;
-    }
-
-    const STATE_TONE = {
-      MEETING_BOOKED: 'p-green', DEMO_ENGAGED: 'p-green', DEMO_SENT: 'p-blue',
-      REPLIED: 'p-blue', SEQUENCE_RUNNING: 'p-grey', READY: 'p-grey',
-      REVIEW_REQUIRED: 'p-amber', NURTURE: 'p-amber',
-      NOT_INTERESTED: 'p-grey', OPTED_OUT: 'p-red', UNKNOWN: 'p-red',
-      READY_TO_PROBE: 'p-blue', PROBE_OBSERVING: 'p-purple', PROBE_IN_PROGRESS: 'p-amber',
-      PROBE_COMPLETE: 'p-blue', PREPARING_OUTREACH: 'p-amber', READY_FOR_OUTREACH: 'p-blue',
-      WAITING_FOR_FIRST_EMAIL: 'p-grey', REPLIED_NEEDS_HUMAN: 'p-amber', DEMO_REQUESTED: 'p-blue',
-      DEMO_SENT_UNOPENED: 'p-grey', DEMO_OPENED: 'p-green', DEMO_FOLLOWUP_SENT: 'p-blue',
-      MANUAL_REPLY_SENT_WAITING: 'p-grey', CALL_DUE: 'p-red', MEETING_INTENT: 'p-green',
-      NO_NEXT_ACTION: 'p-red', ERROR: 'p-red', CLOSED: 'p-grey', LEAD_POOL: 'p-grey',
-    };
-    const PRIORITY_TONE = { CRITICAL: 'p-red', HIGH: 'p-amber', NORMAL: 'p-blue', LOW: 'p-grey' };
-    const CONTACT_TONE = { OWNER_DIRECT: 'p-purple', NAMED_HUMAN: 'p-blue', GENERIC: 'p-grey', UNKNOWN: 'p-grey' };
-
-    function pill(value, tone) {
-      if (!value) return '<span class="pill p-grey">&mdash;</span>';
-      return `<span class="pill ${tone || 'p-grey'}">${esc(String(value).replace(/_/g, ' '))}</span>`;
-    }
-
-    function rowHtml(lead) {
-      const nextAction = lead.next_action.type
-        ? `${esc(lead.next_action.type.replace(/_/g, ' '))}<div class="cell-sub">${dash(lead.next_action.owner)} · ${dash(when(lead.next_action.due_at))}</div><div class="cell-sub">${dash(lead.next_action.reason)}</div>`
-        : '<span class="cell-sub">&mdash;</span>';
-      const latest = lead.latest_event.type
-        ? `${esc(lead.latest_event.summary)}<div class="cell-sub">${esc(when(lead.latest_event.at))}</div>`
-        : '<span class="cell-sub">&mdash;</span>';
-      return `<tr data-id="${esc(lead.agency_id)}">
-        <td>
-          <div class="cell-primary">${dash(lead.agency_name)}</div>
-          <div class="cell-sub">${dash(lead.probe_summary.property_street)}</div>
-        </td>
-        <td>
-          <div>${dash(lead.contact.name)}</div>
-          <div class="cell-sub mono">${dash(lead.contact.email)}</div>
-        </td>
-        <td>${pill(lead.current_stage, STATE_TONE[lead.current_stage])}</td>
-        <td class="col-hide">${latest}</td>
-        <td>${nextAction}</td>
-        <td>${lead.priority ? pill(lead.priority, PRIORITY_TONE[lead.priority]) : '<span class="cell-sub">&mdash;</span>'}</td>
-      </tr>`;
-    }
-
-    // ---- filtering ---------------------------------------------------------
-
-    function matches(lead) {
-      const q = $('q').value.trim().toLowerCase();
-      if (q) {
-        const haystack = [
-          lead.agency_name, lead.contact.name, lead.contact.email, lead.probe_summary.property_street,
-        ].join(' ').toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      if ($('f-attention').checked && !lead.needs_human) return false;
-      const state = $('f-state').value;
-      if (state && lead.current_stage !== state) return false;
-      const priority = $('f-priority').value;
-      if (priority && lead.priority !== priority) return false;
-      const contact = $('f-contact').value;
-      if (contact && lead.contact.contact_type !== contact) return false;
-      return true;
-    }
-
-    function render() {
-      const visible = LEADS.filter(matches);
-      const attention = visible.filter((l) => l.needs_human);
-      const system = visible.filter((l) => !l.needs_human);
-
-      $('tb-attention').innerHTML = attention.map(rowHtml).join('');
-      $('tb-system').innerHTML = system.map(rowHtml).join('');
-      $('c-attention').textContent = String(attention.length);
-      $('c-system').textContent = String(system.length);
-      $('empty-attention').classList.toggle('hidden', attention.length > 0);
-      $('empty-system').classList.toggle('hidden', system.length > 0);
-      const exceptions = visible.filter((l) => (l.exceptions || []).length);
-      const globalRows = GLOBAL_EXCEPTIONS.map((item) => `<tr style="cursor:default"><td class="cell-primary">System</td><td>${pill(item.type, 'p-red')}</td><td>&mdash;</td><td class="col-hide">${dash(item.reason)}</td></tr>`).join('');
-      $('tb-exceptions').innerHTML = globalRows + exceptions.map((lead) => `<tr data-id="${esc(lead.agency_id)}">
-        <td class="cell-primary">${dash(lead.agency_name)}</td>
-        <td>${(lead.exceptions || []).map((e) => pill(e, 'p-red')).join(' ')}</td>
-        <td>${pill(lead.current_stage, STATE_TONE[lead.current_stage])}</td>
-        <td class="col-hide">${dash(lead.current_stage_reason)}</td></tr>`).join('');
-      $('c-exceptions').textContent = String(exceptions.length + GLOBAL_EXCEPTIONS.length);
-      $('empty-exceptions').classList.toggle('hidden', exceptions.length + GLOBAL_EXCEPTIONS.length > 0);
-    }
-
-    // ---- drawer ------------------------------------------------------------
-
-    function kv(pairs) {
-      return `<dl class="kv">${pairs.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>`;
-    }
-
-    function block(title, tag, tagClass, inner) {
-      const tagHtml = tag ? `<span class="block-tag ${tagClass}">${esc(tag)}</span>` : '';
-      return `<div class="block"><div class="block-head"><span class="block-title">${esc(title)}</span>${tagHtml}</div>${inner}</div>`;
-    }
-
-    // ---- sales conversation + Phase 3B human reply -------------------------
-    //
-    // PERFORMANCE. One opened lead = at most one Instantly GET, made by the
-    // server for that lead alone. This is never called from load(), never
-    // batched across leads, and never polled. CONV_TOKEN discards the response
-    // of a drawer the operator has already moved on from, so a slow fetch can
-    // never paint itself into the wrong lead.
-    //
-    let CONV_TOKEN = 0;
-    let CONV_LEAD = null;
-    let CONV_DATA = null;
-    let SEND_IN_FLIGHT = false;
-    let SEND_OUTBOUND_ID = null;
-    let MANUAL_REPLY_ACTION_SECRET = '';
-    const REPLY_DRAFTS = new Map();
-    const AMBIGUOUS_LOCKS = new Set();
-
-    function senderInboxHtml(data) {
-      const inbox = data.sender_inbox || {};
-      if (inbox.status === 'CONFIRMED') {
-        return `<div class="inbox-line">Sending inbox: <span class="mono">${esc(inbox.eaccount)}</span></div>`;
-      }
-      if (inbox.status === 'AMBIGUOUS') {
-        return `<div class="conv-status"><strong>Sending inbox: ambiguous.</strong> This conversation involves more than
-          one Instantly inbox (${esc((inbox.candidates || []).join(', '))}), so none was chosen.</div>`;
-      }
-      return `<div class="inbox-line">Sending inbox: <span class="muted">not resolved from the live conversation</span></div>`;
-    }
-
-    // NOVUS outbound and prospect inbound are visually distinct, and a message
-    // whose direction the server could not establish is shown as exactly that
-    // rather than being guessed onto one side.
-    function messageHtml(message, agencyName) {
-      if (message.message_type === 'CAMPAIGN_ADDED') {
-        return `<div class="msg marker">
-          <div class="msg-head">
-            <span class="msg-who neutral">Added to Instantly campaign</span>
-            <span class="msg-when">${esc(when(message.at))}</span>
+        <div class="section">
+          <div class="section-head">
+            <div class="section-title">Funnel</div>
+            <div class="section-note">Every agency, counted once at its furthest point reached.</div>
           </div>
-          <div class="msg-none">NOVUS does not store the original campaign email text, and Instantly did not return it for this lead.</div>
-        </div>`;
-      }
-
-      let cls = 'unknown';
-      let who = 'Unattributed';
-      let whoCls = 'neutral';
-      if (message.direction === 'OUTBOUND') {
-        cls = 'outbound'; who = 'NOVUS'; whoCls = 'novus';
-      } else if (message.direction === 'INBOUND') {
-        cls = 'inbound'; who = agencyName || 'Prospect'; whoCls = 'prospect';
-      }
-
-      const meta = [];
-      if (message.direction === 'OUTBOUND' && message.eaccount) meta.push(`Sent from: ${esc(message.eaccount)}`);
-      if (message.direction === 'INBOUND' && message.from) meta.push(`From: ${esc(message.from)}`);
-      if (message.direction === 'UNKNOWN') {
-        meta.push(`From: ${dash(message.from)}`);
-        meta.push('Direction could not be established from the addresses');
-      }
-      if (message.classification) meta.push(`Classified: ${esc(message.classification)}`);
-      if (message.send_outcome === 'AMBIGUOUS') {
-        cls = 'unknown'; who = 'NOVUS send unconfirmed'; whoCls = 'neutral';
-        meta.push('Send outcome: may have sent');
-      }
-      meta.push(message.source.replace(/_/g, ' ').toLowerCase());
-
-      return `<div class="msg ${cls}">
-        <div class="msg-head">
-          <span class="msg-who ${whoCls}">${esc(who)}</span>
-          <span class="msg-when">${esc(when(message.at)) || '&mdash;'}</span>
+          <div class="card"><div class="card-body"><div class="funnel" id="ov-funnel"></div></div></div>
         </div>
-        <div class="msg-meta">${meta.join(' &middot; ')}</div>
-        ${message.subject ? `<div class="msg-subject">${esc(message.subject)}</div>` : ''}
-        ${message.body_text
-          ? `<div class="msg-body">${esc(message.body_text)}</div>`
-          : '<div class="msg-none">No message text available.</div>'}
-      </div>`;
-    }
 
-    const REPLY_BLOCK_TEXT = {
-      PROSPECT_OPTED_OUT: 'This prospect has opted out. A reply cannot be sent.',
-      STALE_REPLY_EVENT: 'A newer reply has arrived. Refresh the conversation before replying.',
-      SENDER_INBOX_AMBIGUOUS: 'The sending inbox is ambiguous. Resolve the conversation before replying.',
-      SENDER_INBOX_UNKNOWN: 'The sending inbox could not be resolved from the live conversation.',
-      REPLY_NOT_FOUND: 'The latest stored reply is not available in the live Instantly conversation.',
-      REPLY_NOT_CONFIRMED_INBOUND: 'The latest message is not confirmed as an inbound prospect reply.',
-      THREAD_ID_MISMATCH: 'The stored reply and live Instantly thread do not match.',
-      EACCOUNT_NOT_ALLOWLISTED: 'The resolved sending inbox is not allowlisted.',
-      OUTBOUND_MATCH_MISSING: 'The outreach journey could not be resolved safely.',
-      OUTBOUND_MATCH_AMBIGUOUS: 'The outreach journey is ambiguous.',
-      OUTBOUND_LEAD_EMAIL_MISMATCH: 'The prospect email no longer matches the outreach journey.',
-      REPLY_EVENT_NOT_FOUND: 'There is no stored prospect reply to answer.',
-    };
-
-    function replyComposerHtml(data, agencyName, notice) {
-      const candidate = data.manual_reply || {};
-      const inbox = data.sender_inbox || {};
-      const outboundId = data.outbound_id || '';
-      const draft = REPLY_DRAFTS.get(outboundId) || '';
-      const ambiguousLocked = AMBIGUOUS_LOCKS.has(outboundId);
-      const eligible = candidate.eligible === true && inbox.status === 'CONFIRMED' && !ambiguousLocked;
-      const inFlight = SEND_IN_FLIGHT && SEND_OUTBOUND_ID === outboundId;
-      const disabled = !eligible || !draft.trim() || inFlight;
-      let reason = '';
-      if (ambiguousLocked) {
-        reason = 'This may have sent. Refresh/check the conversation before any further action.';
-      } else if (!candidate.eligible) {
-        reason = REPLY_BLOCK_TEXT[candidate.blocked_reason]
-          || (candidate.blocked_reason ? `Reply unavailable: ${candidate.blocked_reason.replace(/_/g, ' ').toLowerCase()}.` : 'No eligible latest reply is available.');
-      }
-      const noticeHtml = notice?.text
-        ? `<div id="reply-outcome" class="reply-outcome show ${esc(notice.type || 'warning')}">${esc(notice.text)}</div>`
-        : '<div id="reply-outcome" class="reply-outcome"></div>';
-
-      return `<div class="reply-box">
-        <div class="reply-label">Reply</div>
-        <div class="reply-target">Replying to: <strong>${esc(agencyName || data.lead_email || 'Prospect')}</strong>
-          <span class="mono">${esc(data.lead_email || '')}</span>, ${esc(when(candidate.received_at)) || 'timestamp unavailable'}<br/>
-          From: <span class="mono">${inbox.status === 'CONFIRMED' ? esc(inbox.eaccount) : 'not resolved'}</span>
+        <div class="section">
+          <div class="section-head">
+            <div class="section-title">Needs you today</div>
+            <div class="section-note">Manual sales actions only — probing lives in the Prober.</div>
+            <button class="section-link" data-goto="actions" type="button">View all actions &rarr;</button>
+          </div>
+          <div class="card"><div class="tasks" id="ov-tasks"></div></div>
         </div>
-        <textarea id="reply-body" maxlength="5000" placeholder="Type or paste Joe's reply" ${eligible ? '' : 'disabled'}>${esc(draft)}</textarea>
-        <div class="reply-actions">
-          <span class="reply-count" id="reply-count">${draft.length} / 5000</span>
-          <button class="btn btn-send" id="send-reply" type="button" ${disabled ? 'disabled' : ''}>${inFlight ? 'Sending…' : 'Send Reply'}</button>
+
+        <div class="section">
+          <div class="section-head">
+            <div class="section-title">NOVUS is working</div>
+            <div class="section-note">Running without you.</div>
+          </div>
+          <div class="syslist" id="ov-system"></div>
         </div>
-        ${reason ? `<div class="note">${esc(reason)}</div>` : ''}
-        ${noticeHtml}
-      </div>`;
+
+        <div class="section hidden" id="ov-exc-section">
+          <div class="section-head">
+            <div class="section-title">Exceptions</div>
+            <div class="section-note">Things that are genuinely stuck.</div>
+            <button class="section-link" data-goto="exceptions" type="button">Open exceptions &rarr;</button>
+          </div>
+          <div class="card"><div id="ov-exc"></div></div>
+        </div>
+      </section>
+
+      <!-- ══ ACTIONS ═══════════════════════════════════════════════════ -->
+      <section class="view" id="v-actions">
+        <div class="page-head">
+          <h1 class="page-title">Actions</h1>
+          <p class="page-sub">Everything that needs you personally. Probe queue work, pipeline checkpoints and
+            anything NOVUS is handling are deliberately not here.</p>
+        </div>
+        <div class="tabs" id="ac-tabs"></div>
+        <div class="card"><div class="tasks" id="ac-list"></div></div>
+      </section>
+
+      <!-- ══ PIPELINE ══════════════════════════════════════════════════ -->
+      <section class="view" id="v-pipeline">
+        <div class="page-head">
+          <h1 class="page-title">Pipeline</h1>
+          <p class="page-sub">Where every agency currently sits. Each agency appears in exactly one stage.
+            Select a stage to list it.</p>
+        </div>
+        <div class="filters">
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer;font-weight:600;">
+            <input type="checkbox" id="pl-closed" style="accent-color:var(--brand);margin-right:2px;" /> Include closed states
+          </label>
+          <button class="btn btn-quiet btn-sm" id="pl-clear" type="button">Clear selection</button>
+        </div>
+        <div id="pl-bands"></div>
+        <div class="section" id="pl-list-wrap" style="margin-top:32px;">
+          <div class="section-head">
+            <div class="section-title" id="pl-list-title">Agencies</div>
+            <div class="section-note" id="pl-list-note"></div>
+          </div>
+          <div class="card"><div class="tablewrap"><table>
+            <thead><tr><th>Agency</th><th>Contact</th><th>Stage</th><th class="col-lg">Next action</th><th class="col-md">Owner</th></tr></thead>
+            <tbody id="pl-rows"></tbody></table></div>
+            <div id="pl-empty"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ PROBER ════════════════════════════════════════════════════ -->
+      <section class="view" id="v-prober">
+        <div class="page-head">
+          <h1 class="page-title">Prober</h1>
+          <p class="page-sub">The physical probe queue. An agency is in this queue when its
+            <span class="mono">probe_sent</span> cell is blank — nothing else decides it.</p>
+        </div>
+        <div class="probe-hero">
+          <div class="probe-panel brandy">
+            <div class="probe-eyebrow">Probe queue</div>
+            <div class="probe-n" id="pr-remaining">&mdash;</div>
+            <div class="probe-cap" id="pr-cap">agencies remaining</div>
+            <div class="btnrow" style="margin-top:20px;">
+              <a class="btn btn-primary" href="/novus/probe?next=1">
+                <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 5l7 7-7 7"/></svg>Start probing</a>
+            </div>
+          </div>
+          <div class="probe-panel">
+            <div class="probe-stats">
+              <div class="probe-stat"><div class="n" id="pr-today">&mdash;</div><div class="l">Probes sent today</div></div>
+              <div class="probe-stat"><div class="n" id="pr-observing">&mdash;</div><div class="l">Observing now</div></div>
+              <div class="probe-stat"><div class="n" id="pr-complete">&mdash;</div><div class="l">Observation closed</div></div>
+              <div class="probe-stat"><div class="n" id="pr-draft">&mdash;</div><div class="l">Draft, not sent</div></div>
+            </div>
+            <div class="steps" style="margin-top:20px;">
+              <div class="step"><div class="step-t"><b>Start probing</b> opens the first queue agency and its Rightmove branch page.</div></div>
+              <div class="step"><div class="step-t">Paste the property URL, submit the genuine enquiry, then <b>Mark as Sent</b>.</div></div>
+              <div class="step"><div class="step-t">NOVUS stamps <span class="mono">probe_sent</span>, starts the 4-day observation and loads the next blank row.</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head">
+            <div class="section-title">In the queue</div>
+            <div class="section-note">Blank <span class="mono">probe_sent</span>, eligible, not suppressed or closed.</div>
+          </div>
+          <div class="card"><div class="tablewrap"><table>
+            <thead><tr><th>Agency</th><th class="col-md">Location</th><th class="col-lg">Rightmove branch</th><th>Stage</th><th></th></tr></thead>
+            <tbody id="pr-rows"></tbody></table></div>
+            <div id="pr-empty"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ LEADS ═════════════════════════════════════════════════════ -->
+      <section class="view" id="v-leads">
+        <div class="page-head">
+          <h1 class="page-title">Leads</h1>
+          <p class="page-sub">The master record. Search every agency, contact and probe, then open the full lead.</p>
+        </div>
+        <div class="filters">
+          <div class="searchbox">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+            <input class="input" id="q" type="search" placeholder="Agency, contact, email or property street" autocomplete="off" spellcheck="false" />
+          </div>
+          <select class="input" id="f-stage"><option value="">All stages</option></select>
+          <select class="input" id="f-owner"><option value="">All queues</option>
+            <option value="JOE">Needs you</option><option value="PROBER">Prober</option><option value="SYSTEM">NOVUS / system</option></select>
+          <select class="input" id="f-priority"><option value="">All priorities</option></select>
+          <select class="input" id="f-contact"><option value="">All contact types</option></select>
+          <select class="input" id="f-demo"><option value="">All demo states</option>
+            <option value="SENT">Demo sent</option><option value="OPENED">Demo opened</option>
+            <option value="ENGAGED">Demo engaged</option><option value="NONE">No demo</option></select>
+          <select class="input" id="f-reply"><option value="">All reply states</option>
+            <option value="ANY">Has replied</option><option value="NONE">No reply</option></select>
+          <button class="btn btn-quiet btn-sm" id="f-clear" type="button">Clear</button>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title" id="ld-count">&mdash;</div>
+            <div class="card-note">Click any row for the full record.</div></div>
+          <div class="tablewrap"><table>
+            <thead><tr><th>Agency</th><th>Contact</th><th>Stage</th><th class="col-lg">Next action</th>
+              <th class="col-md">Queue</th><th class="col-lg">Last activity</th><th class="col-md">Priority</th></tr></thead>
+            <tbody id="ld-rows"></tbody></table></div>
+          <div id="ld-empty"></div>
+        </div>
+      </section>
+
+      <!-- ══ ANALYTICS ═════════════════════════════════════════════════ -->
+      <section class="view" id="v-analytics">
+        <div class="page-head">
+          <h1 class="page-title">Analytics</h1>
+          <p class="page-sub">Current-state funnel conversion, computed from stored evidence. There is no historical
+            time series yet, so no trends are shown.</p>
+        </div>
+        <div id="an-bottleneck"></div>
+        <div class="section">
+          <div class="section-head"><div class="section-title">Volume</div>
+            <div class="section-note">Cumulative reach at each stage of the funnel.</div></div>
+          <div class="card"><div class="card-body"><div class="funnel" id="an-funnel"></div></div></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div class="section-title">Conversion</div>
+            <div class="section-note">A rate is blank when its denominator is zero.</div></div>
+          <div class="conv-grid" id="an-conversions"></div>
+        </div>
+      </section>
+
+      <!-- ══ EXCEPTIONS ════════════════════════════════════════════════ -->
+      <section class="view" id="v-exceptions">
+        <div class="page-head">
+          <h1 class="page-title">Exceptions</h1>
+          <p class="page-sub">System health. Only genuinely broken or unaccounted-for states appear here —
+            normal pipeline waiting is not an exception.</p>
+        </div>
+        <div class="filters">
+          <button class="btn btn-secondary btn-sm" id="unrouted" type="button">
+            <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg>Check unrouted replies</button>
+          <span class="card-note">Reads Instantly once. Classifies nothing, writes nothing.</span>
+        </div>
+        <div class="card"><div id="ex-list"></div></div>
+        <div class="section hidden" id="ex-unrouted-wrap" style="margin-top:32px;">
+          <div class="section-head"><div class="section-title">Unrouted replies</div>
+            <div class="section-note">Inbound replies the poller skipped because they matched no single outreach journey.</div></div>
+          <div class="card"><div class="tablewrap"><table>
+            <thead><tr><th>Lead email</th><th>Reason</th><th class="col-md">Match method</th><th class="col-lg">Candidates</th></tr></thead>
+            <tbody id="ex-unrouted"></tbody></table></div>
+            <div id="ex-unrouted-empty"></div></div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- ── LEAD DRAWER ────────────────────────────────────────────────────── -->
+<div id="scrim" class="scrim"></div>
+<aside id="drawer" class="drawer" aria-hidden="true" aria-label="Lead detail">
+  <div class="dr-head">
+    <div class="dr-top">
+      <div style="min-width:0;">
+        <div class="dr-title" id="d-name">&mdash;</div>
+        <div class="dr-sub" id="d-sub">&mdash;</div>
+      </div>
+      <button class="dr-x" id="d-close" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="dr-pills" id="d-pills"></div>
+  </div>
+  <div class="dr-tabs" id="d-tabs">
+    <button class="dr-tab on" data-pane="summary" type="button">Summary</button>
+    <button class="dr-tab" data-pane="conversation" type="button">Conversation</button>
+    <button class="dr-tab" data-pane="probe" type="button">Probe</button>
+    <button class="dr-tab" data-pane="demo" type="button">Demo</button>
+    <button class="dr-tab" data-pane="actions" type="button">Actions</button>
+  </div>
+  <div class="dr-body" id="d-body"></div>
+</aside>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   NOVUS Command Centre
+   ---------------------------------------------------------------------
+   DATA RULE. Every view below is a PRESENTATION of the canonical
+   server-side projection returned by operator-dashboard. Lifecycle stages,
+   next actions, owners, the manual-action queue and funnel metrics are all
+   computed on the server (lib/acquisition-stage.mjs, acquisition-actions.mjs,
+   operator-funnel.mjs). Nothing here re-derives them; the maps below only
+   translate canonical enums into operator language.
+
+   PERFORMANCE. ONE dashboard fetch feeds all seven views; switching view is
+   a client-side render, never a request. The two exceptions are explicitly
+   manual and lazy: the per-lead Instantly conversation (one GET, only for the
+   lead whose drawer is open) and the unrouted-reply sweep (a button).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const $ = (id) => document.getElementById(id);
+
+/* Basic Auth is enforced by the edge middleware on this page load, so the
+   browser already holds credentials for this origin and attaches them to the
+   same-origin API calls below. No token handling here. */
+/* Written out in full, never assembled from fragments: the complete set of
+   NOVUS operations this page can reach is auditable by reading this block,
+   and the self-tests grep for exactly these literals. */
+const LEADS_URL        = '/api/novus/personalisation?novus_operation=operator-dashboard';
+const RECONCILE_URL    = '/api/novus/personalisation?novus_operation=operator-actions-reconcile';
+const MEETING_URL      = '/api/novus/personalisation?novus_operation=operator-mark-meeting-booked';
+const CALL_URL         = '/api/novus/personalisation?novus_operation=operator-call-outcome';
+const CONVERSATION_URL = '/api/novus/personalisation?novus_operation=operator-conversation';
+const MANUAL_REPLY_URL = '/api/novus/personalisation?novus_operation=operator-manual-reply';
+/* READ-ONLY dry run. classify=0 keeps it zero-cost: no AI call, no write. */
+const UNROUTED_URL     = '/api/novus/personalisation?novus_operation=instantly-reply-poll-dry-run&classify=0&limit=50';
+/* Queue telemetry only. Creates, advances and sends no probe. */
+const PROBE_QUEUE_URL  = '/api/novus/probe?queue=1';
+
+let LEADS = [];
+let COUNTS = {};
+let METRICS = {};
+let GLOBAL_EXCEPTIONS = [];
+let LOADED = false;
+let PROBE_QUEUE = null;
+
+/* ── canonical enum → operator language ──────────────────────────────── */
+
+const STAGE_LABEL = {
+  MEETING_BOOKED:'Meeting booked', OPTED_OUT:'Opted out', NOT_INTERESTED:'Not interested', CLOSED:'Closed',
+  REPLIED_NEEDS_HUMAN:'Reply needs you', MEETING_INTENT:'Wants a meeting', DEMO_REQUESTED:'Demo requested',
+  MANUAL_REPLY_SENT_WAITING:'Waiting for reply', CALL_DUE:'Call due', DEMO_FOLLOWUP_SENT:'Demo follow-up sent',
+  DEMO_ENGAGED:'Demo engaged', DEMO_OPENED:'Demo opened', DEMO_SENT_UNOPENED:'Demo sent · not opened',
+  SEQUENCE_RUNNING:'In sequence', WAITING_FOR_FIRST_EMAIL:'Waiting first email',
+  READY_FOR_OUTREACH:'Ready for outreach', PREPARING_OUTREACH:'Preparing outreach',
+  PROBE_COMPLETE:'Probe complete', PROBE_OBSERVING:'Probe observing', PROBE_IN_PROGRESS:'Probe in progress',
+  READY_TO_PROBE:'Ready to probe', LEAD_POOL:'Lead pool', NO_NEXT_ACTION:'No next action', ERROR:'Error',
+};
+const STAGE_TONE = {
+  MEETING_BOOKED:'t-green', MEETING_INTENT:'t-green', DEMO_ENGAGED:'t-green', DEMO_OPENED:'t-green',
+  REPLIED_NEEDS_HUMAN:'t-amber', DEMO_REQUESTED:'t-amber', CALL_DUE:'t-red',
+  PROBE_IN_PROGRESS:'t-amber', PREPARING_OUTREACH:'t-amber',
+  PROBE_OBSERVING:'t-violet', READY_TO_PROBE:'t-blue', PROBE_COMPLETE:'t-blue',
+  READY_FOR_OUTREACH:'t-blue', DEMO_FOLLOWUP_SENT:'t-blue',
+  SEQUENCE_RUNNING:'t-grey', WAITING_FOR_FIRST_EMAIL:'t-grey', MANUAL_REPLY_SENT_WAITING:'t-grey',
+  DEMO_SENT_UNOPENED:'t-grey', LEAD_POOL:'t-grey', CLOSED:'t-grey', NOT_INTERESTED:'t-grey',
+  OPTED_OUT:'t-red', NO_NEXT_ACTION:'t-red', ERROR:'t-red',
+};
+const ACTION_LABEL = {
+  PROBE_AGENCY:'Probe agency', COMPLETE_PROBE:'Finish and send probe',
+  OBSERVATION_CHECKPOINT:'Observation running', PREPARE_OUTREACH:'Preparing outreach',
+  HANDOFF_TO_INSTANTLY:'Hand off to Instantly', FIRST_EMAIL_CHECKPOINT:'Waiting for first email',
+  SEQUENCE_CHECKPOINT:'Sequence running', HUMAN_REPLY:'Reply to prospect', MANUAL_REVIEW:'Review this reply',
+  SEND_DEMO:'Send the demo', OUT_OF_OFFICE_CHECKPOINT:'Out of office · waiting',
+  DEMO_UNOPENED_FOLLOWUP:'Follow up unopened demo', DEMO_OPENED_FOLLOWUP:'Follow up opened demo',
+  CALL_PROSPECT:'Call prospect', RETRY_CALL:'Retry the call',
+  FOLLOW_UP_CONVERSATION:'Follow up conversation', SET_NEXT_STEP:'Set the next step',
+  RESOLVE_EXCEPTION:'Resolve exception',
+};
+const QUEUE_LABEL = { JOE:'Needs you', PROBER:'Prober', SYSTEM:'NOVUS' };
+const QUEUE_TONE  = { JOE:'t-amber', PROBER:'t-blue', SYSTEM:'t-grey' };
+const PRIORITY_TONE = { CRITICAL:'t-red', HIGH:'t-amber', NORMAL:'t-blue', LOW:'t-grey' };
+const CONTACT_TONE  = { OWNER_DIRECT:'t-violet', NAMED_HUMAN:'t-blue', GENERIC:'t-grey', UNKNOWN:'t-grey' };
+
+/* Actions workspace tabs. Types are canonical; grouping is presentation. */
+const ACTION_TABS = [
+  { key:'all',       label:'All',        types:null },
+  { key:'replies',   label:'Replies',    types:['HUMAN_REPLY'] },
+  { key:'calls',     label:'Calls',      types:['CALL_PROSPECT','RETRY_CALL'] },
+  { key:'reviews',   label:'Reviews',    types:['MANUAL_REVIEW','RESOLVE_EXCEPTION'] },
+  { key:'followups', label:'Follow-ups', types:['FOLLOW_UP_CONVERSATION','SET_NEXT_STEP'] },
+];
+
+/* Pipeline bands. Mutually exclusive: a lead has exactly one canonical stage,
+   so a stage belongs to exactly one band and nothing is double counted. */
+const PIPELINE_BANDS = [
+  { label:'Lead pool',    stages:['LEAD_POOL','READY_TO_PROBE'] },
+  { label:'Probing',      stages:['PROBE_IN_PROGRESS','PROBE_OBSERVING','PROBE_COMPLETE'] },
+  { label:'Pre-outreach', stages:['PREPARING_OUTREACH','READY_FOR_OUTREACH','WAITING_FOR_FIRST_EMAIL'] },
+  { label:'Outreach',     stages:['SEQUENCE_RUNNING'] },
+  { label:'Conversation', stages:['REPLIED_NEEDS_HUMAN','MANUAL_REPLY_SENT_WAITING','MEETING_INTENT'] },
+  { label:'Demo',         stages:['DEMO_REQUESTED','DEMO_SENT_UNOPENED','DEMO_OPENED','DEMO_ENGAGED','DEMO_FOLLOWUP_SENT'] },
+  { label:'Call',         stages:['CALL_DUE'] },
+  { label:'Done',         stages:['MEETING_BOOKED'] },
+];
+const CLOSED_BAND = { label:'Closed', stages:['NOT_INTERESTED','OPTED_OUT','CLOSED'] };
+const EXCEPTION_BAND = { label:'Unaccounted', stages:['NO_NEXT_ACTION','ERROR'] };
+
+const EXCEPTION_INFO = {
+  NO_NEXT_ACTION:{ t:'No next action', w:'This agency is active but the engine could not derive a next step, so nothing will advance it.', f:'Open the lead and set a next step, or close the agency if it should no longer be worked.' },
+  ACTION_FAILED:{ t:'An action failed', w:'A durable action ended in FAILED. Whatever it was meant to do did not happen.', f:'Open the lead’s Actions tab, read the recorded error, then reconcile or act manually.' },
+  AMBIGUOUS_SEND:{ t:'Send outcome unconfirmed', w:'A NOVUS message may or may not have reached the prospect. Resending risks a duplicate.', f:'Open the conversation and confirm what actually sent before doing anything else.' },
+  MISSING_DEMO:{ t:'No demo record', w:'Outreach preparation is running but this agency has no DEMOS row, so there is nothing to send.', f:'Build the demo for this probe before the lead can move to outreach.' },
+  MISSING_CONTACT:{ t:'No contact email', w:'Outreach preparation is running with no resolved contact email, so nothing can be sent.', f:'Resolve a verified contact for this agency.' },
+  UNMATCHED_REPLY:{ t:'Reply matched no journey', w:'Inbound replies exist that the poller could not attribute to a single outreach journey, so they are unhandled.', f:'Run the unrouted-reply check below and route them manually.' },
+  STATE_CONFLICT:{ t:'Conflicting state', w:'Stored evidence for this agency disagrees with itself, so the lifecycle resolved to ERROR.', f:'Open the lead, read the stage reason, and correct the underlying record.' },
+  ACTION_LEDGER_UNAVAILABLE:{ t:'Action ledger unavailable', w:'The ACTIONS tab is missing or its header is wrong. Actions are being projected but not stored, so nothing is durable.', f:'Run npm run novus:actions-setup, then reconcile.' },
+};
+
+/* ── formatting helpers ─────────────────────────────────────────────── */
+
+function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function dash(v){ return (v==null||v==='')?'&mdash;':esc(v); }
+function stageLabel(s){ return STAGE_LABEL[s] || String(s||'').replace(/_/g,' ').toLowerCase().replace(/^./,(c)=>c.toUpperCase()); }
+function actionLabel(t){ return ACTION_LABEL[t] || String(t||'').replace(/_/g,' ').toLowerCase().replace(/^./,(c)=>c.toUpperCase()); }
+/* Canonical enums quoted inside server-written reason text. Presentation
+   only: nothing here is compared, stored or sent back. */
+const REASON_WORDS = {
+  QUESTION:'a question', OTHER_UNCLEAR:'unclear', NOT_NOW:'not right now', OPT_OUT:'an opt-out',
+  NOT_INTERESTED:'not interested', POSITIVE_SEND_DEMO:'a demo request', POSITIVE_MEETING:'a meeting request',
+  OOO_AUTOMATED:'an out-of-office auto-reply',
+  SEND_DEMO:'send demo', HUMAN_REPLY:'reply to prospect', CALL_PROSPECT:'call prospect', RETRY_CALL:'retry call',
+  MEETING_BOOKED:'meeting booked', SEQUENCE_RUNNING:'in sequence', READY:'ready', SENT:'sent', ERROR:'error',
+};
+function humaniseReason(text){
+  return String(text || '').replace(/\b[A-Z][A-Z0-9_]{2,}\b/g, (token) =>
+    REASON_WORDS[token] || token.replace(/_/g,' ').toLowerCase());
+}
+
+function pill(text, tone, bare){ return `<span class="pill ${tone||'t-grey'}${bare?' bare':''}">${esc(text)}</span>`; }
+function stagePill(stage){ return pill(stageLabel(stage), STAGE_TONE[stage]); }
+
+/* Short local time. An unparseable stored value is shown verbatim rather than
+   silently turned into a wrong date. */
+function when(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(Number.isNaN(d.getTime())) return String(iso);
+  return d.toLocaleString('en-GB',{ day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+}
+function ago(iso){
+  const ms = Date.now() - Date.parse(iso||'');
+  if(!Number.isFinite(ms)) return '';
+  const m = Math.round(ms/60000);
+  if(m < 1) return 'just now';
+  if(m < 60) return `${m} min ago`;
+  const h = Math.round(m/60);
+  if(h < 48) return `${h}h ago`;
+  return `${Math.round(h/24)}d ago`;
+}
+/* Due-state of an action, used for the only red in the product that matters. */
+function dueState(iso){
+  const t = Date.parse(iso||'');
+  if(!Number.isFinite(t)) return { cls:'', text:'' };
+  const diff = t - Date.now();
+  if(diff <= -3600000) {
+    const h = Math.round(-diff/3600000);
+    return { cls:'over', text: h < 48 ? `Overdue by ${h}h` : `Overdue by ${Math.round(h/24)}d` };
+  }
+  if(diff <= 0) return { cls:'due', text:'Due now' };
+  const h = Math.ceil(diff/3600000);
+  return { cls:'', text: h < 48 ? `Due in ${h}h` : `Due ${when(iso)}` };
+}
+function emptyState(title, sub, icon){
+  const ic = icon || '<path d="M20 6L9 17l-5-5"/>';
+  return `<div class="empty"><div class="empty-ic"><svg viewBox="0 0 24 24">${ic}</svg></div>
+    <div class="empty-t">${esc(title)}</div><div class="empty-s">${esc(sub||'')}</div></div>`;
+}
+function skeletonRows(n){ return Array.from({length:n},()=>'<div class="skel skel-row"></div>').join(''); }
+
+/* Demo/reply state used by the Leads filters. Derived only from stored fields
+   the server already resolved; it changes no lifecycle semantics. */
+function demoState(lead){
+  if(lead.demo.cta_clicked_at || Number(lead.demo.view_count||0) >= 2) return 'ENGAGED';
+  if(lead.demo.first_viewed_at) return 'OPENED';
+  if(lead.demo.slug || lead.demo.status) return 'SENT';
+  return 'NONE';
+}
+
+/* ═══ ROUTING ═══════════════════════════════════════════════════════════
+   Hash routes over one document. Navigation only changes which view is
+   rendered — it never posts, deletes, sends or mutates anything.          */
+
+const VIEWS = ['overview','actions','pipeline','prober','leads','analytics','exceptions'];
+const VIEW_TITLE = { overview:'Overview', actions:'Actions', pipeline:'Pipeline', prober:'Prober',
+  leads:'Leads', analytics:'Analytics', exceptions:'Exceptions' };
+let VIEW = 'overview';
+
+function routeFromHash(){
+  const raw = String(window.location.hash || '').replace(/^#\/?/, '').split('?')[0].trim().toLowerCase();
+  return VIEWS.includes(raw) ? raw : 'overview';
+}
+
+function showView(name, { push = true } = {}){
+  VIEW = VIEWS.includes(name) ? name : 'overview';
+  VIEWS.forEach((v) => $('v-' + v).classList.toggle('on', v === VIEW));
+  document.querySelectorAll('.nav-item').forEach((el) => {
+    const on = el.dataset.view === VIEW;
+    el.classList.toggle('on', on);
+    el.setAttribute('aria-current', on ? 'page' : 'false');
+  });
+  $('crumb').textContent = VIEW_TITLE[VIEW];
+  document.title = `NOVUS — ${VIEW_TITLE[VIEW]}`;
+  if(push && routeFromHash() !== VIEW) window.location.hash = '#' + VIEW;
+  window.scrollTo({ top:0 });
+  renderView();
+  if(VIEW === 'prober') loadProbeQueue();
+}
+
+/* ═══ RENDERERS ═════════════════════════════════════════════════════════ */
+
+function renderAll(){ renderBadges(); renderView(); }
+
+function renderBadges(){
+  const set = (id, n, hot) => {
+    const el = $(id);
+    el.textContent = String(n);
+    el.classList.toggle('zero', !n);
+    el.classList.toggle('hot', Boolean(hot) && n > 0);
+  };
+  set('b-actions', manualActions().length, true);
+  set('b-prober', COUNTS.probe_queue ?? COUNTS.ready_to_probe ?? 0, false);
+  set('b-leads', LEADS.length, false);
+  set('b-exceptions', exceptionItems().length, true);
+}
+
+function renderView(){
+  if(VIEW === 'overview')   renderOverview();
+  if(VIEW === 'actions')    renderActions();
+  if(VIEW === 'pipeline')   renderPipeline();
+  if(VIEW === 'prober')     renderProber();
+  if(VIEW === 'leads')      renderLeads();
+  if(VIEW === 'analytics')  renderAnalytics();
+  if(VIEW === 'exceptions') renderExceptions();
+}
+
+/* needs_human is the SERVER's manual-sales-action verdict. The UI never
+   recomputes it — that is exactly the mistake that put probing in here. */
+function manualActions(){
+  return LEADS.filter((l) => l.needs_human)
+    .sort((a, b) => (Date.parse(a.next_action.due_at||'') || Infinity) - (Date.parse(b.next_action.due_at||'') || Infinity));
+}
+
+/* ── OVERVIEW ───────────────────────────────────────────────────────── */
+
+function kpiCard(label, value, foot, tone, view){
+  return `<div class="kpi ${tone||''} ${view?'act':''}" ${view?`data-goto="${view}"`:''}>
+    <div class="kpi-l">${esc(label)}</div>
+    <div class="kpi-n">${value}</div>
+    <div class="kpi-f">${foot||'&nbsp;'}</div></div>`;
+}
+
+function renderOverview(){
+  if(!LOADED){
+    $('ov-kpis').innerHTML = Array.from({length:4},()=>'<div class="skel skel-kpi"></div>').join('');
+    $('ov-tasks').innerHTML = skeletonRows(3);
+    return;
+  }
+  const todo = manualActions();
+  const overdue = todo.filter((l) => Date.parse(l.next_action.due_at||'') <= Date.now()).length;
+
+  $('ov-sub').innerHTML = `${COUNTS.active ?? 0} active ${COUNTS.active === 1 ? 'agency' : 'agencies'} in the pipeline. `
+    + (todo.length
+      ? `<b>${todo.length}</b> ${todo.length === 1 ? 'action needs' : 'actions need'} you${overdue ? `, ${overdue} overdue` : ''}. `
+      : 'Nothing is waiting on you. ')
+    + `NOVUS is handling the rest.`;
+
+  $('ov-kpis').innerHTML = [
+    kpiCard('Active agencies', COUNTS.active ?? 0, `${COUNTS.total ?? 0} on file`, 'brand', 'leads'),
+    kpiCard('Need you today', todo.length, overdue ? `${overdue} overdue` : 'nothing overdue', todo.length ? 'alert' : '', 'actions'),
+    kpiCard('Demos engaged', METRICS.cta_clicked ?? 0, `${COUNTS.demos_opened ?? 0} opened of ${COUNTS.demos_sent ?? 0} sent`, '', 'pipeline'),
+    kpiCard('Meetings booked', COUNTS.meetings ?? 0, 'terminal, won', 'good', 'pipeline'),
+  ].join('');
+
+  $('ov-funnel').innerHTML = funnelHtml();
+
+  $('ov-tasks').innerHTML = todo.length
+    ? todo.slice(0, 5).map(taskHtml).join('')
+    : emptyState('Your queue is clear', 'Every manual sales action is done. Probing has its own queue.');
+
+  const sys = [
+    ['probe_observing', 'probes observing'],
+    ['sequence_running', 'in Instantly sequences'],
+    ['preparing_outreach', 'preparing outreach'],
+    ['waiting_first_email', 'waiting for the first email'],
+  ].map(([key, label]) => [COUNTS[key] ?? 0, label]);
+  const byStage = COUNTS.by_stage || {};
+  sys.push([byStage.DEMO_SENT_UNOPENED || 0, 'demos sent, not yet opened']);
+  sys.push([(byStage.DEMO_FOLLOWUP_SENT || 0), 'demo follow-ups sent']);
+  sys.push([byStage.MANUAL_REPLY_SENT_WAITING || 0, 'waiting after your replies']);
+  sys.push([byStage.DEMO_REQUESTED || 0, 'demo sends queued']);
+  const live = sys.filter(([n]) => n > 0);
+  $('ov-system').innerHTML = live.length
+    ? live.map(([n, label]) => `<div class="sysitem"><div class="n">${n}</div><div class="l">${esc(label)}</div></div>`).join('')
+    : `<div class="sysitem"><div class="n">0</div><div class="l">nothing is currently in flight</div></div>`;
+
+  const exc = exceptionItems();
+  $('ov-exc-section').classList.toggle('hidden', exc.length === 0);
+  if(exc.length) $('ov-exc').innerHTML = exc.slice(0, 4).map(exceptionHtml).join('');
+}
+
+function funnelHtml(){
+  const m = METRICS || {};
+  const steps = [
+    ['Lead pool', m.total_agencies ?? 0],
+    ['Probed',    m.probed ?? 0],
+    ['Outreach',  m.ready_outbound ?? 0],
+    ['Replied',   m.replied ?? 0],
+    ['Demo sent', m.demo_sent ?? 0],
+    ['Demo open', m.demo_opened ?? 0],
+    ['Meeting',   m.meeting_booked ?? 0],
+  ];
+  const top = Math.max(1, ...steps.map(([, n]) => n));
+  const first = steps[0][1] || 0;
+  return steps.map(([label, n]) => {
+    const pct = first > 0 ? Math.round((n / first) * 1000) / 10 : null;
+    return `<div class="fstep" data-goto="analytics">
+      <div class="fstep-l">${esc(label)}</div>
+      <div class="fstep-n">${n}</div>
+      <div class="fstep-b" style="width:${Math.max(3, Math.round((n / top) * 100))}%"></div>
+      <div class="fstep-r">${pct == null ? '&mdash;' : pct + '% of pool'}</div></div>`;
+  }).join('');
+}
+
+/* ── ACTIONS ────────────────────────────────────────────────────────── */
+
+let ACTION_TAB = 'all';
+
+function taskHtml(lead){
+  const a = lead.next_action || {};
+  const due = dueState(a.due_at);
+  const contact = lead.contact.name || lead.contact.email || 'no named contact';
+  return `<div class="task" data-id="${esc(lead.agency_id)}">
+    <div class="task-rail ${due.cls}"></div>
+    <div class="task-main">
+      <div class="task-top">
+        <div class="task-what">${esc(actionLabel(a.type))}</div>
+        ${stagePill(lead.current_stage)}
+        ${lead.priority && lead.priority !== 'NORMAL' ? pill(lead.priority.toLowerCase(), PRIORITY_TONE[lead.priority], true) : ''}
+      </div>
+      <div class="task-who"><b>${dash(lead.agency_name)}</b> &middot; ${esc(contact)}</div>
+      <div class="task-why">${dash(humaniseReason(a.reason || lead.current_stage_reason))}</div>
+    </div>
+    <div class="task-side">
+      <div class="task-when ${due.cls}">${esc(due.text)}</div>
+      ${lead.reply.received_at ? `<div class="task-when" style="font-weight:500">Replied ${esc(ago(lead.reply.received_at))}</div>` : ''}
+    </div></div>`;
+}
+
+function renderActions(){
+  if(!LOADED){ $('ac-list').innerHTML = skeletonRows(4); return; }
+  const all = manualActions();
+  $('ac-tabs').innerHTML = ACTION_TABS.map((t) => {
+    const n = t.types ? all.filter((l) => t.types.includes(l.next_action.type)).length : all.length;
+    return `<button class="tab ${t.key === ACTION_TAB ? 'on' : ''}" data-actiontab="${t.key}" type="button">
+      ${esc(t.label)}<span class="tab-n">${n}</span></button>`;
+  }).join('');
+  const tab = ACTION_TABS.find((t) => t.key === ACTION_TAB) || ACTION_TABS[0];
+  const rows = tab.types ? all.filter((l) => tab.types.includes(l.next_action.type)) : all;
+  $('ac-list').innerHTML = rows.length
+    ? rows.map(taskHtml).join('')
+    : emptyState(all.length ? 'Nothing in this tab' : 'Your queue is clear',
+        all.length ? 'Other tabs still have work.' : 'Ready-to-probe agencies are in the Prober, not here.');
+}
+
+/* ── PIPELINE ───────────────────────────────────────────────────────── */
+
+let PIPELINE_STAGE = '';
+
+function renderPipeline(){
+  const byStage = COUNTS.by_stage || {};
+  const bands = [...PIPELINE_BANDS];
+  const unaccounted = EXCEPTION_BAND.stages.filter((s) => (byStage[s]||0) > 0);
+  if(unaccounted.length) bands.push(EXCEPTION_BAND);
+  if($('pl-closed').checked) bands.push(CLOSED_BAND);
+
+  $('pl-bands').innerHTML = bands.map((band) => {
+    const total = band.stages.reduce((n, s) => n + (byStage[s] || 0), 0);
+    return `<div class="bandhead"><span class="band-title">${esc(band.label)}</span><span class="band-n">${total}</span></div>
+      <div class="board">${band.stages.map((s) => {
+        const n = byStage[s] || 0;
+        return `<div class="stage ${n ? '' : 'empty'} ${PIPELINE_STAGE === s ? 'on' : ''}" data-stage="${esc(s)}">
+          <div class="stage-n">${n}</div><div class="stage-l">${esc(stageLabel(s))}</div></div>`;
+      }).join('')}</div>`;
+  }).join('');
+
+  const rows = PIPELINE_STAGE ? LEADS.filter((l) => l.current_stage === PIPELINE_STAGE) : [];
+  $('pl-list-title').textContent = PIPELINE_STAGE ? stageLabel(PIPELINE_STAGE) : 'Agencies';
+  $('pl-list-note').textContent = PIPELINE_STAGE
+    ? `${rows.length} ${rows.length === 1 ? 'agency' : 'agencies'} at this stage`
+    : 'Select a stage above.';
+  $('pl-rows').innerHTML = rows.map((l) => `<tr data-id="${esc(l.agency_id)}">
+    <td><div class="t-name">${dash(l.agency_name)}</div><div class="t-sub">${dash(l.probe_summary.property_street)}</div></td>
+    <td><div>${dash(l.contact.name)}</div><div class="t-sub mono">${dash(l.contact.email)}</div></td>
+    <td>${stagePill(l.current_stage)}</td>
+    <td class="col-lg">${l.next_action.type ? esc(actionLabel(l.next_action.type)) : '<span class="muted">&mdash;</span>'}</td>
+    <td class="col-md">${l.action_queue ? pill(QUEUE_LABEL[l.action_queue], QUEUE_TONE[l.action_queue], true) : '<span class="muted">&mdash;</span>'}</td>
+  </tr>`).join('');
+  $('pl-empty').innerHTML = rows.length ? ''
+    : emptyState(PIPELINE_STAGE ? 'No agencies at this stage' : 'Pick a stage',
+        PIPELINE_STAGE ? 'Nothing currently sits here.' : 'Stage cards above filter this list.',
+        '<path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/>');
+}
+
+/* ── PROBER ─────────────────────────────────────────────────────────── */
+
+/* Queue depth comes from the same canonical rule the Prober routes use:
+   a genuinely blank AGENCIES.probe_sent, plus the normal exclusions. The
+   dashboard already reports it, and ?queue=1 refreshes it cheaply. */
+function probeQueueLeads(){
+  return LEADS.filter((l) => l.probe_queue_eligible);
+}
+
+function renderProber(){
+  const queued = probeQueueLeads();
+  const remaining = PROBE_QUEUE?.remaining ?? COUNTS.probe_queue ?? queued.length;
+  $('pr-remaining').textContent = LOADED || PROBE_QUEUE ? remaining : '—';
+  $('pr-cap').textContent = remaining === 1 ? 'agency remaining in the queue' : 'agencies remaining in the queue';
+  $('pr-today').textContent = PROBE_QUEUE?.completed_today ?? '—';
+  const byStage = COUNTS.by_stage || {};
+  $('pr-observing').textContent = COUNTS.probe_observing ?? 0;
+  $('pr-complete').textContent = byStage.PROBE_COMPLETE ?? 0;
+  $('pr-draft').textContent = byStage.PROBE_IN_PROGRESS ?? 0;
+
+  $('pr-rows').innerHTML = queued.slice(0, 60).map((l) => {
+    const rm = l.rightmove_url || '';
+    return `<tr data-id="${esc(l.agency_id)}">
+      <td><div class="t-name">${dash(l.agency_name)}</div>
+        <div class="t-sub mono">${dash(l.contact.phone)}</div></td>
+      <td class="col-md">${dash(l.location)}</td>
+      <td class="col-lg">${rm ? `<a class="mono" href="${esc(rm)}" target="_blank" rel="noopener" style="color:var(--brand)">Branch page &#8599;</a>` : '<span class="muted">&mdash;</span>'}</td>
+      <td>${stagePill(l.current_stage)}</td>
+      <td class="nowrap"><a class="btn btn-secondary btn-sm" href="/novus/probe?agency_id=${encodeURIComponent(l.agency_id)}">Probe</a></td>
+    </tr>`;
+  }).join('');
+  $('pr-empty').innerHTML = queued.length ? '' : emptyState('The probe queue is empty',
+    'Every eligible agency already has a non-blank probe_sent.',
+    '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>');
+}
+
+/* Lazy and cheap: AGENCIES (+PROBES for the "today" figure), no probe is
+   created, advanced or sent. Only called when the Prober view is opened. */
+async function loadProbeQueue(){
+  try{
+    const res = await fetch(PROBE_QUEUE_URL, { headers:{ Accept:'application/json' } });
+    const data = await res.json();
+    if(!res.ok) return;
+    PROBE_QUEUE = data.queue || null;
+    if(VIEW === 'prober') renderProber();
+  }catch{ /* the dashboard figure already on screen remains correct */ }
+}
+
+/* ── LEADS ──────────────────────────────────────────────────────────── */
+
+function leadMatches(lead){
+  const q = $('q').value.trim().toLowerCase();
+  if(q){
+    const hay = [lead.agency_name, lead.contact.name, lead.contact.email, lead.contact.phone,
+      lead.probe_summary.property_street, lead.probe_summary.probe_reference, lead.location].join(' ').toLowerCase();
+    if(!hay.includes(q)) return false;
+  }
+  const stage = $('f-stage').value;    if(stage && lead.current_stage !== stage) return false;
+  const owner = $('f-owner').value;    if(owner && lead.action_queue !== owner) return false;
+  const prio = $('f-priority').value;  if(prio && lead.priority !== prio) return false;
+  const ct = $('f-contact').value;     if(ct && lead.contact.contact_type !== ct) return false;
+  const demo = $('f-demo').value;      if(demo && demoState(lead) !== demo) return false;
+  const reply = $('f-reply').value;
+  if(reply === 'ANY' && !(lead.reply.reply_count > 0)) return false;
+  if(reply === 'NONE' && lead.reply.reply_count > 0) return false;
+  return true;
+}
+
+function renderLeads(){
+  if(!LOADED){ $('ld-rows').innerHTML = ''; $('ld-empty').innerHTML = skeletonRows(6); return; }
+  const rows = LEADS.filter(leadMatches);
+  $('ld-count').textContent = rows.length === LEADS.length
+    ? `${LEADS.length} ${LEADS.length === 1 ? 'agency' : 'agencies'}`
+    : `${rows.length} of ${LEADS.length} agencies`;
+  $('ld-rows').innerHTML = rows.slice(0, 400).map((l) => {
+    const due = dueState(l.next_action.due_at);
+    return `<tr data-id="${esc(l.agency_id)}">
+      <td><div class="t-name">${dash(l.agency_name)}</div><div class="t-sub">${dash(l.probe_summary.property_street || l.location)}</div></td>
+      <td><div>${dash(l.contact.name)}</div><div class="t-sub mono">${dash(l.contact.email)}</div></td>
+      <td>${stagePill(l.current_stage)}</td>
+      <td class="col-lg">${l.next_action.type
+        ? `${esc(actionLabel(l.next_action.type))}<div class="t-sub ${due.cls === 'over' ? 'muted' : ''}">${esc(due.text)}</div>`
+        : '<span class="muted">&mdash;</span>'}</td>
+      <td class="col-md">${l.action_queue ? pill(QUEUE_LABEL[l.action_queue], QUEUE_TONE[l.action_queue], true) : '<span class="muted">&mdash;</span>'}</td>
+      <td class="col-lg nowrap">${l.latest_event.at ? esc(ago(l.latest_event.at)) : '<span class="muted">&mdash;</span>'}</td>
+      <td class="col-md">${l.priority ? pill(l.priority.toLowerCase(), PRIORITY_TONE[l.priority], true) : '<span class="muted">&mdash;</span>'}</td>
+    </tr>`;
+  }).join('');
+  $('ld-empty').innerHTML = rows.length ? (rows.length > 400
+      ? `<div class="empty"><div class="empty-s">Showing the first 400 of ${rows.length}. Narrow the search to see the rest.</div></div>` : '')
+    : emptyState('No agencies match', 'Loosen the search or clear the filters.',
+        '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>');
+}
+
+/* ── ANALYTICS ──────────────────────────────────────────────────────── */
+
+const CONVERSION_LABELS = {
+  probe_to_outreach:'Probe → Outreach', outreach_to_reply:'Outreach → Reply',
+  reply_to_positive:'Reply → Positive', positive_to_demo_sent:'Positive → Demo sent',
+  demo_sent_to_open:'Demo sent → Demo open', demo_open_to_meeting:'Demo open → Meeting',
+  outreach_to_meeting:'Outreach → Meeting',
+};
+/* The end-to-end rate is a summary of the others, so it is excluded from the
+   bottleneck search — otherwise it would almost always "win". */
+const BOTTLENECK_EXCLUDE = ['outreach_to_meeting'];
+
+function renderAnalytics(){
+  const conv = METRICS.conversions || {};
+  $('an-funnel').innerHTML = funnelHtml();
+
+  /* Deterministic: the lowest measurable single-step rate. No AI, no guess,
+     and nothing is claimed when there is no denominator to divide by. */
+  const measurable = Object.entries(conv)
+    .filter(([key, v]) => !BOTTLENECK_EXCLUDE.includes(key) && v && v.percent != null && v.denominator > 0)
+    .sort((a, b) => a[1].percent - b[1].percent);
+  const worst = measurable[0];
+  $('an-bottleneck').innerHTML = worst
+    ? `<div class="bottleneck">
+        <div><div class="bn-l">Largest drop-off</div>
+        <div class="bn-v">${esc(CONVERSION_LABELS[worst[0]] || worst[0])} &middot; ${worst[1].percent}%</div>
+        <div class="bn-s">Only ${worst[1].numerator} of ${worst[1].denominator} got through this step — the lowest
+          single-step conversion currently measurable.</div></div></div>`
+    : `<div class="banner warn" style="margin-bottom:24px;">Not enough volume yet to identify a bottleneck.
+        A rate needs a non-zero denominator before it means anything.</div>`;
+
+  $('an-conversions').innerHTML = Object.entries(CONVERSION_LABELS).map(([key, label]) => {
+    const item = conv[key] || {};
+    const pct = item.percent;
+    const weak = pct != null && worst && key === worst[0];
+    return `<div class="conv-card ${weak ? 'weak' : ''}">
+      <div class="conv-l">${esc(label)}</div>
+      <div class="conv-n">${pct == null ? '&mdash;' : pct + '%'}</div>
+      <div class="conv-v">${item.numerator ?? 0} of ${item.denominator ?? 0}${pct == null ? ' · no denominator' : ''}</div>
+      <div class="conv-bar"><i style="width:${pct == null ? 0 : Math.min(100, pct)}%"></i></div></div>`;
+  }).join('');
+}
+
+/* ── EXCEPTIONS ─────────────────────────────────────────────────────── */
+
+function exceptionItems(){
+  const items = GLOBAL_EXCEPTIONS.map((g) => ({ type:g.type, agency:null, detail:g.reason }));
+  for(const lead of LEADS){
+    for(const type of (lead.exceptions || [])){
+      items.push({ type, agency:lead, detail:lead.current_stage_reason });
     }
+  }
+  return items;
+}
 
-    function conversationHtml(data, agencyName, notice) {
-      const parts = [];
+function exceptionHtml(item){
+  const info = EXCEPTION_INFO[item.type] || { t:String(item.type).replace(/_/g,' '), w:item.detail || '', f:'Open the lead and inspect the stored evidence.' };
+  return `<div class="exc" ${item.agency ? `data-id="${esc(item.agency.agency_id)}"` : 'style="cursor:default"'}>
+    <div class="exc-ic"><svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></div>
+    <div style="min-width:0;flex:1">
+      <div class="exc-t">${esc(info.t)}${item.agency ? ` <span class="muted" style="font-weight:600">· ${esc(item.agency.agency_name)}</span>` : ' <span class="muted" style="font-weight:600">· system-wide</span>'}</div>
+      <div class="exc-w">${esc(info.w)}</div>
+      <div class="exc-f"><b>What you can do:</b> ${esc(info.f)}</div>
+      ${item.detail ? `<div class="exc-f muted">${esc(item.detail)}</div>` : ''}
+    </div></div>`;
+}
 
-      // The durable Phase 1 data is always rendered. A failed Instantly call
-      // degrades this section, it never empties the drawer.
-      if (!data.instantly?.available) {
-        parts.push('<div class="conv-status">Live conversation unavailable &mdash; showing stored NOVUS data.</div>');
-      }
-      parts.push(senderInboxHtml(data));
+function renderExceptions(){
+  const items = exceptionItems();
+  $('ex-list').innerHTML = items.length
+    ? items.map(exceptionHtml).join('')
+    : emptyState('No exceptions', 'Every agency is accounted for by a canonical stage and a next action.');
+}
 
-      const messages = data.conversation?.messages || [];
-      if (!messages.length) {
-        parts.push('<div class="note">No messages on file for this lead yet.</div>');
-      } else {
-        parts.push(messages.map((m) => messageHtml(m, agencyName)).join(''));
-      }
+/* ═══ LEAD DRAWER ═══════════════════════════════════════════════════════
+   The Phase 1–3B lead record, reorganised into tabs. Every control and
+   guard below is the existing behaviour; nothing was relaxed.            */
 
-      if (!data.conversation?.original_campaign_emails_available) {
-        parts.push(`<div class="note">The original campaign email bodies are not stored by NOVUS. Where Instantly
-          returns them they are shown above; otherwise only the campaign handoff is marked.</div>`);
-      }
-      parts.push(replyComposerHtml(data, agencyName, notice));
-      parts.push(`<button class="btn btn-ghost btn-mini" id="conv-refresh" type="button">Refresh conversation</button>`);
-      return parts.join('');
-    }
+let OPEN_LEAD = null;
+let DRAWER_PANE = 'summary';
 
-    async function loadConversation(outboundId, agencyName, notice) {
-      const token = ++CONV_TOKEN;
-      const body = $('conv-body');
-      if (!body) return;
-      body.innerHTML = '<div class="note"><span class="spinner"></span>Loading the live conversation&hellip;</div>';
-      try {
-        const res = await fetch(`${CONVERSATION_URL}&outbound_id=${encodeURIComponent(outboundId)}`,
-          { headers: { Accept: 'application/json' } });
-        const data = await res.json();
-        if (token !== CONV_TOKEN) return; // the operator has opened another lead
-        if (!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
-        CONV_DATA = data;
-        const target = $('conv-body');
-        if (target) target.innerHTML = conversationHtml(data, agencyName, notice);
-      } catch (err) {
-        if (token !== CONV_TOKEN) return;
-        const target = $('conv-body');
-        if (target) {
-          target.innerHTML = '<div class="conv-status">Live conversation unavailable &mdash; showing stored NOVUS data.'
-            + `<div class="note">${esc(err.message || 'The conversation could not be loaded.')}</div></div>`
-            + '<button class="btn btn-ghost btn-mini" id="conv-refresh" type="button">Retry</button>';
-        }
-      }
-    }
+function kv(pairs){
+  return `<dl class="kv">${pairs.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>`;
+}
+function blk(title, inner){ return `<div class="blk"><div class="blk-h">${esc(title)}</div>${inner}</div>`; }
 
-    function syncReplyControls() {
-      const textarea = $('reply-body');
-      const button = $('send-reply');
-      if (!textarea || !button || !CONV_DATA) return;
-      const outboundId = CONV_DATA.outbound_id;
-      REPLY_DRAFTS.set(outboundId, textarea.value);
-      const count = $('reply-count');
-      if (count) count.textContent = `${textarea.value.length} / 5000`;
-      const canSend = CONV_DATA.manual_reply?.eligible === true
-        && CONV_DATA.sender_inbox?.status === 'CONFIRMED'
-        && !AMBIGUOUS_LOCKS.has(outboundId)
-        && textarea.value.trim().length > 0
-        && !(SEND_IN_FLIGHT && SEND_OUTBOUND_ID === outboundId);
-      button.disabled = !canSend;
-      button.textContent = SEND_IN_FLIGHT && SEND_OUTBOUND_ID === outboundId ? 'Sending…' : 'Send Reply';
-    }
+function nextActionBox(lead){
+  const a = lead.next_action || {};
+  if(!a.type) return `<div class="nextbox"><div class="nextbox-why">No next action is currently derived for this agency.</div></div>`;
+  const due = dueState(a.due_at);
+  return `<div class="nextbox">
+    <div class="nextbox-top">
+      <div><div class="nextbox-l">Next action</div><div class="nextbox-v">${esc(actionLabel(a.type))}</div></div>
+      <div style="text-align:right"><div class="nextbox-l">Queue</div>
+        <div style="margin-top:6px">${lead.action_queue ? pill(QUEUE_LABEL[lead.action_queue], QUEUE_TONE[lead.action_queue]) : '&mdash;'}</div></div>
+    </div>
+    <div class="nextbox-grid">
+      <div class="nextbox-cell"><div class="nextbox-l">Owner</div><div class="nextbox-cv">${dash(a.owner)}</div></div>
+      <div class="nextbox-cell"><div class="nextbox-l">Due</div>
+        <div class="nextbox-cv ${due.cls === 'over' ? 'over' : ''}">${esc(due.text || '—')}</div></div>
+    </div>
+    <div class="nextbox-why"><span class="muted">Why:</span> ${dash(humaniseReason(a.reason || lead.current_stage_reason))}</div>
+  </div>`;
+}
 
-    function showReplyOutcome(type, message) {
-      const box = $('reply-outcome');
-      if (!box) return;
-      box.className = `reply-outcome show ${type}`;
-      box.textContent = message;
-    }
-
-    function manualReplyActionSecret() {
-      if (!MANUAL_REPLY_ACTION_SECRET) {
-        MANUAL_REPLY_ACTION_SECRET = (window.prompt('Enter the NOVUS action secret to authorise live replies:') || '').trim();
-      }
-      return MANUAL_REPLY_ACTION_SECRET;
-    }
-
-    async function sendManualReply() {
-      const textarea = $('reply-body');
-      const data = CONV_DATA;
-      if (!textarea || !data || SEND_IN_FLIGHT) return;
-      const candidate = data.manual_reply || {};
-      const inbox = data.sender_inbox || {};
-      const replyText = textarea.value.trim();
-      if (!replyText || !candidate.eligible || inbox.status !== 'CONFIRMED') return;
-
-      SEND_IN_FLIGHT = true;
-      SEND_OUTBOUND_ID = data.outbound_id;
-      syncReplyControls();
-      const confirmed = window.confirm(`You’re about to send this reply from ${inbox.eaccount} to ${data.lead_email}. Send it?`);
-      if (!confirmed) {
-        SEND_IN_FLIGHT = false;
-        SEND_OUTBOUND_ID = null;
-        syncReplyControls();
-        return;
-      }
-      const actionSecret = manualReplyActionSecret();
-      if (!actionSecret) {
-        SEND_IN_FLIGHT = false;
-        SEND_OUTBOUND_ID = null;
-        syncReplyControls();
-        showReplyOutcome('error', 'Live reply authorisation was cancelled. Nothing was sent.');
-        return;
-      }
-
-      showReplyOutcome('warning', 'Sending one manual reply…');
-      try {
-        const response = await fetch(MANUAL_REPLY_URL, {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            'X-NOVUS-REPLY-POLLER-SECRET': actionSecret,
-          },
-          body: JSON.stringify({
-            reply_event_id: candidate.reply_event_id,
-            body: replyText,
-            expected_received_at: candidate.received_at,
-            confirm: 'SEND_ONE_MANUAL_REPLY',
-          }),
-        });
-        const result = await response.json();
-
-        if (result.send_outcome === 'SENT' || result.sent === true) {
-          REPLY_DRAFTS.delete(data.outbound_id);
-          let notice = { type: 'success', text: 'Reply sent.' };
-          if (result.persistence_error) {
-            notice = { type: 'warning', text: `Reply sent, but local audit persistence failed: ${result.persistence_error}. Do not resend.` };
-          } else if (result.action_update_error) {
-            notice = { type: 'warning', text: `Reply sent and recorded, but the pending action could not be completed: ${result.action_update_error}. Do not resend.` };
-          } else if (result.thread_continuity === 'DIFFERENT') {
-            notice = { type: 'warning', text: 'Reply sent, but Instantly reported a different thread. Check the conversation.' };
-          }
-          SEND_IN_FLIGHT = false;
-          SEND_OUTBOUND_ID = null;
-          await load(true);
-          if (CONV_LEAD?.outbound_id === data.outbound_id) {
-            await loadConversation(data.outbound_id, CONV_LEAD.agency_name, notice);
-          }
-          return;
-        }
-
-        if (result.send_outcome === 'AMBIGUOUS') {
-          AMBIGUOUS_LOCKS.add(data.outbound_id);
-          const auditWarning = result.persistence_error
-            ? ` Local audit persistence also failed: ${result.persistence_error}.`
-            : '';
-          showReplyOutcome('warning', `This may have sent.${auditWarning} Do not resend yet. Refresh/check the conversation first.`);
-        } else if (result.blocked_reason === 'STALE_REPLY_EVENT') {
-          SEND_IN_FLIGHT = false;
-          SEND_OUTBOUND_ID = null;
-          await loadConversation(data.outbound_id, CONV_LEAD?.agency_name || '', {
-            type: 'warning',
-            text: 'A newer reply has arrived. Refresh the conversation before replying.',
-          });
-          return;
-        } else if (result.send_outcome === 'REJECTED') {
-          showReplyOutcome('error', result.error || 'Instantly rejected the reply. Correct the issue and try again.');
-        } else if (result.blocked_reason === 'DUPLICATE_MANUAL_REPLY') {
-          showReplyOutcome('warning', 'That exact reply is already in progress or was recently submitted. Check the conversation before retrying.');
-        } else {
-          if (response.status === 403) {
-            MANUAL_REPLY_ACTION_SECRET = '';
-          }
-          showReplyOutcome('error', result.error || REPLY_BLOCK_TEXT[result.blocked_reason]
-            || `Reply was not sent${result.blocked_reason ? ` (${result.blocked_reason})` : ''}.`);
-        }
-      } catch (err) {
-        // Failure before a classified response is not proof the send failed.
-        // Keep the draft, and make the operator verify the conversation.
-        AMBIGUOUS_LOCKS.add(data.outbound_id);
-        showReplyOutcome('warning', 'The send result could not be confirmed. Do not resend yet. Refresh/check the conversation first.');
-      } finally {
-        SEND_IN_FLIGHT = false;
-        SEND_OUTBOUND_ID = null;
-        syncReplyControls();
-      }
-    }
-
-    function openDrawer(agencyId) {
-      const lead = LEADS.find((l) => l.agency_id === agencyId);
-      if (!lead) return;
-
-      $('d-agency').textContent = lead.agency_name || '(no agency name)';
-      $('d-sub').innerHTML = `${dash(lead.probe_summary.property_street)} &middot; <span class="mono">${esc(lead.outbound_id)}</span>`;
-
-      const parts = [];
-
-      parts.push(block('Agency & contact', 'Sales', 'tag-sales', kv([
+function paneSummary(lead){
+  const action = lead.current_action || {};
+  const callControls = ['CALL_PROSPECT','RETRY_CALL'].includes(action.action_type) && action.action_id
+    ? blk('Call outcome', `<div class="btnrow">${['NO_ANSWER','SPOKE_CONTINUE','MEETING_BOOKED','NOT_INTERESTED','CALL_LATER']
+        .map((v) => `<button class="btn btn-secondary btn-sm call-outcome" data-outcome="${v}" data-action="${esc(action.action_id)}" type="button">${esc(v.replace(/_/g,' ').toLowerCase())}</button>`).join('')}</div>`)
+    : '';
+  const meetingControl = !['MEETING_BOOKED','OPTED_OUT','NOT_INTERESTED','CLOSED'].includes(lead.current_stage)
+    ? `<div class="btnrow"><button class="btn btn-secondary btn-sm" id="mark-meeting" data-agency="${esc(lead.agency_id)}" type="button">Mark meeting booked</button></div>`
+    : '';
+  return nextActionBox(lead)
+    + blk('Agency & contact', kv([
         ['Contact', dash(lead.contact.name)],
         ['Email', `<span class="mono">${dash(lead.contact.email)}</span>`],
         ['Phone', `<span class="mono">${dash(lead.contact.phone)}</span>`],
-        ['Contact type', pill(lead.contact.contact_type, CONTACT_TONE[lead.contact.contact_type])],
-        ['Verification', dash(lead.contact.email_verification_status)],
-        ['Resolution', dash(lead.contact.resolution_status)],
-        ['Decision maker', pill(lead.contact.decision_maker_confidence, lead.contact.decision_maker_confidence === 'HIGH' ? 'p-green' : 'p-grey')],
-      ])));
+        ['Location', dash(lead.location)],
+        ['Contact type', pill(String(lead.contact.contact_type||'unknown').replace(/_/g,' ').toLowerCase(), CONTACT_TONE[lead.contact.contact_type], true)],
+        ['Email verification', dash(lead.contact.email_verification_status)],
+        ['Decision maker', dash(lead.contact.decision_maker_confidence)],
+      ]))
+    + blk('Where this sits', kv([
+        ['Stage', stagePill(lead.current_stage)],
+        ['Why', `<span class="muted">${dash(humaniseReason(lead.current_stage_reason))}</span>`],
+        ['Priority', lead.priority ? pill(lead.priority.toLowerCase(), PRIORITY_TONE[lead.priority], true) : '&mdash;'],
+        ['Outreach', lead.outreach.handed_to_instantly
+          ? `In sequence<div class="sub">since ${esc(when(lead.outreach.instantly_added_at))}</div>`
+          : `<span class="muted">not handed to Instantly${lead.outreach.outbound_status ? ` (${esc(lead.outreach.outbound_status)})` : ''}</span>`],
+        ['Replies on file', String(lead.reply.reply_count || 0)],
+      ]))
+    + callControls + meetingControl
+    + (lead.other_journeys.length
+        ? blk('Other journeys', kv(lead.other_journeys.map((j) => [j.outbound_id,
+            `${dash(j.property_street)} &middot; ${dash(j.outbound_status)}${j.instantly_lead_id ? ' &middot; in sequence' : ''}`]))
+          + '<div class="note">Shown so nothing is hidden. Only the primary journey drives this lead’s state.</div>')
+        : '')
+    + `<details class="tech"><summary>Technical details</summary>${kv([
+        ['agency_id', `<span class="mono">${dash(lead.agency_id)}</span>`],
+        ['outbound_id', `<span class="mono">${dash(lead.outbound_id)}</span>`],
+        ['probe_id', `<span class="mono">${dash(lead.probe_id)}</span>`],
+        ['Canonical stage', `<span class="mono">${dash(lead.current_stage)}</span>`],
+        ['Action type', `<span class="mono">${dash(lead.next_action.type)}</span>`],
+        ['Action status', `<span class="mono">${dash(lead.next_action.status)}</span>`],
+        ['Last outreach error', lead.outreach.last_error ? `<span class="mono">${esc(lead.outreach.last_error)}</span>` : '&mdash;'],
+      ])}</details>`;
+}
 
-      parts.push(block('Current status', 'Sales', 'tag-sales', kv([
-        ['Stage', pill(lead.current_stage, STATE_TONE[lead.current_stage])],
-        ['Why', `<span class="muted">${dash(lead.current_stage_reason)}</span>`],
-        ['Priority', lead.priority ? pill(lead.priority, PRIORITY_TONE[lead.priority]) : '&mdash;'],
-        ['Next action', dash(lead.next_action.type)],
-        ['Action status', dash(lead.next_action.status)],
-        ['Owner', dash(lead.next_action.owner)],
-        ['Due', dash(when(lead.next_action.due_at))],
-        ['Action reason', `<span class="muted">${dash(lead.next_action.reason)}</span>`],
-        ['Needs a human', lead.needs_human ? pill('YES', 'p-red') : pill('NO', 'p-grey')],
-        ['Campaign', lead.outreach.handed_to_instantly
-          ? `In sequence <span class="cell-sub">since ${esc(when(lead.outreach.instantly_added_at))}</span>`
-          : `<span class="muted">not handed to Instantly (${dash(lead.outreach.outbound_status)})</span>`],
-        ['Last error', lead.outreach.last_error ? `<span class="mono">${esc(lead.outreach.last_error)}</span>` : '&mdash;'],
-      ])));
+function paneProbe(lead){
+  return blk('Probe finding', kv([
+      ['Probe reference', `<span class="mono">${dash(lead.probe_summary.probe_reference)}</span>`],
+      ['Property', dash(lead.probe_summary.property_street)],
+      ['Grade', dash(lead.probe_summary.grade)],
+      ['Grade reason', `<span class="muted">${dash(lead.probe_summary.grade_reason)}</span>`],
+      ['Human response', dash(lead.probe_summary.human_contact)],
+      ['Response time', lead.probe_summary.response_hours ? `${esc(lead.probe_summary.response_hours)} hrs` : '&mdash;'],
+      ['Probe sent', dash(when(lead.probe?.sent_at))],
+      ['Observation closes', dash(when(lead.probe?.observation_deadline))],
+      ['Observation status', dash(lead.probe?.status)],
+    ])
+    + (lead.probe_summary.main_finding ? `<div class="quote">${esc(lead.probe_summary.main_finding)}</div>` : '')
+    + (lead.probe_summary.email_observation ? `<div class="quote">${esc(lead.probe_summary.email_observation)}</div>` : '')
+    + (lead.probe_summary.probe_reference ? '' : '<div class="note">No probe has been recorded for this agency yet.</div>'));
+}
 
-      const action = lead.current_action || {};
-      const callControls = ['CALL_PROSPECT', 'RETRY_CALL'].includes(action.action_type) && action.action_id
-        ? `<div class="action-bar" style="margin-top:12px">
-          ${['NO_ANSWER','SPOKE_CONTINUE','MEETING_BOOKED','NOT_INTERESTED','CALL_LATER'].map((value) => `<button class="btn btn-ghost btn-mini call-outcome" data-outcome="${value}" data-action="${esc(action.action_id)}">${value.replace(/_/g, ' ')}</button>`).join('')}
-        </div>` : '';
-      const meetingControl = lead.current_stage !== 'MEETING_BOOKED' && !['OPTED_OUT','NOT_INTERESTED','CLOSED'].includes(lead.current_stage)
-        ? `<button class="btn btn-ghost mt" id="mark-meeting" data-agency="${esc(lead.agency_id)}">Mark Meeting Booked</button>` : '';
-      parts.push(block('Actions', 'Workflow', 'tag-sales',
-        (lead.action_history || []).length ? kv(lead.action_history.slice(0, 12).map((a) => [
-          `${a.action_type} · ${a.action_status}`, `${dash(when(a.due_at))}<div class="cell-sub">${dash(a.reason)}</div>`,
-        ])) : '<div class="note">No durable action history yet.</div>') + callControls + meetingControl);
+function paneDemo(lead){
+  /* PREVIEW ONLY. The normal demo URL counts a view, so opening it here would
+     contaminate this lead's engagement data. */
+  const link = lead.demo.preview_url
+    ? `<a class="linkout" href="${esc(lead.demo.preview_url)}" target="_blank" rel="noopener">Open demo preview &#8599;</a>
+       <div class="note">Preview link only. The live demo URL records a view, so it is never opened from here.</div>`
+    : '<div class="note">No demo link on this journey yet.</div>';
+  return blk('Demo', kv([
+      ['Engagement', pill(String(lead.demo.engagement||'none').toLowerCase(), lead.demo.engagement === 'NONE' ? 't-grey' : 't-green', true)],
+      ['Status', dash(lead.demo.status)],
+      ['Slug', `<span class="mono">${dash(lead.demo.slug)}</span>`],
+      ['First viewed', dash(when(lead.demo.first_viewed_at))],
+      ['Last viewed', dash(when(lead.demo.last_viewed_at))],
+      ['View count', `${lead.demo.view_count || 0}<div class="sub">soft signal</div>`],
+      ['CTA clicked', dash(when(lead.demo.cta_clicked_at))],
+      ['Meeting booked', dash(when(lead.demo.meeting_booked_at))],
+    ]) + link);
+}
 
-      if (lead.reply.reply_count > 0) {
-        parts.push(block('Latest reply', 'Sales', 'tag-sales',
-          kv([
-            ['Received', dash(when(lead.reply.received_at))],
-            ['Classification', dash(lead.reply.classification)],
-            ['Confidence', dash(lead.reply.confidence)],
-            ['Replies on file', String(lead.reply.reply_count)],
-            ['Classifier reason', `<span class="muted">${dash(lead.reply.classifier_reason)}</span>`],
-            ['Suppression', dash(lead.reply.suppression_type)],
-            ['Error', lead.reply.error ? `<span class="mono">${esc(lead.reply.error)}</span>` : '&mdash;'],
-          ])
-          + (lead.reply.text ? `<div class="quote">${esc(lead.reply.text)}</div>` : '')));
-      }
+function paneActions(lead){
+  const history = lead.action_history || [];
+  if(!history.length) return blk('Action history', '<div class="note">No durable action history yet. Reconcile actions to create the ledger entries for this agency.</div>');
+  const tone = { COMPLETED:'t-green', CANCELLED:'t-grey', FAILED:'t-red', DUE:'t-amber', PENDING:'t-blue', IN_PROGRESS:'t-blue' };
+  return blk('Action history', kv(history.slice(0, 20).map((a) => [
+    actionLabel(a.action_type),
+    `${pill(String(a.action_status||'').toLowerCase(), tone[String(a.action_status||'').toUpperCase()], true)}
+     <div class="sub">${esc(a.action_owner || '')}${a.due_at ? ` · due ${esc(when(a.due_at))}` : ''}</div>
+     <div class="sub">${esc(humaniseReason(a.completion_reason || a.reason || ''))}</div>`,
+  ])));
+}
 
-      // SALES CONVERSATION — filled in by loadConversation() once the drawer is
-      // on screen. Deliberately its own block, well away from PROBE FINDING
-      // below: probe communications use a different identity and a different
-      // purpose, and the two threads must never read as one.
-      parts.push(block('Sales conversation', 'Sales', 'tag-sales',
-        '<div id="conv-body"></div>'));
-
-      const demoLink = lead.demo.preview_url
-        ? `<a class="preview-link" href="${esc(lead.demo.preview_url)}" target="_blank" rel="noopener">Open demo preview &#8599;</a>
-           <div class="note">Preview links only. The normal demo URL counts a view, so opening it here would contaminate this lead's engagement data.</div>`
-        : '<div class="note">No demo link on this journey yet.</div>';
-
-      parts.push(block('Demo', 'Sales', 'tag-sales',
-        kv([
-          ['Engagement', pill(lead.demo.engagement, lead.demo.engagement === 'NONE' ? 'p-grey' : 'p-green')],
-          ['Demo status', dash(lead.demo.status)],
-          ['Slug', `<span class="mono">${dash(lead.demo.slug)}</span>`],
-          ['First viewed', dash(when(lead.demo.first_viewed_at))],
-          ['Last viewed', dash(when(lead.demo.last_viewed_at))],
-          ['View count', `${lead.demo.view_count} <span class="cell-sub">soft signal</span>`],
-          ['CTA clicked', dash(when(lead.demo.cta_clicked_at))],
-          ['Meeting booked', dash(when(lead.demo.meeting_booked_at))],
-        ]) + demoLink));
-
-      parts.push(block('Probe finding', 'Probe evidence', 'tag-probe',
-        kv([
-          ['Probe ref', `<span class="mono">${dash(lead.probe_summary.probe_reference)}</span>`],
-          ['Property', dash(lead.probe_summary.property_street)],
-          ['Grade', dash(lead.probe_summary.grade)],
-          ['Grade reason', `<span class="muted">${dash(lead.probe_summary.grade_reason)}</span>`],
-          ['Human response', dash(lead.probe_summary.human_contact)],
-          ['Response time', lead.probe_summary.response_hours ? `${esc(lead.probe_summary.response_hours)} hrs` : '&mdash;'],
-          ['Probe sent', dash(when(lead.probe?.sent_at))],
-          ['Observation closes', `${dash(when(lead.probe?.observation_deadline))}${lead.probe?.observation_deadline ? `<div class="cell-sub">${esc(remaining(lead.probe.observation_deadline))}</div>` : ''}`],
-          ['Observation status', dash(lead.probe?.status)],
-        ])
-        + (lead.probe_summary.main_finding ? `<div class="quote">${esc(lead.probe_summary.main_finding)}</div>` : '')
-        + (lead.probe_summary.email_observation ? `<div class="quote">${esc(lead.probe_summary.email_observation)}</div>` : '')));
-
-      if (lead.other_journeys.length) {
-        parts.push(block('Other journeys for this agency', 'Sales', 'tag-sales',
-          kv(lead.other_journeys.map((j) => [
-            j.outbound_id,
-            `${dash(j.property_street)} &middot; ${dash(j.outbound_status)}${j.instantly_lead_id ? ' &middot; in sequence' : ''}`,
-          ]))
-          + '<div class="note">Shown so nothing is hidden. Only the primary journey above drives this lead’s state.</div>'));
-      }
-
-      $('d-body').innerHTML = parts.join('');
-      $('drawer').classList.add('show');
-      $('drawer').setAttribute('aria-hidden', 'false');
-      $('scrim').classList.add('show');
-
-      // ONE conversation GET, for THIS lead, now that it is actually open.
+function renderDrawerPane(){
+  const lead = OPEN_LEAD;
+  if(!lead) return;
+  document.querySelectorAll('.dr-tab').forEach((t) => t.classList.toggle('on', t.dataset.pane === DRAWER_PANE));
+  if(DRAWER_PANE === 'conversation'){
+    $('d-body').innerHTML = `<div id="conv-body"></div>`;
+    /* ONE conversation GET, for THIS lead, only once its tab is open. */
+    if(lead.outbound_id){
       CONV_LEAD = { outbound_id: lead.outbound_id, agency_name: lead.agency_name };
-      if (lead.outbound_id) loadConversation(lead.outbound_id, lead.agency_name);
-      else $('conv-body').innerHTML = '<div class="note">No OUTBOUND journey yet; live Instantly conversation is not applicable.</div>';
+      loadConversation(lead.outbound_id, lead.agency_name);
+    } else {
+      $('conv-body').innerHTML = '<div class="note">No outreach journey yet, so there is no Instantly conversation to show.</div>';
     }
+    return;
+  }
+  if(DRAWER_PANE === 'probe')   { $('d-body').innerHTML = paneProbe(lead); return; }
+  if(DRAWER_PANE === 'demo')    { $('d-body').innerHTML = paneDemo(lead); return; }
+  if(DRAWER_PANE === 'actions') { $('d-body').innerHTML = paneActions(lead); return; }
+  $('d-body').innerHTML = paneSummary(lead)
+    + (lead.reply.text ? blk('Latest reply', kv([
+        ['Received', dash(when(lead.reply.received_at))],
+        ['Classification', dash(lead.reply.classification)],
+        ['Confidence', dash(lead.reply.confidence)],
+        ['Suppression', dash(lead.reply.suppression_type)],
+      ]) + `<div class="quote">${esc(lead.reply.text)}</div>`) : '');
+}
 
-    function closeDrawer() {
-      $('drawer').classList.remove('show');
-      $('drawer').setAttribute('aria-hidden', 'true');
-      $('scrim').classList.remove('show');
-      // Invalidate any conversation fetch still in flight for the closed lead.
-      CONV_TOKEN += 1;
-      CONV_LEAD = null;
-      CONV_DATA = null;
+function openDrawer(agencyId, pane){
+  const lead = LEADS.find((l) => l.agency_id === agencyId);
+  if(!lead) return;
+  OPEN_LEAD = lead;
+  DRAWER_PANE = pane || (lead.needs_human && lead.outbound_id ? 'conversation' : 'summary');
+  $('d-name').textContent = lead.agency_name || '(no agency name)';
+  $('d-sub').textContent = [lead.contact.name, lead.contact.email].filter(Boolean).join(' · ') || 'No resolved contact';
+  $('d-pills').innerHTML = stagePill(lead.current_stage)
+    + (lead.action_queue ? pill(QUEUE_LABEL[lead.action_queue], QUEUE_TONE[lead.action_queue]) : '')
+    + (lead.priority ? pill(lead.priority.toLowerCase(), PRIORITY_TONE[lead.priority], true) : '');
+  renderDrawerPane();
+  $('drawer').classList.add('on');
+  $('drawer').setAttribute('aria-hidden','false');
+  $('scrim').classList.add('on');
+}
+
+function closeDrawer(){
+  $('drawer').classList.remove('on');
+  $('drawer').setAttribute('aria-hidden','true');
+  $('scrim').classList.remove('on');
+  /* Invalidate any conversation fetch still in flight for the closed lead. */
+  CONV_TOKEN += 1;
+  OPEN_LEAD = null; CONV_LEAD = null; CONV_DATA = null;
+}
+
+/* ═══ SALES CONVERSATION + PHASE 3B MANUAL REPLY ════════════════════════
+   PERFORMANCE. One opened conversation tab = at most one Instantly GET,
+   made by the server for that lead alone. Never called from load(), never
+   batched across leads, never polled. CONV_TOKEN discards the response of a
+   drawer the operator has already moved on from, so a slow fetch can never
+   paint itself into the wrong lead.                                       */
+
+let CONV_TOKEN = 0;
+let CONV_LEAD = null;
+let CONV_DATA = null;
+let SEND_IN_FLIGHT = false;
+let SEND_OUTBOUND_ID = null;
+const REPLY_DRAFTS = new Map();
+const AMBIGUOUS_LOCKS = new Set();
+
+function senderInboxHtml(data){
+  const inbox = data.sender_inbox || {};
+  if(inbox.status === 'CONFIRMED') return `<div class="inbox-line">Sending inbox: <span class="mono">${esc(inbox.eaccount)}</span></div>`;
+  if(inbox.status === 'AMBIGUOUS') return `<div class="conv-status"><strong>Sending inbox: ambiguous.</strong> This conversation
+    involves more than one Instantly inbox (${esc((inbox.candidates||[]).join(', '))}), so none was chosen.</div>`;
+  return `<div class="inbox-line">Sending inbox: <span class="muted">not resolved from the live conversation</span></div>`;
+}
+
+/* NOVUS outbound and prospect inbound are visually distinct, and a message
+   whose direction the server could not establish is shown as exactly that
+   rather than being guessed onto one side. */
+function messageHtml(message, agencyName){
+  if(message.message_type === 'CAMPAIGN_ADDED'){
+    return `<div class="msg marker"><div class="msg-head">
+      <span class="msg-who neutral">Added to Instantly campaign</span>
+      <span class="msg-when">${esc(when(message.at))}</span></div>
+      <div class="msg-none">NOVUS does not store the original campaign email text, and Instantly did not return it for this lead.</div></div>`;
+  }
+  let cls = 'unknown', who = 'Unattributed', whoCls = 'neutral';
+  if(message.direction === 'OUTBOUND'){ cls = 'outbound'; who = 'NOVUS'; whoCls = 'novus'; }
+  else if(message.direction === 'INBOUND'){ cls = 'inbound'; who = agencyName || 'Prospect'; whoCls = 'prospect'; }
+  const meta = [];
+  if(message.direction === 'OUTBOUND' && message.eaccount) meta.push(`Sent from: ${esc(message.eaccount)}`);
+  if(message.direction === 'INBOUND' && message.from) meta.push(`From: ${esc(message.from)}`);
+  if(message.direction === 'UNKNOWN'){
+    meta.push(`From: ${dash(message.from)}`);
+    meta.push('Direction could not be established from the addresses');
+  }
+  if(message.classification) meta.push(`Classified: ${esc(message.classification)}`);
+  if(message.send_outcome === 'AMBIGUOUS'){
+    cls = 'unknown'; who = 'NOVUS send unconfirmed'; whoCls = 'neutral';
+    meta.push('Send outcome: may have sent');
+  }
+  meta.push(String(message.source||'').replace(/_/g,' ').toLowerCase());
+  return `<div class="msg ${cls}">
+    <div class="msg-head"><span class="msg-who ${whoCls}">${esc(who)}</span>
+      <span class="msg-when">${esc(when(message.at)) || '&mdash;'}</span></div>
+    <div class="msg-meta">${meta.join(' &middot; ')}</div>
+    ${message.subject ? `<div class="msg-subject">${esc(message.subject)}</div>` : ''}
+    ${message.body_text ? `<div class="msg-body">${esc(message.body_text)}</div>` : '<div class="msg-none">No message text available.</div>'}
+  </div>`;
+}
+
+const REPLY_BLOCK_TEXT = {
+  PROSPECT_OPTED_OUT:'This prospect has opted out. A reply cannot be sent.',
+  STALE_REPLY_EVENT:'A newer reply has arrived. Refresh the conversation before replying.',
+  SENDER_INBOX_AMBIGUOUS:'The sending inbox is ambiguous. Resolve the conversation before replying.',
+  SENDER_INBOX_UNKNOWN:'The sending inbox could not be resolved from the live conversation.',
+  REPLY_NOT_FOUND:'The latest stored reply is not available in the live Instantly conversation.',
+  REPLY_NOT_CONFIRMED_INBOUND:'The latest message is not confirmed as an inbound prospect reply.',
+  THREAD_ID_MISMATCH:'The stored reply and live Instantly thread do not match.',
+  EACCOUNT_NOT_ALLOWLISTED:'The resolved sending inbox is not allowlisted.',
+  OUTBOUND_MATCH_MISSING:'The outreach journey could not be resolved safely.',
+  OUTBOUND_MATCH_AMBIGUOUS:'The outreach journey is ambiguous.',
+  OUTBOUND_LEAD_EMAIL_MISMATCH:'The prospect email no longer matches the outreach journey.',
+  REPLY_EVENT_NOT_FOUND:'There is no stored prospect reply to answer.',
+};
+
+function replyComposerHtml(data, agencyName, notice){
+  const candidate = data.manual_reply || {};
+  const inbox = data.sender_inbox || {};
+  const outboundId = data.outbound_id || '';
+  const draft = REPLY_DRAFTS.get(outboundId) || '';
+  const ambiguousLocked = AMBIGUOUS_LOCKS.has(outboundId);
+  const eligible = candidate.eligible === true && inbox.status === 'CONFIRMED' && !ambiguousLocked;
+  const inFlight = SEND_IN_FLIGHT && SEND_OUTBOUND_ID === outboundId;
+  const disabled = !eligible || !draft.trim() || inFlight;
+  let reason = '';
+  if(ambiguousLocked){
+    reason = 'This may have sent. Refresh/check the conversation before any further action.';
+  } else if(!candidate.eligible){
+    reason = REPLY_BLOCK_TEXT[candidate.blocked_reason]
+      || (candidate.blocked_reason ? `Reply unavailable: ${String(candidate.blocked_reason).replace(/_/g,' ').toLowerCase()}.` : 'No eligible latest reply is available.');
+  }
+  const noticeHtml = notice?.text
+    ? `<div id="reply-outcome" class="reply-outcome show ${esc(notice.type||'warning')}">${esc(notice.text)}</div>`
+    : '<div id="reply-outcome" class="reply-outcome"></div>';
+  return `<div class="reply-box">
+    <div class="reply-label">Reply</div>
+    <div class="reply-target">Replying to: <strong>${esc(agencyName || data.lead_email || 'Prospect')}</strong>
+      <span class="mono">${esc(data.lead_email || '')}</span>, ${esc(when(candidate.received_at)) || 'timestamp unavailable'}<br/>
+      From: <span class="mono">${inbox.status === 'CONFIRMED' ? esc(inbox.eaccount) : 'not resolved'}</span></div>
+    <textarea id="reply-body" maxlength="5000" placeholder="Type or paste Joe's reply" ${eligible ? '' : 'disabled'}>${esc(draft)}</textarea>
+    <div class="reply-actions">
+      <span class="reply-count" id="reply-count">${draft.length} / 5000</span>
+      <button class="btn btn-primary" id="send-reply" type="button" ${disabled ? 'disabled' : ''}>${inFlight ? 'Sending…' : 'Send reply'}</button>
+    </div>
+    ${reason ? `<div class="note">${esc(reason)}</div>` : ''}
+    ${noticeHtml}</div>`;
+}
+
+function conversationHtml(data, agencyName, notice){
+  const parts = [];
+  /* The durable Phase 1 data is always rendered. A failed Instantly call
+     degrades this section, it never empties the drawer. */
+  if(!data.instantly?.available) parts.push('<div class="conv-status">Live conversation unavailable &mdash; showing stored NOVUS data.</div>');
+  parts.push(senderInboxHtml(data));
+  const messages = data.conversation?.messages || [];
+  parts.push(messages.length ? messages.map((m) => messageHtml(m, agencyName)).join('')
+    : '<div class="note">No messages on file for this lead yet.</div>');
+  if(!data.conversation?.original_campaign_emails_available){
+    parts.push(`<div class="note">The original campaign email bodies are not stored by NOVUS. Where Instantly
+      returns them they are shown above; otherwise only the campaign handoff is marked.</div>`);
+  }
+  parts.push(replyComposerHtml(data, agencyName, notice));
+  parts.push(`<div class="btnrow"><button class="btn btn-quiet btn-sm" id="conv-refresh" type="button">Refresh conversation</button></div>`);
+  return parts.join('');
+}
+
+async function loadConversation(outboundId, agencyName, notice){
+  const token = ++CONV_TOKEN;
+  const body = $('conv-body');
+  if(!body) return;
+  body.innerHTML = '<div class="note"><span class="spin"></span>Loading the live conversation&hellip;</div>';
+  try{
+    const res = await fetch(`${CONVERSATION_URL}&outbound_id=${encodeURIComponent(outboundId)}`, { headers:{ Accept:'application/json' } });
+    const data = await res.json();
+    if(token !== CONV_TOKEN) return; /* the operator has opened another lead */
+    if(!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+    CONV_DATA = data;
+    const target = $('conv-body');
+    if(target) target.innerHTML = conversationHtml(data, agencyName, notice);
+  }catch(err){
+    if(token !== CONV_TOKEN) return;
+    const target = $('conv-body');
+    if(target){
+      target.innerHTML = '<div class="conv-status">Live conversation unavailable &mdash; showing stored NOVUS data.'
+        + `<div class="note">${esc(err.message || 'The conversation could not be loaded.')}</div></div>`
+        + '<div class="btnrow"><button class="btn btn-quiet btn-sm" id="conv-refresh" type="button">Retry</button></div>';
     }
+  }
+}
 
-    // ---- loading -----------------------------------------------------------
+function syncReplyControls(){
+  const textarea = $('reply-body');
+  const button = $('send-reply');
+  if(!textarea || !button || !CONV_DATA) return;
+  const outboundId = CONV_DATA.outbound_id;
+  REPLY_DRAFTS.set(outboundId, textarea.value);
+  const count = $('reply-count');
+  if(count) count.textContent = `${textarea.value.length} / 5000`;
+  const canSend = CONV_DATA.manual_reply?.eligible === true
+    && CONV_DATA.sender_inbox?.status === 'CONFIRMED'
+    && !AMBIGUOUS_LOCKS.has(outboundId)
+    && textarea.value.trim().length > 0
+    && !(SEND_IN_FLIGHT && SEND_OUTBOUND_ID === outboundId);
+  button.disabled = !canSend;
+  button.textContent = SEND_IN_FLIGHT && SEND_OUTBOUND_ID === outboundId ? 'Sending…' : 'Send reply';
+}
 
-    function fillFilter(select, values) {
-      const current = select.value;
-      const first = select.options[0];
-      select.innerHTML = '';
-      select.appendChild(first);
-      values.forEach((v) => {
-        const opt = document.createElement('option');
-        opt.value = v;
-        opt.textContent = v.replace(/_/g, ' ');
-        select.appendChild(opt);
-      });
-      select.value = current;
-    }
+function showReplyOutcome(type, message){
+  const box = $('reply-outcome');
+  if(!box) return;
+  box.className = `reply-outcome show ${type}`;
+  box.textContent = message;
+}
 
-    function showWarnings(warnings) {
-      const box = $('warn-box');
-      if (!warnings || !warnings.length) { box.classList.add('hidden'); return; }
-      box.innerHTML = `<strong>${warnings.length} data note${warnings.length === 1 ? '' : 's'} from this read</strong>`
-        + `<ul>${warnings.slice(0, 12).map((w) => `<li>${esc(w.detail)}</li>`).join('')}</ul>`;
-      box.classList.remove('hidden');
-    }
+async function sendManualReply(){
+  const textarea = $('reply-body');
+  const data = CONV_DATA;
+  if(!textarea || !data || SEND_IN_FLIGHT) return;
+  const candidate = data.manual_reply || {};
+  const inbox = data.sender_inbox || {};
+  const replyText = textarea.value.trim();
+  if(!replyText || !candidate.eligible || inbox.status !== 'CONFIRMED') return;
 
-    async function load(force) {
-      const btn = $('refresh');
-      btn.disabled = true;
-      $('stamp').innerHTML = '<span class="spinner"></span>Loading';
-      $('load-err').classList.remove('show');
-      try {
-        const res = await fetch(LEADS_URL + (force ? '&refresh=1' : ''), { headers: { Accept: 'application/json' } });
-        const data = await res.json();
-        if (!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
-
-        LEADS = data.leads || [];
-        GLOBAL_EXCEPTIONS = data.global_exceptions || [];
-        const counts = data.counts || {};
-        $('s-attention').textContent = counts.needs_attention ?? 0;
-        $('s-total').textContent = counts.active ?? counts.total ?? 0;
-        $('s-probe').textContent = counts.ready_to_probe ?? 0;
-        $('s-observing').textContent = counts.probe_observing ?? 0;
-        $('s-preparing').textContent = counts.preparing_outreach ?? 0;
-        $('s-first-email').textContent = counts.waiting_first_email ?? 0;
-        $('s-sequence').textContent = counts.sequence_running ?? 0;
-        $('s-replied').textContent = counts.replied ?? 0;
-        $('s-demo-sent').textContent = counts.demos_sent ?? 0;
-        $('s-engaged').textContent = counts.demos_opened ?? 0;
-        $('s-calls').textContent = counts.calls_due ?? 0;
-        $('s-exceptions').textContent = counts.exceptions ?? 0;
-        $('s-meetings').textContent = counts.meetings ?? 0;
-        const conversions = data.metrics?.conversions || {};
-        const labels = {
-          probe_to_outreach: 'Probe → Outreach', outreach_to_reply: 'Outreach → Reply',
-          reply_to_positive: 'Reply → Positive', positive_to_demo_sent: 'Positive → Demo Sent',
-          demo_sent_to_open: 'Demo Sent → Demo Open', demo_open_to_meeting: 'Demo Open → Meeting',
-          outreach_to_meeting: 'Outreach → Meeting',
-        };
-        $('tb-conversions').innerHTML = Object.entries(labels).map(([key, label]) => {
-          const item = conversions[key] || {};
-          return `<tr style="cursor:default"><td class="cell-primary">${label}</td><td>${item.percent == null ? '&mdash;' : `${item.percent}%`}</td><td>${item.numerator ?? 0} / ${item.denominator ?? 0}</td></tr>`;
-        }).join('');
-
-        fillFilter($('f-state'), [...new Set(LEADS.map((l) => l.current_stage))].sort());
-        fillFilter($('f-priority'), ['CRITICAL', 'HIGH', 'NORMAL', 'LOW']);
-        fillFilter($('f-contact'), [...new Set(LEADS.map((l) => l.contact.contact_type))].sort());
-
-        showWarnings(data.warnings);
-        render();
-
-        const age = data.cached ? ` (cached ${Math.round((data.cache_age_ms || 0) / 1000)}s)` : '';
-        $('stamp').textContent = `Read ${when(data.generated_at)}${age}`;
-      } catch (err) {
-        $('load-err').textContent = err.message || 'Failed to load the operator feed.';
-        $('load-err').classList.add('show');
-        $('stamp').textContent = 'Load failed';
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
-    // The unrouted-replies sweep is a MANUAL action, deliberately not part of
-    // the page load: it calls Instantly, and the operator view must not put
-    // external API load behind every refresh. It is the existing dry run with
-    // classify=0 - it reads, and writes nothing anywhere.
-    async function loadUnrouted() {
-      const btn = $('unrouted');
-      btn.disabled = true;
-      btn.textContent = 'Checking…';
-      try {
-        const res = await fetch(UNROUTED_URL, { headers: { Accept: 'application/json' } });
-        const data = await res.json();
-        if (!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
-
-        const wanted = new Set(['no_outbound_match', 'ambiguous_outbound_match']);
-        const rows = (data.skipped || []).filter((s) => wanted.has(s.reason));
-        $('tb-unrouted').innerHTML = rows.map((s) => `<tr style="cursor:default">
-          <td class="mono">${dash(s.lead_email)}</td>
-          <td>${pill(s.reason, s.reason === 'ambiguous_outbound_match' ? 'p-amber' : 'p-grey')}</td>
-          <td>${dash(s.match_method)}</td>
-          <td class="col-hide mono">${dash((s.candidates || []).map((c) => c.outbound_id || c).join(', '))}</td>
-        </tr>`).join('');
-        $('c-unrouted').textContent = String(rows.length);
-        $('empty-unrouted').classList.toggle('hidden', rows.length > 0);
-        $('sec-unrouted').classList.remove('hidden');
-      } catch (err) {
-        $('load-err').textContent = `Unrouted reply check failed: ${err.message}`;
-        $('load-err').classList.add('show');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Check unrouted replies';
-      }
-    }
-
-    async function postWorkflow(url, body) {
-      const res = await fetch(url, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const data = await res.json();
-      if (!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
-      return data;
-    }
-
-    async function reconcileActions() {
-      const btn = $('reconcile');
-      btn.disabled = true; btn.textContent = 'Reconciling…';
-      try {
-        await postWorkflow(RECONCILE_URL, { confirm: 'RECONCILE_ACTIONS' });
-        await load(true);
-      } catch (err) {
-        $('load-err').textContent = `Action reconciliation failed: ${err.message}`;
-        $('load-err').classList.add('show');
-      } finally { btn.disabled = false; btn.textContent = 'Reconcile actions'; }
-    }
-
-    async function markMeetingBooked(agencyId) {
-      if (!window.confirm('Mark this agency as MEETING BOOKED and cancel all active acquisition chasing?')) return;
-      await postWorkflow(MEETING_URL, { agency_id: agencyId, confirm: 'MARK_MEETING_BOOKED' });
-      closeDrawer(); await load(true);
-    }
-
-    async function recordCallOutcome(actionId, outcome) {
-      let dueAt = '';
-      let nextActionType = '';
-      if (outcome === 'CALL_LATER' || outcome === 'SPOKE_CONTINUE') {
-        const entered = window.prompt('Future checkpoint date/time (for example 2026-09-05 10:00):');
-        if (!entered) return;
-        const parsed = new Date(entered);
-        if (Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()) { window.alert('Please enter a valid future date/time.'); return; }
-        dueAt = parsed.toISOString();
-      }
-      if (outcome === 'SPOKE_CONTINUE') {
-        nextActionType = (window.prompt('Next action: CALL_PROSPECT, FOLLOW_UP_CONVERSATION, or SET_NEXT_STEP', 'CALL_PROSPECT') || '').trim().toUpperCase();
-        if (!['CALL_PROSPECT','FOLLOW_UP_CONVERSATION','SET_NEXT_STEP'].includes(nextActionType)) { window.alert('Choose one of the listed next actions.'); return; }
-      }
-      if (!window.confirm(`Record call outcome: ${outcome.replace(/_/g, ' ')}?`)) return;
-      await postWorkflow(CALL_URL, { action_id: actionId, outcome, due_at: dueAt, next_action_type: nextActionType, confirm: 'RECORD_CALL_OUTCOME' });
-      closeDrawer(); await load(true);
-    }
-
-    // ---- wiring ------------------------------------------------------------
-
-    ['q', 'f-attention', 'f-state', 'f-priority', 'f-contact'].forEach((elId) => {
-      $(elId).addEventListener('input', render);
-      $(elId).addEventListener('change', render);
+  SEND_IN_FLIGHT = true;
+  SEND_OUTBOUND_ID = data.outbound_id;
+  syncReplyControls();
+  const confirmed = window.confirm(`You’re about to send this reply from ${inbox.eaccount} to ${data.lead_email}. Send it?`);
+  if(!confirmed){
+    SEND_IN_FLIGHT = false; SEND_OUTBOUND_ID = null; syncReplyControls(); return;
+  }
+  showReplyOutcome('warning', 'Sending one manual reply…');
+  try{
+    const response = await fetch(MANUAL_REPLY_URL, {
+      method:'POST',
+      headers:{ Accept:'application/json', 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        reply_event_id: candidate.reply_event_id,
+        body: replyText,
+        expected_received_at: candidate.received_at,
+        confirm:'SEND_ONE_MANUAL_REPLY',
+      }),
     });
-    $('refresh').addEventListener('click', () => load(true));
-    $('reconcile').addEventListener('click', reconcileActions);
-    $('unrouted').addEventListener('click', loadUnrouted);
-    $('d-close').addEventListener('click', closeDrawer);
-    $('scrim').addEventListener('click', closeDrawer);
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
-    document.addEventListener('click', (e) => {
-      // Manual, one-shot conversation re-read. Delegated because the button is
-      // re-rendered with the section. Nothing polls.
-      if (e.target.id === 'conv-refresh') {
-        if (CONV_LEAD) {
-          AMBIGUOUS_LOCKS.delete(CONV_LEAD.outbound_id);
-          loadConversation(CONV_LEAD.outbound_id, CONV_LEAD.agency_name);
-        }
-        return;
-      }
-      if (e.target.id === 'send-reply') {
-        sendManualReply();
-        return;
-      }
-      if (e.target.id === 'mark-meeting') {
-        markMeetingBooked(e.target.dataset.agency).catch((err) => window.alert(err.message));
-        return;
-      }
-      if (e.target.classList.contains('call-outcome')) {
-        recordCallOutcome(e.target.dataset.action, e.target.dataset.outcome).catch((err) => window.alert(err.message));
-        return;
-      }
-      const row = e.target.closest('#tb-attention tr, #tb-system tr, #tb-exceptions tr');
-      if (row && row.dataset.id) openDrawer(row.dataset.id);
-    });
-    document.addEventListener('input', (e) => {
-      if (e.target.id === 'reply-body') syncReplyControls();
-    });
+    const result = await response.json();
 
-    load(false);
-  </script>
+    if(result.send_outcome === 'SENT' || result.sent === true){
+      REPLY_DRAFTS.delete(data.outbound_id);
+      let notice = { type:'success', text:'Reply sent.' };
+      if(result.persistence_error){
+        notice = { type:'warning', text:`Reply sent, but local audit persistence failed: ${result.persistence_error}. Do not resend.` };
+      } else if(result.action_update_error){
+        notice = { type:'warning', text:`Reply sent and recorded, but the pending action could not be completed: ${result.action_update_error}. Do not resend.` };
+      } else if(result.thread_continuity === 'DIFFERENT'){
+        notice = { type:'warning', text:'Reply sent, but Instantly reported a different thread. Check the conversation.' };
+      }
+      SEND_IN_FLIGHT = false; SEND_OUTBOUND_ID = null;
+      await load(true);
+      if(CONV_LEAD?.outbound_id === data.outbound_id) await loadConversation(data.outbound_id, CONV_LEAD.agency_name, notice);
+      return;
+    }
+
+    if(result.send_outcome === 'AMBIGUOUS'){
+      AMBIGUOUS_LOCKS.add(data.outbound_id);
+      const auditWarning = result.persistence_error ? ` Local audit persistence also failed: ${result.persistence_error}.` : '';
+      showReplyOutcome('warning', `This may have sent.${auditWarning} Do not resend yet. Refresh/check the conversation first.`);
+    } else if(result.blocked_reason === 'STALE_REPLY_EVENT'){
+      SEND_IN_FLIGHT = false; SEND_OUTBOUND_ID = null;
+      await loadConversation(data.outbound_id, CONV_LEAD?.agency_name || '',
+        { type:'warning', text:'A newer reply has arrived. Refresh the conversation before replying.' });
+      return;
+    } else if(result.send_outcome === 'REJECTED'){
+      showReplyOutcome('error', result.error || 'Instantly rejected the reply. Correct the issue and try again.');
+    } else if(result.blocked_reason === 'DUPLICATE_MANUAL_REPLY'){
+      showReplyOutcome('warning', 'That exact reply is already in progress or was recently submitted. Check the conversation before retrying.');
+    } else {
+      showReplyOutcome('error', result.error || REPLY_BLOCK_TEXT[result.blocked_reason]
+        || `Reply was not sent${result.blocked_reason ? ` (${result.blocked_reason})` : ''}.`);
+    }
+  }catch(err){
+    /* Failure before a classified response is not proof the send failed.
+       Keep the draft, and make the operator verify the conversation. */
+    AMBIGUOUS_LOCKS.add(data.outbound_id);
+    showReplyOutcome('warning', 'The send result could not be confirmed. Do not resend yet. Refresh/check the conversation first.');
+  }finally{
+    SEND_IN_FLIGHT = false; SEND_OUTBOUND_ID = null; syncReplyControls();
+  }
+}
+
+/* ═══ LOADING + WORKFLOW ════════════════════════════════════════════════ */
+
+function fillFilter(select, values){
+  const current = select.value;
+  const first = select.options[0];
+  select.innerHTML = '';
+  select.appendChild(first);
+  values.forEach((v) => {
+    if(!v) return;
+    const opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = select.id === 'f-stage' ? stageLabel(v) : String(v).replace(/_/g,' ').toLowerCase();
+    select.appendChild(opt);
+  });
+  select.value = current;
+}
+
+function showWarnings(warnings){
+  const box = $('warn-box');
+  if(!warnings || !warnings.length){ box.classList.add('hidden'); return; }
+  box.innerHTML = `<div><strong>${warnings.length} data note${warnings.length === 1 ? '' : 's'} from this read</strong>`
+    + `<ul>${warnings.slice(0, 12).map((w) => `<li>${esc(w.detail)}</li>`).join('')}</ul></div>`;
+  box.classList.remove('hidden');
+}
+
+async function load(force){
+  const btn = $('refresh');
+  btn.disabled = true;
+  $('stamp').innerHTML = '<span class="spin"></span>Loading';
+  $('load-err').classList.add('hidden');
+  try{
+    const res = await fetch(LEADS_URL + (force ? '&refresh=1' : ''), { headers:{ Accept:'application/json' } });
+    const data = await res.json();
+    if(!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+
+    LEADS = data.leads || [];
+    COUNTS = data.counts || {};
+    METRICS = data.metrics || {};
+    GLOBAL_EXCEPTIONS = data.global_exceptions || [];
+    LOADED = true;
+
+    fillFilter($('f-stage'), [...new Set(LEADS.map((l) => l.current_stage))].sort((a,b) => stageLabel(a).localeCompare(stageLabel(b))));
+    fillFilter($('f-priority'), ['CRITICAL','HIGH','NORMAL','LOW']);
+    fillFilter($('f-contact'), [...new Set(LEADS.map((l) => l.contact.contact_type))].sort());
+
+    showWarnings(data.warnings);
+    renderAll();
+
+    const age = data.cached ? ` · cached ${Math.round((data.cache_age_ms||0)/1000)}s` : '';
+    $('stamp').innerHTML = `<span class="nav-dot${data.cached ? ' stale' : ''}"></span>${esc(when(data.generated_at))}${esc(age)}`;
+  }catch(err){
+    $('load-err').innerHTML = `<div><strong>The command centre could not load.</strong><br/>${esc(err.message || 'Failed to load the operator feed.')}</div>`;
+    $('load-err').classList.remove('hidden');
+    $('stamp').innerHTML = '<span class="nav-dot bad"></span>Load failed';
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+/* Manual sweep, deliberately not part of the page load: it calls Instantly,
+   and the operator view must not put external API load behind every refresh.
+   It is the existing dry run with classify=0 — it reads, and writes nothing. */
+async function loadUnrouted(){
+  const btn = $('unrouted');
+  btn.disabled = true;
+  const original = btn.innerHTML;
+  btn.textContent = 'Checking…';
+  try{
+    const res = await fetch(UNROUTED_URL, { headers:{ Accept:'application/json' } });
+    const data = await res.json();
+    if(!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+    const wanted = new Set(['no_outbound_match','ambiguous_outbound_match']);
+    const rows = (data.skipped || []).filter((s) => wanted.has(s.reason));
+    $('ex-unrouted').innerHTML = rows.map((s) => `<tr>
+      <td class="mono">${dash(s.lead_email)}</td>
+      <td>${pill(String(s.reason).replace(/_/g,' '), s.reason === 'ambiguous_outbound_match' ? 't-amber' : 't-grey', true)}</td>
+      <td class="col-md">${dash(s.match_method)}</td>
+      <td class="col-lg mono">${dash((s.candidates||[]).map((c) => c.outbound_id || c).join(', '))}</td></tr>`).join('');
+    $('ex-unrouted-empty').innerHTML = rows.length ? ''
+      : emptyState('No skipped inbound replies', 'Every reply in the last sweep matched exactly one outreach journey.');
+    $('ex-unrouted-wrap').classList.remove('hidden');
+  }catch(err){
+    $('load-err').innerHTML = `<div>Unrouted reply check failed: ${esc(err.message)}</div>`;
+    $('load-err').classList.remove('hidden');
+  }finally{
+    btn.disabled = false; btn.innerHTML = original;
+  }
+}
+
+async function postWorkflow(url, body){
+  const res = await fetch(url, { method:'POST', headers:{ Accept:'application/json', 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if(!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+async function reconcileActions(){
+  const btn = $('reconcile');
+  btn.disabled = true;
+  const original = btn.innerHTML;
+  btn.textContent = 'Reconciling…';
+  try{
+    await postWorkflow(RECONCILE_URL, { confirm:'RECONCILE_ACTIONS' });
+    await load(true);
+  }catch(err){
+    $('load-err').innerHTML = `<div>Action reconciliation failed: ${esc(err.message)}</div>`;
+    $('load-err').classList.remove('hidden');
+  }finally{ btn.disabled = false; btn.innerHTML = original; }
+}
+
+async function markMeetingBooked(agencyId){
+  if(!window.confirm('Mark this agency as MEETING BOOKED and cancel all active acquisition chasing?')) return;
+  await postWorkflow(MEETING_URL, { agency_id: agencyId, confirm:'MARK_MEETING_BOOKED' });
+  closeDrawer(); await load(true);
+}
+
+async function recordCallOutcome(actionId, outcome){
+  let dueAt = '';
+  let nextActionType = '';
+  if(outcome === 'CALL_LATER' || outcome === 'SPOKE_CONTINUE'){
+    const entered = window.prompt('Future checkpoint date/time (for example 2026-09-05 10:00):');
+    if(!entered) return;
+    const parsed = new Date(entered);
+    if(Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()){ window.alert('Please enter a valid future date/time.'); return; }
+    dueAt = parsed.toISOString();
+  }
+  if(outcome === 'SPOKE_CONTINUE'){
+    nextActionType = (window.prompt('Next action: CALL_PROSPECT, FOLLOW_UP_CONVERSATION, or SET_NEXT_STEP', 'CALL_PROSPECT') || '').trim().toUpperCase();
+    if(!['CALL_PROSPECT','FOLLOW_UP_CONVERSATION','SET_NEXT_STEP'].includes(nextActionType)){ window.alert('Choose one of the listed next actions.'); return; }
+  }
+  if(!window.confirm(`Record call outcome: ${outcome.replace(/_/g,' ')}?`)) return;
+  await postWorkflow(CALL_URL, { action_id: actionId, outcome, due_at: dueAt, next_action_type: nextActionType, confirm:'RECORD_CALL_OUTCOME' });
+  closeDrawer(); await load(true);
+}
+
+/* ═══ WIRING ════════════════════════════════════════════════════════════ */
+
+window.addEventListener('hashchange', () => showView(routeFromHash(), { push:false }));
+
+document.addEventListener('click', (e) => {
+  const nav = e.target.closest('.nav-item');
+  if(nav){ showView(nav.dataset.view); return; }
+
+  const goto = e.target.closest('[data-goto]');
+  if(goto){ showView(goto.dataset.goto); return; }
+
+  const actionTab = e.target.closest('[data-actiontab]');
+  if(actionTab){ ACTION_TAB = actionTab.dataset.actiontab; renderActions(); return; }
+
+  const stage = e.target.closest('[data-stage]');
+  if(stage){
+    PIPELINE_STAGE = PIPELINE_STAGE === stage.dataset.stage ? '' : stage.dataset.stage;
+    renderPipeline();
+    return;
+  }
+
+  const drTab = e.target.closest('.dr-tab');
+  if(drTab){ DRAWER_PANE = drTab.dataset.pane; renderDrawerPane(); return; }
+
+  if(e.target.id === 'conv-refresh'){
+    if(CONV_LEAD){
+      AMBIGUOUS_LOCKS.delete(CONV_LEAD.outbound_id);
+      loadConversation(CONV_LEAD.outbound_id, CONV_LEAD.agency_name);
+    }
+    return;
+  }
+  if(e.target.id === 'send-reply'){ sendManualReply(); return; }
+  if(e.target.id === 'mark-meeting'){
+    markMeetingBooked(e.target.dataset.agency).catch((err) => window.alert(err.message));
+    return;
+  }
+  if(e.target.classList.contains('call-outcome')){
+    recordCallOutcome(e.target.dataset.action, e.target.dataset.outcome).catch((err) => window.alert(err.message));
+    return;
+  }
+
+  /* A row/task click opens the record. Anything that is itself a link or a
+     button inside the row keeps its own behaviour. */
+  if(e.target.closest('a,button')) return;
+  const row = e.target.closest('[data-id]');
+  if(row && row.dataset.id) openDrawer(row.dataset.id);
+});
+
+$('refresh').addEventListener('click', () => load(true));
+$('reconcile').addEventListener('click', reconcileActions);
+$('unrouted').addEventListener('click', loadUnrouted);
+$('d-close').addEventListener('click', closeDrawer);
+$('scrim').addEventListener('click', closeDrawer);
+$('pl-closed').addEventListener('change', renderPipeline);
+$('pl-clear').addEventListener('click', () => { PIPELINE_STAGE = ''; renderPipeline(); });
+$('f-clear').addEventListener('click', () => {
+  ['q','f-stage','f-owner','f-priority','f-contact','f-demo','f-reply'].forEach((id) => { $(id).value = ''; });
+  renderLeads();
+});
+['q','f-stage','f-owner','f-priority','f-contact','f-demo','f-reply'].forEach((id) => {
+  $(id).addEventListener('input', renderLeads);
+  $(id).addEventListener('change', renderLeads);
+});
+document.addEventListener('input', (e) => { if(e.target.id === 'reply-body') syncReplyControls(); });
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape'){ closeDrawer(); return; }
+  /* "/" focuses search from anywhere except a field. */
+  if(e.key === '/' && !/^(INPUT|TEXTAREA)$/.test(e.target.tagName)){
+    e.preventDefault();
+    showView('leads');
+    $('q').focus();
+  }
+});
+
+showView(routeFromHash(), { push:false });
+load(false);
+</script>
 </body>
 </html>

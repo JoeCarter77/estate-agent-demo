@@ -2,7 +2,7 @@
 // live sends, real agency deletes, meetings, or call outcomes.
 import assert from 'node:assert/strict';
 import { resolveLifecycleStage } from '../lib/acquisition-stage.mjs';
-import { deriveExpectedActions, reconcileActions } from '../lib/acquisition-actions.mjs';
+import { actionQueue, deriveExpectedActions, isManualSalesAction, MANUAL_SALES_ACTION_TYPES, reconcileActions } from '../lib/acquisition-actions.mjs';
 import { ACQUISITION_POLICY } from '../lib/acquisition-policy.mjs';
 import { ACTIONS_HEADER, appendAction, buildActionsSetupPlan } from '../lib/actions-store.mjs';
 import { buildAcquisitionDashboard, buildFunnelMetrics, enforceNextActionInvariant } from '../lib/operator-funnel.mjs';
@@ -154,6 +154,79 @@ check('agency-wide dashboard never drops a pre-OUTBOUND lead and enforces the ne
   assert.equal(ready.current_stage, 'READY_TO_PROBE'); assert.equal(ready.current_action.action_type, 'PROBE_AGENCY');
   assert.equal(dashboard.global_exceptions[0].type, 'ACTION_LEDGER_UNAVAILABLE');
 });
+
+console.log('\nManual action queue semantics (Needs your attention)');
+{
+  const queueOf = (action_type, action_owner = 'JOE') => actionQueue({ action_type, action_owner, action_status: 'DUE' });
+  for (const type of MANUAL_SALES_ACTION_TYPES) {
+    check(`${type} owned by JOE is a manual sales action`, () => {
+      assert.equal(queueOf(type), 'JOE');
+      assert.equal(isManualSalesAction({ action_type: type, action_owner: 'JOE', action_status: 'DUE' }), true);
+    });
+  }
+  check('PROBE_AGENCY is PROBER queue work, never a daily manual sales action', () => {
+    assert.equal(queueOf('PROBE_AGENCY'), 'PROBER');
+    assert.equal(isManualSalesAction({ action_type: 'PROBE_AGENCY', action_owner: 'JOE', action_status: 'DUE' }), false);
+  });
+  check('COMPLETE_PROBE is PROBER queue work too', () => assert.equal(queueOf('COMPLETE_PROBE'), 'PROBER'));
+  for (const type of ['OBSERVATION_CHECKPOINT', 'PREPARE_OUTREACH', 'HANDOFF_TO_INSTANTLY', 'FIRST_EMAIL_CHECKPOINT', 'SEQUENCE_CHECKPOINT', 'SEND_DEMO', 'OUT_OF_OFFICE_CHECKPOINT', 'DEMO_UNOPENED_FOLLOWUP', 'DEMO_OPENED_FOLLOWUP']) {
+    check(`${type} is pipeline/system work, not Joe's queue`, () => {
+      assert.equal(queueOf(type, 'SYSTEM'), 'SYSTEM');
+      assert.equal(isManualSalesAction({ action_type: type, action_owner: 'SYSTEM', action_status: 'DUE' }), false);
+    });
+  }
+  check('a RESOLVE_EXCEPTION that NOVUS owns is not Joe\'s manual action', () =>
+    assert.equal(isManualSalesAction({ action_type: 'RESOLVE_EXCEPTION', action_owner: 'NOVUS', action_status: 'DUE' }), false));
+  check('a completed manual action is no longer in the queue', () =>
+    assert.equal(isManualSalesAction({ action_type: 'HUMAN_REPLY', action_owner: 'JOE', action_status: 'COMPLETED' }), false));
+}
+{
+  // End-to-end through the dashboard: probing must not reach needs_attention.
+  const agenciesHeader = ['agency_id', 'agency_name', 'rightmove_sales_branch_url', 'probe_sent'];
+  const tables = {
+    AGENCIES: { header: agenciesHeader, rows: [
+      ['ag_probe', 'Unprobed Agency', 'https://rightmove.test/probe', ''],
+      ['ag_reply', 'Replied Agency', 'https://rightmove.test/reply', 'YES'],
+      ['ag_done', 'Probed Agency', 'https://rightmove.test/done', 'YES'],
+    ] },
+    PROBES: { header: ['probe_id', 'agency_id', 'probe_status', 'observation_deadline'], rows: [
+      ['prb_done', 'ag_done', 'observing', hoursAgo(-48)],
+    ] },
+    INTELLIGENCE: { header: ['intelligence_id', 'probe_id'], rows: [] },
+    PERSONALISATION: { header: ['probe_id', 'agency_id'], rows: [] },
+    DEMOS: { header: ['demo_id', 'agency_id', 'probe_id'], rows: [] },
+    OUTBOUND: { header: ['outbound_id', 'agency_id', 'probe_id'], rows: [] },
+    REPLY_EVENTS: { header: ['reply_event_id', 'agency_id', 'classification', 'received_at'], rows: [
+      ['r_q', 'ag_reply', 'QUESTION', hoursAgo(1)],
+    ] },
+    SALES_MESSAGES: { header: [], rows: [] },
+    ACTIONS: { header: [], rows: [] },
+  };
+  const dashboard = buildAcquisitionDashboard(tables, { now: NOW, actionsAvailable: false });
+  const lead = (id) => dashboard.leads.find((row) => row.agency_id === id);
+  check('READY_TO_PROBE never enters the manual action queue', () => {
+    assert.equal(lead('ag_probe').current_stage, 'READY_TO_PROBE');
+    assert.equal(lead('ag_probe').current_action.action_type, 'PROBE_AGENCY');
+    assert.equal(lead('ag_probe').needs_human, false);
+    assert.equal(lead('ag_probe').action_queue, 'PROBER');
+  });
+  check('a genuine reply still needs a human', () => {
+    assert.equal(lead('ag_reply').needs_human, true);
+    assert.equal(lead('ag_reply').action_queue, 'JOE');
+    assert.equal(lead('ag_reply').next_action.type, 'HUMAN_REPLY');
+  });
+  check('a running observation stays with the system', () => {
+    assert.equal(lead('ag_done').needs_human, false);
+    assert.equal(lead('ag_done').action_queue, 'SYSTEM');
+  });
+  check('needs_attention counts only manual sales actions', () =>
+    assert.equal(dashboard.counts.needs_attention, 1));
+  check('probe queue depth comes from the physical probe_sent cell', () => {
+    assert.equal(dashboard.counts.probe_queue, 1);
+    assert.equal(lead('ag_probe').probe_queue_eligible, true);
+    assert.equal(lead('ag_done').probe_queue_eligible, false);
+  });
+}
 
 console.log('\nAPI security and read shape');
 {
