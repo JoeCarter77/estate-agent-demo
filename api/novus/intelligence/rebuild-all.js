@@ -16,6 +16,7 @@ import { requireAuth } from '../_auth.mjs';
 import { inboundMatchDryRunOptions, runInboundMatchDryRun } from '../../../lib/inbound-match-review.mjs';
 import { runInboundMatchBackfill } from '../../../lib/inbound-match-backfill.mjs';
 import { confirmInboundCommunicationMatch } from '../../../lib/inbound-match-manual.mjs';
+import { deleteInboundCommunication } from '../../../lib/inbound-match-delete.mjs';
 import { fetchTwilioRecording } from '../../../lib/twilio-recording.mjs';
 
 export const maxDuration = 60;
@@ -77,6 +78,19 @@ async function handleInboundManualMatch(req, res) {
   }
 }
 
+async function handleInboundMatchDelete(req, res) {
+  let body;
+  try { body = parseBody(req); }
+  catch (err) { return res.status(400).json({ error: err.message }); }
+  try {
+    const result = await deleteInboundCommunication(getRepo(), body);
+    return res.status(result.status || (result.ok ? 200 : 400)).json(result);
+  } catch (err) {
+    console.error('inbound match delete error:', err?.message || String(err));
+    return res.status(500).json({ ok: false, error: err?.message || 'Failed to delete communication' });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   const action = String(req.query?.action || '').trim();
@@ -120,6 +134,15 @@ export default async function handler(req, res) {
     if (!requireAuth(req, res)) return;
     res.setHeader('Cache-Control', 'no-store');
     return handleInboundManualMatch(req, res);
+  }
+
+  // Deliberate human deletion of a communication carrying no useful evidence.
+  // Tombstones the row (never a physical delete) and the RAW_EVENT(s) that
+  // produced it, then recomputes any probe it was matched to.
+  if (req.method === 'POST' && action === 'inbound-match-delete') {
+    if (!requireAuth(req, res)) return;
+    res.setHeader('Cache-Control', 'no-store');
+    return handleInboundMatchDelete(req, res);
   }
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });

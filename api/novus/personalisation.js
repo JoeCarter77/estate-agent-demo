@@ -48,7 +48,11 @@ import {
   ACQUISITION_REQUIRED_TABS,
   buildAcquisitionDashboard,
 } from '../../lib/operator-funnel.mjs';
-import { reconcileActionEngine } from '../../lib/action-engine.mjs';
+import { handedOutreachEmails, reconcileActionEngine } from '../../lib/action-engine.mjs';
+// READ-ONLY canonical outreach execution state. One bounded, cached Instantly
+// sweep per five minutes for the whole campaign — never a per-lead call from
+// the browser, and never a write endpoint.
+import { loadOutreachExecutionState } from '../../lib/instantly-execution-state.mjs';
 import { ACTIONS_HEADER, appendAction, patchAction, readActions } from '../../lib/actions-store.mjs';
 import { ACQUISITION_POLICY, addMs } from '../../lib/acquisition-policy.mjs';
 import {
@@ -732,10 +736,35 @@ async function handleOperatorDashboard(req, res) {
         entries.push([tab, { header: [], rows: [] }]);
       }
     }
-    const built = buildAcquisitionDashboard(Object.fromEntries(entries), {
-      now: new Date().toISOString(), actionsAvailable,
+    const tables = Object.fromEntries(entries);
+    // Additive and soft-failing. If Instantly cannot be read the dashboard is
+    // built exactly as it was before this integration existed, plus a warning.
+    const execution = await loadOutreachExecutionState({
+      handedEmails: handedOutreachEmails(tables),
+      refresh,
     });
-    const payload = { success: true, ...built, cache_ttl_ms: OPERATOR_LEADS_CACHE_TTL_MS };
+    const built = buildAcquisitionDashboard(tables, {
+      now: new Date().toISOString(), actionsAvailable, execution,
+    });
+    const payload = {
+      success: true,
+      ...built,
+      cache_ttl_ms: OPERATOR_LEADS_CACHE_TTL_MS,
+      // Provenance the operator can see: how the send figures were obtained,
+      // how fresh they are, and whether the sweep was complete.
+      outreach_execution: {
+        available: execution.available === true,
+        source: execution.available === true ? 'INSTANTLY' : 'UNAVAILABLE',
+        error: execution.error || '',
+        cached: Boolean(execution.cached),
+        cache_age_ms: execution.cache_age_ms || 0,
+        pages: execution.pages || 0,
+        truncated: Boolean(execution.truncated),
+        emails_scanned: execution.emails_scanned || 0,
+        leads_with_evidence: execution.totals?.leads_with_evidence || 0,
+        totals: execution.totals || null,
+      },
+    };
     operatorDashboardCache = { at: Date.now(), payload };
     return res.status(200).json({ ...payload, cached: false, cache_age_ms: 0 });
   } catch (err) {

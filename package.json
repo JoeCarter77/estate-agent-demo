@@ -10,6 +10,7 @@
     "novus:selftest": "node scripts/novus-selftest.mjs",
     "novus:agency-probe-selftest": "node scripts/novus-agency-probe-selftest.mjs",
     "novus:comms-selftest": "node scripts/novus-comms-selftest.mjs",
+    "novus:comms-delete-selftest": "node scripts/novus-comms-delete-selftest.mjs",
     "novus:agency-content-classification-selftest": "node scripts/novus-agency-content-classification-selftest.mjs",
     "novus:observation-selftest": "node scripts/novus-observation-selftest.mjs",
     "novus:rebuild-all-selftest": "node scripts/novus-rebuild-all-selftest.mjs",
@@ -64,6 +65,7 @@
     "novus:actions-setup": "node scripts/novus-actions-setup.mjs",
     "novus:acquisition-selftest": "node scripts/novus-acquisition-selftest.mjs",
     "novus:command-centre-selftest": "node scripts/novus-command-centre-selftest.mjs",
+    "novus:outreach-execution-selftest": "node scripts/novus-outreach-execution-selftest.mjs",
     "novus:historical-replay": "node scripts/novus-historical-replay.mjs",
     "novus:probe-rerun": "node scripts/novus-probe-rerun.mjs"
   },

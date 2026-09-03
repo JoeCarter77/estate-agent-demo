@@ -29,6 +29,7 @@ import { classifyCommunication } from '../../../lib/classification.mjs';
 import { matchInboundCommunication } from '../../../lib/inbound-matching.mjs';
 import { requireTwilioSignature, parseTwilioBody } from '../../../lib/twilio-webhook.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
+import { isDeletedCommunication } from '../../../lib/communication-status.mjs';
 
 export const maxDuration = 20;
 
@@ -98,6 +99,19 @@ export default async function handler(req, res) {
     }
 
     const comm = target.obj;
+
+    // The Communication this recording/transcript belongs to was deliberately
+    // deleted (no useful evidence). A late-arriving recording/transcript must
+    // never resurrect it — record the raw evidence and stop.
+    if (isDeletedCommunication(comm)) {
+      await repo.updateById('RAW_EVENTS', 'raw_event_id', rawEventId, {
+        processing_status: 'processed',
+        processed_communication_id: '',
+        error_message: `Communication ${comm.communication_id} was deleted; recording/transcript discarded`,
+      });
+      return res.status(200).json({ matched: false, deleted: true, raw_event_id: rawEventId });
+    }
+
     const patch = {};
 
     if (!isTranscription) {
