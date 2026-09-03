@@ -1,0 +1,348 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOVUS — COMPONENTS
+   The shared vocabulary every chapter is built from. If a section needs a
+   one-off, it lives in sections.css; anything used twice lives here.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── FRAME ───────────────────────────────────────────────────────────────── */
+.frame{
+  width:100%; max-width:var(--frame);
+  margin-inline:auto;
+  padding-inline:var(--gutter);
+}
+.frame--narrow{ max-width:var(--frame-narrow); }
+/* Only the Command Centre uses this: it is the one thing on the page allowed
+   to sit outside the body's text frame, because it is the product itself. */
+.frame--wide{ max-width:var(--frame-wide); }
+
+/* TWO RHYTHMS, deliberately.
+     --lg  showpiece chapters: hero, intelligence layer, product, example,
+           command centre. These breathe.
+     --sm  supporting chapters: problem, outcomes, human+novus, levels, close.
+           These are tight, and the contrast between the two is the pacing. */
+.section{ position:relative; padding-block:var(--sec-y); }
+.section--lg{ padding-block:var(--sec-y-lg); }
+.section--sm{ padding-block:var(--sec-y-sm); }
+/* Used where one chapter should read as a continuation of the one above it
+   rather than as a new screen. */
+.section--joined{ padding-top:0; }
+
+/* Two chapters of the same weight back to back would otherwise put two full
+   section heights into one gap — the 250–350px voids that make a page read as
+   though something failed to load. The second chapter starts sooner; the
+   background change or the rule still marks the boundary. */
+.section--lg + .section--lg{ padding-top:calc(var(--sec-y-lg) * .55); }
+.section--sm + .section--sm{ padding-top:calc(var(--sec-y-sm) * .8); }
+.section--lg + .section--sm{ padding-top:calc(var(--sec-y-sm) * .9); }
+.section--ruled{ border-top:1px solid var(--hair); }
+.section--dark{ background:linear-gradient(180deg,var(--black),#080A0D 50%,var(--black)); }
+
+/* ── REVEAL ──────────────────────────────────────────────────────────────────
+   One engine, two classes. Elements start 14px low and slightly soft, and
+   land on the real composition. Stagger is set per-element in JS via a
+   custom property so we never ship 40 nth-child rules. */
+.reveal,.reveal-child{
+  opacity:0;
+  transform:translate3d(0,14px,0);
+  transition:
+    opacity var(--dur-slow) var(--ease) var(--d,0ms),
+    transform var(--dur-slow) var(--ease) var(--d,0ms);
+}
+.is-in .reveal-child,
+.reveal.is-in{ opacity:1; transform:none; }
+
+/* ── EYEBROW ─────────────────────────────────────────────────────────────────
+   A small system label above a large statement. Tightly tracked, never shouty. */
+.eyebrow{
+  display:flex; align-items:center; gap:11px;
+  font-family:var(--sans);
+  font-size:var(--t-label);
+  font-weight:600;
+  letter-spacing:.185em;
+  text-transform:uppercase;
+  color:var(--ink-3);
+  line-height:1;
+}
+.eyebrow::before{
+  content:''; width:20px; height:1px; flex:none;
+  background:var(--blue-line);
+}
+.eyebrow--plain::before{ display:none; }
+.eyebrow em{ font-style:normal; color:var(--blue); }
+
+/* ── SECTION HEAD ────────────────────────────────────────────────────────── */
+.head{ max-width:var(--measure-wide); }
+.head .eyebrow{ margin-bottom:clamp(20px,2.4vw,34px); }
+.head h2,.head h1{ margin-bottom:clamp(18px,2vw,28px); }
+.head p{
+  font-size:var(--t-lede);
+  line-height:1.62;
+  color:var(--ink-2);
+  max-width:var(--measure);
+}
+.head p + p{ margin-top:1.05em; }
+
+/* Copy blocks that sit below a head at body scale. */
+.copy{ color:var(--ink-2); max-width:var(--measure); }
+.copy p + p{ margin-top:1.1em; }
+.copy strong{ color:var(--ink); font-weight:500; }
+
+/* ── BUTTONS ─────────────────────────────────────────────────────────────── */
+.btn{
+  display:inline-flex; align-items:center; gap:9px;
+  font-family:var(--sans);
+  font-size:var(--t-sm); font-weight:600; letter-spacing:.004em;
+  padding:13px 22px;
+  border-radius:var(--r-full);
+  border:1px solid transparent;
+  white-space:nowrap;
+  transition:background .2s var(--ease),border-color .2s var(--ease),
+             color .2s var(--ease),transform .2s var(--ease);
+}
+.btn:active{ transform:translateY(1px); }
+.btn .arw{ transition:transform .28s var(--ease); }
+.btn:hover .arw{ transform:translateX(3px); }
+
+.btn--primary{ background:var(--ink); color:#0B0D10; font-weight:650; }
+.btn--primary:hover{ background:#fff; }
+
+.btn--ghost{
+  border-color:var(--hair-2); color:var(--ink-2);
+  background:rgba(241,237,230,.02);
+}
+.btn--ghost:hover{
+  border-color:var(--blue-line); color:var(--ink);
+  background:var(--blue-tint);
+}
+
+.btn--quiet{ padding:0; color:var(--ink-2); border-radius:var(--r-xs); }
+.btn--quiet:hover{ color:var(--blue); }
+
+.btn--sm{ padding:9px 17px; font-size:var(--t-xs); }
+
+/* ── THE MARK ────────────────────────────────────────────────────────────────
+   The canonical NOVUS symbol. ONE implementation, one file, referenced
+   everywhere — header, field, strata, product UI, command centre, footer,
+   favicon. It is never redrawn and never distorted: the box is derived from
+   the asset's own 384 × 360 pixel ratio, so setting font-size (or width) is
+   the only way to change its size.
+
+   Where the mark appears inside a diagram it is an <image> on the same file,
+   not a second drawing of the N. */
+.mark{
+  --mark-w:384; --mark-h:360;
+  height:1em;
+  width:calc(1em * var(--mark-w) / var(--mark-h));
+  flex:none;
+  object-fit:contain;
+  /* Below ~18px the master's own soft edge and glow start to blur. A touch of
+     contrast holds the counter open at interface sizes without recolouring. */
+  filter:saturate(1.04) contrast(1.06);
+}
+
+.wordmark{
+  display:inline-flex; align-items:center; gap:9px;
+  color:var(--ink);
+}
+.wordmark .mark{ font-size:22px; }
+.wordmark b{
+  font-family:var(--sans);
+  font-size:.95rem; font-weight:800; letter-spacing:.16em;
+}
+
+/* ── STATUS CHIP ─────────────────────────────────────────────────────────────
+   Used only where something genuinely has a state. Rule 12: never decorative. */
+.chip{
+  display:inline-flex; align-items:center; gap:7px;
+  font-size:var(--t-micro); font-weight:700;
+  letter-spacing:.13em; text-transform:uppercase;
+  padding:5px 11px 5px 9px;
+  border-radius:var(--r-full);
+  border:1px solid var(--hair-2);
+  color:var(--ink-3);
+  white-space:nowrap;
+}
+.chip .dot{ width:5px; height:5px; border-radius:50%; background:currentColor; flex:none; }
+.chip--novus{ color:var(--blue); border-color:var(--blue-line); background:var(--blue-tint); }
+.chip--amber{ color:var(--amber); border-color:var(--amber-line); background:var(--amber-tint); }
+.chip--red{ color:var(--red); border-color:var(--red-line); background:var(--red-tint); }
+
+/* A live indicator that breathes rather than blinks. */
+.pulse{ position:relative; }
+.pulse::after{
+  content:''; position:absolute; inset:-4px; border-radius:50%;
+  border:1px solid currentColor; opacity:0;
+  animation:pulse 2.8s var(--ease) infinite;
+}
+@keyframes pulse{
+  0%{ opacity:.55; transform:scale(.6); }
+  70%,100%{ opacity:0; transform:scale(1.9); }
+}
+
+/* ── SYSTEM TEXT ─────────────────────────────────────────────────────────────
+   Machine-produced values: times, ids, counts, field names. */
+.sys{
+  font-family:var(--mono);
+  font-size:var(--t-micro);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--ink-4);
+  font-variant-numeric:tabular-nums;
+}
+.num{ font-variant-numeric:tabular-nums; }
+
+/* ── INDEX NUMERAL ───────────────────────────────────────────────────────── */
+.idx{
+  display:block;
+  font-family:var(--mono);
+  font-size:var(--t-micro);
+  letter-spacing:.12em;
+  color:var(--ink-4);
+}
+
+/* ── PANEL ───────────────────────────────────────────────────────────────────
+   The only "box" in the system, and it is used for one thing: representing a
+   NOVUS surface. Everything else is separated by rules and space. */
+.panel{
+  position:relative;
+  background:linear-gradient(180deg,rgba(241,237,230,.028),rgba(241,237,230,.012));
+  border:1px solid var(--hair);
+  border-radius:var(--r-lg);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  overflow:hidden;
+}
+.panel__bar{
+  display:flex; align-items:center; gap:12px;
+  padding:14px 18px;
+  border-bottom:1px solid var(--hair);
+  background:rgba(241,237,230,.014);
+}
+.panel__title{
+  font-size:var(--t-xs); font-weight:650; letter-spacing:.02em; color:var(--ink-2);
+}
+.panel__right{ margin-left:auto; display:flex; align-items:center; gap:10px; }
+
+/* ── RULE-SEPARATED LIST ─────────────────────────────────────────────────────
+   Rule 11: do not overuse cards. Most "cards" in this brief are records, and
+   records want hairlines. */
+.records{ border-top:1px solid var(--hair); }
+.record{
+  position:relative;
+  border-bottom:1px solid var(--hair);
+  padding-block:clamp(24px,2.6vw,38px);
+}
+
+/* ── FLOW CHAIN ──────────────────────────────────────────────────────────────
+   "NOVUS detects → prioritises → acts" rendered as a system statement. */
+.chain{
+  display:flex; align-items:center; flex-wrap:wrap; gap:9px;
+  font-family:var(--mono); font-size:var(--t-micro);
+  letter-spacing:.1em; text-transform:uppercase;
+}
+.chain span{ color:var(--ink-3); }
+.chain i{ font-style:normal; color:var(--ink-5); }
+.chain .on{ color:var(--blue); }
+
+/* ── HAIRLINE HELPERS ────────────────────────────────────────────────────── */
+.vrule{ border-left:1px solid var(--hair); }
+.hrule{ height:1px; background:var(--hair); border:0; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HEADER
+   Restrained to the point of near-invisibility until it is needed.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.hdr{
+  position:fixed; inset:0 0 auto; z-index:120;
+  height:66px;
+  display:flex; align-items:center;
+  transition:background .35s var(--ease),border-color .35s var(--ease),height .35s var(--ease);
+  border-bottom:1px solid transparent;
+}
+.hdr.is-stuck{
+  height:58px;
+  /* Opaque enough that a large serif headline scrolling underneath reads as
+     "behind the bar" rather than as a collision. */
+  background:rgba(8,9,12,.88);
+  backdrop-filter:blur(18px) saturate(140%);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);
+  border-bottom-color:var(--hair);
+}
+.hdr .frame{ display:flex; align-items:center; gap:28px; }
+
+.hdr__nav{ margin-left:auto; display:flex; align-items:center; gap:clamp(18px,2.2vw,34px); }
+.hdr__nav a{
+  font-size:var(--t-xs); font-weight:500; letter-spacing:.005em;
+  color:var(--ink-3);
+  transition:color .2s var(--ease);
+}
+.hdr__nav a:hover,.hdr__nav a.is-active{ color:var(--ink); }
+.hdr__cta{ margin-left:clamp(6px,1.4vw,18px); }
+
+.hdr__burger{
+  display:none; margin-left:auto;
+  width:40px; height:40px; align-items:center; justify-content:center;
+  border:1px solid var(--hair-2); border-radius:var(--r-sm);
+}
+.hdr__burger span:first-child{
+  display:block; width:15px; height:1px; background:var(--ink-2);
+  position:relative;
+  transition:transform .3s var(--ease),background .3s var(--ease);
+}
+.hdr__burger span:first-child::before,
+.hdr__burger span:first-child::after{
+  content:''; position:absolute; left:0; width:15px; height:1px; background:var(--ink-2);
+  transition:transform .3s var(--ease),opacity .2s var(--ease);
+}
+.hdr__burger span:first-child::before{ top:-5px; }
+.hdr__burger span:first-child::after{ top:5px; }
+body.menu-open .hdr__burger span:first-child{ background:transparent; }
+body.menu-open .hdr__burger span:first-child::before{ transform:translateY(5px) rotate(45deg); }
+body.menu-open .hdr__burger span:first-child::after{ transform:translateY(-5px) rotate(-45deg); }
+
+/* Mobile overlay — deliberately designed, not a stacked desktop menu. */
+.menu{
+  position:fixed; inset:0; z-index:110;
+  background:rgba(7,8,10,.97);
+  backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
+  display:flex; flex-direction:column; justify-content:center;
+  padding:96px var(--gutter) var(--gutter);
+  opacity:0; visibility:hidden;
+  transition:opacity .32s var(--ease),visibility .32s;
+}
+body.menu-open .menu{ opacity:1; visibility:visible; }
+.menu a{
+  font-family:var(--serif); font-size:clamp(1.9rem,8vw,2.7rem);
+  line-height:1.28; color:var(--ink-2);
+  border-bottom:1px solid var(--hair-soft);
+  padding-block:13px;
+  opacity:0; transform:translateY(12px);
+  transition:opacity .45s var(--ease),transform .45s var(--ease),color .2s var(--ease);
+}
+body.menu-open .menu a{ opacity:1; transform:none; transition-delay:var(--d,0ms); }
+.menu a:hover{ color:var(--ink); }
+/* The overlay's CTA is a button, not another overlay link — it has to out-rank
+   the `.menu a` rules that style the navigation items. */
+.menu a.menu__cta{
+  margin-top:clamp(28px,6vw,44px); align-self:flex-start;
+  font-family:var(--sans); font-size:var(--t-sm); font-weight:650;
+  line-height:1; border-bottom:0; padding:14px 24px;
+  color:#0B0D10;
+}
+
+@media (max-width:900px){
+  .hdr__nav{ display:none; }
+  .hdr__cta{ display:none; }
+  .hdr__burger{ display:flex; }
+}
+
+/* With only a wordmark and a burger to carry, the bar can sit tighter on a
+   phone — which is height the hero gets back. */
+@media (max-width:560px){
+  .hdr{ height:58px; }
+  .hdr.is-stuck{ height:54px; }
+  .hdr .frame{ padding-inline:15px; }
+  .hdr__burger{ width:36px; height:36px; }
+  .wordmark .mark{ font-size:20px; }
+  .wordmark b{ font-size:.875rem; letter-spacing:.15em; }
+}
