@@ -19,6 +19,9 @@ import { buildAcquisitionDashboard } from '../lib/operator-funnel.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const HTML = fs.readFileSync(path.join(ROOT, '..', 'novus', 'operator.html'), 'utf8');
+// The design system lives in one shared stylesheet (novus/novus-ui.css) so the
+// Command Centre and the Prober cannot drift apart; style assertions read it.
+const CSS = fs.readFileSync(path.join(ROOT, '..', 'novus', 'novus-ui.css'), 'utf8');
 
 let passed = 0;
 const ok = (msg) => { passed += 1; console.log(`  ✓ ${msg}`); };
@@ -306,7 +309,7 @@ check('the sidebar counts due work and scheduled work separately', () => {
 check('Future actions is visually calmer than the live queue', () => {
   // The container carries the modifier the stylesheet quietens.
   assert.ok(HTML.includes('class="tasks future" id="fu-list"'));
-  assert.ok(HTML.includes('.tasks.future .task{opacity'));
+  assert.ok(CSS.includes('.tasks.future .task{opacity'));
 });
 
 console.log('\nOverview');
