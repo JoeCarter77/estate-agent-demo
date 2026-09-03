@@ -48,6 +48,41 @@ const communications = [
     direction: 'inbound', channel: 'email', source_identifier_raw: 'reply@agency-a.co.uk', source_identifier_normalized: 'reply@agency-a.co.uk',
     agency_id: 'ag_a', probe_id: 'prb_high_1', matching_method: 'email_exact', match_status: 'matched',
   },
+  // Legacy pre-matcher rows: both ids already populated, matching_method never
+  // backfilled, match_status carries the old grading vocabulary. These must be
+  // excluded from the queue regardless of match_status/matching_method.
+  {
+    communication_id: 'com_legacy_high', occurred_at: occurredAt, received_at: occurredAt,
+    direction: 'inbound', channel: 'email', source_identifier_raw: 'old-system@legacy.invalid',
+    body_text: 'Historical HIGH-grade communication from before the matcher existed.',
+    agency_id: 'ag_a', probe_id: 'prb_high_1', matching_method: '', match_status: 'HIGH',
+  },
+  {
+    communication_id: 'com_legacy_medium', occurred_at: occurredAt, received_at: occurredAt,
+    direction: 'inbound', channel: 'email', source_identifier_raw: 'old-system@legacy.invalid',
+    body_text: 'Historical MEDIUM-grade communication from before the matcher existed.',
+    agency_id: 'ag_b', probe_id: 'prb_b', matching_method: '', match_status: 'MEDIUM',
+  },
+  {
+    communication_id: 'com_legacy_oow', occurred_at: occurredAt, received_at: occurredAt,
+    direction: 'inbound', channel: 'email', source_identifier_raw: 'old-system@legacy.invalid',
+    body_text: 'Historical out-of-window communication from before the matcher existed.',
+    agency_id: 'ag_a', probe_id: 'prb_high_1', matching_method: '', match_status: 'HIGH_AGENCY_OUT_OF_WINDOW',
+  },
+  // Partial identity: exactly one of agency_id/probe_id is blank. These must
+  // stay in the queue no matter what legacy match_status they carry.
+  {
+    communication_id: 'com_blank_probe', occurred_at: occurredAt, received_at: occurredAt,
+    direction: 'inbound', channel: 'sms', source_identifier_raw: 'Unknown',
+    body_text: 'Hi, please confirm the details discussed earlier.',
+    agency_id: 'ag_b', probe_id: '', matching_method: '', match_status: 'unmatched',
+  },
+  {
+    communication_id: 'com_blank_agency', occurred_at: occurredAt, received_at: occurredAt,
+    direction: 'inbound', channel: 'sms', source_identifier_raw: 'Unknown',
+    body_text: 'Hi, please confirm the details discussed earlier.',
+    agency_id: '', probe_id: 'prb_b', matching_method: '', match_status: 'unmatched',
+  },
 ];
 
 let reads = 0;
@@ -106,13 +141,22 @@ assert.ok(response.headers['Cache-Control'].includes('no-store'), 'private data 
 assert.equal(response.body.read_only, true);
 assert.deepEqual(response.body.parameters, { days: 30, limit: 150 });
 assert.deepEqual(response.body.summary, {
-  reviewed: 4, recoverable: 1, unmatched: 1, ambiguous: 1, conflict: 1,
+  reviewed: 6, recoverable: 1, unmatched: 3, ambiguous: 1, conflict: 1,
 });
 assert.equal(reads, 3, 'exactly one read for each required tab');
 assert.equal(response.body.rows.find((row) => row.communication_id === 'com_recoverable').proposed_probe_id, 'prb_b');
 assert.equal(response.body.rows.find((row) => row.communication_id === 'com_conflict').status, 'conflict');
 assert.ok(!response.body.rows.some((row) => row.communication_id === 'com_resolved_excluded'));
 assert.ok(response.body.rows.every((row) => Object.hasOwn(row, 'evidence_reason')));
+
+// Regression: fully-identified rows stay out of the queue regardless of
+// legacy match_status/blank matching_method; partially-identified rows
+// (exactly one id blank) stay in it no matter what legacy status they carry.
+assert.ok(!response.body.rows.some((row) => row.communication_id === 'com_legacy_high'), 'HIGH row with both ids is excluded');
+assert.ok(!response.body.rows.some((row) => row.communication_id === 'com_legacy_medium'), 'MEDIUM row with both ids is excluded');
+assert.ok(!response.body.rows.some((row) => row.communication_id === 'com_legacy_oow'), 'HIGH_AGENCY_OUT_OF_WINDOW row with both ids is excluded');
+assert.ok(response.body.rows.some((row) => row.communication_id === 'com_blank_probe'), 'row missing only probe_id is included');
+assert.ok(response.body.rows.some((row) => row.communication_id === 'com_blank_agency'), 'row missing only agency_id is included');
 
 const capped = res();
 await handler(req({ query: { days: '999', limit: '999' } }), capped);
