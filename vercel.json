@@ -5,6 +5,8 @@
   "rewrites": [
     { "source": "/assets/:path*", "destination": "/site/assets/:path*" },
     { "source": "/capture", "destination": "/capture.html" },
+    { "source": "/privacy", "destination": "/site/privacy.html" },
+    { "source": "/terms", "destination": "/site/terms.html" },
     { "source": "/demo/grade-c", "destination": "/grade-c-demo.html" },
     { "source": "/demo/:demo_slug", "destination": "/demo.html" },
     { "source": "/novus", "destination": "/novus/probe.html" },
@@ -22,7 +24,7 @@
     { "source": "/api/novus/operator/conversation", "destination": "/api/novus/personalisation?novus_operation=operator-conversation" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/d/(.*)", "destination": "/index.html" },
-    { "source": "/:demo_slug((?!api$|demo$|novus$|capture$|d$)[^/]+)", "destination": "/demo.html" }
+    { "source": "/:demo_slug((?!api$|demo$|novus$|capture$|privacy$|terms$|d$)[^/]+)", "destination": "/demo.html" }
   ],
   "headers": [
     {
