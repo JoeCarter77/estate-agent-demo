@@ -76,13 +76,17 @@ const first = await runInboundMatchBackfill(repo, { days: 14, limit: 100, now },
   recompute: async (_repo, probeId) => { recomputed.push(probeId); },
 });
 
+// com_existing_id's stored agency_id (ag_a) contradicts the property evidence
+// in its body (ag_b's probe), so the matcher itself now classifies it as a
+// conflict before the write layer ever sees it — safer than reaching the
+// write-time "existing ID" skip, since the contradiction is surfaced earlier.
 assert.deepEqual(first.summary, {
   reviewed: 5,
   updated: 1,
   skipped_unmatched: 1,
   skipped_ambiguous: 1,
-  skipped_conflict: 1,
-  skipped_existing: 1,
+  skipped_conflict: 2,
+  skipped_existing: 0,
   failed: 0,
 });
 assert.deepEqual(first.updated, [{

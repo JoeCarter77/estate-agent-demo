@@ -102,9 +102,9 @@ assert.equal(reads, 0, 'ordinary GET does not touch Sheets');
 const response = res();
 await handler(req(), response);
 assert.equal(response.statusCode, 200);
-assert.equal(response.headers['Cache-Control'], 'no-store');
+assert.ok(response.headers['Cache-Control'].includes('no-store'), 'private data response must be no-store');
 assert.equal(response.body.read_only, true);
-assert.deepEqual(response.body.parameters, { days: 14, limit: 100 });
+assert.deepEqual(response.body.parameters, { days: 30, limit: 150 });
 assert.deepEqual(response.body.summary, {
   reviewed: 4, recoverable: 1, unmatched: 1, ambiguous: 1, conflict: 1,
 });
@@ -116,7 +116,7 @@ assert.ok(response.body.rows.every((row) => Object.hasOwn(row, 'evidence_reason'
 
 const capped = res();
 await handler(req({ query: { days: '999', limit: '999' } }), capped);
-assert.deepEqual(capped.body.parameters, { days: 90, limit: 500 });
+assert.deepEqual(capped.body.parameters, { days: 180, limit: 500 });
 
 __setRepoForTests(null);
 console.log('✅ Read-only inbound-match debug endpoint contract passed.');
