@@ -1,0 +1,1109 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOVUS — CHAPTERS
+   Eleven chapters, two rhythms. Showpiece chapters (hero, intelligence layer,
+   product, example, command centre) breathe. Supporting chapters are set
+   tight, and the contrast between them is the pacing of the page.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══ 01 · HERO + INTELLIGENCE FIELD ═════════════════════════════════════════
+   One screen, not two. The statement sits in quiet centred type and the field
+   runs the full width immediately beneath it, close enough that the reader
+   sees signals → NOVUS → action without scrolling for it. */
+.hero{ padding-top:clamp(104px,13vh,148px); padding-bottom:0; }
+.hero__head{ max-width:1000px; margin-inline:auto; text-align:center; }
+.hero .eyebrow{ justify-content:center; margin-bottom:clamp(22px,2.6vw,32px); }
+.hero .eyebrow::before{ width:28px; }
+.hero .eyebrow::after{ content:''; width:28px; height:1px; background:var(--blue-line); }
+
+.hero h1{
+  font-size:var(--t-display);
+  line-height:.99;
+  letter-spacing:-.03em;
+  margin-bottom:clamp(20px,2.1vw,28px);
+}
+/* The second line steps back without dropping out of readable contrast — the
+   pair has to work as one sentence, not as a headline and a whisper. */
+.hero h1 .soft{ color:rgba(241,237,230,.58); display:block; }
+
+.hero__sub{
+  font-size:var(--t-lede);
+  color:var(--ink-2);
+  max-width:38em;
+  margin-inline:auto;
+}
+
+.hero__actions{
+  display:flex; align-items:center; justify-content:center;
+  gap:14px; flex-wrap:wrap;
+  margin-top:clamp(26px,2.8vw,36px);
+}
+
+/* ── THE INTELLIGENCE FIELD ─────────────────────────────────────────────────
+   Full width by construction (it is not inside .frame), so no 100vw and no
+   scrollbar overflow. Masked at the edges so it dissolves rather than stops,
+   and at the foot so it hands over to the Problem chapter instead of ending
+   on a hard line above a band of black. */
+.field{
+  position:relative;
+  margin-top:clamp(14px,2vw,30px);
+  -webkit-mask-image:
+    linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent),
+    linear-gradient(180deg,#000 74%,rgba(0,0,0,.35));
+  mask-image:
+    linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent),
+    linear-gradient(180deg,#000 74%,rgba(0,0,0,.35));
+  -webkit-mask-composite:source-in;
+  mask-composite:intersect;
+}
+.field svg{ width:100%; height:auto; }
+.field__desktop{ display:block; }
+.field__mobile{ display:none; }
+
+/* field type */
+.f-col{
+  font-family:var(--mono); font-size:11px; letter-spacing:.2em;
+  text-transform:uppercase; fill:var(--ink-4);
+}
+.f-sig{
+  font-family:var(--sans); font-size:12.5px; font-weight:500;
+  letter-spacing:.11em; text-transform:uppercase; fill:var(--ink-3);
+  transition:fill .6s var(--ease);
+}
+.f-opp{
+  font-family:var(--sans); font-size:12.5px; font-weight:600;
+  letter-spacing:.1em; text-transform:uppercase; fill:var(--ink-4);
+  transition:fill .5s var(--ease);
+}
+.f-act{
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; fill:var(--ink-5);
+  transition:fill .5s var(--ease),opacity .5s var(--ease);
+  opacity:0;
+}
+.f-core-label{
+  font-family:var(--sans); font-size:12px; font-weight:700;
+  letter-spacing:.24em; text-transform:uppercase; fill:var(--ink-2);
+}
+
+.f-line{ fill:none; stroke:var(--hair-2); stroke-width:1; }
+.f-line--soft{ fill:none; stroke:var(--hair); stroke-width:1; }
+.f-dot{ fill:var(--ink-5); transition:fill .5s var(--ease); }
+.f-ring{ fill:none; stroke:var(--blue-line); stroke-width:1; }
+.f-ring--faint{ fill:none; stroke:var(--hair); stroke-width:1; }
+.f-ring--dash{
+  fill:none; stroke:var(--hair-2); stroke-width:1; stroke-dasharray:2 9;
+  transform-box:view-box; transform-origin:620px 240px;
+  animation:fspin 46s linear infinite;
+}
+@keyframes fspin{ to{ transform:rotate(360deg); } }
+
+/* a row of the opportunity ledger, lit one at a time */
+.f-row{ transition:color .5s var(--ease); }
+.f-row--risk{ color:var(--red); }
+.f-row--open{ color:var(--amber); }
+.f-row--good{ color:var(--blue); }
+.f-row.is-live .f-opp{ fill:var(--ink); }
+.f-row.is-live .f-dot{ fill:currentColor; }
+.f-row.is-live .f-act{ opacity:1; fill:currentColor; }
+.f-row.is-live .f-conn{ stroke:currentColor; opacity:.7; }
+.f-conn{ fill:none; stroke:var(--hair); stroke-width:1; transition:stroke .5s var(--ease),opacity .5s var(--ease); }
+
+/* signal labels brighten as their pulse departs */
+.f-sig.is-hot{ fill:var(--ink); }
+
+/* travelling pips — injected by JS only where offset-path is supported */
+.pip{ fill:var(--blue); offset-rotate:0deg; }
+.pip--out{ fill:var(--ink-2); }
+@keyframes pipflow{
+  0%{ offset-distance:0%; opacity:0; }
+  12%{ opacity:.95; }
+  86%{ opacity:.95; }
+  100%{ offset-distance:100%; opacity:0; }
+}
+
+/* the mobile field runs vertically and needs its own optical sizes */
+.field__mobile .f-col{ font-size:9.5px; letter-spacing:.18em; }
+.field__mobile .f-sig{ font-size:10.5px; letter-spacing:.07em; }
+.field__mobile .f-opp{ font-size:11px; letter-spacing:.07em; }
+.field__mobile .f-act{ font-size:9.5px; letter-spacing:.1em; }
+.field__mobile .f-core-label{ font-size:10.5px; letter-spacing:.2em; }
+.field__mobile .f-ring--dash{ transform-origin:200px 296px; }
+
+/* ═══ 02 · THE PROBLEM ═══════════════════════════════════════════════════════
+   Three failure patterns, not four feature rows. The state word is set as
+   editorial display type; each row is composed differently so the group never
+   reads as a table. */
+/* Joined to the hero, but not welded to it: the field's core label needs a
+   little air before the next chapter's first line. */
+#problem{ padding-top:clamp(26px,3vw,48px); }
+/* The measure belongs to the prose, not to the head — an eyebrow constrained
+   to 30em wraps to two lines and hangs its rule between them. */
+.problem__head{ max-width:none; }
+.problem__head h2{ max-width:14em; }
+.problem__head > p{ max-width:30em; }
+.states{ margin-top:clamp(34px,4vw,56px); }
+
+.state{
+  display:grid;
+  grid-template-columns:minmax(0,auto) minmax(0,42em) auto;
+  justify-content:start;
+  gap:clamp(18px,3vw,44px);
+  align-items:baseline;
+  padding-block:clamp(20px,2.4vw,32px);
+  border-top:1px solid var(--hair);
+}
+/* The state word is the loudest thing in the row: this chapter is about three
+   commercial failures, and the failure is what should be read first. */
+.state__w{
+  font-family:var(--serif); font-weight:400;
+  font-size:clamp(1.75rem,1.15rem + 2.4vw,3.2rem);
+  line-height:1; letter-spacing:-.028em;
+  color:currentColor;
+  min-width:clamp(112px,12vw,190px);
+}
+.state h3{ font-size:var(--t-h3); color:var(--ink); }
+/* Scoped to the body: an unscoped `.state p` would out-specify .state__w. */
+.state__b p{ font-size:var(--t-sm); color:var(--ink-2); max-width:34em; margin-top:9px; }
+
+/* Each row is offset a little further, so the eye reads a progression rather
+   than three identical bands. */
+.state:nth-child(2) .state__b{ padding-left:clamp(0px,2vw,38px); }
+.state:nth-child(3) .state__b{ padding-left:clamp(0px,4vw,76px); }
+
+/* the trace: a chain with the step that failed drawn as a break */
+.trace{ display:flex; align-items:center; width:clamp(96px,10vw,140px); align-self:center; }
+.trace i{ width:5px; height:5px; border-radius:50%; background:var(--ink-5); flex:none; }
+.trace u{ flex:1; height:1px; background:var(--hair-2); }
+.trace .on{ background:currentColor; }
+.trace .off{ background:transparent; box-shadow:inset 0 0 0 1px currentColor; opacity:.5; }
+.trace u.broken{ background:none; border-top:1px dashed currentColor; opacity:.45; }
+.state--red{ color:var(--red); }
+.state--amber{ color:var(--amber); }
+
+/* ═══ 03 · ONE INTELLIGENCE LAYER ════════════════════════════════════════════
+   The strata. A single rail carries the whole agency down through four
+   levels; the intelligence level is the one that is lit. */
+.strata{
+  --rail:clamp(26px,4.6vw,80px);
+  position:relative;
+  margin-top:clamp(48px,5.6vw,84px);
+  padding-left:var(--rail);
+}
+.strata__rail{
+  position:absolute; left:0; top:0; bottom:0; width:1px;
+  background:linear-gradient(180deg,transparent,var(--hair-2) 6%,var(--hair-2) 94%,transparent);
+  overflow:hidden;
+}
+.strata__rail::after{
+  content:''; position:absolute; left:-1px; top:0; width:3px; height:34%;
+  background:linear-gradient(180deg,transparent,var(--blue),transparent);
+  opacity:.5;
+  animation:railrun 9s var(--ease-io) infinite;
+}
+@keyframes railrun{
+  0%{ transform:translateY(-100%); opacity:0; }
+  12%,72%{ opacity:.5; }
+  100%{ transform:translateY(300%); opacity:0; }
+}
+
+.stratum{
+  position:relative;
+  border-top:1px solid var(--hair);
+  padding-block:clamp(26px,3.2vw,46px);
+  display:grid;
+  grid-template-columns:minmax(0,210px) minmax(0,1fr);
+  gap:clamp(16px,2.6vw,44px);
+  align-items:start;
+}
+.stratum:first-child{ border-top:0; padding-top:0; }
+.stratum::before{
+  content:''; position:absolute; top:calc(clamp(26px,3.2vw,46px) + 7px);
+  left:calc(var(--rail) * -1 - 3.5px);
+  width:8px; height:8px; border-radius:50%;
+  background:var(--bg); box-shadow:inset 0 0 0 1px var(--hair-2);
+}
+.stratum:first-child::before{ top:7px; }
+.stratum--core::before{ background:var(--blue); box-shadow:0 0 0 4px rgba(78,155,255,.14); }
+
+.stratum__label{ padding-top:3px; }
+.stratum__items{ display:flex; flex-wrap:wrap; column-gap:0; row-gap:4px; }
+.stratum__items li{
+  font-size:var(--t-sm); color:var(--ink-2);
+  padding:4px clamp(12px,1.5vw,22px);
+  border-left:1px solid var(--hair);
+  line-height:1.4;
+}
+.stratum__items li:first-child{ border-left:0; padding-left:0; }
+
+/* the lit stratum */
+.stratum--core{
+  background:linear-gradient(90deg,var(--blue-tint),transparent 78%);
+  border-top-color:var(--blue-line);
+  margin-left:calc(var(--rail) * -1);
+  padding-left:var(--rail);
+  padding-right:clamp(14px,2vw,28px);
+  border-radius:0 var(--r-lg) var(--r-lg) 0;
+  overflow:hidden;
+  grid-template-columns:minmax(0,1fr);
+}
+.stratum--core::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(78,155,255,.10),transparent);
+  width:38%;
+  animation:scan 7.5s var(--ease-io) infinite;
+}
+@keyframes scan{
+  0%{ transform:translateX(-110%); }
+  60%,100%{ transform:translateX(300%); }
+}
+.stratum__body{ display:flex; align-items:center; gap:clamp(14px,2.2vw,26px); flex-wrap:wrap; }
+.stratum__body .mark{ font-size:clamp(34px,3.4vw,46px); }
+.stratum__body h3{
+  font-size:clamp(1.25rem,1rem + 1vw,2rem); color:var(--ink);
+  letter-spacing:-.015em;
+}
+.stratum__body p{ font-size:var(--t-sm); color:var(--ink-3); max-width:30em; }
+
+.strata__note{
+  margin-top:clamp(34px,3.8vw,52px);
+  font-size:var(--t-lede); color:var(--ink-2); max-width:var(--measure);
+}
+
+/* ═══ 04 · UNDERSTAND → ACT → OPTIMISE ═══════════════════════════════════════
+   One chapter with three states. The left column scrolls; the panel on the
+   right stays and changes meaning. This is the only place on the site where a
+   composition mutates, and it does so because the product genuinely has three
+   ordered stages operating on the same surface. */
+.stages__head h2 i{
+  font-style:normal; color:var(--blue);
+  padding-inline:.12em;
+}
+
+.stages{
+  margin-top:clamp(36px,4.4vw,64px);
+  display:grid;
+  grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr);
+  gap:clamp(34px,5vw,80px);
+  align-items:start;
+}
+/* Source order puts the panel first so that, when the grid collapses, the
+   reader still meets the copy before the interface. */
+.stages__panel{ grid-column:2; grid-row:1; position:sticky; top:104px; }
+.stages__copy{ grid-column:1; grid-row:1; }
+
+/* All three views occupy the same grid cell: the panel is as tall as the
+   tallest of them, so changing stage never moves the page. */
+.views{ display:grid; }
+.view{
+  position:relative;
+  grid-area:1 / 1;
+  opacity:0; visibility:hidden; pointer-events:none;
+  transform:translateY(8px);
+  transition:opacity .5s var(--ease),transform .5s var(--ease),visibility .5s;
+}
+.view.is-on{ opacity:1; visibility:visible; pointer-events:auto; transform:none; }
+/* Only needed where the views are stacked rather than swapped. */
+.view__k{ display:none; }
+
+/* ── the stage list ──────────────────────────────────────────────────────── */
+.stage{
+  padding-block:clamp(26px,3.4vw,50px);
+  border-top:1px solid var(--hair);
+  opacity:.4;
+  transition:opacity .5s var(--ease);
+}
+.stage:first-child{ border-top:0; padding-top:0; }
+.stage.is-on{ opacity:1; }
+.stage__k{
+  display:flex; align-items:center; gap:11px;
+  font-size:var(--t-label); font-weight:600;
+  letter-spacing:.185em; text-transform:uppercase;
+  color:var(--ink-3);
+  margin-bottom:clamp(14px,1.6vw,20px);
+}
+.stage__k em{
+  font-style:normal; font-family:var(--mono);
+  color:var(--ink-5); transition:color .5s var(--ease);
+}
+.stage.is-on .stage__k{ color:var(--ink); }
+.stage.is-on .stage__k em{ color:var(--blue); }
+.stage h3{
+  font-size:clamp(1.45rem,1.05rem + 1.7vw,2.5rem);
+  line-height:1.1; letter-spacing:-.022em;
+  margin-bottom:clamp(12px,1.4vw,18px);
+}
+.stage > p{ font-size:var(--t-body); color:var(--ink-2); max-width:32em; }
+.stage__close{
+  margin-top:clamp(18px,2vw,26px);
+  padding-top:clamp(14px,1.6vw,20px);
+  border-top:1px solid var(--hair);
+  font-size:var(--t-sm); color:var(--ink-3);
+}
+.stage__close strong{ color:var(--ink-2); font-weight:500; }
+
+/* ── view 01 · the intelligence interface ────────────────────────────────── */
+.iface__scan{
+  position:absolute; inset:0 0 auto; height:34%; pointer-events:none; z-index:2;
+  background:linear-gradient(180deg,transparent,rgba(78,155,255,.10),transparent);
+  transform:translateY(-120%);
+}
+.view.is-on .iface__scan{ animation:ifacescan 1.6s var(--ease-io) .1s 1 forwards; }
+.is-in .view .iface__scan{ animation:ifacescan 1.6s var(--ease-io) .1s 1 forwards; }
+@keyframes ifacescan{ to{ transform:translateY(320%); } }
+
+.finding{
+  position:relative;
+  display:grid; grid-template-columns:minmax(0,1fr) auto;
+  gap:6px clamp(14px,2vw,26px);
+  padding:clamp(16px,1.8vw,22px) clamp(16px,2vw,24px);
+  border-bottom:1px solid var(--hair);
+}
+.finding:last-child{ border-bottom:0; }
+.finding::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:2px;
+  background:currentColor; opacity:0;
+  transition:opacity .5s var(--ease) var(--d,0ms);
+}
+.view.is-on .finding::before{ opacity:.55; }
+.finding--amber{ color:var(--amber); }
+.finding--novus{ color:var(--blue); }
+.finding--red{ color:var(--red); }
+
+.finding__k{ grid-column:1; }
+.finding__t{
+  grid-column:1; font-size:var(--t-sm); font-weight:600; color:var(--ink);
+  letter-spacing:-.004em;
+}
+.finding__e{ grid-column:1; font-size:var(--t-xs); color:var(--ink-3); max-width:44em; }
+.finding__m{
+  grid-column:2; grid-row:1 / span 3;
+  display:flex; flex-direction:column; align-items:flex-end; gap:9px;
+  padding-top:2px;
+}
+.conf{ display:flex; align-items:center; gap:7px; }
+.conf u{ display:block; width:52px; height:2px; background:var(--hair-2); border-radius:2px; overflow:hidden; }
+.conf u::after{
+  content:''; display:block; height:100%; width:var(--v,60%);
+  background:currentColor; opacity:.75;
+  transform:scaleX(0); transform-origin:left;
+  transition:transform .9s var(--ease) calc(var(--d,0ms) + 260ms);
+}
+.view.is-on .conf u::after{ transform:scaleX(1); }
+
+/* ── view 02 · act ───────────────────────────────────────────────────────── */
+.view[data-view="2"]{ padding:clamp(20px,2.4vw,30px) clamp(18px,2.2vw,28px); }
+.act__flow{ position:relative; padding-left:32px; }
+.act__flow::before{
+  content:''; position:absolute; left:5px; top:16px; bottom:26px; width:1px;
+  background:linear-gradient(180deg,var(--blue-line),var(--hair-2));
+}
+.act__step{ position:relative; padding-block:clamp(11px,1.4vw,16px); }
+.act__step::before{
+  content:''; position:absolute; left:-32px; top:calc(clamp(11px,1.4vw,16px) + 4px);
+  width:11px; height:11px; border-radius:50%;
+  background:var(--bg); box-shadow:inset 0 0 0 1px var(--blue-line);
+}
+.act__step--out::before{ background:var(--blue); box-shadow:0 0 0 4px rgba(78,155,255,.14); }
+.act__k{ margin-bottom:6px; color:var(--ink-4); }
+.act__k span{ color:var(--blue); }
+.act__step h4{ font-family:var(--sans); font-size:var(--t-sm); font-weight:650; letter-spacing:.01em; color:var(--ink); }
+.act__step > p{ font-size:var(--t-xs); color:var(--ink-3); margin-top:6px; max-width:38em; }
+
+.channels{ display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
+.channels span{
+  font-family:var(--mono); font-size:var(--t-micro);
+  letter-spacing:.13em; text-transform:uppercase;
+  padding:7px 13px; border-radius:var(--r-sm);
+  border:1px solid var(--hair); color:var(--ink-4);
+  transition:color .45s var(--ease),border-color .45s var(--ease),background .45s var(--ease);
+}
+.channels span.is-on{ color:var(--blue); border-color:var(--blue-line); background:var(--blue-tint); }
+
+.act__rules{ margin-top:clamp(20px,2.2vw,28px); }
+.act__rules li{
+  display:flex; gap:12px; align-items:baseline;
+  padding-block:10px; border-top:1px solid var(--hair);
+  font-size:var(--t-xs); color:var(--ink-2);
+}
+.act__rules li b{
+  font-family:var(--mono); font-size:var(--t-micro); font-weight:400;
+  color:var(--ink-4); letter-spacing:.1em; text-transform:uppercase;
+  flex:none; width:78px;
+}
+
+/* ── view 03 · optimise ──────────────────────────────────────────────────── */
+.view[data-view="3"]{ padding:clamp(20px,2.4vw,30px) clamp(18px,2.2vw,28px); }
+.feedback{
+  display:grid; grid-template-columns:minmax(0,190px) minmax(0,1fr);
+  gap:clamp(20px,3vw,44px); align-items:center;
+}
+.loop svg{ width:100%; height:auto; }
+.l-circle{ fill:none; stroke:var(--hair-2); stroke-width:1; }
+.l-arc{
+  fill:none; stroke:var(--blue); stroke-width:1.5; stroke-linecap:round;
+  stroke-dasharray:150 730; opacity:.85;
+  transform-box:view-box; transform-origin:210px 210px;
+  animation:larc 9s linear infinite;
+}
+@keyframes larc{ to{ transform:rotate(360deg); } }
+.l-node{ fill:var(--bg); stroke:var(--hair-2); stroke-width:1; transition:fill .4s var(--ease); }
+.l-node--on{ fill:var(--blue); stroke:none; }
+.l-label{
+  font-family:var(--sans); font-size:13px; font-weight:650;
+  letter-spacing:.18em; text-transform:uppercase; fill:var(--ink-2);
+}
+
+.feedback__list li{
+  padding-block:clamp(12px,1.4vw,17px); border-top:1px solid var(--hair);
+}
+.feedback__list li:first-child{ border-top:0; padding-top:0; }
+.feedback__list .sys{ display:block; color:var(--blue-dim); margin-bottom:5px; }
+.feedback__list p{ font-size:var(--t-sm); color:var(--ink-2); }
+
+/* ═══ 05 · LIVE EXAMPLE ══════════════════════════════════════════════════════ */
+.example{
+  display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);
+  gap:clamp(34px,5vw,86px); align-items:start;
+}
+.example__head{ position:sticky; top:110px; }
+
+.tl{ --tlpad:clamp(66px,7vw,104px); --tlrule:clamp(50px,5.4vw,80px); position:relative; padding-left:var(--tlpad); }
+.tl::before{
+  content:''; position:absolute;
+  left:var(--tlrule); top:6px; bottom:6px; width:1px;
+  background:var(--hair-2);
+}
+.tl__step{ position:relative; padding-block:clamp(16px,2vw,26px); }
+.tl__time{
+  /* .tl__step already starts after .tl's padding-left, so the time has to be
+     pulled back into that gutter by exactly that amount. */
+  position:absolute; top:calc(clamp(16px,2vw,26px) + 2px);
+  left:calc(var(--tlpad) * -1);
+  width:calc(var(--tlrule) - 14px);
+  text-align:right;
+}
+.tl__node{
+  position:absolute; top:calc(clamp(16px,2vw,26px) + 5px);
+  left:calc(var(--tlrule) - var(--tlpad) - 4px);
+  width:9px; height:9px; border-radius:50%;
+  background:var(--bg); box-shadow:inset 0 0 0 1px var(--hair-2);
+}
+.tl__k{ margin-bottom:10px; }
+.tl__t{ font-size:var(--t-h4); font-family:var(--sans); font-weight:600; color:var(--ink); letter-spacing:-.006em; }
+.tl__d{ font-size:var(--t-sm); color:var(--ink-3); margin-top:7px; max-width:38em; }
+.tl__flag{
+  display:inline-flex; align-items:center; gap:8px; margin-top:10px;
+  font-size:var(--t-xs); color:var(--ink-2);
+}
+.tl__flag svg{
+  width:13px; height:13px; stroke:var(--blue); fill:none;
+  stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; flex:none;
+}
+
+/* THE GAP. The commercial point of the example, so it is set as the largest
+   element in the timeline rather than as a caption. */
+.gap{
+  position:relative;
+  padding-block:clamp(20px,2.6vw,34px);
+  padding-left:clamp(14px,1.8vw,22px);
+  margin-left:calc(clamp(14px,1.8vw,22px) * -1);
+  display:flex; align-items:baseline; gap:clamp(14px,2vw,26px); flex-wrap:wrap;
+}
+.gap::before{
+  content:''; position:absolute;
+  left:calc(var(--tlrule) - var(--tlpad) + clamp(14px,1.8vw,22px)); top:0; bottom:0; width:1px;
+  background:repeating-linear-gradient(180deg,var(--amber) 0 3px,transparent 3px 9px);
+  opacity:.75;
+}
+.gap__t{
+  font-family:var(--serif); font-weight:400;
+  font-size:clamp(2rem,1.3rem + 2.8vw,3.6rem);
+  line-height:1; letter-spacing:-.03em;
+  color:var(--amber);
+  font-variant-numeric:tabular-nums;
+}
+.gap__l{
+  font-family:var(--sans); font-size:var(--t-xs); font-weight:600;
+  letter-spacing:.15em; text-transform:uppercase;
+  color:var(--amber); opacity:.85;
+  max-width:16em;
+}
+
+/* The NOVUS steps sit in a tinted, indented plate, which moves their padding
+   box left; the node is pushed back by exactly that amount so it stays welded
+   to the rail. */
+.tl__step--novus{
+  --tlinset:clamp(14px,2vw,22px);
+  margin-left:calc(var(--tlinset) * -1);
+  padding-left:var(--tlinset);
+  border-left:1px solid var(--blue-line);
+  border-radius:0 var(--r-md) var(--r-md) 0;
+  background:linear-gradient(90deg,var(--blue-tint),transparent 62%);
+}
+.tl__step--novus .tl__node{
+  left:calc(var(--tlrule) - var(--tlpad) - 4px + var(--tlinset));
+  background:var(--blue); box-shadow:0 0 0 4px rgba(78,155,255,.14);
+}
+.tl__rec{
+  margin-top:14px; padding:14px 16px;
+  border:1px solid var(--hair); border-radius:var(--r-md);
+  background:rgba(241,237,230,.02);
+  font-size:var(--t-sm); color:var(--ink-2);
+}
+.tl__rec b{
+  display:block; font-family:var(--mono); font-size:var(--t-micro); font-weight:400;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-4); margin-bottom:7px;
+}
+
+/* ═══ 06 · COMMAND CENTRE ════════════════════════════════════════════════════
+   A real application, drawn in markup rather than pasted in as a picture: it
+   stays sharp at every density and reflows honestly on small screens. Its
+   chrome is deliberately unlike the Understand/Act panel — heavier surface,
+   flat top corners, a navigation rail — because it is a different product
+   surface, not another diagram. */
+.cc{ margin-top:clamp(34px,4vw,58px); }
+.app{
+  display:grid; grid-template-columns:238px minmax(0,1fr);
+  border:1px solid var(--hair-2);
+  border-radius:var(--r-lg);
+  overflow:hidden;
+  background:linear-gradient(180deg,#0C0E13,#090B0F);
+  box-shadow:0 40px 90px -50px rgba(0,0,0,.9);
+}
+.app__rail{
+  border-right:1px solid var(--hair-2);
+  padding:16px 12px 18px;
+  background:rgba(0,0,0,.30);
+  display:flex; flex-direction:column;
+}
+.app__rail .wordmark{ padding:4px 8px 18px; }
+.app__rail .wordmark b{ font-size:.78rem; }
+.app__navlabel{
+  font-size:var(--t-micro); font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--ink-5); padding:15px 8px 7px;
+}
+.app__item{
+  display:flex; align-items:center; gap:10px;
+  padding:8px 9px; border-radius:var(--r-sm);
+  font-size:var(--t-xs); font-weight:550; color:var(--ink-3);
+}
+.app__item i{ width:5px; height:5px; border-radius:50%; background:var(--ink-5); flex:none; }
+.app__item b{ margin-left:auto; font-family:var(--mono); font-size:var(--t-micro); color:var(--ink-4); font-weight:400; }
+.app__item.on{ background:var(--blue-tint); color:var(--ink); box-shadow:inset 2px 0 0 var(--blue); }
+.app__item.on i{ background:var(--blue); }
+.app__item.on b{ color:var(--blue); }
+.app__foot{ margin-top:auto; padding:16px 9px 0; border-top:1px solid var(--hair); }
+
+.app__main{ min-width:0; }
+.app__top{
+  display:flex; align-items:center; gap:14px;
+  padding:14px 20px; border-bottom:1px solid var(--hair-2);
+  background:rgba(241,237,230,.016);
+}
+.app__top h4{ font-family:var(--sans); font-size:var(--t-sm); font-weight:650; letter-spacing:.005em; }
+.app__crumb{ color:var(--ink-5); }
+.seg{ display:flex; margin-left:auto; border:1px solid var(--hair); border-radius:var(--r-sm); overflow:hidden; }
+.seg span{
+  padding:6px 13px; font-size:var(--t-micro); font-weight:600; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-4); border-left:1px solid var(--hair);
+}
+.seg span:first-child{ border-left:0; }
+.seg span.on{ background:rgba(241,237,230,.06); color:var(--ink); }
+
+.grp__hd{
+  display:flex; align-items:center; gap:10px; padding:16px 20px 9px;
+  font-size:var(--t-micro); font-weight:700; letter-spacing:.17em; text-transform:uppercase;
+}
+.grp__hd b{ margin-left:auto; font-family:var(--mono); font-weight:400; color:var(--ink-4); }
+.grp--attn .grp__hd{ color:var(--amber); }
+.grp--auto .grp__hd{ color:var(--blue); }
+.grp--grow .grp__hd{ color:var(--ink-3); }
+
+.row{
+  display:grid; grid-template-columns:30px minmax(0,1fr) auto auto;
+  gap:14px; align-items:center;
+  padding:12px 20px; border-top:1px solid var(--hair);
+  transition:background .2s var(--ease);
+}
+.row:hover{ background:rgba(241,237,230,.022); }
+.row__av{
+  width:30px; height:30px; border-radius:var(--r-sm);
+  display:grid; place-items:center;
+  font-size:10.5px; font-weight:700; letter-spacing:.03em;
+  color:var(--ink-2); background:rgba(241,237,230,.05);
+  border:1px solid var(--hair);
+}
+.row__c{ min-width:0; }
+.row__n{ display:block; font-size:var(--t-xs); font-weight:650; color:var(--ink); }
+.row__s{ display:block; font-size:var(--t-micro); color:var(--ink-3); margin-top:2px; letter-spacing:.005em; }
+.row__m{ color:var(--ink-5); }
+.row__a{
+  display:flex; align-items:center; gap:7px;
+  font-size:var(--t-micro); font-weight:650; letter-spacing:.05em; white-space:nowrap;
+  color:var(--ink-3);
+  min-width:clamp(120px,11vw,168px); justify-content:flex-end;
+}
+.row__a--attn{ color:var(--amber); }
+.row__a--auto{ color:var(--blue-dim); }
+.row__a svg{ width:11px; height:11px; stroke:currentColor; fill:none; stroke-width:2; }
+
+/* three ticks keeping time — the only "activity" indicator on the site */
+.running{ display:inline-flex; gap:3px; align-items:center; }
+.running i{ width:3px; height:3px; border-radius:50%; background:currentColor; opacity:.3; animation:tick 1.4s var(--ease) infinite; }
+.running i:nth-child(2){ animation-delay:.18s; }
+.running i:nth-child(3){ animation-delay:.36s; }
+@keyframes tick{ 0%,100%{ opacity:.25; } 40%{ opacity:1; } }
+
+/* ═══ 07 · INTELLIGENCE FIRST ════════════════════════════════════════════════
+   The editorial break. Almost nothing on the screen, deliberately. */
+.first__channels{ margin-top:clamp(30px,3.4vw,48px); }
+.first__channels li{
+  font-family:var(--serif); font-size:clamp(1.5rem,1.1rem + 1.6vw,2.4rem);
+  line-height:1.32; color:var(--ink-5);
+  transition:color .9s var(--ease) var(--d,0ms);
+}
+.is-in .first__channels li{ color:var(--ink-3); }
+.first__copy{ margin-top:clamp(30px,3.4vw,46px); }
+.first__big{
+  margin-top:clamp(44px,5vw,82px);
+  padding-top:clamp(30px,3.4vw,48px);
+  border-top:1px solid var(--hair);
+  font-family:var(--serif); font-weight:400;
+  font-size:clamp(1.85rem,1.15rem + 3.1vw,4.1rem);
+  line-height:1.1; letter-spacing:-.026em;
+  max-width:15em;
+}
+.first__big em{ font-style:normal; color:var(--blue); }
+
+/* ═══ 08 · OUTCOMES + USE CASES ══════════════════════════════════════════════
+   Five rows, rule-separated. Large numeral, editorial heading, one supporting
+   line, and the example it corresponds to. No cards, no five-up grid. */
+.gains{ margin-top:clamp(34px,4vw,58px); }
+.gain{
+  display:grid;
+  grid-template-columns:minmax(0,auto) minmax(0,5fr) minmax(0,5fr);
+  gap:clamp(18px,3.2vw,58px);
+  align-items:baseline;
+  padding-block:clamp(20px,2.3vw,32px);
+  border-top:1px solid var(--hair);
+}
+.gain__i{
+  font-family:var(--serif); font-weight:400;
+  font-size:clamp(1.5rem,1rem + 1.8vw,2.6rem);
+  line-height:1; letter-spacing:-.02em;
+  color:var(--ink-5);
+  font-variant-numeric:tabular-nums;
+}
+.gain__h h3{
+  font-family:var(--sans); font-size:var(--t-xs); font-weight:700;
+  letter-spacing:.2em; text-transform:uppercase; color:var(--ink);
+  margin-bottom:11px;
+}
+.gain__h p{
+  font-family:var(--serif); font-size:clamp(1.15rem,.98rem + .8vw,1.75rem);
+  line-height:1.24; letter-spacing:-.016em; color:var(--ink-2);
+}
+.gain__e b{
+  display:block; font-family:var(--mono); font-size:var(--t-micro); font-weight:400;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--blue-dim);
+  margin-bottom:9px;
+}
+.gain__e p{ font-size:var(--t-sm); color:var(--ink-3); max-width:32em; }
+
+.gains__note{
+  margin-top:clamp(30px,3.4vw,46px); padding-top:clamp(20px,2.2vw,30px);
+  border-top:1px solid var(--hair);
+  font-size:var(--t-lede); color:var(--ink-3); max-width:var(--measure-wide);
+}
+.gains__note strong{ color:var(--ink); font-weight:400; }
+
+/* ═══ 09 · HUMAN + NOVUS ═════════════════════════════════════════════════════
+   The two columns are deliberately NOT typographic twins: the system is a set
+   of operations, set as machine text; the team is a practice, set in serif. */
+.split__head h2{ max-width:20em; }
+.split{
+  margin-top:clamp(34px,4vw,58px);
+  display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);
+  gap:clamp(26px,4vw,72px);
+  align-items:start;
+}
+.split__col h3{
+  font-family:var(--sans); font-size:var(--t-xs); font-weight:700;
+  letter-spacing:.2em; text-transform:uppercase;
+  padding-bottom:16px; border-bottom:1px solid var(--hair-2);
+}
+.split__col--n h3{ color:var(--blue); }
+.split__col--t h3{ color:var(--ink); }
+
+/* the system side: dense, machine-set, uniform */
+.split__col--n li{
+  display:flex; align-items:center; gap:12px;
+  font-family:var(--mono); font-size:var(--t-sm);
+  letter-spacing:.12em; text-transform:uppercase; color:var(--ink-2);
+  padding-block:clamp(8px,.9vw,12px);
+  border-bottom:1px solid var(--hair-soft);
+}
+.split__col--n li::before{
+  content:''; width:5px; height:5px; border-radius:50%; flex:none;
+  background:var(--blue); opacity:.7;
+}
+
+/* the human side: larger, warmer, unlisted */
+.split__col--t li{
+  font-family:var(--serif); font-size:clamp(1.4rem,1.05rem + 1.3vw,2.2rem);
+  line-height:1.32; color:var(--ink);
+  padding-block:clamp(5px,.6vw,9px);
+}
+
+.split__note{
+  margin-top:clamp(16px,1.8vw,24px);
+  font-size:var(--t-xs); color:var(--ink-4);
+}
+
+/* ═══ 10 · LEVELS ════════════════════════════════════════════════════════════
+   Not a pricing table. Three products, named at display size, with the claim
+   set as the secondary line beneath. */
+.levels{ margin-top:clamp(34px,4vw,58px); display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.level{
+  position:relative;
+  display:flex; flex-direction:column;
+  padding:clamp(22px,2.6vw,34px) clamp(18px,2.4vw,38px);
+  border-top:1px solid var(--hair-2); border-left:1px solid var(--hair);
+}
+.level:first-child{ border-left:0; padding-left:0; }
+.level__tag{
+  color:var(--ink-5);
+  /* Every tier's name starts at the same height, whether its tag is a numeral
+     or the CORE label. flex-start keeps the CORE pill the width of its own
+     word — the card is a flex column, so it would otherwise stretch. */
+  display:flex; align-items:center; align-self:flex-start; min-height:29px;
+  margin-bottom:clamp(14px,1.6vw,20px);
+}
+.level__tag--core{
+  display:inline-flex; align-items:center;
+  font-family:var(--sans); font-size:var(--t-micro); font-weight:700;
+  letter-spacing:.19em; text-transform:uppercase;
+  color:var(--blue);
+  padding:5px 10px; border-radius:var(--r-xs);
+  border:1px solid var(--blue-line); background:var(--blue-tint);
+}
+.level h3{
+  font-family:var(--serif); font-weight:400;
+  font-size:clamp(1.7rem,1.15rem + 2vw,2.9rem);
+  line-height:1; letter-spacing:-.028em; color:var(--ink);
+  margin-bottom:clamp(12px,1.4vw,18px);
+}
+.level__claim{
+  font-size:var(--t-sm); font-weight:600; color:var(--ink-2);
+  letter-spacing:-.002em; line-height:1.45; text-wrap:balance;
+  padding-bottom:clamp(14px,1.6vw,20px);
+  border-bottom:1px solid var(--hair);
+  margin-bottom:clamp(14px,1.6vw,20px);
+}
+.level__d{ font-size:var(--t-sm); color:var(--ink-3); margin-bottom:20px; }
+/* The three prices sit on one line whatever the descriptions above them do. */
+.level__price{
+  margin-top:auto; padding-top:15px; border-top:1px solid var(--hair);
+  font-size:var(--t-sm); color:var(--ink-2);
+}
+.level__price b{ font-family:var(--sans); font-weight:650; color:var(--ink); }
+.level__price span{ color:var(--ink-4); font-size:var(--t-xs); }
+
+/* The recommended product is marked, not tinted into vagueness. */
+.level--core{ border-top-color:var(--blue); }
+.level--core::before{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(180deg,var(--blue-tint),transparent 62%);
+}
+.level--core > *{ position:relative; }
+
+.levels__foot{
+  margin-top:clamp(26px,3vw,40px);
+  display:flex; align-items:flex-start; gap:clamp(20px,3vw,44px); flex-wrap:wrap;
+}
+.levels__notes{ flex:1 1 24em; min-width:0; }
+.levels__note{ font-size:var(--t-sm); color:var(--ink-3); max-width:38em; }
+.levels__note + .levels__note{ margin-top:.7em; }
+/* Ordinary commercial information — quieter than the positioning line above it,
+   and deliberately not styled as a warning. */
+.levels__setup{
+  margin-top:clamp(12px,1.4vw,18px);
+  padding-top:clamp(11px,1.2vw,15px);
+  border-top:1px solid var(--hair-soft);
+  font-size:var(--t-xs); color:var(--ink-4); max-width:38em;
+}
+
+/* One switch hides every price on the page: data-pricing on <body>. Prices-off
+   is the safe default, so a missing or mistyped attribute hides the numbers and
+   shows the explanation, rather than publishing prices by accident. */
+.level__price{ display:none; }
+body[data-pricing="on"] .level__price{ display:block; }
+body[data-pricing="on"] .levels__note--off{ display:none; }
+
+/* ═══ 11 · PHILOSOPHY → ABOUT → CTA ══════════════════════════════════════════
+   One continuous ending. Three movements separated by rules, not by three
+   section-lengths of empty black. */
+.close .philo{ text-align:center; }
+.philo__line{
+  font-family:var(--serif); font-weight:400;
+  font-size:clamp(1.6rem,1.05rem + 2.4vw,3.3rem);
+  line-height:1.16; letter-spacing:-.024em;
+  max-width:16em; margin-inline:auto;
+  padding-block:clamp(22px,3.2vw,46px);
+}
+.philo__line + .philo__line{ border-top:1px solid var(--hair-soft); }
+.philo__line b{ display:block; font-weight:400; color:var(--ink-4); }
+.philo__line i{ display:block; font-style:normal; color:var(--ink); }
+.philo__end{
+  margin-top:clamp(26px,3vw,44px); padding-top:clamp(24px,2.8vw,38px);
+  border-top:1px solid var(--hair);
+  display:flex; align-items:center; justify-content:center; gap:clamp(12px,2vw,22px);
+  flex-wrap:wrap;
+  font-family:var(--sans); font-size:var(--t-xs); font-weight:700;
+  letter-spacing:.24em; text-transform:uppercase; color:var(--ink-2);
+}
+.philo__end i{ font-style:normal; color:var(--blue); }
+
+.about{
+  margin-top:clamp(38px,4.6vw,68px);
+  padding-top:clamp(32px,3.6vw,52px);
+  border-top:1px solid var(--hair);
+  text-align:center;
+}
+.about .eyebrow{ justify-content:center; margin-bottom:clamp(16px,1.8vw,24px); }
+.about h2{ max-width:14em; margin-inline:auto; }
+.about__copy{
+  margin-top:clamp(22px,2.6vw,34px);
+  margin-inline:auto; max-width:36em;
+}
+.about q{
+  quotes:none; display:block; font-family:var(--serif); font-size:var(--t-h3);
+  color:var(--ink); line-height:1.36; margin-block:1.1em;
+}
+/* No portrait: a real photograph or nothing. A grey placeholder with initials
+   in it is worse than an honest byline. */
+.byline{ margin-top:clamp(26px,3vw,40px); }
+.byline b{ display:block; font-family:var(--sans); font-size:var(--t-sm); font-weight:650; color:var(--ink); }
+.byline span{ font-size:var(--t-xs); color:var(--ink-4); }
+
+.final{
+  margin-top:clamp(38px,4.6vw,68px);
+  padding-top:clamp(32px,3.6vw,52px);
+  border-top:1px solid var(--hair);
+  text-align:center;
+}
+.final h2{ font-size:var(--t-h1); max-width:14em; margin-inline:auto; }
+.final p{ margin:clamp(18px,2vw,26px) auto 0; max-width:34em; font-size:var(--t-lede); color:var(--ink-2); }
+.final__actions{ margin-top:clamp(28px,3.2vw,40px); display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:wrap; }
+.final__mail{
+  font-size:var(--t-sm); color:var(--ink-3);
+  border-bottom:1px solid var(--hair-2); padding-bottom:2px;
+  transition:color .2s var(--ease),border-color .2s var(--ease);
+}
+.final__mail:hover{ color:var(--blue); border-color:var(--blue-line); }
+
+/* ═══ FOOTER ═════════════════════════════════════════════════════════════════ */
+.ftr{ border-top:1px solid var(--hair); padding-block:clamp(44px,4.6vw,66px) clamp(28px,2.8vw,40px); }
+.ftr__grid{
+  display:grid; grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr));
+  gap:clamp(28px,4vw,64px);
+}
+.ftr__brand p{ margin-top:16px; font-size:var(--t-sm); color:var(--ink-4); max-width:22em; }
+.ftr h5{
+  font-size:var(--t-micro); font-weight:700; letter-spacing:.17em; text-transform:uppercase;
+  color:var(--ink-5); margin-bottom:16px;
+}
+.ftr li{ padding-block:6px; }
+.ftr li a{ font-size:var(--t-sm); color:var(--ink-3); transition:color .2s var(--ease); }
+.ftr li a:hover{ color:var(--ink); }
+.ftr__base{
+  margin-top:clamp(36px,4vw,58px); padding-top:22px; border-top:1px solid var(--hair-soft);
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  font-size:var(--t-xs); color:var(--ink-5);
+}
+.ftr__base .sys{ margin-left:auto; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   Rule 16: mobile is a designed composition, not a stacked desktop. Layouts
+   change shape here — they do not simply fall into one column.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── TABLET ────────────────────────────────────────────────────────────────
+   Between roughly 900 and 1180 the wide intelligence field still composes,
+   but its type is scaling down with the drawing. The labels have room in the
+   diagram, so they are set larger in user units to hold their rendered size —
+   which is why the field does NOT flip to the phone drawing here. */
+@media (max-width:1180px){
+  .field__desktop .f-sig,
+  .field__desktop .f-opp{ font-size:15.5px; letter-spacing:.06em; }
+  .field__desktop .f-act{ font-size:13px; letter-spacing:.08em; }
+  .field__desktop .f-col{ font-size:13px; letter-spacing:.14em; }
+  .field__desktop .f-core-label{ font-size:14.5px; letter-spacing:.18em; }
+}
+
+@media (max-width:1080px){
+  /* The merged product chapter loses its sticky pairing: copy first, then the
+     surface it describes, with all three views shown in sequence. */
+  .stages{ grid-template-columns:minmax(0,1fr); gap:clamp(26px,4vw,40px); }
+  .stages__panel{ grid-column:1; grid-row:2; position:static; }
+  .stages__copy{ grid-column:1; grid-row:1; }
+  .stage{ opacity:1; }
+
+  /* Without the sticky pairing there is nothing to swap the panel against, so
+     the three states are shown in sequence instead of one replacing the other
+     — otherwise a phone only ever sees whichever view happened to be last. */
+  .views{ display:block; }
+  .view{
+    position:static; opacity:1; visibility:visible; pointer-events:auto;
+    transform:none; border-top:1px solid var(--hair-2);
+  }
+  .view:first-child{ border-top:0; }
+  .view__k{
+    display:block; color:var(--blue-dim);
+    padding:16px clamp(16px,2vw,24px) 0;
+  }
+  .view[data-view="2"] .view__k,
+  .view[data-view="3"] .view__k{ padding-inline:0; padding-top:0; margin-bottom:14px; }
+  /* Each view carries its own name here, so the bar must not claim one. */
+  [data-stage-title]{ display:none; }
+
+  .example,.feedback{ grid-template-columns:minmax(0,1fr); gap:clamp(26px,4.4vw,44px); }
+  .example__head{ position:static; }
+  .loop svg{ width:min(100%,300px); margin-inline:auto; }
+
+  .app{ grid-template-columns:minmax(0,1fr); }
+  .app__rail{ display:none; }
+  .ftr__grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+
+  .gain{ grid-template-columns:minmax(0,auto) minmax(0,1fr); row-gap:14px; }
+  .gain__e{ grid-column:2; }
+}
+
+/* ── SMALL TABLET / LARGE PHONE ────────────────────────────────────────────
+   Set from composition, not from a round number: at this width the wide
+   field's opportunity column can no longer hold "Reactivation opportunity"
+   on one line without colliding with its action, so the vertical drawing
+   takes over. */
+@media (max-width:900px){
+  .field__desktop{ display:none; }
+  .field__mobile{ display:block; }
+  .field{
+    -webkit-mask-image:linear-gradient(180deg,#000 88%,transparent);
+    mask-image:linear-gradient(180deg,#000 88%,transparent);
+  }
+  /* A tablet is not a large phone. Stretched to 800px the vertical drawing
+     becomes a poster: 1400px tall with 22px labels. Capped and centred it
+     reads as what it is — a diagram sitting inside a wide page. */
+  .field__mobile{ max-width:470px; margin-inline:auto; }
+
+  /* The problem states become records with the state word leading. */
+  .state{ grid-template-columns:minmax(0,1fr) auto; gap:14px clamp(16px,4vw,32px); align-items:center; }
+  .state__w{ grid-column:1; }
+  .trace{ grid-column:2; grid-row:1; }
+  .state__b{ grid-column:1 / -1; padding-left:0 !important; }
+
+  .stratum{ grid-template-columns:minmax(0,1fr); gap:16px; }
+  .stratum__items{ row-gap:2px; }
+  .stratum__items li{ padding:3px 16px 3px 0; border-left:0; }
+  .stratum--core{ border-radius:0; }
+
+  .split{ grid-template-columns:minmax(0,1fr); gap:clamp(28px,5vw,44px); }
+  .levels{ grid-template-columns:minmax(0,1fr); }
+  .level{ border-left:0; padding-inline:0; }
+  .level--core{ padding-inline:18px; margin-inline:-18px; border-radius:var(--r-md); }
+
+  .finding{ grid-template-columns:minmax(0,1fr); }
+  .finding__m{ grid-column:1; grid-row:auto; align-items:center; flex-direction:row; gap:14px; }
+
+  .ftr__grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .ftr__brand{ grid-column:1 / -1; }
+}
+
+@media (max-width:560px){
+  .field__mobile{ max-width:none; }
+
+  /* ── THE HERO ON A PHONE ────────────────────────────────────────────────
+     Same composition as the desktop, not a squeezed copy of it. The order the
+     reader gets is header → eyebrow → headline → copy → CTA, and the field is
+     allowed to begin below the fold so that sequence can breathe.
+
+     The headline is the whole hero, so it gets the width: the hero's frame
+     runs a narrower gutter than the rest of the page, which is worth a full
+     line of type at this size. */
+  .hero .frame{ padding-inline:15px; }
+  .hero{ padding-top:clamp(84px,10.5vh,104px); }
+
+  .hero .eyebrow{ font-size:.63rem; letter-spacing:.16em; margin-bottom:20px; }
+  /* The eyebrow wraps to two lines here; the flanking rules then hang off a
+     single line and read as a mistake, so they go. */
+  .hero .eyebrow::before,
+  .hero .eyebrow::after{ display:none; }
+
+  /* Sized so the sentence breaks where it means to — "Your agency produces /
+     thousands of signals." — instead of balancing itself into four ragged
+     lines. Fewer, fuller lines read larger than a bigger ragged block does. */
+  /* A steep slope on purpose: the sentence has to break "Your agency produces /
+     thousands of signals." at every common phone width, and the difference
+     between a 375 and a 430 screen is exactly one line of type. */
+  .hero h1{
+    font-size:clamp(1.7rem,-0.42rem + 10.7vw,2.6rem);
+    line-height:1.06;
+    letter-spacing:-.024em;
+    text-wrap:normal;
+    margin-bottom:18px;
+  }
+  .hero h1 .soft{ margin-top:.12em; }
+
+  .hero__sub{
+    font-size:.975rem; line-height:1.52;
+    max-width:23em;
+  }
+
+  .hero__actions{
+    flex-direction:column; align-items:stretch;
+    gap:9px; margin-top:24px;
+  }
+  .hero__actions .btn{ justify-content:center; padding-block:12px; }
+
+  /* The message finishes before the product visual starts. Overrunning the
+     fold here is the point — the reader should reach the end of the sentence
+     before the diagram begins. */
+  .field{ margin-top:62px; }
+
+  /* The timeline's time column costs a third of the width on a phone. The
+     times move above their step and the rail moves to the far left. */
+  .tl{ --tlpad:26px; --tlrule:4px; }
+  .tl__time{ position:static; display:block; width:auto; text-align:left; margin-bottom:6px; }
+  .tl__node{ top:calc(clamp(16px,2vw,26px) + 4px); }
+  .gap{ flex-direction:column; gap:8px; }
+
+  .gain{ grid-template-columns:minmax(0,1fr); row-gap:12px; }
+  .gain__i{ font-size:1.35rem; }
+  .gain__e{ grid-column:1; padding-top:4px; }
+
+  .row{ grid-template-columns:26px minmax(0,1fr) auto; row-gap:8px; }
+  .row__av{ width:26px; height:26px; font-size:9.5px; }
+  .row__m{ justify-self:end; }
+  .row__a{ grid-column:1 / -1; justify-content:flex-start; min-width:0; }
+  .app__top .seg{ display:none; }
+  .app__crumb{ margin-left:auto; }
+
+  .philo__line{ max-width:none; }
+  .final__actions{ flex-direction:column; gap:16px; }
+  .final__actions .btn{ width:100%; justify-content:center; }
+  .levels__foot .btn{ width:100%; justify-content:center; }
+}
+
+/* Wide displays get more air, never more content. */
+@media (min-width:1600px){
+  :root{ --frame:1400px; }
+}
+
+/* Print: the page still reads as a document. */
+@media print{
+  body::before,body::after,.hdr,.menu{ display:none !important; }
+  body{ background:#fff; color:#111; }
+  .section{ padding-block:24px; break-inside:avoid; }
+  .view{ opacity:1 !important; visibility:visible !important; position:static; }
+}

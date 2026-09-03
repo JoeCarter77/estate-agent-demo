@@ -1,0 +1,36 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOVUS — LEGAL PAGES
+   Static, no-motion layer for Privacy and Terms of Use. Reuses tokens/base/
+   components; adds only the header, article typography and layout those don't
+   already cover. No JS dependency — these pages never call main.js.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lgl-hdr{
+  border-bottom:1px solid var(--hair);
+  padding-block:18px;
+}
+.lgl-hdr .frame{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  flex-wrap:wrap;
+}
+
+.legal-updated{ margin-top:10px; }
+
+.legal-copy{ max-width:var(--measure-wide); margin-top:clamp(30px,3.2vw,46px); }
+.legal-copy h2{
+  font-family:var(--sans);
+  font-size:var(--t-h4); font-weight:650;
+  letter-spacing:-.006em; color:var(--ink);
+  margin-top:clamp(36px,3.6vw,52px);
+  margin-bottom:.65em;
+}
+.legal-copy h2:first-child{ margin-top:0; }
+.legal-copy p{ margin-top:1.05em; }
+.legal-copy p:first-child{ margin-top:0; }
+.legal-copy ul{ margin-top:1.05em; padding-left:1.25em; }
+.legal-copy li{ list-style:disc; padding-block:.28em; }
+.legal-copy a{ color:var(--blue); text-decoration:underline; text-underline-offset:.18em; }
+.legal-copy a:hover{ color:var(--blue-hi); }
+.legal-copy strong{ color:var(--ink); font-weight:600; }
+
+.legal-back{ margin-top:clamp(44px,4.4vw,64px); }
