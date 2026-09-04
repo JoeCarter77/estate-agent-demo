@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>NOVUS — Intelligence for estate agencies</title>
-<meta name="description" content="NOVUS is an intelligence and action layer for independent UK estate agencies. It reads the signals your agency already produces, identifies commercial opportunity, decides what should happen next and makes sure the right action happens." />
+<title>NOVUS — Commercial intelligence for estate agencies</title>
+<meta name="description" content="The smartest agency will win. NOVUS is an always-on commercial intelligence layer for estate agencies — it continuously understands what is happening across the business, identifies what matters, acts when it should and improves from every outcome." />
 <meta name="theme-color" content="#0A0B0E" />
 <link rel="canonical" href="https://getnovus.co.uk/" />
 
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="NOVUS" />
-<meta property="og:title" content="NOVUS — Intelligence for estate agencies" />
-<meta property="og:description" content="Your agency produces thousands of signals. NOVUS turns them into action." />
+<meta property="og:title" content="NOVUS — The smartest agency will win." />
+<meta property="og:description" content="An always-on commercial intelligence layer for estate agencies." />
 <meta property="og:url" content="https://getnovus.co.uk/" />
 <meta name="twitter:card" content="summary_large_image" />
 
@@ -36,21 +36,11 @@
   /* Every reveal is a transition FROM a shifted state TO the real composition.
      With no JS there is nothing to trigger it, so land the page directly. */
   .reveal,.reveal-child{ opacity:1 !important; transform:none !important; }
-  .stage{ opacity:1 !important; }
-  /* The three product views are stacked in one grid cell and swapped by class.
-     With nothing to swap them, show them in sequence instead. */
-  .views{ display:block !important; }
-  .view{
-    position:static !important; opacity:1 !important;
-    visibility:visible !important; transform:none !important;
-    border-top:1px solid var(--hair-2);
-  }
-  .view:first-child{ border-top:0; }
-  .view__k{ display:block !important; color:var(--blue-dim); padding:16px 20px 0; }
-  .stages__panel{ position:static !important; }
   /* The ledger's actions are revealed as each row resolves. */
   .f-act{ opacity:1; }
-  .conf u::after{ transform:scaleX(1); }
+  /* The thesis resolves its four verbs out of the dark as the chapter arrives.
+     With nothing to resolve them, they are simply set. */
+  .notice li{ color:var(--ink) !important; }
 </style></noscript>
 </head>
 
@@ -69,7 +59,7 @@
 
     <nav class="hdr__nav" aria-label="Primary">
       <a href="#product">Product</a>
-      <a href="#how">How it works</a>
+      <a href="#command">Command centre</a>
       <a href="#levels">Levels</a>
       <a href="#about">About</a>
     </nav>
@@ -85,7 +75,7 @@
 
 <nav class="menu" id="menu" aria-label="Mobile" aria-hidden="true">
   <a href="#product">Product</a>
-  <a href="#how">How it works</a>
+  <a href="#command">Command centre</a>
   <a href="#levels">Levels</a>
   <a href="#about">About</a>
   <a class="btn btn--primary menu__cta" href="https://calendly.com/joe-getnovus/10min" target="_blank" rel="noopener noreferrer">Book a conversation <span class="arw" aria-hidden="true">→</span></a>
@@ -93,24 +83,25 @@
 
 <main id="main">
 
-<!-- ═══ 01 · HERO + INTELLIGENCE FIELD ═══════════════════════════════════ -->
+<!-- ═══ 01 · HERO + INTELLIGENCE FIELD ═══════════════════════════════════
+     One claim, set as large as the page will allow. Everything that explains
+     it waits until after the field. -->
 <section class="section hero" id="top">
   <div class="frame">
-    <div class="hero__head" data-reveal data-stagger="110">
-      <p class="eyebrow reveal-child">The intelligence layer for estate agencies</p>
+    <div class="hero__head" data-reveal data-stagger="120">
+      <p class="eyebrow reveal-child">Commercial intelligence for estate agencies</p>
 
-      <h1 class="reveal-child">
-        Your agency produces thousands of signals.
-        <span class="soft">NOVUS turns them into action.</span>
-      </h1>
+      <h1 class="reveal-child">The smartest agency will win.</h1>
 
       <p class="hero__sub reveal-child">
-        NOVUS reads the enquiries, conversations and database activity you already
-        produce — then decides what should happen next, and makes sure it happens.
+        Not the one with the most software. The one that sees more,
+        understands more and acts faster.
       </p>
 
+      <p class="hero__claim reveal-child">NOVUS gives your agency that intelligence.</p>
+
       <div class="hero__actions reveal-child">
-        <a class="btn btn--primary" href="#how">See how NOVUS works <span class="arw" aria-hidden="true">→</span></a>
+        <a class="btn btn--primary" href="#product">See what NOVUS is <span class="arw" aria-hidden="true">→</span></a>
         <a class="btn btn--ghost" href="https://calendly.com/joe-getnovus/10min" target="_blank" rel="noopener noreferrer">Book a conversation</a>
       </div>
     </div>
@@ -290,368 +281,221 @@
       <g class="f-pips"></g>
     </svg>
   </div>
-</section>
 
-<!-- ═══ 02 · THE PROBLEM ═════════════════════════════════════════════════
-     Joined to the hero: the field dissolves straight into the sentence that
-     explains it, rather than leaving a band of black between them. -->
-<section class="section section--sm section--joined" id="problem">
-  <div class="frame" data-reveal>
-    <div class="head problem__head">
-      <p class="eyebrow reveal-child">More is happening than you can see</p>
-      <h2 class="reveal-child">Opportunity disappears in the gaps.</h2>
-      <p class="reveal-child">
-        Most agencies don't have an enquiry problem. They have a visibility and
-        execution problem — and because no single case looks dramatic, nobody
-        ever sees the pattern.
-      </p>
-    </div>
-
-    <div class="states">
-      <article class="state state--red reveal-child">
-        <p class="state__w">Missed</p>
-        <div class="state__b">
-          <h3>Seller opportunity left unfinished</h3>
-          <p>A buyer mentions they have a property to sell. The viewing progresses. The valuation opportunity doesn't.</p>
-        </div>
-        <span class="trace" aria-hidden="true"><i class="on"></i><u></u><i class="on"></i><u></u><i class="on"></i><u class="broken"></u><i class="off"></i></span>
-      </article>
-
-      <article class="state state--amber reveal-child">
-        <p class="state__w">Stalled</p>
-        <div class="state__b">
-          <h3>The conversation simply stops</h3>
-          <p>The initial response happens. Nobody makes sure the opportunity reaches the next commercial step.</p>
-        </div>
-        <span class="trace" aria-hidden="true"><i class="on"></i><u></u><i class="on"></i><u class="broken"></u><i class="off"></i><u class="broken"></u><i class="off"></i></span>
-      </article>
-
-      <article class="state state--amber reveal-child">
-        <p class="state__w">Dormant</p>
-        <div class="state__b">
-          <h3>Value already sitting in your database</h3>
-          <p>Previous applicants, valuations and vendors contain intent the agency has already paid to acquire.</p>
-        </div>
-        <span class="trace" aria-hidden="true"><i class="on"></i><u class="broken"></u><i class="off"></i><u class="broken"></u><i class="off"></i><u class="broken"></u><i class="off"></i></span>
-      </article>
-    </div>
-  </div>
-</section>
-
-<!-- ═══ 03 · ONE INTELLIGENCE LAYER ══════════════════════════════════════ -->
-<section class="section section--lg section--dark section--ruled" id="product">
-  <div class="frame" data-reveal>
-    <div class="head">
-      <p class="eyebrow reveal-child">One intelligence layer</p>
-      <h2 class="reveal-child">NOVUS connects the signals your agency already produces.</h2>
-    </div>
-
-    <div class="strata">
-      <div class="strata__rail" aria-hidden="true"></div>
-
-      <div class="stratum reveal-child">
-        <p class="eyebrow eyebrow--plain stratum__label">Inputs</p>
-        <ul class="stratum__items">
-          <li>Enquiries</li><li>Calls</li><li>Emails</li><li>Follow-up</li>
-          <li>Database</li><li>Appointments</li><li>Past vendors</li>
-          <li>Applicants</li><li>Seller intent</li><li>Outcomes</li>
-        </ul>
-      </div>
-
-      <div class="stratum stratum--core reveal-child">
-        <div class="stratum__body">
-          <img class="mark" src="assets/img/novus-mark.png" alt="" width="384" height="360" />
-          <h3>NOVUS Intelligence</h3>
-          <p>
-            Interprets what happened, what should have happened, and what the
-            activity is commercially worth.
-          </p>
-        </div>
-      </div>
-
-      <div class="stratum reveal-child">
-        <p class="eyebrow eyebrow--plain stratum__label">Opportunities</p>
-        <ul class="stratum__items">
-          <li>Missed opportunity</li><li>Stalled enquiry</li>
-          <li>Reactivation opportunity</li><li>Priority action</li>
-          <li>Growth opportunity</li>
-        </ul>
-      </div>
-
-      <div class="stratum reveal-child">
-        <p class="eyebrow eyebrow--plain stratum__label">Action</p>
-        <ul class="stratum__items">
-          <li>Email</li><li>SMS</li><li>Follow-up</li><li>Outreach</li>
-          <li>Database reactivation</li><li>Appointment action</li><li>Escalation</li>
-        </ul>
-      </div>
-    </div>
-
-    <p class="strata__note reveal-child">
-      One agency. Thousands of signals. Instead of adding another isolated tool,
-      NOVUS creates an intelligence layer across all of them.
+  <div class="frame">
+    <p class="hero__note reveal" data-reveal>
+      Every enquiry, conversation and outcome contains information about what
+      should happen next. <strong>NOVUS continuously connects those signals,
+      identifies what matters and acts when it should.</strong>
     </p>
   </div>
 </section>
 
-<!-- ═══ 04 · UNDERSTAND → ACT → OPTIMISE ═════════════════════════════════
-     One chapter, three states. The panel on the right does not get replaced
-     by another section — it changes meaning as the reader moves down. -->
-<section class="section section--lg" id="how">
-  <div class="frame">
-    <div class="head stages__head" data-reveal>
-      <p class="eyebrow reveal-child">How NOVUS works</p>
-      <h2 class="reveal-child">Understand <i aria-hidden="true">→</i> Act <i aria-hidden="true">→</i> Optimise</h2>
+<!-- ═══ 02 · THE THESIS ══════════════════════════════════════════════════
+     The competitive argument, and the only place on the page that owns it. -->
+<section class="section section--lg section--ruled" id="thesis">
+  <div class="frame" data-reveal>
+    <div class="head">
+      <p class="eyebrow reveal-child">The thesis</p>
+      <h2 class="reveal-child">Intelligence compounds.</h2>
+      <p class="reveal-child">
+        Two agencies can have the same CRM, similar people and the same market.
+      </p>
     </div>
 
-    <div class="stages" data-stages data-stage="1">
-      <!-- The evolving surface. One panel, three views. -->
-      <div class="stages__panel">
-        <div class="panel">
-          <div class="panel__bar">
-            <img class="mark" src="assets/img/novus-mark.png" alt="" width="384" height="360" style="font-size:16px" />
-            <span class="panel__title" data-stage-title>Intelligence</span>
-            <span class="panel__right">
-              <span class="chip chip--novus"><i class="dot pulse"></i>Live</span>
-            </span>
-          </div>
+    <div class="thesis">
+      <ul class="notice">
+        <li class="reveal-child">One notices more.</li>
+        <li class="reveal-child">Remembers more.</li>
+        <li class="reveal-child">Acts sooner.</li>
+        <li class="reveal-child">Learns from every outcome.</li>
+      </ul>
 
-          <div class="views">
-            <!-- 01 · UNDERSTAND — what the system can see -->
-            <div class="view is-on" data-view="1">
-              <p class="view__k sys">01 · Understand</p>
-              <div class="iface__scan" aria-hidden="true"></div>
-
-              <article class="finding finding--amber">
-                <p class="finding__k"><span class="chip chip--amber">Seller intent detected</span></p>
-                <p class="finding__t">Valuation opportunity not progressed</p>
-                <p class="finding__e">Buyer confirmed an onward sale during the enquiry. No appraisal or valuation step was offered afterwards.</p>
-                <div class="finding__m">
-                  <span class="sys">Enquiry · 4d</span>
-                  <span class="conf"><u style="--v:88%"></u><span class="sys">High</span></span>
-                </div>
-              </article>
-
-              <article class="finding finding--red">
-                <p class="finding__k"><span class="chip chip--red">Follow-up gap</span></p>
-                <p class="finding__t">High-intent applicant received no further action</p>
-                <p class="finding__e">Two inbound messages, one viewing request, no response after the initial reply.</p>
-                <div class="finding__m">
-                  <span class="sys">Applicant · 9d</span>
-                  <span class="conf"><u style="--v:74%"></u><span class="sys">Med</span></span>
-                </div>
-              </article>
-
-              <article class="finding finding--novus">
-                <p class="finding__k"><span class="chip chip--novus">Database opportunity</span></p>
-                <p class="finding__t">Previously engaged vendor showing renewed intent</p>
-                <p class="finding__e">Valuation recorded last year, no instruction. Recent activity indicates the move is live again.</p>
-                <div class="finding__m">
-                  <span class="sys">Vendor · 14m</span>
-                  <span class="conf"><u style="--v:66%"></u><span class="sys">Med</span></span>
-                </div>
-              </article>
-            </div>
-
-            <!-- 02 · ACT — opportunity → decision → channel -->
-            <div class="view" data-view="2" data-seq="channels">
-              <p class="view__k sys">02 · Act</p>
-              <div class="act__flow">
-                <div class="act__step">
-                  <p class="act__k sys">Opportunity</p>
-                  <h4>Seller intent on an enquiry that progressed to viewing only</h4>
-                </div>
-                <div class="act__step">
-                  <p class="act__k sys">Decision</p>
-                  <h4>Recover the valuation opportunity</h4>
-                  <p>Channel, timing and message are chosen from what this opportunity needs — not from a fixed sequence.</p>
-                </div>
-                <div class="act__step act__step--out">
-                  <p class="act__k sys">Action · <span data-seq-readout>Email</span></p>
-                  <div class="channels">
-                    <span class="is-on">Email</span>
-                    <span>SMS</span>
-                    <span>Follow-up</span>
-                    <span>Call</span>
-                    <span>Appointment</span>
-                    <span>Escalation</span>
-                  </div>
-                </div>
-              </div>
-
-              <ul class="act__rules">
-                <li><b>Automatic</b> Some actions happen without anyone being asked.</li>
-                <li><b>Escalated</b> Some are handed to your team, with the reasoning attached.</li>
-                <li><b>Always</b> Every action carries the context that produced it.</li>
-              </ul>
-            </div>
-
-            <!-- 03 · OPTIMISE — the outcome returns to intelligence -->
-            <div class="view" data-view="3">
-              <p class="view__k sys">03 · Optimise</p>
-              <div class="feedback">
-                <div class="loop" data-seq="loop">
-                  <svg viewBox="-26 -26 472 472" role="img"
-                       aria-label="A continuous cycle: identify, act, outcome, learn, returning to identify.">
-                    <circle class="l-circle" cx="210" cy="210" r="140" />
-                    <circle class="l-arc"    cx="210" cy="210" r="140" />
-
-                    <circle class="l-node" cx="210" cy="70"  r="7" />
-                    <circle class="l-node" cx="350" cy="210" r="7" />
-                    <circle class="l-node" cx="210" cy="350" r="7" />
-                    <circle class="l-node" cx="70"  cy="210" r="7" />
-
-                    <text class="l-label" x="210" y="38"  text-anchor="middle">Identify</text>
-                    <text class="l-label" x="388" y="214" text-anchor="middle">Act</text>
-                    <text class="l-label" x="210" y="388" text-anchor="middle">Outcome</text>
-                    <text class="l-label" x="32"  y="214" text-anchor="middle">Learn</text>
-
-                    <image class="l-mark" href="assets/img/novus-mark.png"
-                           x="181.2" y="183" width="57.6" height="54"
-                           preserveAspectRatio="xMidYMid meet" />
-                  </svg>
-                </div>
-
-                <ul class="feedback__list">
-                  <li>
-                    <span class="sys">Outcome</span>
-                    <p>Valuation booked from a recovered seller opportunity.</p>
-                  </li>
-                  <li>
-                    <span class="sys">Learned</span>
-                    <p>Recovery works best inside 24 hours of the viewing being agreed.</p>
-                  </li>
-                  <li>
-                    <span class="sys">Applied</span>
-                    <p>The next comparable opportunity is actioned sooner, through the channel that worked.</p>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="copy thesis__copy">
+        <p class="reveal-child"><strong>That agency has an advantage.</strong></p>
+        <p class="reveal-child">
+          Every call, email, viewing, valuation and database interaction adds to
+          the picture. No individual can hold all of it, across an entire agency,
+          continuously.
+        </p>
+        <p class="reveal-child">This is where opportunities quietly disappear.</p>
       </div>
-
-      <!-- The three stages. Scrolling these drives the panel. -->
-      <ol class="stages__copy">
-        <li class="stage" data-s="1">
-          <p class="stage__k"><em>01</em> Understand</p>
-          <h3>See what is actually happening.</h3>
-          <p>
-            NOVUS continuously interprets the commercial activity across your
-            agency: what happened, what should have happened, where opportunity
-            has been lost and what deserves attention next.
-          </p>
-          <p class="stage__close"><strong>Intelligence is the foundation.</strong> NOVUS doesn't automate blindly. It understands first.</p>
-        </li>
-
-        <li class="stage" data-s="2">
-          <p class="stage__k"><em>02</em> Act</p>
-          <h3>When action is needed, NOVUS can take it.</h3>
-          <p>
-            Once an opportunity is understood, NOVUS orchestrates the next step
-            through the right channel — immediately, consistently and within the
-            rules you define.
-          </p>
-        </li>
-
-        <li class="stage" data-s="3">
-          <p class="stage__k"><em>03</em> Optimise</p>
-          <h3>Every outcome improves what happens next.</h3>
-          <p>
-            NOVUS tracks what happened afterwards — which opportunities
-            progressed and which actions worked — then feeds that back into the
-            intelligence layer.
-          </p>
-          <p class="stage__close"><strong>The system compounds.</strong> Every action the agency takes makes the next one better informed.</p>
-        </li>
-      </ol>
     </div>
+
+    <div class="misses">
+      <article class="miss reveal-child">
+        <p class="miss__a">Seller intent appears.</p>
+        <p class="miss__b">Nobody progresses it.</p>
+        <span class="trace" aria-hidden="true"><i class="on"></i><u></u><i class="on"></i><u class="broken"></u><i class="off"></i></span>
+      </article>
+      <article class="miss reveal-child">
+        <p class="miss__a">An enquiry stalls.</p>
+        <p class="miss__b">Nobody catches it.</p>
+        <span class="trace" aria-hidden="true"><i class="on"></i><u class="broken"></u><i class="off"></i><u class="broken"></u><i class="off"></i></span>
+      </article>
+      <article class="miss reveal-child">
+        <p class="miss__a">An old opportunity becomes relevant again.</p>
+        <p class="miss__b">Nobody sees it.</p>
+        <span class="trace" aria-hidden="true"><i class="on"></i><u></u><i class="on"></i><u></u><i class="on"></i><u class="broken"></u><i class="off"></i></span>
+      </article>
+    </div>
+
+    <p class="belief reveal-child">
+      The future isn't more software.
+      <em>It's a business that understands itself.</em>
+    </p>
   </div>
 </section>
 
-<!-- ═══ 05 · LIVE EXAMPLE ════════════════════════════════════════════════ -->
+<!-- ═══ 03 · WHAT NOVUS IS ═══════════════════════════════════════════════ -->
+<section class="section section--lg section--dark section--ruled" id="product">
+  <div class="frame" data-reveal>
+    <div class="head">
+      <p class="eyebrow reveal-child">What NOVUS is</p>
+      <h2 class="reveal-child">An always-on commercial intelligence layer.</h2>
+      <p class="reveal-child">
+        NOVUS continuously understands what is happening across the agency,
+        identifies what matters and turns that intelligence into action.
+      </p>
+    </div>
+
+    <p class="versus reveal-child">
+      <b>Your CRM stores what happened.</b>
+      <i>NOVUS understands what it means.</i>
+    </p>
+
+    <p class="versus__note reveal-child">
+      NOVUS sits across the systems and activity your agency already has. It does
+      not exist to give your team another system to manage. It exists to make the
+      operation itself more intelligent.
+    </p>
+
+    <div class="model">
+      <div class="model__ring reveal-child" data-seq="loop">
+        <svg viewBox="-26 -26 472 472" role="img"
+             aria-label="A continuous cycle: understand, act, outcome, learn, returning to understand.">
+          <circle class="l-circle" cx="210" cy="210" r="140" />
+          <circle class="l-arc"    cx="210" cy="210" r="140" />
+
+          <circle class="l-node" cx="210" cy="70"  r="7" />
+          <circle class="l-node" cx="350" cy="210" r="7" />
+          <circle class="l-node" cx="210" cy="350" r="7" />
+          <circle class="l-node" cx="70"  cy="210" r="7" />
+
+          <text class="l-label" x="210" y="38"  text-anchor="middle">Understand</text>
+          <text class="l-label" x="392" y="214" text-anchor="middle">Act</text>
+          <text class="l-label" x="210" y="388" text-anchor="middle">Outcome</text>
+          <text class="l-label" x="30"  y="214" text-anchor="middle">Learn</text>
+
+          <image class="l-mark" href="assets/img/novus-mark.png"
+                 x="181.2" y="183" width="57.6" height="54"
+                 preserveAspectRatio="xMidYMid meet" />
+        </svg>
+      </div>
+
+      <ol class="model__steps">
+        <li class="reveal-child">
+          <p class="model__k"><em>01</em> Understand</p>
+          <p>NOVUS identifies opportunities, gaps and priorities across the agency.</p>
+        </li>
+        <li class="reveal-child">
+          <p class="model__k"><em>02</em> Act</p>
+          <p>When the next step is clear, NOVUS can execute it.</p>
+        </li>
+        <li class="reveal-child">
+          <p class="model__k"><em>03</em> Optimise</p>
+          <p>NOVUS tracks outcomes and improves future decisions and actions.</p>
+        </li>
+      </ol>
+    </div>
+
+    <p class="model__close reveal-child">
+      Intelligence first. Execution second. Improvement always.
+    </p>
+  </div>
+</section>
+
+<!-- ═══ 04 · PROOF ═══════════════════════════════════════════════════════
+     Everything above makes the claim. This shows NOVUS seeing something the
+     agency missed. -->
 <section class="section section--lg section--ruled" id="example">
   <div class="frame">
     <div class="example" data-reveal data-stagger="90">
       <div class="example__head">
         <div class="head">
-          <p class="eyebrow reveal-child">Live example</p>
-          <h2 class="reveal-child">From enquiry to opportunity.</h2>
+          <p class="eyebrow reveal-child">Proof</p>
+          <h2 class="reveal-child">
+            <span class="soft">The enquiry was handled.</span>
+            The opportunity wasn't.
+          </h2>
           <p class="reveal-child">One ordinary enquiry, read the way NOVUS reads it.</p>
         </div>
       </div>
 
-      <div class="tl">
-        <article class="tl__step reveal-child">
-          <span class="tl__time sys">21:42</span>
-          <span class="tl__node" aria-hidden="true"></span>
-          <p class="tl__t">Buyer enquires about 14 Church Road.</p>
-          <p class="tl__flag">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
-            Has property to sell
-          </p>
-        </article>
+      <div class="example__body">
+        <div class="tl">
+          <article class="tl__step reveal-child">
+            <span class="tl__time sys">21:42</span>
+            <span class="tl__node" aria-hidden="true"></span>
+            <p class="tl__t">Buyer enquires about 14 Church Road.</p>
+            <p class="tl__flag">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+              Has a property to sell
+            </p>
+          </article>
 
-        <article class="tl__step reveal-child">
-          <span class="tl__time sys">08:17</span>
-          <span class="tl__node" aria-hidden="true"></span>
-          <p class="tl__t">Agency replies.</p>
-          <p class="tl__flag">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
-            Viewing progressed
-          </p>
-        </article>
+          <article class="tl__step reveal-child">
+            <span class="tl__time sys">08:17</span>
+            <span class="tl__node" aria-hidden="true"></span>
+            <p class="tl__t">Agency replies. Viewing progresses.</p>
+          </article>
 
-        <!-- The commercial point of the whole example. It is set as the largest
-             thing in the timeline because it is the largest thing in the story. -->
-        <div class="gap reveal-child">
-          <p class="gap__t">10h 35m</p>
-          <p class="gap__l">Seller opportunity still not progressed</p>
+          <!-- The commercial point of the whole example, set as the largest
+               thing in the timeline because it is the largest thing here. -->
+          <div class="gap reveal-child">
+            <p class="gap__t">10h 35m</p>
+            <p class="gap__l">Seller opportunity still not progressed</p>
+          </div>
         </div>
 
-        <article class="tl__step tl__step--novus reveal-child">
-          <span class="tl__time sys">NOVUS</span>
-          <span class="tl__node" aria-hidden="true"></span>
-          <p class="tl__k"><span class="chip chip--amber"><i class="dot"></i>Detects</span></p>
-          <p class="tl__t">Seller status acknowledged but no valuation or appraisal step offered.</p>
-          <p class="tl__d">The enquiry was handled. The commercial opportunity inside it was not.</p>
-        </article>
-
-        <article class="tl__step tl__step--novus reveal-child">
-          <span class="tl__time sys">Decision</span>
-          <span class="tl__node" aria-hidden="true"></span>
-          <p class="tl__t">Recover seller opportunity</p>
-          <div class="tl__rec">
-            <b>Recommended action</b>
-            Re-engage the prospect around their onward move and offer a valuation.
+        <div class="read reveal-child">
+          <div class="read__row">
+            <p class="read__k sys">Detect</p>
+            <p class="read__v">Seller intent exists.</p>
           </div>
-        </article>
+          <div class="read__row">
+            <p class="read__k sys">Decide</p>
+            <p class="read__v">There is a valuation opportunity worth progressing.</p>
+          </div>
+          <div class="read__row">
+            <p class="read__k sys">Act</p>
+            <p class="read__v">The appropriate follow-up, outreach or escalation happens.</p>
+          </div>
+        </div>
 
-        <article class="tl__step tl__step--novus reveal-child">
-          <span class="tl__time sys">Action</span>
-          <span class="tl__node" aria-hidden="true"></span>
-          <p class="tl__k"><span class="chip chip--novus"><i class="dot"></i>Follow-up sent</span></p>
-          <p class="tl__d">
-            Sent through the channel the prospect already used, with the context
-            that produced it attached for the team.
-          </p>
-        </article>
+        <p class="example__close reveal-child">
+          NOVUS sees the commercial opportunity inside the interaction —
+          <strong>not just the interaction itself.</strong>
+        </p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══ 06 · COMMAND CENTRE ══════════════════════════════════════════════
-     The one thing on the page allowed outside the body frame. -->
+<!-- ═══ 05 · COMMAND CENTRE ══════════════════════════════════════════════
+     The one thing on the page allowed outside the body frame. The UI does
+     the selling; the copy stays out of its way. -->
 <section class="section section--lg section--dark section--ruled" id="command">
   <div class="frame" data-reveal>
     <div class="head">
       <p class="eyebrow reveal-child">The command centre</p>
-      <h2 class="reveal-child">Know exactly where your attention is needed.</h2>
+      <h2 class="reveal-child">
+        <span class="soft">You shouldn't have to watch everything.</span>
+        You should know what needs you.
+      </h2>
       <p class="reveal-child">
-        NOVUS separates what the system can handle, what needs human judgement,
-        and which opportunities matter now.
+        Your team handles the moments where people matter.
+        NOVUS handles the intelligence around them.
       </p>
     </div>
   </div>
@@ -668,7 +512,7 @@
           <p class="app__navlabel">Today</p>
           <p class="app__item on"><i></i>Needs your attention <b>2</b></p>
           <p class="app__item"><i></i>NOVUS is handling <b>14</b></p>
-          <p class="app__item"><i></i>Growth opportunities <b>3</b></p>
+          <p class="app__item"><i></i>Opportunities surfaced <b>3</b></p>
 
           <p class="app__navlabel">Agency</p>
           <p class="app__item"><i></i>Enquiries</p>
@@ -757,7 +601,7 @@
           </section>
 
           <section class="grp grp--grow">
-            <p class="grp__hd">Growth opportunities <b>3</b></p>
+            <p class="grp__hd">Opportunities surfaced <b>3</b></p>
             <div class="row">
               <span class="row__av num">32</span>
               <span class="row__c">
@@ -787,44 +631,12 @@
   </div>
 </section>
 
-<!-- ═══ 07 · INTELLIGENCE FIRST ══════════════════════════════════════════
-     The editorial break. Almost nothing on the screen, deliberately. -->
-<section class="section section--lg section--ruled">
-  <div class="frame frame--narrow first" data-reveal data-stagger="120">
-    <div class="head">
-      <p class="eyebrow reveal-child">Intelligence first</p>
-      <h2 class="reveal-child">The channel isn't the product.</h2>
-    </div>
-
-    <ul class="first__channels">
-      <li class="reveal-child">Voice.</li>
-      <li class="reveal-child">Email.</li>
-      <li class="reveal-child">SMS.</li>
-      <li class="reveal-child">Database campaigns.</li>
-      <li class="reveal-child">Follow-up.</li>
-    </ul>
-
-    <div class="copy first__copy">
-      <p class="reveal-child">These are simply ways NOVUS can act.</p>
-      <p class="reveal-child">
-        The important part happens before that: understanding the opportunity,
-        deciding what should happen and knowing why.
-      </p>
-    </div>
-
-    <p class="first__big reveal-child">
-      Automation without intelligence just does the <em>wrong thing faster.</em>
-    </p>
-  </div>
-</section>
-
-<!-- ═══ 08 · OUTCOMES + USE CASES ════════════════════════════════════════
-     One chapter. Each row is an outcome and the thing it actually is. -->
+<!-- ═══ 06 · COMMERCIAL OUTCOME ══════════════════════════════════════════ -->
 <section class="section section--sm section--ruled" id="outcomes">
   <div class="frame" data-reveal>
     <div class="head">
-      <p class="eyebrow reveal-child">The outcome</p>
-      <h2 class="reveal-child">More of the opportunity you already create becomes revenue.</h2>
+      <p class="eyebrow reveal-child">The commercial outcome</p>
+      <h2 class="reveal-child">Capture more value from the business you already generate.</h2>
     </div>
 
     <div class="gains">
@@ -832,120 +644,49 @@
         <span class="gain__i">01</span>
         <div class="gain__h">
           <h3>See more</h3>
-          <p>Reveal opportunities currently hidden across your agency.</p>
-        </div>
-        <div class="gain__e">
-          <b>Seller opportunity recovery</b>
-          <p>A buyer has a property to sell, but nobody progresses the valuation opportunity.</p>
+          <p>Surface opportunities that would otherwise disappear.</p>
         </div>
       </article>
 
       <article class="gain reveal-child">
         <span class="gain__i">02</span>
         <div class="gain__h">
-          <h3>Miss less</h3>
-          <p>Catch valuable enquiries before they quietly disappear.</p>
-        </div>
-        <div class="gain__e">
-          <b>Stalled enquiry recovery</b>
-          <p>The initial conversation happens, then follow-up stops.</p>
+          <h3>Act faster</h3>
+          <p>Move while intent is still high.</p>
         </div>
       </article>
 
       <article class="gain reveal-child">
         <span class="gain__i">03</span>
         <div class="gain__h">
-          <h3>Recover more</h3>
-          <p>Return to value already sitting in your database.</p>
-        </div>
-        <div class="gain__e">
-          <b>Database reactivation</b>
-          <p>High-value historic prospects are identified and re-engaged.</p>
-        </div>
-      </article>
-
-      <article class="gain reveal-child">
-        <span class="gain__i">04</span>
-        <div class="gain__h">
-          <h3>Act faster</h3>
-          <p>Move opportunities while intent is still high.</p>
-        </div>
-        <div class="gain__e">
-          <b>Opportunity prioritisation</b>
-          <p>NOVUS identifies where attention is commercially most valuable.</p>
-        </div>
-      </article>
-
-      <article class="gain reveal-child">
-        <span class="gain__i">05</span>
-        <div class="gain__h">
           <h3>Improve continuously</h3>
-          <p>Understand what works and improve future actions.</p>
-        </div>
-        <div class="gain__e">
-          <b>Growth discovery</b>
-          <p>Patterns across the agency reveal opportunities no individual workflow can see.</p>
+          <p>Use outcomes to make future decisions better.</p>
         </div>
       </article>
     </div>
 
     <p class="gains__note reveal-child">
-      NOVUS doesn't create the underlying demand. <strong>It helps your agency
-      capture more value from the demand, conversations and data you already have.</strong>
+      NOVUS doesn't manufacture the underlying demand. <strong>It helps your agency
+      understand and convert more of the value already flowing through it.</strong>
     </p>
   </div>
 </section>
 
-<!-- ═══ 09 · HUMAN + NOVUS ═══════════════════════════════════════════════ -->
-<section class="section section--sm section--dark section--ruled">
-  <div class="frame" data-reveal>
-    <div class="head split__head">
-      <h2 class="reveal-child">
-        Your team handles people.<br />
-        NOVUS makes sure opportunity doesn't get forgotten.
-      </h2>
-    </div>
-
-    <div class="split">
-      <!-- Two different typographic registers, because the two do different
-           work: the system is a list of operations, the team is a practice. -->
-      <div class="split__col split__col--n reveal-child">
-        <h3>NOVUS</h3>
-        <ul>
-          <li>Monitor</li><li>Analyse</li><li>Prioritise</li>
-          <li>Follow up</li><li>Reactivate</li><li>Escalate</li>
-        </ul>
-        <p class="split__note">Intelligence and repeatable execution.</p>
-      </div>
-      <div class="split__col split__col--t reveal-child">
-        <h3>Your team</h3>
-        <ul>
-          <li>Advise</li><li>Negotiate</li><li>Build trust</li>
-          <li>Win instructions</li><li>Close</li>
-        </ul>
-        <p class="split__note">Judgement, trust and commercial relationships.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══ 10 · LEVELS ══════════════════════════════════════════════════════ -->
+<!-- ═══ 07 · LEVELS ══════════════════════════════════════════════════════ -->
 <section class="section section--sm section--ruled" id="levels">
   <div class="frame" data-reveal>
     <div class="head">
       <p class="eyebrow reveal-child">Levels of NOVUS</p>
-      <h2 class="reveal-child">Choose how far NOVUS goes.</h2>
+      <h2 class="reveal-child">Choose how much responsibility NOVUS takes.</h2>
     </div>
 
     <div class="levels">
       <article class="level reveal-child">
         <p class="level__tag sys">01</p>
         <h3>Intelligence</h3>
-        <p class="level__claim">See what is happening. Know what should happen next.</p>
+        <p class="level__claim">NOVUS identifies.</p>
         <p class="level__d">
-          NOVUS gives your team a live commercial view across the agency —
-          identifying missed opportunities, stalled activity and the actions that
-          matter most.
+          See what is happening, what matters and what should happen next.
         </p>
         <p class="level__price"><b>From £699</b> <span>/ month</span></p>
       </article>
@@ -953,11 +694,10 @@
       <article class="level level--core reveal-child">
         <p class="level__tag level__tag--core">Core</p>
         <h3>Action</h3>
-        <p class="level__claim">Remove the repetitive work between insight and execution.</p>
+        <p class="level__claim">NOVUS identifies and executes.</p>
         <p class="level__d">
-          NOVUS uses its intelligence to handle follow-up, reactivation, outreach
-          and other repeatable actions — escalating to your team when human
-          judgement matters.
+          NOVUS also carries out defined actions across follow-up, outreach and
+          opportunity recovery.
         </p>
         <p class="level__price"><b>From £1,199</b> <span>/ month</span></p>
       </article>
@@ -965,11 +705,10 @@
       <article class="level reveal-child">
         <p class="level__tag sys">03</p>
         <h3>Growth</h3>
-        <p class="level__claim">Continuously improve how your agency performs.</p>
+        <p class="level__claim">NOVUS identifies, executes and optimises.</p>
         <p class="level__d">
-          NOVUS learns from activity and outcomes, discovers patterns and growth
-          opportunities, and continuously improves where time, attention and
-          action should be focused.
+          NOVUS proactively discovers opportunities, tracks outcomes and
+          continuously improves performance.
         </p>
         <p class="level__price"><b>From £1,499</b> <span>/ month</span></p>
       </article>
@@ -977,10 +716,6 @@
 
     <div class="levels__foot reveal-child">
       <div class="levels__notes">
-        <p class="levels__note">
-          Every level runs on the same NOVUS intelligence layer. The difference is
-          how much responsibility NOVUS takes for what happens next.
-        </p>
         <!-- Shown only when prices are hidden: without it a reader has no
              explanation for the missing numbers. -->
         <p class="levels__note levels__note--off">
@@ -998,48 +733,20 @@
   </div>
 </section>
 
-<!-- ═══ 11 · PHILOSOPHY → ABOUT → CTA ════════════════════════════════════
-     One continuous ending rather than four separate closing chapters. -->
-<section class="section section--sm section--dark section--ruled close" id="about">
+<!-- ═══ 08 · ABOUT → CTA ═════════════════════════════════════════════════ -->
+<section class="section section--sm section--dark section--ruled" id="about">
   <div class="frame frame--narrow">
-
-    <div class="philo" data-reveal data-stagger="140">
-      <p class="philo__line reveal-child">
-        <b>Your agency doesn't need more data.</b>
-        <i>It needs to know what the data means.</i>
-      </p>
-      <p class="philo__line reveal-child">
-        <b>It doesn't need more notifications.</b>
-        <i>It needs to know what matters.</i>
-      </p>
-      <p class="philo__line reveal-child">
-        <b>It doesn't need more automation.</b>
-        <i>It needs the right action.</i>
-      </p>
-
-      <p class="philo__end reveal-child">
-        Intelligence <i aria-hidden="true">→</i> Action <i aria-hidden="true">→</i> Outcome
-      </p>
-    </div>
 
     <div class="about" data-reveal>
       <p class="eyebrow reveal-child">About</p>
-      <h2 class="reveal-child">Built with one obsession.</h2>
-
-      <div class="copy about__copy">
-        <p class="reveal-child">NOVUS started with a simple question:</p>
-        <q class="reveal-child">
-          How much commercial opportunity already exists inside an estate agency
-          that nobody can currently see?
-        </q>
-        <p class="reveal-child">
-          We began by studying how opportunities actually move through estate
-          agencies — where seller intent is recognised, where progression stops,
-          how follow-up happens and what gets left behind. That evidence, not an
-          assumption, is what the intelligence layer is built on.
-        </p>
-      </div>
-
+      <q class="reveal-child">
+        How much commercial opportunity already exists inside an estate agency
+        that nobody can currently see?
+      </q>
+      <p class="about__l reveal-child">
+        NOVUS started with that question, and with the evidence of how
+        opportunities actually move through an agency.
+      </p>
       <p class="byline reveal-child">
         <b>Joe Carter</b>
         <span>Founder, NOVUS</span>
@@ -1047,10 +754,9 @@
     </div>
 
     <div class="final" id="contact" data-reveal data-stagger="100">
-      <h2 class="reveal-child">Find out what your agency is missing.</h2>
+      <h2 class="reveal-child">How intelligent is your agency today?</h2>
       <p class="reveal-child">
-        See how NOVUS could sit across your agency, identify commercial opportunities
-        and make sure more of them get acted on.
+        See what NOVUS could understand, surface and act on across your business.
       </p>
       <div class="final__actions reveal-child">
         <a class="btn btn--primary" href="https://calendly.com/joe-getnovus/10min" target="_blank" rel="noopener noreferrer">
@@ -1074,14 +780,14 @@
           <img class="mark" src="assets/img/novus-mark.png" alt="" width="384" height="360" />
           <b>NOVUS</b>
         </span>
-        <p>Intelligence for estate agencies.</p>
+        <p>Commercial intelligence for estate agencies.</p>
       </div>
 
       <nav aria-label="Product">
         <h5>Product</h5>
         <ul>
           <li><a href="#product">Product</a></li>
-          <li><a href="#how">How it works</a></li>
+          <li><a href="#command">Command centre</a></li>
           <li><a href="#levels">Levels</a></li>
           <li><a href="#about">About</a></li>
         </ul>
@@ -1106,7 +812,7 @@
 
     <div class="ftr__base">
       <span>© NOVUS 2026</span>
-      <span class="sys">Intelligence · Action · Optimisation</span>
+      <span class="sys">Understand · Act · Optimise</span>
     </div>
   </div>
 </footer>

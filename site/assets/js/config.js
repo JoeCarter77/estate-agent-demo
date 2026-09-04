@@ -19,17 +19,8 @@ export const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').mat
 /* Timings, in milliseconds. */
 export const TIMING = {
   ledger: 2600,   // how long each opportunity in the hero ledger stays lit
-  channel: 1700,  // how long each action channel stays selected
   loop: 2000,     // how long each stage of the optimise loop stays lit
   pip: 3400,      // one signal's journey into the intelligence layer
-};
-
-/* The merged product chapter. A stage becomes active once its copy occupies
-   the middle band of the viewport, so the panel changes as the reader arrives
-   at the paragraph that describes it — never before, never after. */
-export const STAGES = {
-  rootMargin: '-42% 0px -42% 0px',
-  threshold: 0,
 };
 
 /* Reveal geometry: an element is "in" once it is a little way up the viewport,
