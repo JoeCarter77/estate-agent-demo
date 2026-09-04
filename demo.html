@@ -36,14 +36,20 @@
 
      ONE JOB: turn a stranger who opened a link into a booked ten minutes.
 
-     SIX SECTIONS, and the single thought each one has to land:
+     FIVE BEATS, and the single thought each one has to land:
 
-       1  their agency, their property, their enquiry   "that's genuinely us"
-       2  what NOVUS understood, and what it didn't     "there was more in it"
-       3  what NOVUS would do next                      "it can take that on"
+       1  the problem, their agency, their listing       "that's genuinely us"
+       2  the record beside what was in it               "there was more in it"
+       3  the plan beside NOVUS executing it             "it can take that on"
        4  the zoom-out                                  "this isn't one enquiry"
-       5  understand / act / optimise                   "three kinds of value"
-       6  the payoff                                    "worth ten minutes"
+       5  understand / act / connect, then the ask       "worth ten minutes"
+
+     AND ONE RHYTHM, WHICH IS WHY BEAT 5 IS NOT SPLIT IN TWO:
+     calm split, split, quiet, restrained split, cinematic, plain, plain.
+     Every section arriving as two equal columns is the same as none of them
+     doing it - the reader stops being told what to look at first. The field
+     in beat 4 is the loudest thing on the page and everything after it is
+     deliberately quieter than the thing it is explaining.
 
      WHAT THIS PAGE IS NOT. Not an audit, not a grade, not a missed-seller
      detector. It reports what the enquiry contained, what the conversation
@@ -82,51 +88,61 @@
     letter-spacing:-.018em; line-height:1.14; text-wrap:balance;
   }
   .d-statement .soft{ display:block; color:rgba(241,237,230,.44); }
-  /* The quiet line that closes a section. One sentence, never a paragraph. */
-  .d-close{
-    margin-top:clamp(26px,3.2vw,44px);
-    padding-top:clamp(18px,2.2vw,26px);
-    border-top:1px solid var(--hair);
-    font-size:var(--t-lede); color:var(--ink-2);
-    max-width:var(--measure-wide);
-  }
-  .d-close strong{ color:var(--ink); font-weight:600; }
 
   /* ═══ 01 · THE REAL ENQUIRY ════════════════════════════════════════════
      Their agency, their property, their enquiry, and the factual record of
      what happened. No analysis: this section has about four seconds to
      prove the page is genuinely about them, and then it is finished. */
-  .d-open{ padding-top:clamp(104px,13vh,150px); }
+  .d-open{ padding-top:clamp(96px,12vh,138px); }
   .d-open__grid{
     display:grid; grid-template-columns:minmax(0,1.06fr) minmax(0,.94fr);
     gap:clamp(32px,5vw,74px); align-items:start;
   }
+  /* THREE WEIGHTS, IN ORDER: the big idea, the commercial turn, the thing
+     that is actually theirs. Everything the eye does on this screen is
+     decided by that ranking, which is why the second line - the one that
+     costs them something - is the only one carrying the accent. */
   .d-open h1{
     font-size:clamp(1.9rem,1.2rem + 2.4vw,3.2rem);
-    margin:clamp(18px,2vw,26px) 0 clamp(14px,1.6vw,20px);
-    max-width:14em;
+    margin:clamp(18px,2vw,26px) 0 0;
+    max-width:13em;
   }
-  .d-open__lede{ font-size:var(--t-lede); line-height:1.6; color:var(--ink-2); max-width:var(--measure); }
-
-  /* THE TWO THINGS THAT HAPPEN TO A SIGNAL. Numbered, hairline-separated,
-     and deliberately the same vocabulary as the actions in section three -
-     the page opens on a problem shaped exactly like the plan that answers
-     it. No card, no icon, no accent: this is framing, not evidence. */
-  .d-two{
-    margin-top:clamp(26px,3.2vw,40px);
+  .d-open__turn{ display:block; color:var(--blue-hi); }
+  /* Smaller and quieter than the headline it explains. It is the sentence an
+     owner recognises, not the sentence that wins the argument. */
+  .d-open__sub{
+    margin-top:clamp(16px,1.9vw,24px);
+    font-size:var(--t-body); line-height:1.62; color:var(--ink-3);
+    max-width:var(--measure);
+  }
+  /* The turn from an idea to their agency. Set apart by a rule rather than
+     by size, so the hero keeps three weights instead of four. */
+  .d-open__probe{
+    margin-top:clamp(24px,2.8vw,34px);
+    padding-top:clamp(18px,2.1vw,24px);
     border-top:1px solid var(--hair);
-    max-width:var(--measure-wide);
+    font-size:var(--t-lede); line-height:1.55; color:var(--ink-2);
+    max-width:var(--measure);
   }
-  .d-two__r{
-    display:grid; grid-template-columns:auto minmax(0,1fr);
-    gap:clamp(14px,2vw,24px); align-items:baseline;
-    padding-block:clamp(14px,1.7vw,20px); border-bottom:1px solid var(--hair);
-  }
-  .d-two__i{ font-family:var(--mono); font-size:var(--t-micro); color:var(--ink-4); letter-spacing:.1em; }
-  .d-two__t{ font-size:var(--t-body); line-height:1.55; color:var(--ink-2); }
   /* The agency's own name is the proof. Lifted out of the sentence just
      enough to be the thing the eye lands on. */
   .d-name{ color:var(--blue-hi); font-weight:600; }
+
+  /* THE ENQUIRY, IN TWO COLUMNS. The record on the left, everything the
+     enquiry actually contained on the right - so the reader sees the event
+     and its contents in one glance rather than as two chapters. Both
+     columns start on the same hairline. */
+  .d-enq{
+    display:grid;
+    grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);
+    gap:clamp(30px,4.4vw,72px);
+    margin-top:clamp(26px,3vw,40px);
+    align-items:start;
+  }
+  /* A row with no signals at all must not leave half the frame empty. */
+  .d-enq.is-solo{ grid-template-columns:minmax(0,1fr); max-width:var(--measure-wide); }
+  .d-enq__aside{ border-top:1px solid var(--hair); padding-top:clamp(13px,1.5vw,17px); }
+  .d-enq .d-log{ margin-top:0; }
 
   /* THE RECORD. Times and events only - what happened, in the order it
      happened. Everything the page concludes from it waits for section two,
@@ -193,11 +209,14 @@
      anything is described as unresolved: a strong operator told what they
      missed first starts arguing with the methodology instead of reading. */
   .d-credit{
-    margin-top:clamp(24px,2.8vw,34px);
-    margin-bottom:clamp(20px,2.4vw,30px);
-    font-size:var(--t-lede); font-weight:500; color:var(--blue-hi);
+    margin-top:clamp(22px,2.6vw,30px);
+    font-size:var(--t-lede); font-weight:500; line-height:1.5; color:var(--blue-hi);
     max-width:var(--measure);
   }
+  /* Only where the credit is actually rendered - a hidden one must not
+     leave its spacing behind and push the column out of alignment with the
+     one beside it. */
+  .d-credit:not([hidden]) + *{ margin-top:clamp(22px,2.6vw,30px); }
 
   /* The quiet label that names a block inside a section. Small enough that
      it orders the page without competing with the heading above it. */
@@ -208,30 +227,29 @@
     font-size:var(--t-micro); font-weight:700; letter-spacing:.18em; text-transform:uppercase;
     color:var(--ink-4);
   }
+  /* At the head of a column that already carries the rule. */
+  .d-key--flush{ margin-top:0; padding-top:0; border-top:none; }
 
   /* THE SIGNALS. Value first, at scale; label under it, small. Deliberately
      not cards - a border around each fact turns considered intelligence
-     back into CRM fields. */
+     back into CRM fields.
+
+     THE GRID IS NOT SET BY US. auto-fit composes the rank around however
+     many facts this row actually had and however wide the column is, so one
+     signal is a statement, six are a block, and neither is ever a stranded
+     cell or an empty placeholder. */
   .d-sigs{
-    display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
-    gap:clamp(26px,3.2vw,44px) clamp(24px,3vw,48px);
-    margin-top:clamp(30px,3.6vw,50px);
-    padding-top:clamp(26px,3vw,38px);
-    border-top:1px solid var(--hair);
-    max-width:1080px;
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(196px,1fr));
+    gap:clamp(22px,2.6vw,34px) clamp(20px,2.4vw,36px);
+    margin-top:clamp(18px,2.2vw,26px);
   }
-  /* Four signals in a three-column grid strand the fourth on its own row.
-     Four reads better as a square, and gains room for the value type. */
-  .d-sigs[data-count="4"]{ grid-template-columns:repeat(2,minmax(0,1fr)); max-width:760px; }
-  /* The label above it already carries the rule. */
-  .d-key + .d-sigs{ margin-top:clamp(20px,2.4vw,28px); padding-top:0; border-top:none; }
   /* Values run to one or two lines depending on the row. The label is pushed
      to the bottom of its cell so a rank of them still reads as one line
      across, rather than as a ragged edge. */
   .d-sig{ display:flex; flex-direction:column; }
   .d-sig__v{
-    font-size:clamp(1.28rem,1.06rem + .9vw,1.85rem);
-    font-weight:600; letter-spacing:-.018em; line-height:1.12;
+    font-size:clamp(1.22rem,1.04rem + .68vw,1.6rem);
+    font-weight:600; letter-spacing:-.018em; line-height:1.14;
     color:var(--ink); text-wrap:balance;
   }
   .d-sig__l{
@@ -246,37 +264,46 @@
 
   /* WHAT IS STILL OPEN. Each item names the unresolved thing and, under it,
      what the record actually shows - which is where an agency that DID ask
-     gets the credit for asking. */
+     gets the credit for asking.
+
+     IT IS THE TAIL OF THE SAME READING, NOT A CHAPTER. One quiet block under
+     the two columns above it: a small label, a tight list, no second column
+     invented to balance it and no dot repeating a colour the label already
+     carries. The evidence is the whole point, so nothing competes with it. */
   .d-open-q{
-    margin-top:clamp(40px,4.6vw,66px);
+    margin-top:clamp(26px,3vw,38px);
+    padding-top:clamp(19px,2.2vw,25px);
+    border-top:1px solid var(--hair);
     max-width:var(--measure-wide);
   }
   .d-open-q__k{
     font-size:var(--t-micro); font-weight:700; letter-spacing:.18em; text-transform:uppercase;
-    color:var(--amber); margin-bottom:clamp(16px,2vw,22px);
+    color:var(--amber); margin-bottom:clamp(4px,.6vw,7px);
   }
-  .d-open-q__list{ border-top:1px solid var(--hair); }
-  .d-open-q__item{ padding-block:clamp(15px,1.7vw,20px); border-bottom:1px solid var(--hair); }
+  .d-open-q__item{ padding-block:clamp(11px,1.3vw,15px); border-bottom:1px solid var(--hair); }
   .d-open-q__t{
-    display:flex; gap:12px;
-    font-size:var(--t-h4); font-weight:600; letter-spacing:-.004em; color:var(--ink);
+    font-size:var(--t-body); font-weight:600; letter-spacing:-.002em; color:var(--ink);
   }
-  .d-open-q__t::before{
-    content:''; width:5px; height:5px; border-radius:50%; flex:none;
-    background:var(--amber); transform:translateY(.62em);
-  }
-  .d-open-q__n{ margin:6px 0 0 17px; font-size:var(--t-sm); line-height:1.6; color:var(--ink-3); }
+  .d-open-q__n{ margin-top:4px; font-size:var(--t-sm); line-height:1.55; color:var(--ink-3); }
 
   /* ═══ 03 · WHAT NOVUS WOULD DO NEXT ════════════════════════════════════
      Intelligence becoming action. Three steps at most, one example message,
      and a two-branch progression - never an architecture diagram. */
-  /* Held to a reading width. A hairline run across the whole frame for four
-     words of text turns a considered plan back into a table. */
-  .d-acts{
-    margin-top:clamp(30px,3.6vw,50px);
-    border-top:1px solid var(--hair-2);
-    max-width:880px;
+  /* THE DECISION ON THE LEFT, THE EXECUTION ON THE RIGHT. The plan and the
+     thing NOVUS would actually send sit beside each other, so the second
+     column reads as the first one happening rather than as more detail. */
+  .d-next{
+    display:grid;
+    grid-template-columns:minmax(0,1.04fr) minmax(0,.96fr);
+    gap:clamp(30px,4.4vw,72px);
+    margin-top:clamp(26px,3vw,40px);
+    align-items:start;
   }
+  .d-next__aside{ border-top:1px solid var(--hair-2); padding-top:clamp(16px,1.9vw,22px); }
+
+  /* A hairline run across the whole frame for four words of text turns a
+     considered plan back into a table. */
+  .d-acts{ border-top:1px solid var(--hair-2); }
   .d-act{
     display:grid; grid-template-columns:auto minmax(0,1fr);
     gap:4px clamp(18px,2.6vw,36px); align-items:baseline;
@@ -289,38 +316,31 @@
   /* ONE MESSAGE. The point is not that NOVUS asks a lot of questions - it
      is that it asks the few that unlock the most. */
   .d-msg{
-    margin-top:clamp(30px,3.6vw,48px);
     border-left:2px solid var(--blue-line);
-    padding:clamp(4px,.6vw,8px) 0 clamp(4px,.6vw,8px) clamp(18px,2.2vw,28px);
-    max-width:var(--measure-wide);
+    padding:clamp(2px,.4vw,6px) 0 clamp(2px,.4vw,6px) clamp(16px,2vw,24px);
   }
   .d-msg__k{
     font-size:var(--t-micro); font-weight:700; letter-spacing:.16em; text-transform:uppercase;
     color:var(--ink-4); margin-bottom:10px;
   }
   .d-msg__b{
-    font-size:clamp(1.02rem,.96rem + .42vw,1.28rem); line-height:1.55;
+    font-size:clamp(1rem,.95rem + .34vw,1.2rem); line-height:1.55;
     color:var(--ink); font-weight:400;
   }
 
-  /* THE TWO OUTCOMES. Whatever comes back, the enquiry keeps moving and the
-     team is only pulled in where a person is the better use of the moment. */
-  .d-branch{
-    display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:clamp(20px,3vw,44px);
-    margin-top:clamp(32px,3.8vw,52px);
+  /* WHAT HAPPENS AFTER IT, IN ONE LINE. A reply/no-reply pair drawn as two
+     labelled panels is a second interface inside a section that only needed
+     a sentence - and the sentence says the same thing.
+
+     The rule appears only under a message that was actually rendered, so a
+     row with nothing to send closes on the aside's own hairline instead of
+     a second one. */
+  .d-after{ font-size:var(--t-sm); line-height:1.65; color:var(--ink-3); }
+  .d-msg:not([hidden]) + .d-after{
+    margin-top:clamp(20px,2.4vw,28px);
+    padding-top:clamp(16px,1.9vw,22px);
+    border-top:1px solid var(--hair);
   }
-  .d-branch__c{ border-top:1px solid var(--hair-2); padding-top:clamp(16px,1.9vw,22px); }
-  .d-branch__k{
-    font-size:var(--t-micro); font-weight:700; letter-spacing:.16em; text-transform:uppercase;
-    color:var(--ink-4);
-  }
-  .d-branch__s{
-    display:flex; align-items:center; flex-wrap:wrap; gap:8px 11px;
-    margin-top:13px; font-size:var(--t-sm); color:var(--ink-2);
-  }
-  .d-branch__s i{ font-style:normal; color:var(--ink-5); }
-  .d-branch--auto .d-branch__k{ color:var(--blue); }
 
   /* ═══ 04 · THE ZOOM-OUT ════════════════════════════════════════════════
      THE ONE MOMENT THE PAGE STOPS BEING ABOUT AN ENQUIRY.
@@ -407,58 +427,53 @@
   .d-zoom.is-static .d-zoom__insights{ order:2; position:static; display:grid; gap:14px 32px; grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:clamp(28px,3.4vw,44px); }
   .d-zoom.is-static .d-zoom__i{ position:static; opacity:1; transform:none; max-width:none; text-align:left; flex-direction:row; }
 
-  /* ═══ 05 · UNDERSTAND → ACT → OPTIMISE ═════════════════════════════════
-     Three levels of value, each with one outcome sentence and a few
-     concrete terms. Not a feature list, not a price list. */
-  .d-model{
-    margin-top:clamp(30px,3.6vw,52px);
-    border-top:1px solid var(--hair-2);
-    max-width:1080px;
-  }
+  /* ═══ 05 · UNDERSTAND → ACT → CONNECT ══════════════════════════════════
+     THREE PRINCIPLES, NOT THREE CARDS. The field has just made this point
+     visually; the words only have to name it. So the vocabulary chips, the
+     ordinal numbers and the container rule are all gone - what is left is a
+     blue name, a sentence, and one hairline between them. */
+  /* Held to the width the three sentences actually occupy - a hairline run
+     out across 300px of empty frame is a divider dividing nothing. */
+  .d-model{ margin-top:clamp(24px,2.8vw,38px); max-width:940px; }
   .d-layer{
-    display:grid; grid-template-columns:minmax(150px,230px) minmax(0,1fr);
-    gap:10px clamp(24px,4vw,64px);
-    padding-block:clamp(26px,3.2vw,44px);
-    border-bottom:1px solid var(--hair);
+    display:grid;
+    grid-template-columns:minmax(112px,168px) minmax(0,1fr);
+    gap:8px clamp(24px,3.6vw,64px);
+    padding-block:clamp(20px,2.4vw,32px);
+    align-items:baseline;
   }
-  .d-layer__k{ display:flex; align-items:baseline; gap:12px; }
-  .d-layer__i{ font-family:var(--mono); font-size:var(--t-micro); color:var(--ink-4); }
+  .d-layer + .d-layer{ border-top:1px solid var(--hair); }
   .d-layer__n{
     font-size:var(--t-micro); font-weight:700; letter-spacing:.2em; text-transform:uppercase;
     color:var(--blue);
   }
   .d-layer__o{
-    font-size:clamp(1.1rem,1rem + .6vw,1.5rem); font-weight:500;
-    letter-spacing:-.012em; line-height:1.36; color:var(--ink);
-    max-width:38ch; text-wrap:balance;
-  }
-  .d-layer__terms{
-    display:flex; flex-wrap:wrap; gap:6px 9px;
-    margin-top:clamp(13px,1.5vw,17px);
-  }
-  .d-layer__terms span{
-    font-size:var(--t-xs); color:var(--ink-3);
-    border:1px solid var(--hair); border-radius:var(--r-full); padding:5px 13px;
+    font-size:clamp(1.1rem,1rem + .58vw,1.45rem); font-weight:500;
+    letter-spacing:-.012em; line-height:1.4; color:var(--ink);
+    max-width:32em; text-wrap:balance;
   }
 
   /* ═══ 06 · THE PAYOFF ══════════════════════════════════════════════════
      No new concept. Three outcomes that synthesise what has just been read,
-     and then the ask. */
-  .d-payoff{
-    border-top:1px solid var(--hair-2);
-    margin-bottom:clamp(38px,4.6vw,64px);
-    max-width:1000px;
-  }
-  .d-payoff p{
-    padding-block:clamp(18px,2.2vw,28px); border-bottom:1px solid var(--hair);
-    font-family:var(--serif); font-weight:400;
-    font-size:clamp(1.22rem,1.02rem + 1vw,1.95rem);
-    letter-spacing:-.016em; line-height:1.22; color:var(--ink);
-    text-wrap:balance;
-  }
+     and then the ask.
 
-  .d-cta .btn{ font-size:var(--t-body); padding:15px 28px; }
-  .d-cta__support{ margin-top:clamp(14px,1.8vw,20px); font-size:var(--t-sm); color:var(--ink-3); }
+     ONE IDEA, THEN THE BUTTON. Three ranked statements and a second column
+     of persuasion made the reader choose what the page was asking for. It
+     asks for one thing, so it says one thing. */
+  .d-final{ max-width:var(--measure-wide); }
+  .d-final__h{
+    font-family:var(--serif); font-weight:400;
+    font-size:clamp(1.5rem,1.16rem + 1.5vw,2.6rem);
+    letter-spacing:-.018em; line-height:1.16; color:var(--ink);
+    max-width:15em; text-wrap:balance;
+  }
+  .d-final__s{
+    margin-top:clamp(16px,1.9vw,22px);
+    font-size:var(--t-lede); line-height:1.58; color:var(--ink-2);
+    max-width:var(--measure);
+  }
+  .d-cta .btn{ font-size:var(--t-body); padding:15px 28px; margin-top:clamp(26px,3.2vw,40px); }
+  .d-cta__support{ margin-top:clamp(12px,1.5vw,17px); font-size:var(--t-sm); color:var(--ink-3); }
   .d-cal{
     max-height:0; overflow:hidden; opacity:0;
     transition:max-height .7s var(--ease), opacity .5s var(--ease), margin-top .7s var(--ease);
@@ -496,7 +511,11 @@
     /* The listing leads on a narrow screen: the photograph is the fastest
        possible proof that this page is about them. */
     .d-open__art{ order:-1; max-width:560px; }
-    .d-layer{ grid-template-columns:minmax(0,1fr); gap:12px; }
+    /* Below this the second column is too narrow to be a column. Every
+       pairing on the page becomes the same single reading order it has
+       always had, in the order the argument runs. */
+    .d-enq,.d-next{ grid-template-columns:minmax(0,1fr); gap:clamp(30px,4vw,44px); }
+    .d-enq__aside,.d-next__aside{ max-width:var(--measure-wide); }
   }
 
   @media (max-width:900px){
@@ -521,8 +540,7 @@
       margin-top:clamp(26px,4vw,40px); text-align:left;
     }
     .d-zoom__i{ position:static; max-width:none; text-align:left; flex-direction:row; }
-    .d-branch{ grid-template-columns:minmax(0,1fr); gap:clamp(18px,3vw,26px); }
-    .d-sigs{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .d-layer{ grid-template-columns:minmax(0,1fr); gap:9px; }
   }
 
   @media (max-width:640px){
@@ -530,7 +548,7 @@
     .d-open h1{ font-size:clamp(1.8rem,1rem + 4.2vw,2.35rem); letter-spacing:-.024em; }
     /* Two signals a row keeps the value type large enough to read as a
        statement rather than as a table cell. */
-    .d-sigs{ gap:clamp(20px,5vw,26px) clamp(18px,4vw,24px); }
+    .d-sigs{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:clamp(20px,5vw,26px) clamp(18px,4vw,24px); }
     .d-sig__v{ font-size:1.15rem; }
     .d-sig__l{ font-size:.6rem; letter-spacing:.12em; }
     .d-log__row{ grid-template-columns:minmax(0,1fr); gap:3px; }
@@ -583,26 +601,18 @@
         <div>
           <p class="eyebrow reveal-child" id="s1-eyebrow">Prepared for your agency</p>
           <h1 class="reveal-child">
-            Your agency creates thousands of signals. Two things usually happen to them.
+            Your agency creates thousands of signals.
+            <span class="d-open__turn">Most are never used to their full value.</span>
           </h1>
 
-          <div class="d-two reveal-child">
-            <div class="d-two__r">
-              <span class="d-two__i">01</span>
-              <p class="d-two__t">Useful information in individual enquiries gets missed or left unused.</p>
-            </div>
-            <div class="d-two__r">
-              <span class="d-two__i">02</span>
-              <p class="d-two__t">
-                Across the agency, those signals stay separate - so the bigger patterns
-                and opportunities stay hidden.
-              </p>
-            </div>
-          </div>
+          <p class="d-open__sub reveal-child">
+            You can see the deals you win. You rarely see the opportunities that
+            quietly disappear before they get that far.
+          </p>
 
-          <p class="d-open__lede reveal-child">
+          <p class="d-open__probe reveal-child">
             We tested one real enquiry with <span class="d-name" id="s1-agency">your agency</span>
-            to show what that looks like.
+            to show you what that looks like.
           </p>
         </div>
 
@@ -645,27 +655,25 @@
         <h2 class="reveal-child">What actually happened.</h2>
       </div>
 
-      <div class="d-log reveal-child" id="s2-log"></div>
+      <div class="d-enq" id="s2-grid">
+        <div class="d-enq__main">
+          <div class="d-log reveal-child" id="s2-log"></div>
+          <p class="d-note reveal-child">
+            We sent this enquiry ourselves, and stopped once we had enough to read it.
+          </p>
+          <p class="d-credit reveal-child" id="s2-credit" hidden></p>
+        </div>
 
-      <p class="d-note reveal-child">
-        We sent this enquiry ourselves and stopped engaging once we had enough to
-        understand the interaction. Nothing here is a judgement on your team.
-      </p>
-
-      <p class="d-credit reveal-child" id="s2-credit" hidden></p>
-
-      <p class="d-key reveal-child">The signals inside this enquiry</p>
-      <div class="d-sigs reveal-child" id="s2-signals"></div>
+        <aside class="d-enq__aside reveal-child" id="s2-aside">
+          <p class="d-key d-key--flush">The signals inside this enquiry</p>
+          <div class="d-sigs" id="s2-signals"></div>
+        </aside>
+      </div>
 
       <div class="d-open-q reveal-child" id="s2-open" hidden>
         <p class="d-open-q__k">Still unresolved</p>
         <div class="d-open-q__list" id="s2-open-list"></div>
       </div>
-
-      <p class="d-close reveal-child">
-        Capturing the enquiry is only the start. The value is understanding
-        <strong>what the information means</strong> - and what still needs to be learned.
-      </p>
     </div>
   </section>
 
@@ -675,36 +683,31 @@
       <div class="head">
         <p class="eyebrow reveal-child">What NOVUS would do next</p>
         <h2 class="reveal-child">
-          <span class="soft">Once the full picture is understood,</span>
-          the next step becomes much clearer.
+          <span class="soft">Reading the enquiry is half of it.</span>
+          This is the other half.
         </h2>
       </div>
 
-      <!-- Only where the record genuinely credits the team. Never a second
-           telling of the compliment section two already paid them. -->
-      <p class="d-credit reveal-child" id="s3-note" hidden></p>
-
-      <div class="d-acts reveal-child" id="s3-actions"></div>
-
-      <div class="d-msg reveal-child" id="s3-msg" hidden>
-        <p class="d-msg__k">For example, NOVUS could send</p>
-        <p class="d-msg__b" id="s3-msg-body"></p>
-      </div>
-
-      <div class="d-branch">
-        <div class="d-branch__c d-branch--auto reveal-child">
-          <p class="d-branch__k">They reply</p>
-          <p class="d-branch__s">Understanding updates <i>&rarr;</i> the next action adapts</p>
+      <div class="d-next">
+        <div class="d-next__main">
+          <!-- Only where the record genuinely credits the team. Never a second
+               telling of the compliment section two already paid them. -->
+          <p class="d-credit reveal-child" id="s3-note" hidden></p>
+          <div class="d-acts reveal-child" id="s3-actions"></div>
         </div>
-        <div class="d-branch__c reveal-child">
-          <p class="d-branch__k">No reply</p>
-          <p class="d-branch__s">Follow-up continues <i>&rarr;</i> a team action is surfaced when it matters</p>
-        </div>
-      </div>
 
-      <p class="d-close reveal-child">
-        The intelligence doesn't just sit there. <strong>It determines what happens next.</strong>
-      </p>
+        <aside class="d-next__aside">
+          <div class="d-msg reveal-child" id="s3-msg" hidden>
+            <p class="d-msg__k">For example, NOVUS could send</p>
+            <p class="d-msg__b" id="s3-msg-body"></p>
+          </div>
+
+          <p class="d-after reveal-child">
+            From there, NOVUS keeps adapting to what happens next - or surfaces
+            the opportunity to your team when human attention matters more.
+          </p>
+        </aside>
+      </div>
     </div>
   </section>
 
@@ -738,8 +741,7 @@
 
     <div class="frame d-zoom__close">
       <p class="d-zoom__after reveal" >
-        Connected, those signals reveal patterns, gaps and opportunities
-        no single interaction can show.
+        No single interaction can show you that.
       </p>
     </div>
   </section>
@@ -748,39 +750,26 @@
   <section class="section section--lg section--dark section--ruled" data-reveal data-stagger="90">
     <div class="frame">
       <div class="head">
-        <p class="eyebrow reveal-child">Understand &middot; Act &middot; Connect</p>
-        <h2 class="reveal-child">What you have just seen, named.</h2>
+        <!-- Not "Understand · Act · Connect": the three names are already
+             the first thing under this heading, in blue. -->
+        <p class="eyebrow reveal-child">Across the agency</p>
+        <h2 class="reveal-child">What NOVUS does with that picture.</h2>
       </div>
 
       <div class="d-model">
         <div class="d-layer reveal-child">
-          <p class="d-layer__k"><span class="d-layer__i">01</span><span class="d-layer__n">Understand</span></p>
-          <div>
-            <p class="d-layer__o">Understand each interaction properly - what matters, what's missing and what should happen next.</p>
-            <p class="d-layer__terms">
-              <span>Intent</span><span>Position</span><span>History</span><span>Progression</span>
-            </p>
-          </div>
+          <p class="d-layer__n">Understand</p>
+          <p class="d-layer__o">See what is happening, what is being missed and where the opportunity is.</p>
         </div>
 
         <div class="d-layer reveal-child">
-          <p class="d-layer__k"><span class="d-layer__i">02</span><span class="d-layer__n">Act</span></p>
-          <div>
-            <p class="d-layer__o">Handle the repetitive work and bring the team in when human attention matters.</p>
-            <p class="d-layer__terms">
-              <span>Follow-up</span><span>Outreach</span><span>Progression</span><span>Reactivation</span><span>Escalation</span>
-            </p>
-          </div>
+          <p class="d-layer__n">Act</p>
+          <p class="d-layer__o">Decide what should happen next - and make sure it happens.</p>
         </div>
 
         <div class="d-layer reveal-child">
-          <p class="d-layer__k"><span class="d-layer__i">03</span><span class="d-layer__n">Connect</span></p>
-          <div>
-            <p class="d-layer__o">Turn thousands of interactions into a clearer picture of how the agency is really operating.</p>
-            <p class="d-layer__terms">
-              <span>Patterns</span><span>Gaps</span><span>Priorities</span><span>Opportunities</span><span>Growth</span>
-            </p>
-          </div>
+          <p class="d-layer__n">Connect</p>
+          <p class="d-layer__o">Join the signals across the agency so patterns and opportunities become visible.</p>
         </div>
       </div>
     </div>
@@ -789,16 +778,17 @@
   <!-- ═══ 06 · THE PAYOFF ══════════════════════════════════════════════ -->
   <section class="section section--lg section--ruled d-cta" data-reveal data-stagger="110">
     <div class="frame">
-      <div class="d-payoff">
-        <p class="reveal-child">See where opportunity and friction are building across your agency.</p>
-        <p class="reveal-child">Take repetitive work away from your team.</p>
-        <p class="reveal-child">Surface more commercial value from the business you already have.</p>
+      <div class="d-final">
+        <p class="d-final__h reveal-child">See where opportunity is building across your agency.</p>
+        <p class="d-final__s reveal-child">
+          NOVUS connects what is happening, identifies what matters, and helps make
+          sure the next action happens.
+        </p>
+        <button class="btn btn--primary reveal-child" onclick="revealCalendly()">
+          Book a conversation <span class="arw" aria-hidden="true">&rarr;</span>
+        </button>
+        <p class="d-cta__support reveal-child">Ten minutes. Nothing to prepare.</p>
       </div>
-
-      <button class="btn btn--primary reveal-child" onclick="revealCalendly()">
-        Book a conversation <span class="arw" aria-hidden="true">&rarr;</span>
-      </button>
-      <p class="d-cta__support reveal-child">20 minutes. No prep needed.</p>
 
       <div class="d-cal" id="calendly-wrap">
         <div class="calendly-inline-widget" data-url="https://calendly.com/joe-getnovus/10min?hide_gdpr_banner=1&background_color=0a0b0e&text_color=f1ede6&primary_color=4e9bff"></div>
@@ -1305,10 +1295,17 @@
       written += 1;
     }
     /* The grid composes itself around how many facts this row actually had -
-       see .d-sigs[data-count] - so a thin probe is a square rather than a
+       see .d-sigs - so a thin probe is a short rank rather than a
        three-across row with one signal stranded under it. */
     wrap.dataset.count = String(written);
     wrap.hidden = written === 0;
+    /* A row that carried no signals at all must not leave a labelled empty
+       column beside the record: the aside goes, and the record takes the
+       frame back. */
+    const aside = document.getElementById('s2-aside');
+    const grid = document.getElementById('s2-grid');
+    if (aside) aside.hidden = written === 0;
+    if (grid) grid.classList.toggle('is-solo', written === 0);
   }
 
   /* SECTION 2 — what the conversation left open, and what the record shows.
@@ -1384,7 +1381,7 @@
        NOVUS is FOR in that case - keeping the standard they already set -
        rather than repeating the compliment section two has already paid. */
     setField('s3-note', r.handledWell
-      ? 'NOVUS would keep the standard your team already set here, and take the repetitive work around it off them.'
+      ? 'NOVUS would hold the standard your team already set here, and take the repetitive part off them.'
       : '');
 
     document.getElementById('stage').hidden = false;
