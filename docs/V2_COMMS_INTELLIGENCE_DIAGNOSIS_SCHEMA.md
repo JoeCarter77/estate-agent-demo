@@ -828,7 +828,7 @@ No fingerprints, no hashing. One rule:
 
 Deterministic fields are recomputed on every run regardless, so they self-heal. Because a second rebuild finds the AI fields populated and skips them, `npm run novus:pipeline-regression`'s existing *"a second rebuild changes nothing"* invariant still holds.
 
-Two AI calls per probe, once. Roughly 30 live probes → ~60 calls to populate the entire history. Suggested model: `claude-sonnet-5` (the key is already configured for `api/chat.js`).
+Two AI calls per probe, once. Roughly 30 live probes → ~60 calls to populate the entire history. Suggested model: `claude-sonnet-5` (the server-side Anthropic key is selected by deployment environment).
 
 ### To go live
 

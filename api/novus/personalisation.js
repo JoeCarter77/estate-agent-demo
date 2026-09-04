@@ -41,6 +41,7 @@ import {
 } from '../../lib/reply-send-demo.mjs';
 import { classifyReply, CONFIDENCE_THRESHOLD } from '../../lib/reply-classification.mjs';
 import { _internal as aiClientInternal } from '../../lib/ai-client.mjs';
+import { anthropicApiKeyVariable, hasAnthropicApiKey } from '../../lib/anthropic-server.mjs';
 import { normalizeInstantlyEmail } from '../../lib/reply-router.mjs';
 import { PHRASES, DETERMINISTIC_PHRASES, CONTEXTUAL_PHRASES } from '../../lib/reply-classification-fixtures.mjs';
 import { buildOperatorLeads, OPERATOR_TABS } from '../../lib/operator-leads.mjs';
@@ -324,7 +325,7 @@ async function handleInstantlyReplyPollDryRun(req, res) {
     // Semantic classification is opt-in and only runs when a key exists. In
     // dry-run it classifies and reports what it WOULD write; it updates
     // nothing. ?classify=0 turns it off for a pure zero-cost pass.
-    const classify = process.env.ANTHROPIC_API_KEY ? req.query?.classify !== '0' : false;
+    const classify = hasAnthropicApiKey() ? req.query?.classify !== '0' : false;
     const summary = await pollInstantlyReplies({ repo: getRepo(), apiKey, limit, dryRun: true, classify });
     return res.status(200).json({ success: true, ...summary });
   } catch (err) {
@@ -428,7 +429,7 @@ async function handleInstantlyReplyPoll(req, res) {
     // derived classification columns on that same row. It still writes
     // nothing to Instantly and touches no OUTBOUND row itself — see
     // runAutoSendDemo for the one thing that runs after it.
-    const classify = process.env.ANTHROPIC_API_KEY ? req.query?.classify !== '0' : false;
+    const classify = hasAnthropicApiKey() ? req.query?.classify !== '0' : false;
     const repo = getRepo();
     const summary = await pollInstantlyReplies({ repo, apiKey, limit, dryRun: false, classify });
     const autoSend = await runAutoSendDemo({ repo, apiKey, events: summary.events });
@@ -536,12 +537,18 @@ async function handleInstantlyReplyPoll(req, res) {
 async function handleReplyClassifierLiveTest(req, res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  let anthropicConfigured;
+  try {
+    anthropicConfigured = hasAnthropicApiKey();
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+  if (!anthropicConfigured) {
     // Fail clearly, without ever echoing whether some OTHER key-shaped env var
     // exists, and without touching the model.
     return res.status(500).json({
       success: false,
-      error: 'ANTHROPIC_API_KEY is not configured in this environment.',
+      error: `${anthropicApiKeyVariable()} is not configured in this environment.`,
     });
   }
 

@@ -7,7 +7,7 @@
 // — is exercised deterministically.
 //
 // `--live` additionally runs the real model over the phrase table and prints
-// expected vs actual. That one COSTS MONEY and needs ANTHROPIC_API_KEY.
+// expected vs actual. That one COSTS MONEY and needs NOVUS_DEVELOPMENT_API.
 //
 // What it proves, beyond the phrase mapping:
 //   - deterministic opt-out and out-of-office never reach the model
@@ -17,6 +17,7 @@
 //   - exactly one REPLY_EVENTS row per reply, before and after classification
 //   - no Instantly write, no OUTBOUND write, no send
 
+import { hasAnthropicApiKey } from '../lib/anthropic-server.mjs';
 import {
   classifyReply,
   validateClassifierResult,
@@ -869,8 +870,8 @@ section('18. LIVE HTML-ish bodies — the real production format end to end');
 // ── Optional live run against the real model ────────────────────────────────
 if (process.argv.includes('--live')) {
   section('LIVE — real model over the phrase table (costs money)');
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.log('  SKIPPED: ANTHROPIC_API_KEY is not set.');
+  if (!hasAnthropicApiKey()) {
+    console.log('  SKIPPED: NOVUS_DEVELOPMENT_API is not set.');
   } else {
     const rows = [];
     let agree = 0;

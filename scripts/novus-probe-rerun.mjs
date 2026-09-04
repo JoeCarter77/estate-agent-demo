@@ -3,7 +3,7 @@
 //
 //   node scripts/novus-probe-rerun.mjs prb_hist_0002 prb_hist_0004 prb_hist_0005
 //
-// LIVE vs REPLAY. With ANTHROPIC_API_KEY set this makes real calls against the
+// LIVE vs REPLAY. With NOVUS_DEVELOPMENT_API set this makes real calls against the
 // real prompt and prints real model output. Without one it cannot, and says so
 // loudly rather than quietly printing something that looks live: it falls back
 // to replaying each probe's recorded output as call 1 and answering any
@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
+import { hasAnthropicApiKey } from '../lib/anthropic-server.mjs';
 import { personaliseProbe, buildOpportunityShape } from '../lib/probe-personalisation.mjs';
 import { buildDemoRow } from '../lib/demos.mjs';
 
@@ -22,7 +23,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const fixtures = JSON.parse(fs.readFileSync(path.join(HERE, 'fixtures', 'historical-probes.json'), 'utf8'));
 const wanted = process.argv.slice(2).filter((a) => a.startsWith('prb_'));
 const targets = wanted.length ? fixtures.filter((f) => wanted.includes(f.probe_id)) : fixtures;
-const LIVE = Boolean(process.env.ANTHROPIC_API_KEY);
+const LIVE = hasAnthropicApiKey();
 const text = (v) => String(v ?? '').trim();
 
 function standIn(fixture) {
@@ -90,7 +91,7 @@ const FIELDS = ['email_observation', 'email_commercial_hook', 'email_commercial_
 async function main() {
   console.log(LIVE
     ? '── LIVE RUN — real model calls against the current prompt\n'
-    : '── REPLAY (no ANTHROPIC_API_KEY in this environment)\n'
+    : '── REPLAY (no NOVUS_DEVELOPMENT_API in this environment)\n'
       + '   Call 1 replays each probe\'s recorded output; a correction is answered by a\n'
       + '   deterministic stand-in for a model following the new prompt. The field/blank/\n'
       + '   call/demo columns are real. The prose is NOT live model output.\n');

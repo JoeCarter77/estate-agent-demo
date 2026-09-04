@@ -67,7 +67,7 @@ process.env.NOVUS_BASIC_AUTH_USER = 'novus';
 process.env.NOVUS_BASIC_AUTH_PASS = 'basic-pass';
 process.env.NOVUS_REPLY_POLLER_SECRET = SECRET;
 process.env.INSTANTLY_REPLY_API_KEY = 'instantly-key';
-process.env.ANTHROPIC_API_KEY = 'test-anthropic-key';
+process.env.NOVUS_DEVELOPMENT_API = 'test-anthropic-key';
 const AUTH_HEADERS = {
   authorization: `Basic ${Buffer.from('novus:basic-pass').toString('base64')}`,
   [REPLY_POLLER_SECRET_HEADER]: SECRET,
