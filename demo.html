@@ -107,6 +107,23 @@
     max-width:14em;
   }
   .d-open__lede{ font-size:var(--t-lede); line-height:1.6; color:var(--ink-2); max-width:var(--measure); }
+
+  /* THE TWO THINGS THAT HAPPEN TO A SIGNAL. Numbered, hairline-separated,
+     and deliberately the same vocabulary as the actions in section three -
+     the page opens on a problem shaped exactly like the plan that answers
+     it. No card, no icon, no accent: this is framing, not evidence. */
+  .d-two{
+    margin-top:clamp(26px,3.2vw,40px);
+    border-top:1px solid var(--hair);
+    max-width:var(--measure-wide);
+  }
+  .d-two__r{
+    display:grid; grid-template-columns:auto minmax(0,1fr);
+    gap:clamp(14px,2vw,24px); align-items:baseline;
+    padding-block:clamp(14px,1.7vw,20px); border-bottom:1px solid var(--hair);
+  }
+  .d-two__i{ font-family:var(--mono); font-size:var(--t-micro); color:var(--ink-4); letter-spacing:.1em; }
+  .d-two__t{ font-size:var(--t-body); line-height:1.55; color:var(--ink-2); }
   /* The agency's own name is the proof. Lifted out of the sentence just
      enough to be the thing the eye lands on. */
   .d-name{ color:var(--blue-hi); font-weight:600; }
@@ -167,16 +184,6 @@
   .d-prop__link{ margin-left:auto; color:var(--ink-4); white-space:nowrap; transition:color .2s var(--ease); }
   .d-prop__link:hover{ color:var(--blue); }
 
-  /* The one piece of framing that stops the reader deciding this is an
-     enquiry-response product. Planted, then left alone until section four. */
-  .d-frame{
-    margin-top:clamp(40px,5vw,72px);
-    padding-top:clamp(20px,2.4vw,30px);
-    border-top:1px solid var(--hair);
-    font-size:var(--t-lede); color:var(--ink-3); max-width:var(--measure-wide);
-  }
-  .d-frame strong{ color:var(--ink-2); font-weight:500; }
-
   /* ═══ 02 · WHAT NOVUS UNDERSTOOD ═══════════════════════════════════════
      ONE intelligence section, not five. What the enquiry contained, what
      the team did with it, and - the half that proves this is reading
@@ -186,9 +193,20 @@
      anything is described as unresolved: a strong operator told what they
      missed first starts arguing with the methodology instead of reading. */
   .d-credit{
+    margin-top:clamp(24px,2.8vw,34px);
     margin-bottom:clamp(20px,2.4vw,30px);
     font-size:var(--t-lede); font-weight:500; color:var(--blue-hi);
     max-width:var(--measure);
+  }
+
+  /* The quiet label that names a block inside a section. Small enough that
+     it orders the page without competing with the heading above it. */
+  .d-key{
+    margin-top:clamp(40px,4.6vw,64px);
+    padding-top:clamp(20px,2.4vw,28px);
+    border-top:1px solid var(--hair);
+    font-size:var(--t-micro); font-weight:700; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--ink-4);
   }
 
   /* THE SIGNALS. Value first, at scale; label under it, small. Deliberately
@@ -205,6 +223,8 @@
   /* Four signals in a three-column grid strand the fourth on its own row.
      Four reads better as a square, and gains room for the value type. */
   .d-sigs[data-count="4"]{ grid-template-columns:repeat(2,minmax(0,1fr)); max-width:760px; }
+  /* The label above it already carries the rule. */
+  .d-key + .d-sigs{ margin-top:clamp(20px,2.4vw,28px); padding-top:0; border-top:none; }
   /* Values run to one or two lines depending on the row. The label is pushed
      to the bottom of its cell so a rank of them still reads as one line
      across, rather than as a ragged edge. */
@@ -303,74 +323,89 @@
   .d-branch--auto .d-branch__k{ color:var(--blue); }
 
   /* ═══ 04 · THE ZOOM-OUT ════════════════════════════════════════════════
-     The most important visual on the page, and the one the copy stays out
-     of. One interaction sits alone, then the agency opens out around it -
-     the reader should FEEL the scope change before reading a word of it. */
-  /* A px measure, not an em one: `em` here resolves against the CONTAINER's
-     inherited body size, not the display type inside it, and would crush the
-     one line on the page that most needs room. */
-  .d-zoom__head{ text-align:center; margin-inline:auto; max-width:min(100%,940px); }
-  .d-zoom__head .d-statement{ font-size:var(--t-h1); }
+     THE ONE MOMENT THE PAGE STOPS BEING ABOUT AN ENQUIRY.
 
-  .d-field{ margin-top:clamp(20px,3vw,46px); }
-  .d-field svg{ width:100%; height:auto; overflow:visible; }
-  .d-field__mobile{ display:none; }
+     A scroll track holds a sticky stage. Everything inside it is driven by
+     one number - how far through the track the reader is - which pulls the
+     camera back from the single interaction they have just read about until
+     the whole agency is in frame: activity, then connections, then clusters,
+     then the few patterns that only exist once the signals are joined up.
 
-  .z-core{ fill:var(--blue); }
-  .z-core-ring{ fill:none; stroke:var(--blue-line); stroke-width:1; }
-  .z-core-label{
-    font-family:var(--sans); font-size:10.5px; font-weight:700;
-    letter-spacing:.2em; text-transform:uppercase; fill:var(--blue);
+     THE FIELD IS DRAWN, NOT DECORATED. It is one canvas of hairline dots in
+     the ink already on the page, with the accent spent only on the clusters
+     that carry an insight. No glow, no gradient mesh, no network graphic.
+     ═══════════════════════════════════════════════════════════════════════ */
+  .d-zoom{ padding-block:0; }
+  /* The track's height IS the length of the sequence. Long enough to feel
+     like a pull-back, short enough that nobody is scrolling through an
+     animation waiting for the page to continue. */
+  .d-zoom__track{ position:relative; height:250vh; }
+  .d-zoom__stage{
+    position:sticky; top:0; height:100vh; min-height:560px;
+    display:grid; place-items:center; overflow:hidden;
   }
-  .z-line{ stroke:var(--hair); stroke-width:1; }
-  .z-node{ fill:var(--ink-4); }
-  .z-label{
-    font-family:var(--sans); font-size:12.5px; font-weight:600;
-    letter-spacing:.13em; text-transform:uppercase; fill:var(--ink-3);
+  .d-zoom__canvas{ position:absolute; inset:0; width:100%; height:100%; }
+  /* The type sits IN the field, so the field is quietened where the type is.
+     A radial wash of the page's own background - not a panel, not a blur. */
+  .d-zoom__veil{
+    position:absolute; inset:0; pointer-events:none; opacity:0;
+    background:radial-gradient(60% 48% at 50% 48%,
+      var(--bg) 0%, rgba(10,11,14,.94) 30%, rgba(10,11,14,.72) 52%,
+      rgba(10,11,14,.34) 68%, rgba(10,11,14,0) 84%);
   }
-  .z-orbit{ fill:none; stroke:var(--hair-soft); stroke-width:1; stroke-dasharray:2 9; }
+  .d-zoom__copy{ position:relative; z-index:2; width:100%; text-align:center; }
 
-  /* THE PULL-BACK. The agency starts collapsed onto the single interaction
-     and opens outward once the section arrives. With motion disabled the
-     group is simply already open, which is the finished composition. */
-  .d-field__bloom{
-    transform-origin:500px 284px;
-    transform:scale(.34); opacity:0;
-    transition:transform 1.5s var(--ease) .12s, opacity 1.2s var(--ease) .12s;
+  /* "But this is only one enquiry." - present at the start, gone as soon as
+     the camera starts moving. */
+  .d-zoom__pre{
+    font-size:var(--t-lede); color:var(--ink-3);
+    margin-bottom:clamp(16px,2vw,24px);
+    will-change:opacity;
   }
-  .is-in .d-field__bloom{ transform:scale(1); opacity:1; }
+  .d-zoom__title{
+    font-size:var(--t-h1); margin-inline:auto; max-width:min(100%,960px);
+    will-change:opacity,transform;
+  }
 
-  /* ── THE ZOOM-OUT ON A PHONE ──
-     A ring of eleven labels cannot compose at 380px, so the agency opens
-     out as a field below the single interaction instead of around it. Same
-     idea - one thing becomes many - drawn for the shape that exists. */
-  .d-field__mobile{ text-align:center; }
-  .d-fieldm__core{
-    display:inline-flex; align-items:center; gap:9px;
-    font-size:var(--t-micro); font-weight:700; letter-spacing:.2em; text-transform:uppercase;
-    color:var(--blue); border:1px solid var(--blue-line); background:var(--blue-tint);
-    border-radius:var(--r-full); padding:8px 15px;
+  /* THE PATTERNS, EMERGING. Four short observations, placed out in the field
+     rather than listed under it, so they read as things the picture surfaced
+     rather than as a feature list. */
+  .d-zoom__insights{ position:absolute; inset:0; z-index:2; pointer-events:none; }
+  .d-zoom__i{
+    position:absolute; max-width:19ch; text-align:left;
+    display:flex; gap:9px;
+    font-size:var(--t-xs); line-height:1.5; color:var(--ink-2);
+    opacity:0; transform:translate3d(0,6px,0);
+    transition:opacity .6s var(--ease), transform .6s var(--ease);
   }
-  .d-fieldm__core span{ width:6px; height:6px; border-radius:50%; background:var(--blue); flex:none; }
-  .d-fieldm__cloud{
-    display:flex; flex-wrap:wrap; justify-content:center; gap:7px 8px;
-    margin-top:22px; padding-top:22px;
-    border-top:1px solid var(--hair);
-    opacity:0; transform:translate3d(0,10px,0) scale(.94); transform-origin:50% 0;
-    transition:opacity 1s var(--ease) .1s, transform 1.2s var(--ease) .1s;
+  .d-zoom__i::before{
+    content:''; flex:none; width:5px; height:5px; border-radius:50%;
+    background:var(--blue); transform:translateY(.5em);
   }
-  .is-in .d-fieldm__cloud{ opacity:1; transform:none; }
-  .d-fieldm__cloud span{
-    font-size:var(--t-xs); font-weight:600; letter-spacing:.1em; text-transform:uppercase;
-    color:var(--ink-3); border:1px solid var(--hair); border-radius:var(--r-full);
-    padding:7px 13px;
-  }
+  .d-zoom__i.is-on{ opacity:1; transform:none; }
+  .d-zoom__i--a{ left:clamp(20px,7vw,120px);  top:22%; }
+  .d-zoom__i--b{ right:clamp(20px,7vw,120px); top:28%; text-align:right; }
+  .d-zoom__i--c{ left:clamp(20px,9vw,164px);  bottom:24%; }
+  .d-zoom__i--d{ right:clamp(20px,9vw,164px); bottom:19%; }
+  .d-zoom__i--b{ flex-direction:row-reverse; }
 
   .d-zoom__after{
-    text-align:center; max-width:36em;
-    margin:clamp(22px,3.2vw,44px) auto 0;
+    text-align:center; max-width:38em;
+    margin:clamp(28px,3.6vw,52px) auto 0;
     font-size:var(--t-lede); line-height:1.6; color:var(--ink-2);
   }
+  .d-zoom__close{ padding-block:0 var(--sec-y-lg); }
+
+  /* NO SEQUENCE, NO STICKY. Reduced motion, or a browser with no canvas,
+     gets the finished composition at a readable height - which is the whole
+     idea, simply not travelled through. */
+  .d-zoom.is-static .d-zoom__track{ height:auto; }
+  .d-zoom.is-static .d-zoom__stage{ position:relative; height:auto; min-height:min(74vh,620px); padding-block:var(--sec-y-lg); }
+  .d-zoom.is-static .d-zoom__pre{ display:none; }
+  .d-zoom.is-static .d-zoom__stage{ align-content:center; }
+  .d-zoom.is-static .d-zoom__copy{ order:1; }
+  .d-zoom.is-static .d-zoom__insights{ order:2; position:static; display:grid; gap:14px 32px; grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:clamp(28px,3.4vw,44px); }
+  .d-zoom.is-static .d-zoom__i{ position:static; opacity:1; transform:none; max-width:none; text-align:left; flex-direction:row; }
 
   /* ═══ 05 · UNDERSTAND → ACT → OPTIMISE ═════════════════════════════════
      Three levels of value, each with one outcome sentence and a few
@@ -465,11 +500,27 @@
   }
 
   @media (max-width:900px){
-    /* Below this the eleven labels can no longer sit around the ellipse
-       without colliding, so the agency opens out as a field of signals
-       instead of a ring of them. Same idea, drawn for the shape available. */
-    .d-field__desktop{ display:none; }
-    .d-field__mobile{ display:block; }
+    /* The four observations cannot sit out in the field at this width
+       without landing on the type, so they gather under it as a list. Same
+       four patterns, drawn for the shape available. */
+    /* Stacked, and in reading order: the statement, then what the picture
+       surfaced. The grid's own ordering is what puts the copy first, since
+       the field's labels are painted before it in the markup. */
+    .d-zoom__stage{ align-content:center; }
+    .d-zoom__copy{ order:1; }
+    /* A tall column of type on a narrow screen would take the whole field
+       with it. The wash is pulled back to the band the type actually
+       occupies. */
+    .d-zoom__veil{
+      background:radial-gradient(84% 34% at 50% 50%,
+        rgba(10,11,14,.94) 0%, rgba(10,11,14,.74) 48%, rgba(10,11,14,0) 88%);
+    }
+    .d-zoom__insights{
+      order:2; position:static; display:grid; gap:12px 26px;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      margin-top:clamp(26px,4vw,40px); text-align:left;
+    }
+    .d-zoom__i{ position:static; max-width:none; text-align:left; flex-direction:row; }
     .d-branch{ grid-template-columns:minmax(0,1fr); gap:clamp(18px,3vw,26px); }
     .d-sigs{ grid-template-columns:repeat(2,minmax(0,1fr)); }
   }
@@ -486,7 +537,10 @@
     .d-log__t{ font-size:var(--t-micro); letter-spacing:.06em; }
     .d-act{ grid-template-columns:minmax(0,1fr); gap:5px; }
     .d-act__d{ grid-column:1; }
-    .d-zoom__head .d-statement{ font-size:clamp(1.75rem,1rem + 4.6vw,2.5rem); }
+    .d-zoom__track{ height:220vh; }
+    .d-zoom__stage{ min-height:0; height:100svh; }
+    .d-zoom__title{ font-size:clamp(1.75rem,1rem + 4.6vw,2.5rem); }
+    .d-zoom__insights{ grid-template-columns:minmax(0,1fr); }
     /* The page names the agency in its first sentence; a truncated copy of
        it beside the button is only crowding. */
     .d-agency{ display:none; }
@@ -495,7 +549,7 @@
   }
 
   @media (prefers-reduced-motion:reduce){
-    .d-field__bloom,.d-fieldm__cloud{ transform:none !important; opacity:1 !important; }
+    .d-zoom__i{ transition:none; }
     .d-cal{ transition:none; }
   }
 </style>
@@ -515,7 +569,7 @@
       <span class="d-agency" id="hdr-agency"></span>
       <span class="chip chip--amber" id="review-flag" hidden
             title="This demo is flagged for review - see review_reasons on its DEMOS row">Needs review</span>
-      <button class="btn btn--ghost btn--sm" id="hdr-cta" hidden onclick="revealCalendly()">Book 10 minutes</button>
+      <button class="btn btn--ghost btn--sm" id="hdr-cta" hidden onclick="revealCalendly()">Book a conversation</button>
     </div>
   </div>
 </header>
@@ -527,17 +581,28 @@
     <div class="frame">
       <div class="d-open__grid">
         <div>
-          <p class="eyebrow reveal-child" id="s1-eyebrow">The enquiry</p>
-          <h1 class="reveal-child">There was more information in this enquiry than first appeared.</h1>
+          <p class="eyebrow reveal-child" id="s1-eyebrow">Prepared for your agency</p>
+          <h1 class="reveal-child">
+            Your agency creates thousands of signals. Two things usually happen to them.
+          </h1>
+
+          <div class="d-two reveal-child">
+            <div class="d-two__r">
+              <span class="d-two__i">01</span>
+              <p class="d-two__t">Useful information in individual enquiries gets missed or left unused.</p>
+            </div>
+            <div class="d-two__r">
+              <span class="d-two__i">02</span>
+              <p class="d-two__t">
+                Across the agency, those signals stay separate - so the bigger patterns
+                and opportunities stay hidden.
+              </p>
+            </div>
+          </div>
+
           <p class="d-open__lede reveal-child">
-            One real enquiry, sent to <span class="d-name" id="s1-agency">your agency</span>.
-          </p>
-
-          <div class="d-log reveal-child" id="s1-log"></div>
-
-          <p class="d-note reveal-child">
-            We sent this enquiry ourselves and stopped engaging once we had enough to
-            understand the interaction. Nothing here is a judgement on your team.
+            We tested one real enquiry with <span class="d-name" id="s1-agency">your agency</span>
+            to show what that looks like.
           </p>
         </div>
 
@@ -569,10 +634,6 @@
           </figcaption>
         </figure>
       </div>
-
-      <p class="d-frame reveal-child">
-        <strong>This is one example of how NOVUS understands what's happening inside your agency.</strong>
-      </p>
     </div>
   </section>
 
@@ -580,12 +641,20 @@
   <section class="section section--lg section--ruled" data-reveal data-stagger="90">
     <div class="frame">
       <div class="head">
-        <p class="eyebrow reveal-child">What NOVUS understood</p>
-        <h2 class="reveal-child">Everything this enquiry actually contained.</h2>
+        <p class="eyebrow reveal-child" id="s2-eyebrow">The enquiry</p>
+        <h2 class="reveal-child">What actually happened.</h2>
       </div>
+
+      <div class="d-log reveal-child" id="s2-log"></div>
+
+      <p class="d-note reveal-child">
+        We sent this enquiry ourselves and stopped engaging once we had enough to
+        understand the interaction. Nothing here is a judgement on your team.
+      </p>
 
       <p class="d-credit reveal-child" id="s2-credit" hidden></p>
 
+      <p class="d-key reveal-child">The signals inside this enquiry</p>
       <div class="d-sigs reveal-child" id="s2-signals"></div>
 
       <div class="d-open-q reveal-child" id="s2-open" hidden>
@@ -594,8 +663,8 @@
       </div>
 
       <p class="d-close reveal-child">
-        NOVUS identifies <strong>what's known</strong>, what's still unclear,
-        and what matters next.
+        Capturing the enquiry is only the start. The value is understanding
+        <strong>what the information means</strong> - and what still needs to be learned.
       </p>
     </div>
   </section>
@@ -604,12 +673,16 @@
   <section class="section section--lg section--dark section--ruled" data-reveal data-stagger="80">
     <div class="frame">
       <div class="head">
-        <p class="eyebrow reveal-child">What happens next</p>
+        <p class="eyebrow reveal-child">What NOVUS would do next</p>
         <h2 class="reveal-child">
-          <span class="soft">Understanding the enquiry is half of it.</span>
-          NOVUS can take the next step too.
+          <span class="soft">Once the full picture is understood,</span>
+          the next step becomes much clearer.
         </h2>
       </div>
+
+      <!-- Only where the record genuinely credits the team. Never a second
+           telling of the compliment section two already paid them. -->
+      <p class="d-credit reveal-child" id="s3-note" hidden></p>
 
       <div class="d-acts reveal-child" id="s3-actions"></div>
 
@@ -621,123 +694,71 @@
       <div class="d-branch">
         <div class="d-branch__c d-branch--auto reveal-child">
           <p class="d-branch__k">They reply</p>
-          <p class="d-branch__s">Understanding updates <i>&rarr;</i> the enquiry progresses</p>
+          <p class="d-branch__s">Understanding updates <i>&rarr;</i> the next action adapts</p>
         </div>
         <div class="d-branch__c reveal-child">
-          <p class="d-branch__k">They don't</p>
-          <p class="d-branch__s">Follow-up continues <i>&rarr;</i> a call is surfaced when it's worth someone's time</p>
+          <p class="d-branch__k">No reply</p>
+          <p class="d-branch__s">Follow-up continues <i>&rarr;</i> a team action is surfaced when it matters</p>
         </div>
       </div>
 
       <p class="d-close reveal-child">
-        NOVUS can <strong>act on that intelligence</strong>, not just report it.
+        The intelligence doesn't just sit there. <strong>It determines what happens next.</strong>
       </p>
     </div>
   </section>
 
   <!-- ═══ 04 · THE ZOOM-OUT ════════════════════════════════════════════
        The moment NOVUS stops looking like an enquiry tool. The scale change
-       is felt in the drawing, so the copy here is two sentences and the
-       diagram is given the room. -->
-  <section class="section section--lg section--ruled" data-reveal data-stagger="80">
-    <div class="frame frame--wide">
-      <div class="d-zoom__head reveal-child">
-        <h2 class="d-statement">
-          <span class="soft">One enquiry creates signals.</span>
-          Thousands reveal how your agency is actually operating.
-        </h2>
-      </div>
+       is FELT - the camera pulls back from the one interaction they have
+       just read about until the whole agency is in frame - so the copy here
+       is three lines and the field is given the screen. -->
+  <section class="section section--ruled d-zoom" id="zoom">
+    <div class="d-zoom__track">
+      <div class="d-zoom__stage">
+        <canvas class="d-zoom__canvas" id="zoom-canvas" aria-hidden="true"></canvas>
+        <div class="d-zoom__veil" aria-hidden="true"></div>
 
-      <div class="d-field" role="img"
-           aria-label="Diagram: one enquiry at the centre, with enquiries, calls, emails, applicants, viewings, valuations, past vendors, database, follow-ups, appointments and outcomes opening out around it.">
-        <svg class="d-field__desktop" viewBox="0 40 1000 490" aria-hidden="true" focusable="false">
-          <defs>
-            <radialGradient id="zhalo" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="#4E9BFF" stop-opacity=".16"/>
-              <stop offset="55%" stop-color="#4E9BFF" stop-opacity=".04"/>
-              <stop offset="100%" stop-color="#4E9BFF" stop-opacity="0"/>
-            </radialGradient>
-          </defs>
+        <div class="d-zoom__insights" id="zoom-insights">
+          <p class="d-zoom__i d-zoom__i--a">Enquiries repeatedly stalling after first contact</p>
+          <p class="d-zoom__i d-zoom__i--b">Seller positions frequently left unresolved</p>
+          <p class="d-zoom__i d-zoom__i--c">Faster follow-up linked to stronger progression</p>
+          <p class="d-zoom__i d-zoom__i--d">Past contacts showing renewed intent</p>
+        </div>
 
-          <g class="d-field__bloom">
-            <ellipse class="z-orbit" cx="500" cy="284" rx="404" ry="207"/>
-            <line class="z-line" x1="500" y1="238" x2="500" y2="121"/>
-            <line class="z-line" x1="524.9" y1="245.3" x2="676.8" y2="146.9"/>
-            <line class="z-line" x1="541.8" y1="264.9" x2="797.4" y2="216.2"/>
-            <line class="z-line" x1="545.5" y1="290.5" x2="823.7" y2="307.2"/>
-            <line class="z-line" x1="534.8" y1="314.1" x2="747.1" y2="390.7"/>
-            <line class="z-line" x1="513" y1="328.1" x2="592.2" y2="440.4"/>
-            <line class="z-line" x1="487" y1="328.1" x2="407.8" y2="440.4"/>
-            <line class="z-line" x1="465.2" y1="314.1" x2="252.9" y2="390.7"/>
-            <line class="z-line" x1="454.5" y1="290.5" x2="176.3" y2="307.2"/>
-            <line class="z-line" x1="458.2" y1="264.9" x2="202.6" y2="216.2"/>
-            <line class="z-line" x1="475.1" y1="245.3" x2="323.2" y2="146.9"/>
-
-            <circle class="z-node" cx="500" cy="112" r="3.4"/>
-            <circle class="z-node" cx="681.7" cy="139.3" r="3.4"/>
-            <circle class="z-node" cx="805.6" cy="212.5" r="3.4"/>
-            <circle class="z-node" cx="832.6" cy="308.5" r="3.4"/>
-            <circle class="z-node" cx="753.9" cy="396.6" r="3.4"/>
-            <circle class="z-node" cx="594.7" cy="449" r="3.4"/>
-            <circle class="z-node" cx="405.3" cy="449" r="3.4"/>
-            <circle class="z-node" cx="246.1" cy="396.6" r="3.4"/>
-            <circle class="z-node" cx="167.4" cy="308.5" r="3.4"/>
-            <circle class="z-node" cx="194.4" cy="212.5" r="3.4"/>
-            <circle class="z-node" cx="318.3" cy="139.3" r="3.4"/>
-
-            <text class="z-label" x="500" y="86" text-anchor="middle">Enquiries</text>
-            <text class="z-label" x="690.9" y="129" text-anchor="start">Calls</text>
-            <text class="z-label" x="821.1" y="209.4" text-anchor="start">Emails</text>
-            <text class="z-label" x="849.4" y="314.9" text-anchor="start">Applicants</text>
-            <text class="z-label" x="766.7" y="411.7" text-anchor="start">Viewings</text>
-            <text class="z-label" x="599.5" y="469.3" text-anchor="start">Valuations</text>
-            <text class="z-label" x="400.5" y="469.3" text-anchor="end">Past vendors</text>
-            <text class="z-label" x="233.3" y="411.7" text-anchor="end">Database</text>
-            <text class="z-label" x="150.6" y="314.9" text-anchor="end">Follow-ups</text>
-            <text class="z-label" x="178.9" y="209.4" text-anchor="end">Appointments</text>
-            <text class="z-label" x="309.1" y="129" text-anchor="end">Outcomes</text>
-          </g>
-
-          <!-- The interaction they have just read about, still at the centre
-               of everything that opened around it. -->
-          <circle cx="500" cy="284" r="120" fill="url(#zhalo)"/>
-          <circle class="z-core-ring" cx="500" cy="284" r="34"/>
-          <circle class="z-core" cx="500" cy="284" r="5"/>
-          <text class="z-core-label" x="500" y="340" text-anchor="middle">This enquiry</text>
-        </svg>
-
-        <div class="d-field__mobile">
-          <div class="d-fieldm__core"><span></span>This enquiry</div>
-          <div class="d-fieldm__cloud">
-            <span>Enquiries</span><span>Calls</span><span>Emails</span><span>Applicants</span>
-            <span>Viewings</span><span>Valuations</span><span>Past vendors</span><span>Database</span>
-            <span>Follow-ups</span><span>Appointments</span><span>Outcomes</span>
-          </div>
+        <div class="frame frame--wide d-zoom__copy">
+          <p class="d-zoom__pre" id="zoom-pre">But this is only one enquiry.</p>
+          <h2 class="d-statement d-zoom__title" id="zoom-title">
+            <span class="soft">One enquiry creates signals.</span>
+            Thousands reveal how your agency is actually operating.
+          </h2>
         </div>
       </div>
+    </div>
 
-      <p class="d-zoom__after reveal-child">
-        NOVUS connects those signals across the agency, so patterns and
-        opportunities that are invisible in isolation start becoming clear.
+    <div class="frame d-zoom__close">
+      <p class="d-zoom__after reveal" >
+        Connected, those signals reveal patterns, gaps and opportunities
+        no single interaction can show.
       </p>
     </div>
   </section>
 
-  <!-- ═══ 05 · UNDERSTAND → ACT → OPTIMISE ═════════════════════════════ -->
+  <!-- ═══ 05 · UNDERSTAND → ACT → CONNECT ══════════════════════════════ -->
   <section class="section section--lg section--dark section--ruled" data-reveal data-stagger="90">
     <div class="frame">
       <div class="head">
-        <p class="eyebrow reveal-child">Understand &middot; Act &middot; Optimise</p>
-        <h2 class="reveal-child">What that intelligence is for.</h2>
+        <p class="eyebrow reveal-child">Understand &middot; Act &middot; Connect</p>
+        <h2 class="reveal-child">What you have just seen, named.</h2>
       </div>
 
       <div class="d-model">
         <div class="d-layer reveal-child">
           <p class="d-layer__k"><span class="d-layer__i">01</span><span class="d-layer__n">Understand</span></p>
           <div>
-            <p class="d-layer__o">See where attention, opportunity and leakage are building across the agency.</p>
+            <p class="d-layer__o">Understand each interaction properly - what matters, what's missing and what should happen next.</p>
             <p class="d-layer__terms">
-              <span>Patterns</span><span>Gaps</span><span>Opportunities</span><span>Priorities</span>
+              <span>Intent</span><span>Position</span><span>History</span><span>Progression</span>
             </p>
           </div>
         </div>
@@ -745,19 +766,19 @@
         <div class="d-layer reveal-child">
           <p class="d-layer__k"><span class="d-layer__i">02</span><span class="d-layer__n">Act</span></p>
           <div>
-            <p class="d-layer__o">Take repetitive work off the team and make sure the right things actually happen.</p>
+            <p class="d-layer__o">Handle the repetitive work and bring the team in when human attention matters.</p>
             <p class="d-layer__terms">
-              <span>Follow-up</span><span>Outreach</span><span>Reactivation</span><span>Progression</span><span>Escalation</span>
+              <span>Follow-up</span><span>Outreach</span><span>Progression</span><span>Reactivation</span><span>Escalation</span>
             </p>
           </div>
         </div>
 
         <div class="d-layer reveal-child">
-          <p class="d-layer__k"><span class="d-layer__i">03</span><span class="d-layer__n">Optimise</span></p>
+          <p class="d-layer__k"><span class="d-layer__i">03</span><span class="d-layer__n">Connect</span></p>
           <div>
-            <p class="d-layer__o">Use the growing picture of your agency to uncover what can perform better and where growth is sitting.</p>
+            <p class="d-layer__o">Turn thousands of interactions into a clearer picture of how the agency is really operating.</p>
             <p class="d-layer__terms">
-              <span>What works</span><span>What repeatedly stalls</span><span>Where value is underused</span>
+              <span>Patterns</span><span>Gaps</span><span>Priorities</span><span>Opportunities</span><span>Growth</span>
             </p>
           </div>
         </div>
@@ -777,7 +798,7 @@
       <button class="btn btn--primary reveal-child" onclick="revealCalendly()">
         Book a conversation <span class="arw" aria-hidden="true">&rarr;</span>
       </button>
-      <p class="d-cta__support reveal-child">10 minutes. No prep needed.</p>
+      <p class="d-cta__support reveal-child">20 minutes. No prep needed.</p>
 
       <div class="d-cal" id="calendly-wrap">
         <div class="calendly-inline-widget" data-url="https://calendly.com/joe-getnovus/10min?hide_gdpr_banner=1&background_color=0a0b0e&text_color=f1ede6&primary_color=4e9bff"></div>
@@ -901,6 +922,290 @@
     update();
   }
 
+  /* ── THE ZOOM-OUT ──
+     ONE NUMBER DRIVES THE WHOLE SECTION: how far the reader has travelled
+     through the sticky track, 0 to 1. It moves a camera backwards away from
+     the single interaction they have just read about, and the agency is
+     simply already there to be found - nothing is spawned, nothing is
+     staged. What changes is how much of it fits in the frame.
+
+       0.00  one interaction, alone
+       0.15  activity, arriving continuously as the frame widens
+       0.38  connections between things that belong together
+       0.66  two clusters carry an accent: repeated shapes, not noise
+       0.70+ the patterns that only exist once the signals are joined up
+
+     The field is GENERATED ONCE from a fixed seed, so every prospect sees
+     the same composition and a reload is not a different picture. It is an
+     illustration of scale, never a chart of their data. */
+  function startZoom() {
+    const section = document.getElementById('zoom');
+    const canvas = document.getElementById('zoom-canvas');
+    if (!section || !canvas) return;
+
+    const ctx = canvas.getContext ? canvas.getContext('2d') : null;
+    const reduced = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    const track = section.querySelector('.d-zoom__track');
+    const pre = document.getElementById('zoom-pre');
+    const title = document.getElementById('zoom-title');
+    const insights = Array.from(section.querySelectorAll('.d-zoom__i'));
+    const veil = section.querySelector('.d-zoom__veil');
+
+    /* No canvas, or a reader who has asked for no motion: the section
+       becomes the finished composition at a readable height. */
+    const isStatic = !ctx || reduced;
+    if (isStatic) {
+      section.classList.add('is-static');
+      if (pre) pre.style.opacity = '0';
+      if (veil) veil.style.opacity = '1';
+      insights.forEach((node) => node.classList.add('is-on'));
+      if (!ctx) { canvas.remove(); return; }
+    }
+
+    /* Same seed, same field, every time. */
+    function mulberry32(a) {
+      return function () {
+        a = a + 0x6D2B79F5 | 0;
+        let t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+    const rand = mulberry32(20260904);
+
+    const TAU = Math.PI * 2;
+    const narrow = window.innerWidth < 760;
+
+    /* A LOGARITHMIC FIELD OF CLUSTERS. Cluster centres are spread evenly in
+       LOG space and everything about a cluster is measured relative to its
+       own distance from the middle, so the field looks equally dense at
+       every zoom level: pulling back always finds more, and what it finds is
+       always grouped. Straight uniform scatter reads as stars; this reads as
+       an agency. */
+    const R_IN = 0.0042;
+    const R_OUT = 1.08;
+    const SEEDS = narrow ? 54 : 88;
+    const PER = narrow ? 11 : 14;
+    const SPREAD = 0.27;
+
+    const seeds = [];
+    for (let i = 0; i < SEEDS; i += 1) {
+      const u = (i + rand() * 0.9) / SEEDS;
+      const r = R_IN * Math.pow(R_OUT / R_IN, u);
+      const a = rand() * TAU;
+      seeds.push({
+        x: Math.cos(a) * r,
+        y: Math.sin(a) * r * 0.92,
+        r,
+        /* Three clusters carry the accent. Everything else stays in ink -
+           an accent on all of it would mark nothing. */
+        hot: i % 11 === 4,
+      });
+    }
+
+    const pts = [];
+    for (let i = 0; i < seeds.length; i += 1) {
+      const seed = seeds[i];
+      const count = Math.max(4, Math.round(PER * (0.6 + rand() * 0.8)));
+      for (let j = 0; j < count; j += 1) {
+        const a = rand() * TAU;
+        const d = seed.r * SPREAD * Math.sqrt(rand());
+        pts.push({
+          x: seed.x + Math.cos(a) * d,
+          y: seed.y + Math.sin(a) * d * 0.94,
+          seed: i,
+          hot: seed.hot,
+          ph: rand() * TAU,
+          sz: 0.85 + rand() * 0.75,
+          live: j % 5 === 0,
+        });
+      }
+    }
+
+    /* Two kinds of join, and the difference is the whole argument:
+       inside a cluster, the interactions that belong to the same shape;
+       between clusters, the repetition that only exists agency-wide. */
+    const links = [];
+    for (let i = 0; i < pts.length; i += 1) {
+      const a = pts[i];
+      let best = -1;
+      let bestD = Infinity;
+      for (let j = i + 1; j < Math.min(i + 16, pts.length); j += 1) {
+        const b = pts[j];
+        if (b.seed !== a.seed) continue;
+        const d = Math.hypot(b.x - a.x, b.y - a.y);
+        if (d < bestD) { bestD = d; best = j; }
+      }
+      if (best >= 0 && bestD < seeds[a.seed].r * SPREAD * 1.15) {
+        links.push({ a: i, b: best, hot: a.hot, far: false });
+      }
+    }
+    /* One join per cluster to its nearest neighbour, held back until the
+       clusters themselves have formed. */
+    const seedFirst = [];
+    for (let i = 0; i < pts.length; i += 1) if (seedFirst[pts[i].seed] === undefined) seedFirst[pts[i].seed] = i;
+    for (let i = 0; i < seeds.length; i += 1) {
+      let best = -1;
+      let bestD = Infinity;
+      for (let j = 0; j < seeds.length; j += 1) {
+        if (j === i) continue;
+        const d = Math.hypot(seeds[j].x - seeds[i].x, seeds[j].y - seeds[i].y);
+        if (d < bestD) { bestD = d; best = j; }
+      }
+      if (best >= 0 && bestD < seeds[i].r * 1.5 && seedFirst[i] !== undefined && seedFirst[best] !== undefined) {
+        links.push({ a: seedFirst[i], b: seedFirst[best], hot: seeds[i].hot && seeds[best].hot, far: true });
+      }
+    }
+
+    function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+    function smooth(a, b, v) { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); }
+
+    let w = 0;
+    let h = 0;
+    function size() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      w = Math.max(1, Math.round(rect.width));
+      h = Math.max(1, Math.round(rect.height));
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    /* How far through the track we are. In the static section there is no
+       track to travel, so the sequence is simply already finished. */
+    function progress() {
+      if (isStatic) return 1;
+      const rect = track.getBoundingClientRect();
+      const travel = rect.height - window.innerHeight;
+      return travel > 0 ? clamp01(-rect.top / travel) : 0;
+    }
+
+    /* THE CAMERA. Geometric, not linear: equal scroll buys equal
+       magnification, which is what a real pull-back does. */
+    const ZOOM_IN = 420;
+
+    function draw(p, t) {
+      const e = smooth(0, 1, p);
+      const zoom = ZOOM_IN * Math.pow(1 / ZOOM_IN, e);
+      /* A tall, narrow frame cannot be filled by a field measured on its
+         short side, so the phone measures on its long one. */
+      const k = (narrow ? Math.max(w, h) * 0.52 : Math.min(w, h) * 0.54) * zoom;
+      const cx = w / 2;
+      const cy = h / 2;
+      const edge = Math.max(w, h) * 0.62;
+
+      ctx.clearRect(0, 0, w, h);
+
+      const linkAlpha = smooth(0.34, 0.58, p);
+      const farAlpha = smooth(0.56, 0.78, p);
+      const accent = smooth(0.60, 0.80, p);
+
+      if (linkAlpha > 0.01) {
+        for (const link of links) {
+          const a = pts[link.a];
+          const b = pts[link.b];
+          const ax = cx + a.x * k;
+          const ay = cy + a.y * k;
+          const bx = cx + b.x * k;
+          const by = cy + b.y * k;
+          if (ax < -60 && bx < -60) continue;
+          if (ax > w + 60 && bx > w + 60) continue;
+          if (ay < -60 && by < -60) continue;
+          if (ay > h + 60 && by > h + 60) continue;
+          const len = Math.hypot(bx - ax, by - ay);
+          if (len > 260 || len < 1) continue;
+          const near = 1 - smooth(0.74, 1, Math.hypot(ax - cx, ay - cy) / edge);
+          const hot = link.hot ? accent : 0;
+          const base = (link.far ? farAlpha * 0.5 : linkAlpha) * near * (1 - smooth(150, 260, len));
+          if (base <= 0.004) continue;
+          ctx.strokeStyle = hot > 0
+            ? 'rgba(78,155,255,' + (base * (0.2 + hot * 0.45)).toFixed(3) + ')'
+            : 'rgba(241,237,230,' + (base * 0.16).toFixed(3) + ')';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(bx, by);
+          ctx.stroke();
+        }
+      }
+
+      for (let i = 0; i < pts.length; i += 1) {
+        const pt = pts[i];
+        const px = cx + pt.x * k;
+        const py = cy + pt.y * k;
+        if (px < -40 || px > w + 40 || py < -40 || py > h + 40) continue;
+        /* Arriving points fade in at the edge of the frame rather than
+           appearing, so the field grows instead of flickering. */
+        const near = 1 - smooth(0.72, 1, Math.hypot(px - cx, py - cy) / edge);
+        if (near <= 0.01) continue;
+        const pulse = pt.live ? 0.6 + 0.4 * Math.abs(Math.sin(t * 0.0007 + pt.ph)) : 1;
+        const hot = pt.hot ? accent : 0;
+        const alpha = near * pulse * (0.5 + hot * 0.34);
+        ctx.fillStyle = hot > 0.02
+          ? 'rgba(78,155,255,' + Math.min(0.9, alpha).toFixed(3) + ')'
+          : 'rgba(241,237,230,' + Math.min(0.58, alpha * 0.7).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(px, py, pt.sz, 0, TAU);
+        ctx.fill();
+      }
+
+      /* The interaction they have just read about. It holds the middle of
+         the frame alone, and gives it up to the headline as the agency
+         opens out around it. */
+      const core = 1 - smooth(0.03, 0.17, p);
+      if (core > 0.01) {
+        ctx.strokeStyle = 'rgba(78,155,255,' + (0.34 * core).toFixed(3) + ')';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 30, 0, TAU);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(78,155,255,' + core.toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 3.4, 0, TAU);
+        ctx.fill();
+      }
+    }
+
+    const STEPS = [0.70, 0.77, 0.84, 0.90];
+    function copyAt(p) {
+      if (isStatic) return;
+      if (pre) pre.style.opacity = String(1 - smooth(0.02, 0.12, p));
+      /* The wash arrives with the type it exists for, so the opening frame
+         is the single interaction and nothing else. */
+      if (veil) veil.style.opacity = String(smooth(0.12, 0.30, p));
+      if (title) {
+        const on = smooth(0.16, 0.30, p);
+        title.style.opacity = String(on);
+        title.style.transform = 'translate3d(0,' + ((1 - on) * 16).toFixed(1) + 'px,0)';
+      }
+      insights.forEach((node, i) => { node.classList.toggle('is-on', p >= STEPS[i]); });
+    }
+
+    let raf = 0;
+    let running = false;
+    function frame(t) {
+      const p = progress();
+      draw(p, t);
+      copyAt(p);
+      raf = running ? requestAnimationFrame(frame) : 0;
+    }
+    function start() { if (!running) { running = true; raf = requestAnimationFrame(frame); } }
+    function stop() { running = false; if (raf) cancelAnimationFrame(raf); raf = 0; }
+
+    size();
+    copyAt(progress());
+    draw(progress(), 0);
+
+    window.addEventListener('resize', () => { size(); draw(progress(), 0); }, { passive: true });
+
+    /* Static, or off-screen: nothing runs. One frame is the whole picture. */
+    if (isStatic || !('IntersectionObserver' in window)) return;
+    new IntersectionObserver(([entry]) => { entry.isIntersecting ? start() : stop(); }, { threshold: 0 })
+      .observe(section);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });
+  }
+
   /* ── CTA ──
      BOTH BUTTONS LAND HERE - the closing one and the compact one in the
      header. One booking flow, one telemetry signal, and the calendar's
@@ -966,9 +1271,9 @@
     photo.alt = txt(demo.property_address) ? 'Photograph of ' + demo.property_address : '';
   }
 
-  /* SECTION 1 — the factual record. Times and events, in order. */
+  /* SECTION 2 — the factual record. Times and events, in order. */
   function renderLog(items) {
-    const wrap = document.getElementById('s1-log');
+    const wrap = document.getElementById('s2-log');
     wrap.innerHTML = '';
     let written = 0;
     for (const item of (Array.isArray(items) ? items : [])) {
@@ -1056,12 +1361,13 @@
     setField('hdr-agency', agency);
     document.getElementById('review-flag').hidden = !needsReview;
 
-    /* ── 01 ── Their agency, their property, their enquiry. No analysis. */
-    /* The eyebrow carries the DATE, not the agency name: the name is already
-       in the sentence below it and in the header, and the date is the piece
-       of evidence a reader has not been given yet. */
-    setField('s1-eyebrow', ['The enquiry', txt(demo.enquiry_date)].filter(Boolean).join(' · '), { keepEmpty: true });
+    /* ── 01 ── The framing, and the proof it is genuinely about them: their
+       agency named at the top of the page, their listing beside it. */
+    setField('s1-eyebrow', 'Prepared for ' + (agency || 'your agency'), { keepEmpty: true });
     setField('s1-agency', agency || 'your agency', { keepEmpty: true });
+    /* Section two's eyebrow carries the DATE - the piece of evidence the
+       reader has not been given yet, and the one the record needs. */
+    setField('s2-eyebrow', ['The enquiry', txt(demo.enquiry_date)].filter(Boolean).join(' · '), { keepEmpty: true });
     renderProperty(demo);
 
     /* ── 01 / 02 / 03 ── The reading /api/demo derived from this row's own
@@ -1074,12 +1380,19 @@
     renderActions(r.actions);
     const wroteMessage = setField('s3-msg-body', r.message);
     document.getElementById('s3-msg').hidden = !wroteMessage;
+    /* Where the record genuinely credits the team, section three says what
+       NOVUS is FOR in that case - keeping the standard they already set -
+       rather than repeating the compliment section two has already paid. */
+    setField('s3-note', r.handledWell
+      ? 'NOVUS would keep the standard your team already set here, and take the repetitive work around it off them.'
+      : '');
 
     document.getElementById('stage').hidden = false;
     document.getElementById('hdr-cta').hidden = false;
     document.getElementById('boot').classList.add('is-gone');
     startReveal();
     startChrome();
+    startZoom();
   }
 
   function fail(message) {
