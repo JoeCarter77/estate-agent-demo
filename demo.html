@@ -1,780 +1,816 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
-<meta name="description" content="NOVUS - what happened inside one real enquiry to your agency." />
+<meta name="description" content="NOVUS - one real enquiry, read the way NOVUS reads everything happening inside your agency." />
+<meta name="theme-color" content="#0A0B0E" />
 <title>NOVUS</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%2711%2016%2080%2080%27%3E%3Crect%20x%3D%2711%27%20y%3D%2716%27%20width%3D%2780%27%20height%3D%2780%27%20rx%3D%2716%27%20fill%3D%27%23172D67%27/%3E%3Cpath%20d%3D%27M29%2082%20L29%2046%20C29%2030%2050%2030%2050%2046%20L73%2082%20L73%2030%27%20fill%3D%27none%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%2711%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E" />
+
+<link rel="icon" href="/assets/img/novus-mark-32.png" sizes="32x32" type="image/png" />
+<link rel="apple-touch-icon" href="/assets/img/novus-mark-180.png" />
+
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet" />
-<link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Inter:wght@300..800&display=swap" />
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     THE DEMO AND THE WEBSITE ARE TWO SURFACES OF ONE BRAND.
+     These three files ARE the site's design system - the same tokens, the
+     same base surface, the same component vocabulary, served from the same
+     origin (/assets/* is rewritten to /site/assets/* in vercel.json). They
+     are linked rather than copied so the demo cannot drift away from
+     getnovus.co.uk the next time a token moves.
+     ═══════════════════════════════════════════════════════════════════════ -->
+<link rel="stylesheet" href="/assets/css/tokens.css" />
+<link rel="stylesheet" href="/assets/css/base.css" />
+<link rel="stylesheet" href="/assets/css/components.css" />
+
+<link rel="stylesheet" href="https://assets.calendly.com/assets/external/widget.css" />
 <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
+
 <style>
   /* ═══════════════════════════════════════════════════════════════════════
-     NOVUS PERSONALISED DEMO — /demo/{demo_slug}
+     NOVUS PERSONALISED DEMO — /{demo_slug}
 
-     ONE STORY, ONE SCROLL. Four acts: the real enquiry, what actually
-     happened, what NOVUS would have done with it, and the same intelligence
-     across the whole agency. The prospect is being shown an analysis of their
-     own business, not a product page, and the design has one job — to feel as
-     precise as the evidence it is presenting.
+     ONE JOB: turn a stranger who opened a link into a booked ten minutes.
 
-     THE SYSTEM
-       surface   deep navy, with a small tonal step between sections rather
-                 than four identical card decks
-       accent    NOVUS cyan, used for NOVUS and for nothing else
-       meaning   colour is semantic, never decorative:
-                   cyan   NOVUS / intelligence
-                   teal   something the agency genuinely did well
-                   coral  something commercially real that stayed unprogressed
-                   mint   the commercial outcome
-                   white / blue-grey  neutral evidence
-       type      Fraunces for the editorial line, Inter for evidence and UI
-       scale     every size is fluid AND capped: a laptop gets a denser page,
-                 a large monitor gets a more spacious one, and nothing grows
-                 without limit. No global zoom, no transform.
+     SIX SECTIONS, and the single thought each one has to land:
+
+       1  their agency, their property, their enquiry   "that's genuinely us"
+       2  what NOVUS understood, and what it didn't     "there was more in it"
+       3  what NOVUS would do next                      "it can take that on"
+       4  the zoom-out                                  "this isn't one enquiry"
+       5  understand / act / optimise                   "three kinds of value"
+       6  the payoff                                    "worth ten minutes"
+
+     WHAT THIS PAGE IS NOT. Not an audit, not a grade, not a missed-seller
+     detector. It reports what the enquiry contained, what the conversation
+     settled, what it left open and what would usefully happen next - and
+     where the evidence credits the team it says so first. The copy for all
+     of that is SELECTED from the row's own ordinals in
+     lib/demo-journeys.mjs; nothing on this page is authored per agency.
+
+     EVERY CLASS BELOW IS PREFIXED d- so it cannot collide with the site
+     components this page reuses (.frame .section .head .eyebrow .btn .chip
+     .sys .wordmark .mark .reveal).
      ═══════════════════════════════════════════════════════════════════════ */
-  :root{
-    /* ── surface ── */
-    --bg:#08122A;
-    --bg-lift:#0C1A38;
-    --hair:rgba(148,178,232,.13);
-    --hair-soft:rgba(148,178,232,.085);
-    --hair-hi:rgba(148,178,232,.26);
 
-    /* ── ink ── */
-    --ink:#EEF3FF;
-    --ink-2:rgba(208,222,247,.78);
-    --ink-3:rgba(178,196,231,.56);
-    --ink-4:rgba(162,182,222,.38);
+  /* ── SCROLL PROGRESS ──
+     One hairline. It reports where the reader is; it is not a set of steps
+     to complete, which is what a row of dots turns into. */
+  .d-progress{ position:fixed; inset:0 0 auto; z-index:130; height:1px; background:transparent; }
+  .d-progress i{ display:block; height:100%; width:0; background:var(--blue); opacity:.85; transition:width .12s linear; }
 
-    /* ── accent, used for meaning ── */
-    --cyan:#7DD3FC;
-    --cyan-deep:#38BDF8;
-    --blue:#9DC0F5;
-    --good:#5EEAD4;
-    --gap:#F3B08B;
-    --lift:#6EE7B7;
-
-    --serif:'Fraunces',Georgia,'Times New Roman',serif;
-    --sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
-
-    /* ── measure & rhythm, fluid between a laptop and a large monitor ── */
-    --gutter:clamp(18px,3.2vw,44px);
-    --col:min(100%, clamp(560px,52vw,820px));
-    --col-wide:min(100%, clamp(860px,76vw,1080px));
-    --act-y:clamp(46px,4.4vw,96px);
-
-    /* ── type, fluid and capped ── */
-    --t-hero:clamp(1.72rem,1.35rem + .78vw,2.55rem);
-    --t-h2:clamp(1.32rem,1.05rem + .62vw,2rem);
-    --t-h3:clamp(1.02rem,.9rem + .3vw,1.34rem);
-    --t-lede:clamp(.89rem,.82rem + .14vw,1.04rem);
-    --t-body:clamp(.85rem,.8rem + .1vw,.96rem);
-    --t-sm:clamp(.74rem,.7rem + .07vw,.83rem);
-    --t-xs:clamp(.665rem,.645rem + .04vw,.735rem);
-    --t-label:clamp(.575rem,.555rem + .035vw,.65rem);
+  .hdr__right{ margin-left:auto; display:flex; align-items:center; gap:14px; min-width:0; }
+  .d-agency{
+    font-size:var(--t-xs); font-weight:500; color:var(--ink-4);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:38vw;
   }
 
-  /* A laptop with browser chrome and a dock has far less usable height than
-     its width suggests. Below this, the vertical rhythm tightens — the type
-     does not, because shrinking text is not the same as improving density. */
-  @media (min-width:1000px) and (max-height:1000px){
-    :root{ --act-y:clamp(34px,3.1vw,58px); }
+  /* A class-level display rule outranks the UA's [hidden], and several
+     below set display on elements the renderer hides when the row has
+     nothing to put in them. One rule, once. */
+  [hidden]{ display:none !important; }
+
+  /* ── SHARED TYPE ──────────────────────────────────────────────────────
+     A statement set alone in the frame, used at the two moments the page
+     stops explaining and simply says one thing. */
+  .d-statement{
+    font-family:var(--serif); font-weight:400;
+    letter-spacing:-.018em; line-height:1.14; text-wrap:balance;
+  }
+  .d-statement .soft{ display:block; color:rgba(241,237,230,.44); }
+  /* The quiet line that closes a section. One sentence, never a paragraph. */
+  .d-close{
+    margin-top:clamp(26px,3.2vw,44px);
+    padding-top:clamp(18px,2.2vw,26px);
+    border-top:1px solid var(--hair);
+    font-size:var(--t-lede); color:var(--ink-2);
+    max-width:var(--measure-wide);
+  }
+  .d-close strong{ color:var(--ink); font-weight:600; }
+
+  /* ═══ 01 · THE REAL ENQUIRY ════════════════════════════════════════════
+     Their agency, their property, their enquiry, and the factual record of
+     what happened. No analysis: this section has about four seconds to
+     prove the page is genuinely about them, and then it is finished. */
+  .d-open{ padding-top:clamp(104px,13vh,150px); }
+  .d-open__grid{
+    display:grid; grid-template-columns:minmax(0,1.06fr) minmax(0,.94fr);
+    gap:clamp(32px,5vw,74px); align-items:start;
+  }
+  .d-open h1{
+    font-size:clamp(1.9rem,1.2rem + 2.4vw,3.2rem);
+    margin:clamp(18px,2vw,26px) 0 clamp(14px,1.6vw,20px);
+    max-width:14em;
+  }
+  .d-open__lede{ font-size:var(--t-lede); line-height:1.6; color:var(--ink-2); max-width:var(--measure); }
+  /* The agency's own name is the proof. Lifted out of the sentence just
+     enough to be the thing the eye lands on. */
+  .d-name{ color:var(--blue-hi); font-weight:600; }
+
+  /* THE RECORD. Times and events only - what happened, in the order it
+     happened. Everything the page concludes from it waits for section two,
+     so nothing here is coloured good or bad. */
+  .d-log{ margin-top:clamp(28px,3.4vw,44px); border-top:1px solid var(--hair); }
+  .d-log__row{
+    display:grid; grid-template-columns:minmax(84px,auto) minmax(0,1fr);
+    gap:4px clamp(16px,2.4vw,32px); align-items:baseline;
+    padding-block:clamp(11px,1.3vw,15px);
+    border-bottom:1px solid var(--hair);
+  }
+  .d-log__t{
+    font-family:var(--mono); font-size:var(--t-xs); font-variant-numeric:tabular-nums;
+    color:var(--ink-2); white-space:nowrap;
+  }
+  .d-log__e{ font-size:var(--t-sm); color:var(--ink-3); }
+
+  /* The one line of methodology the page owes the reader, set small enough
+     that it informs without becoming the subject. */
+  .d-note{
+    margin-top:clamp(16px,2vw,22px);
+    font-size:var(--t-xs); line-height:1.6; color:var(--ink-4);
+    max-width:var(--measure);
   }
 
-  *,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
-  html{ scroll-behavior:smooth; }
-  body{
-    font-family:var(--sans); color:var(--ink); background:#071026;
-    -webkit-font-smoothing:antialiased;
-    text-rendering:optimizeLegibility;
-    overflow-x:hidden;
+  /* The listing, drawn as the artefact it is rather than as a hero image. */
+  .d-prop{ border:1px solid var(--hair-2); border-radius:var(--r-lg); overflow:hidden; background:var(--bg-2); }
+  .d-prop__visual{ position:relative; aspect-ratio:16/10; background:var(--bg-3); overflow:hidden; }
+  .d-prop__visual img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .6s var(--ease); }
+  .d-prop__visual img.is-loaded{ opacity:1; }
+  .d-prop__ph{ position:absolute; inset:0; width:100%; height:100%; }
+  .d-prop__tag{
+    position:absolute; left:12px; top:12px; z-index:2;
+    font-size:var(--t-micro); font-weight:700; letter-spacing:.13em; text-transform:uppercase;
+    color:var(--ink-2); background:rgba(7,8,10,.62); border:1px solid var(--hair-2);
+    border-radius:var(--r-full); padding:5px 11px; backdrop-filter:blur(8px);
   }
-  /* THE FIELD, as a fixed layer rather than background-attachment:fixed —
-     which iOS Safari ignores (it would stretch the gradient over the whole
-     4,000px document) and which costs a full repaint on every scroll frame
-     everywhere else. */
-  body::before{
-    content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
-    background:
-      radial-gradient(115% 70% at 50% -6%, rgba(56,189,248,.11), transparent 62%),
-      radial-gradient(80% 55% at 102% 102%, rgba(37,86,182,.20), transparent 60%),
-      linear-gradient(180deg,#071026 0%,#0A1731 42%,#070F24 100%);
+  .d-prop__price{
+    position:absolute; right:12px; bottom:12px; z-index:2;
+    font-family:var(--sans); font-size:var(--t-sm); font-weight:700; letter-spacing:.01em;
+    color:var(--ink); background:rgba(7,8,10,.66); border:1px solid var(--hair-2);
+    border-radius:var(--r-sm); padding:6px 11px; backdrop-filter:blur(8px);
+    font-variant-numeric:tabular-nums;
   }
-  svg{ display:block; }
+  .d-prop__body{ padding:clamp(15px,1.6vw,20px) clamp(16px,1.8vw,22px) clamp(16px,1.8vw,20px); }
+  .d-prop__addr{ font-size:var(--t-h4); font-weight:600; letter-spacing:-.006em; line-height:1.32; }
+  .d-prop__meta{
+    display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px;
+    margin-top:9px; padding-top:11px; border-top:1px solid var(--hair);
+    font-size:var(--t-xs); color:var(--ink-3);
+  }
+  /* A row with neither a portal nor a listing link must not leave its rule
+     behind - :has() is supported everywhere this page runs. */
+  .d-prop__meta:not(:has(> :not([hidden]))){ display:none; }
+  .d-prop__link{ margin-left:auto; color:var(--ink-4); white-space:nowrap; transition:color .2s var(--ease); }
+  .d-prop__link:hover{ color:var(--blue); }
 
-  /* ── TOP CHROME ── */
-  .chrome{ position:fixed; top:0; left:0; right:0; z-index:50; height:52px; display:flex; align-items:center; justify-content:space-between; padding:0 var(--gutter); background:linear-gradient(180deg, rgba(7,16,38,.86) 0%, rgba(7,16,38,0) 100%); backdrop-filter:blur(4px); pointer-events:none; }
-  .brand{ display:flex; align-items:center; gap:9px; }
-  .brand img{ height:16px; width:auto; filter:brightness(0) invert(1); opacity:.88; }
-  .brand-word{ font-size:.76rem; font-weight:800; letter-spacing:.09em; color:#fff; }
-  .chrome-right{ display:flex; align-items:center; justify-content:flex-end; gap:10px; min-width:0; }
-  .chrome-agency{ font-size:var(--t-xs); font-weight:500; letter-spacing:.02em; color:var(--ink-4); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:34vw; text-align:right; }
-  /* The one interactive element up here — .chrome itself is pointer-events:none
-     so the bar never eats a scroll or a tap. */
-  .chrome-cta{ pointer-events:auto; flex-shrink:0; font-family:var(--sans); font-size:var(--t-xs); font-weight:600; letter-spacing:.005em; white-space:nowrap; color:var(--ink-2); background:rgba(148,178,232,.07); border:1px solid var(--hair); border-radius:100px; padding:7px 14px; cursor:pointer; transition:background .18s ease, border-color .18s ease, color .18s ease; }
-  .chrome-cta:hover{ background:rgba(125,211,252,.12); border-color:rgba(125,211,252,.4); color:#fff; }
-  .chrome-cta:active{ transform:scale(.98); }
-  .review-flag{ font-size:.55rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#FCD9A8; background:rgba(243,176,139,.14); border:1px solid rgba(243,176,139,.4); padding:2px 8px; border-radius:100px; margin-left:8px; }
+  /* The one piece of framing that stops the reader deciding this is an
+     enquiry-response product. Planted, then left alone until section four. */
+  .d-frame{
+    margin-top:clamp(40px,5vw,72px);
+    padding-top:clamp(20px,2.4vw,30px);
+    border-top:1px solid var(--hair);
+    font-size:var(--t-lede); color:var(--ink-3); max-width:var(--measure-wide);
+  }
+  .d-frame strong{ color:var(--ink-2); font-weight:500; }
 
-  /* ── PROGRESS — four dots, deliberately unlabelled ── */
-  .dots{ position:fixed; right:clamp(12px,1.4vw,22px); top:50%; transform:translateY(-50%); z-index:50; display:flex; flex-direction:column; gap:10px; }
-  .dot{ width:6px; height:6px; border-radius:50%; border:none; padding:0; background:rgba(157,192,245,.22); cursor:pointer; transition:background .3s ease, transform .3s ease, box-shadow .3s ease; }
-  .dot:hover{ background:rgba(157,192,245,.5); }
-  .dot.done{ background:rgba(157,192,245,.34); }
-  .dot.on{ background:var(--cyan); transform:scale(1.5); box-shadow:0 0 0 4px rgba(125,211,252,.1); }
+  /* ═══ 02 · WHAT NOVUS UNDERSTOOD ═══════════════════════════════════════
+     ONE intelligence section, not five. What the enquiry contained, what
+     the team did with it, and - the half that proves this is reading
+     rather than pattern-matching - what it left open. */
 
-  /* ── ACTS ── */
-  .stage{ position:relative; }
-  .act{ position:relative; width:100%; padding:var(--act-y) var(--gutter); display:flex; justify-content:center; scroll-margin-top:64px; }
-  .act:first-child{ padding-top:calc(var(--act-y) + 44px); }
-  .act:last-child{ padding-bottom:calc(var(--act-y) + 18px); }
-  .wrap{ width:100%; max-width:var(--col); display:flex; flex-direction:column; align-items:center; text-align:center; gap:clamp(13px,1.3vw,20px); }
-  .wrap.wide{ max-width:var(--col-wide); }
+  /* The credit, where the evidence genuinely supports one. Stated BEFORE
+     anything is described as unresolved: a strong operator told what they
+     missed first starts arguing with the methodology instead of reading. */
+  .d-credit{
+    margin-bottom:clamp(20px,2.4vw,30px);
+    font-size:var(--t-lede); font-weight:500; color:var(--blue-hi);
+    max-width:var(--measure);
+  }
 
-  /* A tonal step, not a page break — the story continues, it does not
-     restart. One section sits very slightly proud of the field; the hairline
-     above it does the rest. */
-  .act--tint::before{ content:''; position:absolute; inset:0; pointer-events:none;
-    background:linear-gradient(180deg, rgba(148,178,232,.05), rgba(148,178,232,.012) 55%, transparent);
-    border-top:1px solid var(--hair-soft); border-bottom:1px solid var(--hair-soft); }
-  .act--tint > *{ position:relative; }
-  .act + .act:not(.act--tint)::before{ content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); width:min(300px,50%); height:1px; background:linear-gradient(90deg, transparent, var(--hair-hi), transparent); }
+  /* THE SIGNALS. Value first, at scale; label under it, small. Deliberately
+     not cards - a border around each fact turns considered intelligence
+     back into CRM fields. */
+  .d-sigs{
+    display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:clamp(26px,3.2vw,44px) clamp(24px,3vw,48px);
+    margin-top:clamp(30px,3.6vw,50px);
+    padding-top:clamp(26px,3vw,38px);
+    border-top:1px solid var(--hair);
+    max-width:1080px;
+  }
+  /* Four signals in a three-column grid strand the fourth on its own row.
+     Four reads better as a square, and gains room for the value type. */
+  .d-sigs[data-count="4"]{ grid-template-columns:repeat(2,minmax(0,1fr)); max-width:760px; }
+  /* Values run to one or two lines depending on the row. The label is pushed
+     to the bottom of its cell so a rank of them still reads as one line
+     across, rather than as a ragged edge. */
+  .d-sig{ display:flex; flex-direction:column; }
+  .d-sig__v{
+    font-size:clamp(1.28rem,1.06rem + .9vw,1.85rem);
+    font-weight:600; letter-spacing:-.018em; line-height:1.12;
+    color:var(--ink); text-wrap:balance;
+  }
+  .d-sig__l{
+    margin-top:auto; padding-top:9px;
+    font-size:var(--t-micro); font-weight:700; letter-spacing:.15em; text-transform:uppercase;
+    color:var(--ink-4); line-height:1.5;
+  }
+  /* THE ACCENT IS SPENT ONCE. Blue marks the signal that changes the
+     reading of the enquiry - not every signal, or it marks nothing. */
+  .d-sig--accent .d-sig__v{ color:var(--blue-hi); }
+  .d-sig--open .d-sig__v{ color:var(--amber); }
 
-  /* ── SHARED TYPE ── */
-  .eyebrow{ font-size:var(--t-label); font-weight:700; letter-spacing:.19em; text-transform:uppercase; color:var(--cyan); line-height:1.5; display:inline-flex; align-items:flex-start; gap:10px; }
-  .eyebrow::before{ content:''; width:20px; height:1px; margin-top:.72em; background:currentColor; opacity:.7; flex-shrink:0; }
-  h1.headline{ font-family:var(--serif); font-size:clamp(1.66rem,1.32rem + .68vw,2.32rem); font-weight:600; line-height:1.1; letter-spacing:-.018em; color:var(--ink); max-width:32ch; text-wrap:balance; }
-  h2.headline{ font-family:var(--serif); font-size:var(--t-h2); font-weight:600; line-height:1.22; letter-spacing:-.012em; color:var(--ink); max-width:26ch; text-wrap:balance; }
-  .wrap.wide h2.headline{ max-width:34ch; }
-  p.lede{ font-size:var(--t-lede); line-height:1.6; color:var(--ink-2); max-width:58ch; }
-  .wrap.wide > p.lede{ max-width:70ch; }
-  p.lede b{ color:var(--ink); font-weight:600; }
-  /* The single place a word inside a headline is coloured. */
-  .hl{ color:var(--cyan); }
-  .lift{ color:var(--lift); }
+  /* WHAT IS STILL OPEN. Each item names the unresolved thing and, under it,
+     what the record actually shows - which is where an agency that DID ask
+     gets the credit for asking. */
+  .d-open-q{
+    margin-top:clamp(40px,4.6vw,66px);
+    max-width:var(--measure-wide);
+  }
+  .d-open-q__k{
+    font-size:var(--t-micro); font-weight:700; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--amber); margin-bottom:clamp(16px,2vw,22px);
+  }
+  .d-open-q__list{ border-top:1px solid var(--hair); }
+  .d-open-q__item{ padding-block:clamp(15px,1.7vw,20px); border-bottom:1px solid var(--hair); }
+  .d-open-q__t{
+    display:flex; gap:12px;
+    font-size:var(--t-h4); font-weight:600; letter-spacing:-.004em; color:var(--ink);
+  }
+  .d-open-q__t::before{
+    content:''; width:5px; height:5px; border-radius:50%; flex:none;
+    background:var(--amber); transform:translateY(.62em);
+  }
+  .d-open-q__n{ margin:6px 0 0 17px; font-size:var(--t-sm); line-height:1.6; color:var(--ink-3); }
 
-  /* ── SCROLL REVEAL — almost invisible, and never a delay to reading ── */
-  .rv{ opacity:0; transform:translateY(9px); transition:opacity .5s cubic-bezier(.22,1,.36,1), transform .5s cubic-bezier(.22,1,.36,1); }
-  .rv.in{ opacity:1; transform:none; }
+  /* ═══ 03 · WHAT NOVUS WOULD DO NEXT ════════════════════════════════════
+     Intelligence becoming action. Three steps at most, one example message,
+     and a two-branch progression - never an architecture diagram. */
+  /* Held to a reading width. A hairline run across the whole frame for four
+     words of text turns a considered plan back into a table. */
+  .d-acts{
+    margin-top:clamp(30px,3.6vw,50px);
+    border-top:1px solid var(--hair-2);
+    max-width:880px;
+  }
+  .d-act{
+    display:grid; grid-template-columns:auto minmax(0,1fr);
+    gap:4px clamp(18px,2.6vw,36px); align-items:baseline;
+    padding-block:clamp(16px,1.9vw,24px); border-bottom:1px solid var(--hair);
+  }
+  .d-act__i{ font-family:var(--mono); font-size:var(--t-micro); color:var(--blue); letter-spacing:.1em; }
+  .d-act__t{ font-size:var(--t-h4); font-weight:650; letter-spacing:-.004em; color:var(--ink); }
+  .d-act__d{ grid-column:2; font-size:var(--t-sm); line-height:1.6; color:var(--ink-3); margin-top:5px; }
 
-  /* ═══ ACT 1 — THE REAL ENQUIRY ═══
-     Asymmetric: the personalised line reads on the left, the actual property
-     anchors on the right. On a laptop that is the difference between the hero
-     filling the viewport and the hero plus the beginning of the evidence
-     being visible at once. */
-  .hero{ display:grid; grid-template-columns:minmax(0,1.06fr) minmax(0,.94fr); gap:clamp(34px,4.8vw,80px); align-items:center; text-align:left; }
-  .hero-copy{ display:flex; flex-direction:column; align-items:flex-start; gap:clamp(9px,1vw,14px); min-width:0; }
-  .hero-copy .eyebrow{ font-size:clamp(.6rem,.58rem + .03vw,.68rem); letter-spacing:.15em; color:rgba(125,211,252,.82); background:rgba(125,211,252,.07); border:1px solid rgba(125,211,252,.16); border-radius:100px; padding:6px 13px 6px 11px; align-items:center; gap:8px; margin-bottom:2px; }
-  .hero-copy .eyebrow::before{ display:none; }
-  .hero-copy h1.headline{ margin-top:2px; }
-  .hero-copy .lede{ max-width:31ch; color:rgba(214,226,250,.86); }
-  .hero-visual{ min-width:0; }
+  /* ONE MESSAGE. The point is not that NOVUS asks a lot of questions - it
+     is that it asks the few that unlock the most. */
+  .d-msg{
+    margin-top:clamp(30px,3.6vw,48px);
+    border-left:2px solid var(--blue-line);
+    padding:clamp(4px,.6vw,8px) 0 clamp(4px,.6vw,8px) clamp(18px,2.2vw,28px);
+    max-width:var(--measure-wide);
+  }
+  .d-msg__k{
+    font-size:var(--t-micro); font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ink-4); margin-bottom:10px;
+  }
+  .d-msg__b{
+    font-size:clamp(1.02rem,.96rem + .42vw,1.28rem); line-height:1.55;
+    color:var(--ink); font-weight:400;
+  }
 
-  .property-card{ width:100%; max-width:clamp(420px,34vw,560px); margin-left:auto; border-radius:17px; overflow:hidden; text-align:left;
-    border:1px solid var(--hair);
-    background:linear-gradient(168deg, rgba(148,178,232,.075), rgba(148,178,232,.02) 60%);
-    box-shadow:0 26px 60px rgba(2,7,20,.5), inset 0 1px 0 rgba(255,255,255,.055); }
-  .property-visual{ position:relative; height:clamp(168px,16.5vw,244px); overflow:hidden; background:linear-gradient(155deg,#0B1226 0%,#12224A 45%,#18305F 100%); }
-  .property-visual svg.placeholder{ position:absolute; inset:0; width:100%; height:100%; }
-  /* The real Rightmove hero photo, resolved ONCE at build time and stored on
-     the row. It fades in over the drawn placeholder, so a dead listing, a
-     blocked extraction or a broken CDN link degrades to exactly the card the
-     demo has always shown rather than to a gap. */
-  .property-photo{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .6s ease; }
-  .property-photo.loaded{ opacity:1; }
-  .property-visual::after{ content:''; position:absolute; inset:0; background:linear-gradient(180deg, rgba(6,12,28,.42) 0%, rgba(6,12,28,0) 42%, rgba(6,12,28,.72) 100%); pointer-events:none; }
-  .property-visual .grain{ position:absolute; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E"); opacity:.05; mix-blend-mode:overlay; }
-  .property-status{ position:absolute; z-index:2; top:11px; left:12px; font-size:.55rem; font-weight:700; letter-spacing:.13em; text-transform:uppercase; color:var(--ink); background:rgba(8,18,42,.62); border:1px solid rgba(255,255,255,.2); backdrop-filter:blur(6px); padding:4px 10px; border-radius:100px; }
-  .property-price-tag{ position:absolute; z-index:2; bottom:11px; left:13px; font-family:var(--serif); font-size:clamp(1.02rem,1.3vw,1.32rem); font-weight:600; letter-spacing:-.01em; color:#fff; text-shadow:0 2px 14px rgba(0,0,0,.6); }
-  .property-body{ padding:13px 15px 14px; display:flex; flex-direction:column; gap:10px; }
-  .property-addr{ font-size:var(--t-sm); font-weight:600; line-height:1.4; color:var(--ink); letter-spacing:-.005em; }
-  .property-agency-row{ display:flex; align-items:center; justify-content:space-between; padding-top:10px; border-top:1px solid var(--hair-soft); gap:12px; flex-wrap:wrap; }
-  .property-agency{ display:flex; align-items:center; gap:7px; font-size:var(--t-xs); line-height:1.45; color:var(--ink-3); min-width:0; }
-  .property-agency svg{ width:12px; height:12px; color:var(--blue); flex-shrink:0; opacity:.8; }
-  .property-agency strong{ color:var(--ink-2); font-weight:600; }
-  .property-link{ font-size:var(--t-xs); font-weight:600; color:var(--cyan); text-decoration:none; white-space:nowrap; opacity:.9; transition:opacity .15s ease; }
-  .property-link:hover{ opacity:1; text-decoration:underline; }
+  /* THE TWO OUTCOMES. Whatever comes back, the enquiry keeps moving and the
+     team is only pulled in where a person is the better use of the moment. */
+  .d-branch{
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:clamp(20px,3vw,44px);
+    margin-top:clamp(32px,3.8vw,52px);
+  }
+  .d-branch__c{ border-top:1px solid var(--hair-2); padding-top:clamp(16px,1.9vw,22px); }
+  .d-branch__k{
+    font-size:var(--t-micro); font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ink-4);
+  }
+  .d-branch__s{
+    display:flex; align-items:center; flex-wrap:wrap; gap:8px 11px;
+    margin-top:13px; font-size:var(--t-sm); color:var(--ink-2);
+  }
+  .d-branch__s i{ font-style:normal; color:var(--ink-5); }
+  .d-branch--auto .d-branch__k{ color:var(--blue); }
 
-  /* Said EARLY, not buried at the end: it is the line that turns "marketing
-     page" into "that is genuinely our enquiry". */
-  .provenance{ font-size:var(--t-xs); line-height:1.6; color:rgba(196,210,240,.72); max-width:42ch; padding-left:14px; border-left:2px solid rgba(125,211,252,.3); }
+  /* ═══ 04 · THE ZOOM-OUT ════════════════════════════════════════════════
+     The most important visual on the page, and the one the copy stays out
+     of. One interaction sits alone, then the agency opens out around it -
+     the reader should FEEL the scope change before reading a word of it. */
+  /* A px measure, not an em one: `em` here resolves against the CONTAINER's
+     inherited body size, not the display type inside it, and would crush the
+     one line on the page that most needs room. */
+  .d-zoom__head{ text-align:center; margin-inline:auto; max-width:min(100%,940px); }
+  .d-zoom__head .d-statement{ font-size:var(--t-h1); }
 
-  /* ═══ ACT 2 — WHAT ACTUALLY HAPPENED ═══
-     An evidence section, not a dashboard. Three facts that read as a verdict,
-     the chronology beneath them in ONE container, and the finding as its
-     closing panel. Teal is reserved for what the agency genuinely did, coral
-     for what stayed unprogressed, and nothing else on the section is
-     saturated at all. */
-  .facts{ width:100%; display:grid; grid-template-columns:repeat(var(--facts,3),minmax(0,1fr));
-    border:1px solid var(--hair-soft); border-radius:14px; overflow:hidden;
-    background:linear-gradient(170deg, rgba(148,178,232,.045), rgba(148,178,232,.008)); }
-  .fact{ display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:11px; row-gap:3px; align-content:start; padding:clamp(13px,1.2vw,17px) clamp(13px,1.2vw,18px); min-width:0; text-align:left; }
-  .fact + .fact{ border-left:1px solid var(--hair-soft); }
-  .fact-icon{ grid-row:1 / span 2; align-self:start; width:25px; height:25px; border-radius:8px; display:grid; place-items:center; border:1px solid var(--hair-hi); background:rgba(148,178,232,.06); color:var(--blue); }
-  .fact-icon svg{ width:13px; height:13px; }
-  .fact.positive .fact-icon{ color:var(--good); border-color:rgba(94,234,212,.3); background:rgba(94,234,212,.09); }
-  .fact.negative .fact-icon{ color:var(--gap); border-color:rgba(243,176,139,.3); background:rgba(243,176,139,.08); }
-  .fact-label{ font-family:var(--serif); font-size:var(--t-h3); font-weight:600; line-height:1.24; letter-spacing:-.012em; color:var(--ink); }
-  .fact-detail{ font-size:var(--t-xs); line-height:1.5; color:var(--ink-4); }
+  .d-field{ margin-top:clamp(20px,3vw,46px); }
+  .d-field svg{ width:100%; height:auto; overflow:visible; }
+  .d-field__mobile{ display:none; }
 
-  /* ONE container for the whole chronology. */
-  .walkthrough{ width:100%; text-align:left; border:1px solid var(--hair); border-radius:17px; overflow:hidden;
-    background:linear-gradient(168deg, rgba(148,178,232,.052), rgba(148,178,232,.012) 62%);
-    box-shadow:0 20px 48px rgba(2,7,20,.28); }
-  .timeline{ padding:clamp(18px,1.8vw,26px) clamp(17px,1.8vw,26px) 2px; display:flex; flex-direction:column; }
-  .step{ display:grid; grid-template-columns:26px minmax(0,1fr); column-gap:15px; position:relative; padding-bottom:clamp(15px,1.4vw,20px); }
-  /* The rail, drawn per step so the last one simply has none. */
-  .step::before{ content:''; position:absolute; left:12.5px; top:30px; bottom:2px; width:1px; background:linear-gradient(180deg, rgba(148,178,232,.34), rgba(148,178,232,.1)); }
-  .step:last-child::before{ display:none; }
-  .step-icon{ width:26px; height:26px; border-radius:9px; display:grid; place-items:center; position:relative; z-index:1;
-    border:1px solid var(--hair-hi); background:rgba(10,22,48,.9); color:var(--blue); }
-  .step-icon svg{ width:13px; height:13px; }
-  .step.good .step-icon{ color:var(--good); border-color:rgba(94,234,212,.3); background:rgba(11,32,52,.92); }
-  /* An absence is a hollow, quieter marker — never a red cross. */
-  .step.gap .step-icon{ color:var(--gap); border-color:rgba(243,176,139,.3); background:rgba(34,24,32,.55); }
-  /* Automated contact is drawn as automated: the one thing this row may never
-     do is read as though a person replied. */
-  .step[data-icon="bot"] .step-icon{ border-style:dashed; color:var(--ink-4); }
-  .step-body{ min-width:0; padding-top:3px; }
-  .step-label{ display:block; font-size:var(--t-label); font-weight:700; letter-spacing:.17em; text-transform:uppercase; color:var(--ink-4); line-height:1.4; }
-  .step.good .step-label{ color:rgba(94,234,212,.72); }
-  .step.gap .step-label{ color:rgba(243,176,139,.75); }
-  .step-detail{ display:block; font-size:var(--t-body); line-height:1.58; color:var(--ink-2); margin-top:5px; max-width:74ch; }
+  .z-core{ fill:var(--blue); }
+  .z-core-ring{ fill:none; stroke:var(--blue-line); stroke-width:1; }
+  .z-core-label{
+    font-family:var(--sans); font-size:10.5px; font-weight:700;
+    letter-spacing:.2em; text-transform:uppercase; fill:var(--blue);
+  }
+  .z-line{ stroke:var(--hair); stroke-width:1; }
+  .z-node{ fill:var(--ink-4); }
+  .z-label{
+    font-family:var(--sans); font-size:12.5px; font-weight:600;
+    letter-spacing:.13em; text-transform:uppercase; fill:var(--ink-3);
+  }
+  .z-orbit{ fill:none; stroke:var(--hair-soft); stroke-width:1; stroke-dasharray:2 9; }
 
-  /* The closing finding: the one place on the page carrying a warning accent,
-     and the only reason it earns one is that it IS the finding. */
-  .verdict{ padding:clamp(16px,1.6vw,22px) clamp(17px,1.8vw,26px) clamp(18px,1.8vw,24px); border-top:1px solid var(--hair); display:flex; flex-direction:column; gap:9px;
-    background:linear-gradient(180deg, rgba(243,176,139,.075), rgba(243,176,139,.014)); }
-  .verdict-label{ font-size:var(--t-label); font-weight:700; letter-spacing:.19em; text-transform:uppercase; color:var(--gap); display:flex; align-items:center; gap:10px; }
-  .verdict-label::before{ content:''; width:20px; height:1px; background:currentColor; flex-shrink:0; opacity:.8; }
-  .verdict-line{ font-family:var(--serif); font-size:var(--t-h3); font-weight:600; line-height:1.3; letter-spacing:-.012em; color:var(--ink); max-width:38ch; }
-  .verdict-note{ font-size:var(--t-sm); line-height:1.58; color:var(--ink-3); max-width:64ch; }
+  /* THE PULL-BACK. The agency starts collapsed onto the single interaction
+     and opens outward once the section arrives. With motion disabled the
+     group is simply already open, which is the finished composition. */
+  .d-field__bloom{
+    transform-origin:500px 284px;
+    transform:scale(.34); opacity:0;
+    transition:transform 1.5s var(--ease) .12s, opacity 1.2s var(--ease) .12s;
+  }
+  .is-in .d-field__bloom{ transform:scale(1); opacity:1; }
 
-  /* ═══ ACT 3 — CONTEXT → INTELLIGENCE → EXECUTION ═══
-     ONE process, not three feature cards. On anything wider than a phone the
-     three stages sit on a single horizontal spine, connected by a hairline
-     that carries a slow travelling light — which is also what keeps the act
-     short enough that the whole idea is visible at once on a laptop. */
-  .stages{ --st-pad:clamp(15px,1.5vw,20px); --st-icon:clamp(34px,3vw,40px);
-    width:100%; display:grid; grid-template-columns:minmax(0,1fr) clamp(22px,2.6vw,40px) minmax(0,1fr) clamp(22px,2.6vw,40px) minmax(0,1fr); align-items:stretch; }
-  .stage-card{ position:relative; overflow:hidden; text-align:left; display:flex; flex-direction:column; gap:9px;
-    padding:var(--st-pad) var(--st-pad) calc(var(--st-pad) + 2px);
-    border:1px solid rgba(125,211,252,.17); border-radius:16px;
-    background:linear-gradient(158deg, rgba(56,189,248,.08), rgba(11,26,56,.42) 62%);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
-    transition:border-color .3s ease, transform .3s ease, box-shadow .3s ease; }
-  /* A single light source in the corner nearest the icon — depth without a
-     second border or a heavier fill. */
-  .stage-card::before{ content:''; position:absolute; inset:0; pointer-events:none;
-    background:radial-gradient(105% 80% at 0% 0%, rgba(56,189,248,.13), transparent 58%); }
-  .stage-card:hover{ border-color:rgba(125,211,252,.3); transform:translateY(-2px); box-shadow:0 16px 34px rgba(2,7,20,.3), inset 0 1px 0 rgba(255,255,255,.06); }
-  .stage-card > *{ position:relative; }
+  /* ── THE ZOOM-OUT ON A PHONE ──
+     A ring of eleven labels cannot compose at 380px, so the agency opens
+     out as a field below the single interaction instead of around it. Same
+     idea - one thing becomes many - drawn for the shape that exists. */
+  .d-field__mobile{ text-align:center; }
+  .d-fieldm__core{
+    display:inline-flex; align-items:center; gap:9px;
+    font-size:var(--t-micro); font-weight:700; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--blue); border:1px solid var(--blue-line); background:var(--blue-tint);
+    border-radius:var(--r-full); padding:8px 15px;
+  }
+  .d-fieldm__core span{ width:6px; height:6px; border-radius:50%; background:var(--blue); flex:none; }
+  .d-fieldm__cloud{
+    display:flex; flex-wrap:wrap; justify-content:center; gap:7px 8px;
+    margin-top:22px; padding-top:22px;
+    border-top:1px solid var(--hair);
+    opacity:0; transform:translate3d(0,10px,0) scale(.94); transform-origin:50% 0;
+    transition:opacity 1s var(--ease) .1s, transform 1.2s var(--ease) .1s;
+  }
+  .is-in .d-fieldm__cloud{ opacity:1; transform:none; }
+  .d-fieldm__cloud span{
+    font-size:var(--t-xs); font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink-3); border:1px solid var(--hair); border-radius:var(--r-full);
+    padding:7px 13px;
+  }
 
-  .stage-icon{ position:relative; width:var(--st-icon); height:var(--st-icon); border-radius:12px; display:grid; place-items:center; flex-shrink:0;
-    border:1px solid rgba(125,211,252,.32); background:rgba(56,189,248,.11);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.09), 0 0 18px rgba(56,189,248,.09);
-    transition:box-shadow .3s ease; }
-  .stage-card:hover .stage-icon{ box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 0 24px rgba(56,189,248,.2); }
-  .stage-icon svg{ width:calc(var(--st-icon) * .44); height:calc(var(--st-icon) * .44); color:var(--cyan); }
-  .stage-num{ position:absolute; top:-6px; right:-6px; width:16px; height:16px; border-radius:50%; display:grid; place-items:center;
-    font-size:.5rem; font-weight:800; color:#06122C; background:var(--cyan); box-shadow:0 0 0 2px #0A1730; }
-  .stage-name{ font-size:var(--t-label); font-weight:700; letter-spacing:.19em; text-transform:uppercase; color:var(--cyan); }
-  .stage-claim{ font-size:var(--t-body); font-weight:600; letter-spacing:-.008em; color:var(--ink); line-height:1.32; }
-  /* Hairline, not a gap — it separates the claim from its explanation without
-     turning the card into two stacked boxes. */
-  .stage-detail{ font-size:var(--t-xs); line-height:1.55; color:var(--ink-3); padding-top:9px; border-top:1px solid var(--hair-soft); }
+  .d-zoom__after{
+    text-align:center; max-width:36em;
+    margin:clamp(22px,3.2vw,44px) auto 0;
+    font-size:var(--t-lede); line-height:1.6; color:var(--ink-2);
+  }
 
-  /* Lands on the icons' centre line, so the three read as one spine. */
-  .stage-join{ align-self:start; height:1px; margin-top:calc(var(--st-pad) + var(--st-icon) / 2); position:relative; overflow:hidden;
-    background:linear-gradient(90deg, rgba(125,211,252,.42), rgba(125,211,252,.16)); }
-  .stage-join::after{ content:''; position:absolute; top:0; left:0; width:9px; height:1px; background:var(--cyan); box-shadow:0 0 7px rgba(125,211,252,.9); animation:join-travel 2.6s linear infinite; }
-  @keyframes join-travel{ 0%{ transform:translateX(-12px); opacity:0; } 22%{ opacity:1; } 78%{ opacity:1; } 100%{ transform:translateX(46px); opacity:0; } }
+  /* ═══ 05 · UNDERSTAND → ACT → OPTIMISE ═════════════════════════════════
+     Three levels of value, each with one outcome sentence and a few
+     concrete terms. Not a feature list, not a price list. */
+  .d-model{
+    margin-top:clamp(30px,3.6vw,52px);
+    border-top:1px solid var(--hair-2);
+    max-width:1080px;
+  }
+  .d-layer{
+    display:grid; grid-template-columns:minmax(150px,230px) minmax(0,1fr);
+    gap:10px clamp(24px,4vw,64px);
+    padding-block:clamp(26px,3.2vw,44px);
+    border-bottom:1px solid var(--hair);
+  }
+  .d-layer__k{ display:flex; align-items:baseline; gap:12px; }
+  .d-layer__i{ font-family:var(--mono); font-size:var(--t-micro); color:var(--ink-4); }
+  .d-layer__n{
+    font-size:var(--t-micro); font-weight:700; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--blue);
+  }
+  .d-layer__o{
+    font-size:clamp(1.1rem,1rem + .6vw,1.5rem); font-weight:500;
+    letter-spacing:-.012em; line-height:1.36; color:var(--ink);
+    max-width:38ch; text-wrap:balance;
+  }
+  .d-layer__terms{
+    display:flex; flex-wrap:wrap; gap:6px 9px;
+    margin-top:clamp(13px,1.5vw,17px);
+  }
+  .d-layer__terms span{
+    font-size:var(--t-xs); color:var(--ink-3);
+    border:1px solid var(--hair); border-radius:var(--r-full); padding:5px 13px;
+  }
 
-  .stage-owner{ font-size:.5rem; font-weight:800; letter-spacing:.09em; text-transform:uppercase; padding:2px 7px; border-radius:100px; margin-right:7px; white-space:nowrap; vertical-align:middle; }
-  .stage-owner.novus{ color:var(--cyan); background:rgba(56,189,248,.13); border:1px solid rgba(125,211,252,.38); }
-  .stage-owner.team{ color:var(--gap); background:rgba(243,176,139,.11); border:1px solid rgba(243,176,139,.34); }
+  /* ═══ 06 · THE PAYOFF ══════════════════════════════════════════════════
+     No new concept. Three outcomes that synthesise what has just been read,
+     and then the ask. */
+  .d-payoff{
+    border-top:1px solid var(--hair-2);
+    margin-bottom:clamp(38px,4.6vw,64px);
+    max-width:1000px;
+  }
+  .d-payoff p{
+    padding-block:clamp(18px,2.2vw,28px); border-bottom:1px solid var(--hair);
+    font-family:var(--serif); font-weight:400;
+    font-size:clamp(1.22rem,1.02rem + 1vw,1.95rem);
+    letter-spacing:-.016em; line-height:1.22; color:var(--ink);
+    text-wrap:balance;
+  }
 
-  /* THE TURN. Nothing sits under this inside the act: it is the question the
-     next section answers, and it is given the space to be one. */
-  .turn{ width:100%; max-width:64ch; margin-top:clamp(34px,4.4vw,74px); padding-top:clamp(24px,2.6vw,40px); position:relative;
-    font-family:var(--serif); font-size:var(--t-h2); font-weight:600; line-height:1.36; letter-spacing:-.012em; text-wrap:balance; }
-  .turn::before{ content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); width:min(220px,44%); height:1px; background:linear-gradient(90deg, transparent, var(--hair-hi), transparent); }
-  .turn-a,.turn-b{ display:block; }
-  .turn-a{ color:var(--ink-3); }
-  .turn-b{ color:var(--ink); margin-top:.28em; }
+  .d-cta .btn{ font-size:var(--t-body); padding:15px 28px; }
+  .d-cta__support{ margin-top:clamp(14px,1.8vw,20px); font-size:var(--t-sm); color:var(--ink-3); }
+  .d-cal{
+    max-height:0; overflow:hidden; opacity:0;
+    transition:max-height .7s var(--ease), opacity .5s var(--ease), margin-top .7s var(--ease);
+  }
+  .d-cal.is-open{ max-height:1200px; opacity:1; margin-top:clamp(26px,3.4vw,42px); }
+  .calendly-inline-widget{
+    min-width:280px; height:680px;
+    border:1px solid var(--hair-2); border-radius:var(--r-lg); overflow:hidden;
+  }
 
-  /* ═══ ACT 4 — ONE LAYER ACROSS THE AGENCY ═══
-     The zoom-out, not a second explanation. Act 3 has already said context →
-     intelligence → execution; this section lands one shape in about two
-     seconds: every source of opportunity the agency already has → ONE NOVUS
-     layer → more of it gets progressed. Deliberately compact: it is a
-     summary, not an architecture diagram. */
-  .map{ --sgap:clamp(8px,1vw,16px); width:100%; max-width:min(100%, clamp(680px,64vw,820px)); margin:clamp(6px,1vw,16px) auto 0; display:flex; flex-direction:column; align-items:center; }
+  /* ── BOOT / FAILURE ────────────────────────────────────────────────────
+     Nothing above renders until one DEMOS row resolves. */
+  .d-boot{
+    position:fixed; inset:0; z-index:140;
+    display:grid; place-content:center; justify-items:center; gap:20px;
+    padding:var(--gutter); text-align:center; background:var(--bg);
+    transition:opacity .5s var(--ease), visibility .5s;
+  }
+  .d-boot.is-gone{ opacity:0; visibility:hidden; }
+  .d-boot__ring{
+    width:26px; height:26px; border-radius:50%;
+    border:1px solid var(--hair-2); border-top-color:var(--blue);
+    animation:spin 1s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .d-boot__msg{ font-size:var(--t-sm); color:var(--ink-3); max-width:34em; }
+  .d-boot__title{ display:block; font-family:var(--serif); font-size:var(--t-h3); color:var(--ink); margin-bottom:.6em; }
+  .d-boot__msg a{ color:var(--blue); font-weight:600; }
 
-  /* SOURCES — one row, no categories. */
-  .src-grid{ width:100%; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); column-gap:var(--sgap); row-gap:14px; }
-  .src{ display:flex; flex-direction:column; align-items:center; gap:8px; min-width:0; }
-  .src-tile{ width:clamp(36px,3.4vw,44px); height:clamp(36px,3.4vw,44px); border-radius:12px; display:grid; place-items:center; color:var(--blue);
-    border:1px solid rgba(157,192,245,.24);
-    background:linear-gradient(160deg, rgba(157,192,245,.11), rgba(157,192,245,.028));
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.055); transition:border-color .3s ease, color .3s ease; }
-  .src:hover .src-tile{ border-color:rgba(125,211,252,.42); color:var(--cyan); }
-  .src-tile svg{ width:clamp(17px,1.5vw,20px); height:clamp(17px,1.5vw,20px); }
-  .src-label{ font-size:var(--t-label); font-weight:700; letter-spacing:.1em; text-transform:uppercase; line-height:1.45; color:var(--ink-4); text-align:center; }
-
-  /* FEED — drawn in the SAME grid as the tiles, so each drop line lands on a
-     tile's centre at any width, and the rail is inset by exactly half a
-     column. No SVG, so nothing distorts when the row is stretched. */
-  .feed{ width:100%; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); column-gap:var(--sgap); margin-top:12px; }
-  .feed-drop{ width:1px; height:15px; margin:0 auto; background:linear-gradient(180deg, rgba(157,192,245,0), rgba(157,192,245,.34)); }
-  .feed-rail{ grid-column:1 / -1; height:1px; margin:0 calc((100% - 6 * var(--sgap)) / 14); background:rgba(157,192,245,.26); }
-  .feed-stem{ position:relative; width:1px; height:22px; margin:0 auto; background:linear-gradient(180deg, rgba(157,192,245,.3), rgba(125,211,252,.6)); }
-  .feed-stem::before{ content:''; position:absolute; top:-3px; left:50%; transform:translateX(-50%); width:5px; height:5px; border-radius:50%; background:var(--cyan); box-shadow:0 0 10px rgba(125,211,252,.85); }
-  .feed-stem::after{ content:''; position:absolute; left:0; top:0; width:1px; height:9px; background:var(--cyan); box-shadow:0 0 7px rgba(125,211,252,.9); animation:feed-travel 2.6s linear infinite; }
-  @keyframes feed-travel{ 0%{ transform:translateY(-9px); opacity:0; } 20%{ opacity:1; } 80%{ opacity:1; } 100%{ transform:translateY(22px); opacity:0; } }
-
-  /* THE LAYER — one panel sitting across everything above it. The three marks
-     are labels, not cards: act 3 already explained them. */
-  .layer{ width:100%; max-width:660px; display:flex; align-items:center; gap:clamp(18px,2.4vw,34px); padding:clamp(14px,1.5vw,20px) clamp(16px,1.8vw,26px); border-radius:18px;
-    border:1px solid rgba(125,211,252,.26);
-    background:linear-gradient(150deg, rgba(56,189,248,.1), rgba(9,20,44,.42) 64%);
-    box-shadow:0 0 40px rgba(56,189,248,.08), inset 0 1px 0 rgba(255,255,255,.05); }
-  .core{ position:relative; width:clamp(84px,8vw,104px); height:clamp(84px,8vw,104px); flex-shrink:0; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; text-align:center;
-    background:radial-gradient(circle at 50% 34%, rgba(56,189,248,.3), rgba(7,17,40,.96) 70%);
-    border:1px solid rgba(125,211,252,.5);
-    box-shadow:0 0 28px rgba(56,189,248,.22), inset 0 0 22px rgba(56,189,248,.12); }
-  .core::after{ content:''; position:absolute; inset:-7px; border-radius:50%; border:1px solid rgba(125,211,252,.18); animation:core-breathe 5s ease-in-out infinite; }
-  @keyframes core-breathe{ 0%,100%{ transform:scale(1); opacity:.5; } 50%{ transform:scale(1.07); opacity:.1; } }
-  .core-name{ font-size:clamp(.7rem,.75vw,.8rem); font-weight:800; letter-spacing:.15em; color:#fff; line-height:1; }
-  .core-role{ font-size:.44rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; line-height:1.6; color:rgba(190,227,248,.8); max-width:80px; }
-  .facets{ flex:1; min-width:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
-  .facet{ display:flex; align-items:center; justify-content:center; gap:8px; padding:5px 8px; min-width:0; }
-  .facet + .facet{ border-left:1px solid rgba(157,192,245,.15); }
-  .facet svg{ width:14px; height:14px; color:var(--cyan); flex-shrink:0; }
-  .facet span{ font-size:var(--t-label); font-weight:700; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-2); white-space:nowrap; }
-
-  /* THE COMMERCIAL PAYOFF. */
-  .out-stem{ width:1px; height:18px; margin:0 auto; background:linear-gradient(180deg, rgba(125,211,252,.5), rgba(110,231,183,.45)); }
-  .out-node{ width:27px; height:27px; border-radius:50%; display:grid; place-items:center; color:var(--lift); border:1px solid rgba(110,231,183,.45); background:rgba(110,231,183,.09); box-shadow:0 0 18px rgba(110,231,183,.16); }
-  .out-node svg{ width:13px; height:13px; }
-  .outcome{ font-family:var(--serif); font-size:var(--t-h2); font-weight:600; line-height:1.3; letter-spacing:-.014em; color:var(--ink); max-width:30ch; margin-top:clamp(14px,1.6vw,22px); text-wrap:balance; }
-  .out-metrics{ display:flex; align-items:stretch; justify-content:center; flex-wrap:wrap; margin-top:clamp(16px,1.8vw,26px);
-    border:1px solid var(--hair-soft); border-radius:14px; overflow:hidden;
-    background:linear-gradient(170deg, rgba(110,231,183,.045), rgba(148,178,232,.008)); }
-  .metric{ display:flex; align-items:center; gap:11px; padding:clamp(11px,1.1vw,15px) clamp(16px,2vw,30px); }
-  .metric + .metric{ border-left:1px solid var(--hair-soft); }
-  .metric-icon{ width:28px; height:28px; border-radius:9px; display:grid; place-items:center; flex-shrink:0; color:var(--lift); border:1px solid rgba(110,231,183,.3); background:rgba(110,231,183,.08); }
-  .metric-icon svg{ width:14px; height:14px; }
-  .metric-text{ text-align:left; font-size:var(--t-sm); line-height:1.3; color:var(--ink-3); }
-  .metric-text b{ display:block; font-weight:700; font-size:var(--t-body); color:var(--ink); letter-spacing:-.008em; }
-
-  .bridge{ font-size:var(--t-xs); line-height:1.6; color:var(--ink-4); max-width:52ch; margin-top:clamp(18px,2vw,28px); }
-
-  /* ── CTA — its own closing moment ──
-     Separated from the diagram by real space and given its own panel: one
-     eyebrow, one line, one button. Nothing competes with it, which is why no
-     direct-dial line lives here. */
-  .cta{ width:100%; max-width:820px; margin:clamp(58px,7vw,120px) auto 0; padding:clamp(38px,4.4vw,68px) clamp(22px,3vw,48px) clamp(32px,3.8vw,56px); border-radius:24px;
-    border:1px solid rgba(157,192,245,.18);
-    background:linear-gradient(180deg, rgba(23,45,103,.42), rgba(9,20,44,.22));
-    box-shadow:0 30px 80px rgba(2,7,20,.3), inset 0 1px 0 rgba(255,255,255,.05);
-    display:flex; flex-direction:column; align-items:center; gap:11px; text-align:center; }
-  .cta-eyebrow{ font-size:clamp(.54rem,.52rem + .03vw,.6rem); font-weight:700; letter-spacing:.26em; text-transform:uppercase; color:rgba(125,211,252,.72); }
-  .cta-subline{ font-size:var(--t-sm); color:rgba(178,196,231,.74); max-width:38ch; }
-  .cta-headline{ font-family:var(--serif); font-size:clamp(1.22rem,.95rem + .62vw,1.92rem); font-weight:600; line-height:1.14; letter-spacing:-.016em; color:var(--ink); max-width:22ch; text-wrap:balance; margin-top:2px; }
-  .cta-headline .cta-accent{ color:var(--blue); }
-  .cta-btn{ display:inline-flex; align-items:center; gap:9px; margin-top:4px; background:#fff; color:#0B1B3F; border:none; border-radius:100px; padding:clamp(11px,1.15vw,15px) clamp(20px,2.15vw,28px); font-family:var(--sans); font-size:clamp(.79rem,.76rem + .08vw,.88rem); font-weight:700; letter-spacing:-.005em; cursor:pointer; box-shadow:0 14px 36px rgba(2,7,20,.38); transition:transform .2s cubic-bezier(.34,1.4,.64,1), box-shadow .2s ease; }
-  .cta-btn:hover{ transform:translateY(-2px); box-shadow:0 20px 46px rgba(2,7,20,.44); }
-  .cta-btn:active{ transform:translateY(0) scale(.99); }
-  .cta-btn svg{ width:11px; height:11px; transition:transform .2s cubic-bezier(.34,1.4,.64,1); }
-  .cta-btn:hover svg{ transform:translateX(3px); }
-  .cta-support{ font-size:var(--t-sm); line-height:1.58; color:rgba(178,196,231,.68); max-width:44ch; }
-  .calendly-wrap{ width:100%; max-width:620px; margin-top:14px; display:none; }
-  .calendly-wrap.show{ display:block; }
-  .calendly-inline-widget{ min-width:280px; height:560px; border-radius:14px; overflow:hidden; border:1px solid var(--hair); background:#fff; }
-
-  /* ── LOADING / ERROR ── */
-  .boot{ position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:var(--gutter); text-align:center; z-index:60; background:#071026; }
-  .boot.hide{ display:none; }
-  .boot-ring{ width:32px; height:32px; border-radius:50%; border:2px solid rgba(125,211,252,.18); border-top-color:var(--cyan); animation:boot-spin .9s linear infinite; }
-  @keyframes boot-spin{ to{ transform:rotate(360deg); } }
-  .boot-msg{ font-size:var(--t-sm); color:var(--ink-3); }
-  .boot-title{ font-family:var(--serif); font-size:1.15rem; font-weight:600; color:var(--ink); }
-
-  .hidden{ display:none !important; }
-
-  /* ══ RESPONSIVE ══
-     Four sizes are designed for, not one design scaled: a normal laptop
-     (dense, elegant), a standard desktop, a large monitor (spacious but
-     capped) and a phone. Everything above is fluid; the rules below are the
-     points where the COMPOSITION itself has to change. */
-
-  /* The hero's two columns stop working before the page does. Below this it
-     becomes one column, and the property sits under the line it illustrates
-     rather than beside it. */
-  @media (max-width:940px){
-    .hero{ grid-template-columns:minmax(0,1fr); gap:clamp(20px,3.4vw,30px); }
-    /* Stacked, the card keeps its own width rather than stretching into a
-       letterbox, and the photo gets back its proportions. */
-    .property-card{ margin:0; max-width:min(100%,520px); }
-    .property-visual{ height:clamp(180px,28vw,250px); }
-    .provenance{ max-width:58ch; }
-    .hero-copy .lede{ max-width:46ch; }
-    .hero-copy h1.headline{ max-width:36ch; }
-
-    /* One spine, top to bottom: the same three stages, turned. */
-    .stages{ grid-template-columns:minmax(0,1fr); }
-    .stage-join{ align-self:stretch; justify-self:start; width:1px; height:18px; margin-top:0;
-      margin-left:calc(var(--st-pad) + var(--st-icon) / 2); background:linear-gradient(180deg, rgba(125,211,252,.42), rgba(125,211,252,.14)); }
-    .stage-join::after{ width:1px; height:9px; animation-name:join-travel-y; }
-    @keyframes join-travel-y{ 0%{ transform:translateY(-10px); opacity:0; } 22%{ opacity:1; } 78%{ opacity:1; } 100%{ transform:translateY(24px); opacity:0; } }
-    .stage-detail{ max-width:70ch; }
+  /* ═══════════════════════════════════════════════════════════════════════
+     RESPONSIVE — a designed composition at every width, never a squeeze.
+     ═══════════════════════════════════════════════════════════════════════ */
+  @media (max-width:1080px){
+    .d-open__grid{ grid-template-columns:minmax(0,1fr); gap:clamp(28px,4vw,40px); }
+    /* The listing leads on a narrow screen: the photograph is the fastest
+       possible proof that this page is about them. */
+    .d-open__art{ order:-1; max-width:560px; }
+    .d-layer{ grid-template-columns:minmax(0,1fr); gap:12px; }
   }
 
   @media (max-width:900px){
-    .chrome-agency{ display:none; }
-  }
-
-  /* Below the width where seven tiles fit on one line the rail would point at
-     tiles that have moved, so the feed narrows to the single centred stem. */
-  @media (max-width:1000px){
-    /* Four per row, and the row of three that follows is centred rather than
-       left with a hole where a fourth column would be. */
-    .src-grid{ display:flex; flex-wrap:wrap; justify-content:center; column-gap:0; max-width:520px; margin:0 auto; }
-    .src{ width:25%; padding:0 6px; }
-    .feed{ display:none; }
-    .feed-stem{ margin-top:16px; }
-  }
-
-  @media (max-width:820px){
-    .layer{ flex-direction:column; gap:16px; padding:18px 16px; }
-    .facets{ width:100%; }
+    /* Below this the eleven labels can no longer sit around the ellipse
+       without colliding, so the agency opens out as a field of signals
+       instead of a ring of them. Same idea, drawn for the shape available. */
+    .d-field__desktop{ display:none; }
+    .d-field__mobile{ display:block; }
+    .d-branch{ grid-template-columns:minmax(0,1fr); gap:clamp(18px,3vw,26px); }
+    .d-sigs{ grid-template-columns:repeat(2,minmax(0,1fr)); }
   }
 
   @media (max-width:640px){
-    :root{ --gutter:16px; --act-y:44px; }
-    .act:first-child{ padding-top:86px; }
-    .chrome{ height:48px; }
-    .wrap{ gap:12px; }
-
-    /* The hero on a phone: the line, then the property directly under it. */
-    .property-visual{ height:clamp(168px,44vw,220px); }
-    .property-agency-row{ gap:8px; }
-
-    /* Three narrow columns cannot hold a finding's own wording, so the strip
-       becomes a stack and the dividers turn with it. */
-    .facts{ grid-template-columns:minmax(0,1fr); }
-    .fact + .fact{ border-left:none; border-top:1px solid var(--hair-soft); }
-    .timeline{ padding:17px 15px 2px; }
-    .step{ grid-template-columns:24px minmax(0,1fr); column-gap:12px; }
-    .step::before{ left:11.5px; top:28px; }
-    .step-icon{ width:24px; height:24px; border-radius:8px; }
-    .verdict{ padding:16px 15px 18px; }
-
-    .stages{ --st-pad:14px; --st-icon:32px; }
-
-    .turn{ margin-top:34px; padding-top:24px; }
-
-    /* ACT 4 on a phone: four columns still divide seven tiles into 4 + 3
-       rather than leaving an orphan, and the three capability marks stay on
-       one line by dropping their icons instead of stacking. */
-    .map{ --sgap:8px; }
-    .src-grid{ row-gap:14px; max-width:340px; }
-    .src-tile{ width:40px; height:40px; border-radius:11px; }
-    .src-tile svg{ width:18px; height:18px; }
-    .src-label{ letter-spacing:.07em; }
-    .core{ width:92px; height:92px; }
-    .facet{ padding:4px 5px; gap:6px; }
-    .facet svg{ display:none; }
-    .facet span{ font-size:.5rem; letter-spacing:.09em; }
-    /* Stacked, but on one left edge: three rows each centring themselves
-       would leave the icons ragged. */
-    .out-metrics{ flex-direction:column; align-items:stretch; width:100%; max-width:300px; }
-    .metric{ padding:12px 16px; }
-    .metric + .metric{ border-left:none; border-top:1px solid var(--hair-soft); }
-    .cta{ margin-top:52px; border-radius:20px; }
-    /* The dot strip floats over the foot of the page, so the last act keeps
-       clear of it. */
-    .act:last-child{ padding-bottom:calc(var(--act-y) + 46px); }
-    /* The dots become a strip at the foot of the screen, where a thumb is. */
-    .dots{ right:auto; left:50%; top:auto; bottom:12px; transform:translateX(-50%); flex-direction:row; gap:9px; padding:7px 11px; border-radius:100px; background:rgba(7,16,38,.66); backdrop-filter:blur(5px); border:1px solid var(--hair-soft); }
+    .d-open{ padding-top:clamp(88px,12vh,110px); }
+    .d-open h1{ font-size:clamp(1.8rem,1rem + 4.2vw,2.35rem); letter-spacing:-.024em; }
+    /* Two signals a row keeps the value type large enough to read as a
+       statement rather than as a table cell. */
+    .d-sigs{ gap:clamp(20px,5vw,26px) clamp(18px,4vw,24px); }
+    .d-sig__v{ font-size:1.15rem; }
+    .d-sig__l{ font-size:.6rem; letter-spacing:.12em; }
+    .d-log__row{ grid-template-columns:minmax(0,1fr); gap:3px; }
+    .d-log__t{ font-size:var(--t-micro); letter-spacing:.06em; }
+    .d-act{ grid-template-columns:minmax(0,1fr); gap:5px; }
+    .d-act__d{ grid-column:1; }
+    .d-zoom__head .d-statement{ font-size:clamp(1.75rem,1rem + 4.6vw,2.5rem); }
+    /* The page names the agency in its first sentence; a truncated copy of
+       it beside the button is only crowding. */
+    .d-agency{ display:none; }
+    .d-cta .btn{ width:100%; justify-content:center; }
+    .calendly-inline-widget{ height:960px; }
   }
 
-  @media (prefers-reduced-motion: reduce){
-    html{ scroll-behavior:auto; }
-    .core::after, .feed-stem::after, .stage-join::after{ animation:none; }
-    .feed-stem::after{ opacity:0; }
-    .rv{ transition:none; opacity:1; transform:none; }
-    .stage-card:hover{ transform:none; }
+  @media (prefers-reduced-motion:reduce){
+    .d-field__bloom,.d-fieldm__cloud{ transform:none !important; opacity:1 !important; }
+    .d-cal{ transition:none; }
   }
 </style>
 </head>
+
 <body>
 
-  <!-- ══ ICON SET ══
-       One consistent line set (1.6px stroke, round caps — Lucide's geometry),
-       defined once and referenced by <use>. Icons appear where they help the
-       page be SCANNED: the chronology, the two summary tones, the three NOVUS
-       stages, the sources and the outcomes. Nowhere else. -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
-    <g id="i-message" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.5a7.5 7.5 0 0 1-7.5 7.5H8l-4 3v-4.6A7.5 7.5 0 0 1 3.5 11.5 7.5 7.5 0 0 1 11 4h2a7.5 7.5 0 0 1 7.5 7.5Z"/></g>
-    <g id="i-clock" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.2V12l3.2 2"/></g>
-    <g id="i-bot" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="11.5" rx="3"/><path d="M12 4v4"/><circle cx="12" cy="3.2" r="1.3"/><path d="M9 13h.01"/><path d="M15 13h.01"/><path d="M9.8 16.4h4.4"/></g>
-    <g id="i-silence" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8.2" r="3.4"/><path d="M3.8 19.5a6.4 6.4 0 0 1 10.6-4.3"/><path d="m16.5 15.5 4.5 4.5"/><path d="m21 15.5-4.5 4.5"/></g>
-    <g id="i-calendar" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.6"/><path d="M3.5 9.6h17"/><path d="M8 3.4v3.2"/><path d="M16 3.4v3.2"/></g>
-    <g id="i-repeat" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3.5 20.5 7 17 10.5"/><path d="M3.5 12V9.5A2.5 2.5 0 0 1 6 7h14.5"/><path d="M7 20.5 3.5 17 7 13.5"/><path d="M20.5 12v2.5a2.5 2.5 0 0 1-2.5 2.5H3.5"/></g>
-    <g id="i-home" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5 12 4l8.5 6.5"/><path d="M5.5 12v7.5h13V12"/><path d="M10 19.5v-4.5h4v4.5"/></g>
-    <g id="i-check" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12.5 9.8 17.3 19 6.8"/></g>
-    <g id="i-unprogressed" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.4 12h7.2"/></g>
-    <g id="i-dot" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.6"/></g>
-    <g id="i-context" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9"/><path d="M15 4h2.5A2.5 2.5 0 0 1 20 6.5V9"/><path d="M20 15v2.5a2.5 2.5 0 0 1-2.5 2.5H15"/><path d="M9 20H6.5A2.5 2.5 0 0 1 4 17.5V15"/><circle cx="11.3" cy="11.3" r="2.7"/><path d="m13.4 13.4 2.1 2.1"/></g>
-    <g id="i-network" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="12" r="2"/><circle cx="18" cy="6.5" r="2"/><circle cx="18" cy="17.5" r="2"/><path d="M7.4 11.2 16.1 7.3"/><path d="M7.4 12.8l8.7 3.9"/></g>
-    <g id="i-zap" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2.5 5 13.5h5.5L11 21.5 19 10.5h-5.5Z"/></g>
-    <g id="i-sparkle" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 13.5 8 18 9.5 13.5 11 12 15.5 10.5 11 6 9.5 10.5 8Z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8Z"/></g>
-    <g id="i-monitor" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="12.5" rx="2"/><path d="M9 20.5h6"/><path d="M12 16.5v4"/><path d="M8.5 12.5 12 9l2.2 2.2L17 8"/></g>
-    <g id="i-globe" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3.2 9.5h17.6"/><path d="M3.2 14.5h17.6"/><path d="M12 3a15 15 0 0 1 0 18"/><path d="M12 3a15 15 0 0 0 0 18"/></g>
-    <g id="i-phone" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h3l1.5 4-2 1.5a12 12 0 0 0 6 6l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7 2 2 0 0 1 6.5 3.5Z"/></g>
-    <g id="i-users" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M16.2 6.2a3.2 3.2 0 0 1 0 5.6"/><path d="M17.5 14.2A5.5 5.5 0 0 1 20.5 19"/></g>
-    <g id="i-user" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 19.5a7 7 0 0 1 14 0"/></g>
-    <g id="i-database" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3"/></g>
-    <g id="i-key" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="14" r="4"/><path d="M11 11.5 19 4"/><path d="M16.5 6.5 18.5 8.5"/><path d="M14.5 8.5 16.5 10.5"/></g>
-    <g id="i-arrow" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></g>
-  </defs></svg>
+<div class="d-progress" aria-hidden="true"><i id="progress"></i></div>
 
-  <div class="chrome">
-    <div class="brand"><img src="/novus-icon.png" alt="" /><span class="brand-word">NOVUS</span></div>
-    <div class="chrome-right">
-      <div class="chrome-agency"><span id="chrome-agency-name"></span><span class="review-flag hidden" id="review-flag" title="This demo is flagged for review - see review_reasons on its DEMOS row">Needs review</span></div>
-      <!-- Understated, and pointed at the SAME booking flow as the closing
-           button. Hidden until the demo has actually resolved, so it can never
-           scroll to a calendar that is not on the page yet. -->
-      <button class="chrome-cta hidden" id="chrome-cta" onclick="revealCalendly()">See how NOVUS fits</button>
+<header class="hdr" id="hdr">
+  <div class="frame">
+    <span class="wordmark">
+      <img class="mark" src="/assets/img/novus-mark.png" alt="" width="384" height="360" />
+      <b>NOVUS</b>
+    </span>
+    <div class="hdr__right">
+      <span class="d-agency" id="hdr-agency"></span>
+      <span class="chip chip--amber" id="review-flag" hidden
+            title="This demo is flagged for review - see review_reasons on its DEMOS row">Needs review</span>
+      <button class="btn btn--ghost btn--sm" id="hdr-cta" hidden onclick="revealCalendly()">Book 10 minutes</button>
     </div>
   </div>
+</header>
 
-  <nav class="dots hidden" id="dots" aria-label="Progress"></nav>
+<main class="d-stage" id="stage" hidden>
 
-  <main class="stage hidden" id="stage">
+  <!-- ═══ 01 · THE REAL ENQUIRY ════════════════════════════════════════ -->
+  <section class="section d-open" data-reveal data-stagger="110">
+    <div class="frame">
+      <div class="d-open__grid">
+        <div>
+          <p class="eyebrow reveal-child" id="s1-eyebrow">The enquiry</p>
+          <h1 class="reveal-child">There was more information in this enquiry than first appeared.</h1>
+          <p class="d-open__lede reveal-child">
+            One real enquiry, sent to <span class="d-name" id="s1-agency">your agency</span>.
+          </p>
 
-    <!-- ══ ACT 1 — THE REAL ENQUIRY ══
-         Their agency, their property, their enquiry, in that order. The
-         property is the anchor, not the subject: it sits beside the line it
-         is evidence for rather than under it. -->
-    <section class="act" data-act="1">
-      <div class="wrap wide hero">
-        <div class="hero-copy">
-          <div class="eyebrow" id="b1-eyebrow">One real enquiry</div>
-          <h1 class="headline" id="b1-heading"></h1>
-          <p class="lede" id="b1-hook"></p>
-          <p class="provenance rv" id="provenance"></p>
+          <div class="d-log reveal-child" id="s1-log"></div>
+
+          <p class="d-note reveal-child">
+            We sent this enquiry ourselves and stopped engaging once we had enough to
+            understand the interaction. Nothing here is a judgement on your team.
+          </p>
         </div>
 
-        <div class="hero-visual rv">
-          <div class="property-card">
-            <div class="property-visual">
-              <svg class="placeholder" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-                <g stroke="rgba(157,192,245,.15)" stroke-width="1">
-                  <line x1="0" y1="168" x2="400" y2="168"/><line x1="60" y1="168" x2="60" y2="34"/>
-                  <line x1="340" y1="168" x2="340" y2="34"/><line x1="60" y1="34" x2="340" y2="34"/>
-                  <line x1="60" y1="101" x2="340" y2="101"/><line x1="150" y1="34" x2="150" y2="168"/>
-                  <line x1="250" y1="34" x2="250" y2="168"/>
-                </g>
-                <g fill="rgba(157,192,245,.08)">
-                  <rect x="72" y="48" width="66" height="30" rx="1"/><rect x="162" y="48" width="76" height="30" rx="1"/>
-                  <rect x="262" y="48" width="66" height="30" rx="1"/><rect x="72" y="115" width="66" height="30" rx="1"/>
-                  <rect x="162" y="115" width="76" height="30" rx="1"/><rect x="262" y="115" width="66" height="30" rx="1"/>
-                </g>
-              </svg>
-              <img class="property-photo hidden" id="property-photo" alt="" />
-              <div class="grain"></div>
-              <div class="property-status">For Sale</div>
-              <div class="property-price-tag" id="property-price"></div>
-            </div>
-            <div class="property-body">
-              <div class="property-addr" id="property-address"></div>
-              <div class="property-agency-row">
-                <div class="property-agency">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clock"/></svg>
-                  <span>Enquiry sent to <strong id="property-agency-name"></strong> <span id="property-enquiry-when"></span></span>
-                </div>
-                <a class="property-link hidden" id="property-link" href="#" target="_blank" rel="noopener">View the listing &#8599;</a>
-              </div>
-            </div>
+        <figure class="d-prop d-open__art reveal-child">
+          <div class="d-prop__visual">
+            <svg class="d-prop__ph" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+              <g stroke="rgba(241,237,230,.055)" stroke-width="1">
+                <path d="M0 196h400M62 196V54M338 196V54M62 54h276M62 125h276M154 54v142M246 54v142"/>
+              </g>
+              <g fill="rgba(78,155,255,.045)">
+                <rect x="74" y="68" width="68" height="34" rx="1"/><rect x="166" y="68" width="68" height="34" rx="1"/>
+                <rect x="258" y="68" width="68" height="34" rx="1"/><rect x="74" y="139" width="68" height="34" rx="1"/>
+                <rect x="166" y="139" width="68" height="34" rx="1"/><rect x="258" y="139" width="68" height="34" rx="1"/>
+              </g>
+            </svg>
+            <img id="prop-photo" alt="" />
+            <span class="d-prop__tag">The listing we enquired about</span>
+            <span class="d-prop__price" id="prop-price" hidden></span>
+          </div>
+          <figcaption class="d-prop__body">
+            <p class="d-prop__addr" id="prop-address">The property in your enquiry</p>
+            <!-- The card says what the LISTING is. Who the enquiry went to is
+                 in the sentence beside it, and when it went is the first line
+                 of the record - neither is repeated here. -->
+            <p class="d-prop__meta">
+              <span id="prop-source" hidden></span>
+              <a class="d-prop__link" id="prop-link" href="#" target="_blank" rel="noopener" hidden>View the listing &#8599;</a>
+            </p>
+          </figcaption>
+        </figure>
+      </div>
+
+      <p class="d-frame reveal-child">
+        <strong>This is one example of how NOVUS understands what's happening inside your agency.</strong>
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ 02 · WHAT NOVUS UNDERSTOOD ═══════════════════════════════════ -->
+  <section class="section section--lg section--ruled" data-reveal data-stagger="90">
+    <div class="frame">
+      <div class="head">
+        <p class="eyebrow reveal-child">What NOVUS understood</p>
+        <h2 class="reveal-child">Everything this enquiry actually contained.</h2>
+      </div>
+
+      <p class="d-credit reveal-child" id="s2-credit" hidden></p>
+
+      <div class="d-sigs reveal-child" id="s2-signals"></div>
+
+      <div class="d-open-q reveal-child" id="s2-open" hidden>
+        <p class="d-open-q__k">Still unresolved</p>
+        <div class="d-open-q__list" id="s2-open-list"></div>
+      </div>
+
+      <p class="d-close reveal-child">
+        NOVUS identifies <strong>what's known</strong>, what's still unclear,
+        and what matters next.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ 03 · WHAT NOVUS WOULD DO NEXT ════════════════════════════════ -->
+  <section class="section section--lg section--dark section--ruled" data-reveal data-stagger="80">
+    <div class="frame">
+      <div class="head">
+        <p class="eyebrow reveal-child">What happens next</p>
+        <h2 class="reveal-child">
+          <span class="soft">Understanding the enquiry is half of it.</span>
+          NOVUS can take the next step too.
+        </h2>
+      </div>
+
+      <div class="d-acts reveal-child" id="s3-actions"></div>
+
+      <div class="d-msg reveal-child" id="s3-msg" hidden>
+        <p class="d-msg__k">For example, NOVUS could send</p>
+        <p class="d-msg__b" id="s3-msg-body"></p>
+      </div>
+
+      <div class="d-branch">
+        <div class="d-branch__c d-branch--auto reveal-child">
+          <p class="d-branch__k">They reply</p>
+          <p class="d-branch__s">Understanding updates <i>&rarr;</i> the enquiry progresses</p>
+        </div>
+        <div class="d-branch__c reveal-child">
+          <p class="d-branch__k">They don't</p>
+          <p class="d-branch__s">Follow-up continues <i>&rarr;</i> a call is surfaced when it's worth someone's time</p>
+        </div>
+      </div>
+
+      <p class="d-close reveal-child">
+        NOVUS can <strong>act on that intelligence</strong>, not just report it.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ 04 · THE ZOOM-OUT ════════════════════════════════════════════
+       The moment NOVUS stops looking like an enquiry tool. The scale change
+       is felt in the drawing, so the copy here is two sentences and the
+       diagram is given the room. -->
+  <section class="section section--lg section--ruled" data-reveal data-stagger="80">
+    <div class="frame frame--wide">
+      <div class="d-zoom__head reveal-child">
+        <h2 class="d-statement">
+          <span class="soft">One enquiry creates signals.</span>
+          Thousands reveal how your agency is actually operating.
+        </h2>
+      </div>
+
+      <div class="d-field" role="img"
+           aria-label="Diagram: one enquiry at the centre, with enquiries, calls, emails, applicants, viewings, valuations, past vendors, database, follow-ups, appointments and outcomes opening out around it.">
+        <svg class="d-field__desktop" viewBox="0 40 1000 490" aria-hidden="true" focusable="false">
+          <defs>
+            <radialGradient id="zhalo" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#4E9BFF" stop-opacity=".16"/>
+              <stop offset="55%" stop-color="#4E9BFF" stop-opacity=".04"/>
+              <stop offset="100%" stop-color="#4E9BFF" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+
+          <g class="d-field__bloom">
+            <ellipse class="z-orbit" cx="500" cy="284" rx="404" ry="207"/>
+            <line class="z-line" x1="500" y1="238" x2="500" y2="121"/>
+            <line class="z-line" x1="524.9" y1="245.3" x2="676.8" y2="146.9"/>
+            <line class="z-line" x1="541.8" y1="264.9" x2="797.4" y2="216.2"/>
+            <line class="z-line" x1="545.5" y1="290.5" x2="823.7" y2="307.2"/>
+            <line class="z-line" x1="534.8" y1="314.1" x2="747.1" y2="390.7"/>
+            <line class="z-line" x1="513" y1="328.1" x2="592.2" y2="440.4"/>
+            <line class="z-line" x1="487" y1="328.1" x2="407.8" y2="440.4"/>
+            <line class="z-line" x1="465.2" y1="314.1" x2="252.9" y2="390.7"/>
+            <line class="z-line" x1="454.5" y1="290.5" x2="176.3" y2="307.2"/>
+            <line class="z-line" x1="458.2" y1="264.9" x2="202.6" y2="216.2"/>
+            <line class="z-line" x1="475.1" y1="245.3" x2="323.2" y2="146.9"/>
+
+            <circle class="z-node" cx="500" cy="112" r="3.4"/>
+            <circle class="z-node" cx="681.7" cy="139.3" r="3.4"/>
+            <circle class="z-node" cx="805.6" cy="212.5" r="3.4"/>
+            <circle class="z-node" cx="832.6" cy="308.5" r="3.4"/>
+            <circle class="z-node" cx="753.9" cy="396.6" r="3.4"/>
+            <circle class="z-node" cx="594.7" cy="449" r="3.4"/>
+            <circle class="z-node" cx="405.3" cy="449" r="3.4"/>
+            <circle class="z-node" cx="246.1" cy="396.6" r="3.4"/>
+            <circle class="z-node" cx="167.4" cy="308.5" r="3.4"/>
+            <circle class="z-node" cx="194.4" cy="212.5" r="3.4"/>
+            <circle class="z-node" cx="318.3" cy="139.3" r="3.4"/>
+
+            <text class="z-label" x="500" y="86" text-anchor="middle">Enquiries</text>
+            <text class="z-label" x="690.9" y="129" text-anchor="start">Calls</text>
+            <text class="z-label" x="821.1" y="209.4" text-anchor="start">Emails</text>
+            <text class="z-label" x="849.4" y="314.9" text-anchor="start">Applicants</text>
+            <text class="z-label" x="766.7" y="411.7" text-anchor="start">Viewings</text>
+            <text class="z-label" x="599.5" y="469.3" text-anchor="start">Valuations</text>
+            <text class="z-label" x="400.5" y="469.3" text-anchor="end">Past vendors</text>
+            <text class="z-label" x="233.3" y="411.7" text-anchor="end">Database</text>
+            <text class="z-label" x="150.6" y="314.9" text-anchor="end">Follow-ups</text>
+            <text class="z-label" x="178.9" y="209.4" text-anchor="end">Appointments</text>
+            <text class="z-label" x="309.1" y="129" text-anchor="end">Outcomes</text>
+          </g>
+
+          <!-- The interaction they have just read about, still at the centre
+               of everything that opened around it. -->
+          <circle cx="500" cy="284" r="120" fill="url(#zhalo)"/>
+          <circle class="z-core-ring" cx="500" cy="284" r="34"/>
+          <circle class="z-core" cx="500" cy="284" r="5"/>
+          <text class="z-core-label" x="500" y="340" text-anchor="middle">This enquiry</text>
+        </svg>
+
+        <div class="d-field__mobile">
+          <div class="d-fieldm__core"><span></span>This enquiry</div>
+          <div class="d-fieldm__cloud">
+            <span>Enquiries</span><span>Calls</span><span>Emails</span><span>Applicants</span>
+            <span>Viewings</span><span>Valuations</span><span>Past vendors</span><span>Database</span>
+            <span>Follow-ups</span><span>Appointments</span><span>Outcomes</span>
           </div>
         </div>
       </div>
-    </section>
 
-    <!-- ══ ACT 2 — WHAT ACTUALLY HAPPENED ══ -->
-    <section class="act act--tint" data-act="2">
-      <div class="wrap">
-        <div class="eyebrow">What actually happened</div>
-        <!-- Every string inside these is written by /api/demo from this
-             agency's own probe — the shell fixes the structure and nothing
-             else. -->
-        <div class="facts rv" id="facts"></div>
-        <div class="walkthrough rv" id="walkthrough">
-          <div class="timeline" id="timeline"></div>
-          <div class="verdict hidden" id="verdict">
-            <div class="verdict-label" id="verdict-label"></div>
-            <p class="verdict-line" id="demo-reveal"></p>
-            <p class="verdict-note hidden" id="commercial-consequence"></p>
+      <p class="d-zoom__after reveal-child">
+        NOVUS connects those signals across the agency, so patterns and
+        opportunities that are invisible in isolation start becoming clear.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ 05 · UNDERSTAND → ACT → OPTIMISE ═════════════════════════════ -->
+  <section class="section section--lg section--dark section--ruled" data-reveal data-stagger="90">
+    <div class="frame">
+      <div class="head">
+        <p class="eyebrow reveal-child">Understand &middot; Act &middot; Optimise</p>
+        <h2 class="reveal-child">What that intelligence is for.</h2>
+      </div>
+
+      <div class="d-model">
+        <div class="d-layer reveal-child">
+          <p class="d-layer__k"><span class="d-layer__i">01</span><span class="d-layer__n">Understand</span></p>
+          <div>
+            <p class="d-layer__o">See where attention, opportunity and leakage are building across the agency.</p>
+            <p class="d-layer__terms">
+              <span>Patterns</span><span>Gaps</span><span>Opportunities</span><span>Priorities</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="d-layer reveal-child">
+          <p class="d-layer__k"><span class="d-layer__i">02</span><span class="d-layer__n">Act</span></p>
+          <div>
+            <p class="d-layer__o">Take repetitive work off the team and make sure the right things actually happen.</p>
+            <p class="d-layer__terms">
+              <span>Follow-up</span><span>Outreach</span><span>Reactivation</span><span>Progression</span><span>Escalation</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="d-layer reveal-child">
+          <p class="d-layer__k"><span class="d-layer__i">03</span><span class="d-layer__n">Optimise</span></p>
+          <div>
+            <p class="d-layer__o">Use the growing picture of your agency to uncover what can perform better and where growth is sitting.</p>
+            <p class="d-layer__terms">
+              <span>What works</span><span>What repeatedly stalls</span><span>Where value is underused</span>
+            </p>
           </div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- ══ ACT 3 — THE INTELLIGENCE THIS ENQUIRY NEEDED ══
-         CONTEXT and INTELLIGENCE describe a capability and are the same on
-         every demo. EXECUTION is composed by lib/demo-journeys.mjs from THIS
-         probe's ordinals, so it says what NOVUS would have done differently
-         HERE — and credits what the team already did rather than inventing a
-         weakness to fill. -->
-    <section class="act" data-act="3">
-      <div class="wrap wide">
-        <div class="eyebrow">The intelligence this enquiry needed</div>
-        <h2 class="headline">Same enquiry. Here's what NOVUS would have done differently.</h2>
-
-        <div class="stages" id="stages">
-          <div class="stage-card rv" data-stage="1">
-            <span class="stage-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-context"/></svg><span class="stage-num">1</span></span>
-            <span class="stage-name">Context</span>
-            <div id="novus-detected"></div>
-          </div>
-          <div class="stage-join rv" aria-hidden="true"></div>
-          <div class="stage-card rv" data-stage="2">
-            <span class="stage-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-network"/></svg><span class="stage-num">2</span></span>
-            <span class="stage-name">Intelligence</span>
-            <div id="novus-decisions"></div>
-          </div>
-          <div class="stage-join rv" aria-hidden="true"></div>
-          <div class="stage-card rv" data-stage="3">
-            <span class="stage-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-zap"/></svg><span class="stage-num">3</span></span>
-            <span class="stage-name">Execution</span>
-            <div id="novus-actions"></div>
-          </div>
-        </div>
-
-        <!-- THE TURN, and the last thing in this act. It is the question act 4
-             exists to answer, so nothing is allowed to sit under it. -->
-        <p class="turn rv">
-          <span class="turn-a">The value isn't what NOVUS would have done with this one enquiry.</span>
-          <span class="turn-b">It's what happens when this intelligence is working continuously across your business.</span>
-        </p>
+  <!-- ═══ 06 · THE PAYOFF ══════════════════════════════════════════════ -->
+  <section class="section section--lg section--ruled d-cta" data-reveal data-stagger="110">
+    <div class="frame">
+      <div class="d-payoff">
+        <p class="reveal-child">See where opportunity and friction are building across your agency.</p>
+        <p class="reveal-child">Take repetitive work away from your team.</p>
+        <p class="reveal-child">Surface more commercial value from the business you already have.</p>
       </div>
-    </section>
 
-    <!-- ══ ACT 4 — ONE LAYER ACROSS THE AGENCY, THEN THE ASK ══
-         The camera pulls back. This section does NOT re-explain NOVUS: it
-         shows the same capability sitting across every source of opportunity
-         the agency already has, and what that is worth. Then it gets out of
-         the way of the CTA. -->
-    <section class="act" data-act="4">
-      <div class="wrap wide">
-        <div class="eyebrow">Now multiply that across your agency</div>
-        <h2 class="headline">The same intelligence, working across <span class="hl">every opportunity in your agency.</span></h2>
-        <p class="lede">NOVUS continuously identifies what needs progressing, decides what should happen next, and either acts — or brings your team in when they're needed.</p>
+      <button class="btn btn--primary reveal-child" onclick="revealCalendly()">
+        Book a conversation <span class="arw" aria-hidden="true">&rarr;</span>
+      </button>
+      <p class="d-cta__support reveal-child">10 minutes. No prep needed.</p>
 
-        <div class="map rv">
-          <div class="src-grid">
-            <div class="src"><span class="src-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-monitor"/></svg></span><span class="src-label">Portal<br/>enquiries</span></div>
-            <div class="src"><span class="src-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-globe"/></svg></span><span class="src-label">Website<br/>leads</span></div>
-            <div class="src"><span class="src-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-phone"/></svg></span><span class="src-label">Calls</span></div>
-            <div class="src"><span class="src-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-users"/></svg></span><span class="src-label">Applicants</span></div>
-            <div class="src"><span class="src-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-user"/></svg></span><span class="src-label">Past<br/>vendors</span></div>
-            <div class="src"><span class="src-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-home"/></svg></span><span class="src-label">Previous<br/>valuations</span></div>
-            <div class="src"><span class="src-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-database"/></svg></span><span class="src-label">Database</span></div>
-          </div>
-
-          <!-- Seven drops onto one rail, then one stem into the layer. Same
-               grid as the tiles above, so the geometry cannot drift. -->
-          <div class="feed" aria-hidden="true">
-            <span class="feed-drop"></span><span class="feed-drop"></span><span class="feed-drop"></span><span class="feed-drop"></span><span class="feed-drop"></span><span class="feed-drop"></span><span class="feed-drop"></span>
-            <span class="feed-rail"></span>
-          </div>
-          <div class="feed-stem" aria-hidden="true"></div>
-
-          <div class="layer">
-            <div class="core">
-              <span class="core-name">NOVUS</span>
-              <span class="core-role">Intelligence &amp; execution layer</span>
-            </div>
-            <!-- Labels, not cards. Act 3 already explained all three. -->
-            <div class="facets">
-              <div class="facet"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sparkle"/></svg><span>Intelligence</span></div>
-              <div class="facet"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-network"/></svg><span>Decision</span></div>
-              <div class="facet"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-zap"/></svg><span>Execution</span></div>
-            </div>
-          </div>
-
-          <div class="out-stem" aria-hidden="true"></div>
-          <span class="out-node" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#i-check"/></svg></span>
-
-          <p class="outcome">More of the opportunity already in your business <span class="lift">gets progressed</span>.</p>
-
-          <div class="out-metrics">
-            <div class="metric">
-              <span class="metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-calendar"/></svg></span>
-              <span class="metric-text"><b>More</b>appointments</span>
-            </div>
-            <div class="metric">
-              <span class="metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-home"/></svg></span>
-              <span class="metric-text"><b>More</b>valuations</span>
-            </div>
-            <div class="metric">
-              <span class="metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-key"/></svg></span>
-              <span class="metric-text"><b>More</b>instructions</span>
-            </div>
-          </div>
-
-          <p class="bridge" id="systemic-bridge"></p>
-        </div>
-
-        <!-- ONE obvious next action, in its own space. -->
-        <div class="cta rv">
-          <span class="cta-eyebrow">One enquiry showed us this.</span>
-          <p class="cta-subline">What would the full agency show?</p>
-          <p class="cta-headline">How much opportunity is sitting <span class="cta-accent">inside your agency</span>?</p>
-          <button class="cta-btn" onclick="revealCalendly()">Show me the full picture
-            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow"/></svg>
-          </button>
-          <p class="cta-support">Give me 30 minutes and we&rsquo;ll map the opportunities already sitting across your enquiries, applicants, past vendors and previous valuations.</p>
-
-          <div class="calendly-wrap" id="calendly-wrap">
-            <div class="calendly-inline-widget" data-url="https://calendly.com/joe-getnovus/10min?hide_gdpr_banner=1"></div>
-          </div>
-        </div>
+      <div class="d-cal" id="calendly-wrap">
+        <div class="calendly-inline-widget" data-url="https://calendly.com/joe-getnovus/10min?hide_gdpr_banner=1&background_color=0a0b0e&text_color=f1ede6&primary_color=4e9bff"></div>
       </div>
-    </section>
+    </div>
+  </section>
 
-  </main>
+</main>
 
-  <!-- Boot / failure state. Nothing below renders until one DEMOS row resolves. -->
-  <div class="boot" id="boot">
-    <div class="boot-ring" id="boot-ring"></div>
-    <p class="boot-msg" id="boot-msg">Loading&#8230;</p>
-  </div>
+<div class="d-boot" id="boot">
+  <div class="d-boot__ring" id="boot-ring"></div>
+  <p class="d-boot__msg" id="boot-msg">Loading&#8230;</p>
+</div>
 
 <script>
-  /* ═══════════════════════════════════════════════════════════════════════
-     THE RENDERER IS JOURNEY-BLIND.
-     It resolves ONE slug, reads ONE DEMOS row, and renders whatever that row
-     carries. There is no hero_journey branch anywhere in this file — which is
-     what stops "four journeys" becoming four demo pages. Adding a journey is
-     authoring content in lib/demo-journeys.mjs; nothing here changes.
-     Every field is optional: an element with no data is removed, so a thin
-     row degrades to a shorter demo rather than to a broken one.
-     ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════
+   THE RENDERER IS JOURNEY-BLIND, AND IT ALWAYS WAS.
+   It resolves ONE slug, reads ONE DEMOS row through /api/demo, and writes
+   whatever that row carries into a fixed structure. There is no
+   hero_journey branch in this file. What VARIES between two agencies is
+   the reading /api/demo derives from their own ordinals - the record, the
+   signals, what was left unresolved and what NOVUS would do next - never
+   the shape of the page.
 
-  const ACTS = 4;
+   Every field is optional. An element with no data is removed, so a thin
+   row degrades to a shorter demo rather than to a broken one.
+   ═══════════════════════════════════════════════════════════════════════ */
+
   let demoSlug = '';
 
-  // /{demo_slug} is the public route; /demo/{demo_slug} remains supported.
-  // ?slug= is accepted too so the page can be opened directly while testing.
+  /* /{demo_slug} is the public route; /demo/{demo_slug} remains supported,
+     and ?slug= is accepted so the page can be opened directly while testing.
+     UNCHANGED from the previous shell - these URLs are already in inboxes. */
   function resolveSlug() {
     const params = new URLSearchParams(location.search);
     const fromQuery = (params.get('slug') || '').trim();
@@ -785,120 +821,101 @@
     return '';
   }
 
-  function esc(value) {
-    return String(value == null ? '' : value)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
   function txt(value) { return String(value == null ? '' : value).trim(); }
 
-  // HOUSE STYLE: no em or en dashes in prospect-facing copy — only the small
-  // hyphen. lib/demos.mjs applies the same rule when the row is compiled; this
-  // is the second half of it, so a row compiled by an EARLIER build (or any
-  // dash that survives in AI-authored PERSONALISATION copy) still reads
-  // correctly without waiting for a recompile. Deliberately NOT applied to
-  // txt(), which is also used for the listing URL.
+  /* HOUSE STYLE: no em or en dashes in prospect-facing copy. lib/demos.mjs
+     applies the same rule when the row is compiled; this is the second half
+     of it, so a row compiled by an earlier build still reads correctly.
+     Deliberately NOT applied to txt(), which also carries the listing URL. */
   function copy(value) { return txt(value).replace(/\s*[—–]\s*/g, ' - ').trim(); }
 
-  // ── ICONS ──
-  // The <symbol> set lives in the markup; this only decides WHICH one a row
-  // gets. The chronology's key comes from /api/demo (lib/demos.mjs owns the
-  // label→icon map, next to the labels themselves), and an unknown or missing
-  // key renders a plain marker rather than a wrong picture.
-  const EVENT_ICONS = new Set(['message', 'clock', 'bot', 'silence', 'calendar', 'repeat', 'home']);
-  const FACT_ICONS = { positive: 'check', negative: 'unprogressed', neutral: 'dot' };
-
-  function iconMarkup(name) {
-    return name
-      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-' + esc(name) + '"/></svg>'
-      : '';
-  }
-
-  // Sets text, and REMOVES the element when there is nothing to say. Blank
-  // upstream data must never render as an empty heading or a stray bullet.
-  function setField(id, value, { hideWhenEmpty = true } = {}) {
+  /* Sets text, and HIDES the element when there is nothing to say. Blank
+     upstream data must never render as an empty heading or a stray rule. */
+  function setField(id, value, { keepEmpty = false } = {}) {
     const el = document.getElementById(id);
     if (!el) return false;
     const v = copy(value);
-    if (!v && hideWhenEmpty) { el.classList.add('hidden'); return false; }
+    if (!v && !keepEmpty) { el.hidden = true; return false; }
     el.textContent = v;
-    el.classList.remove('hidden');
+    el.hidden = false;
     return true;
   }
 
-  function show(id, on) {
-    const el = document.getElementById(id);
-    if (el) el.classList.toggle('hidden', !on);
+  /* One element, one class, one string - the whole page is built from lists
+     of these, so the renderer never concatenates HTML. */
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = copy(text);
+    return node;
   }
 
-  // ── PROGRESS DOTS ──
-  // Four dots, no labels. They report where the scroll is; they are not a
-  // set of steps to complete.
-  const dotsEl = document.getElementById('dots');
-  for (let i = 1; i <= ACTS; i += 1) {
-    const b = document.createElement('button');
-    b.className = 'dot'; b.dataset.i = String(i);
-    b.setAttribute('aria-label', 'Go to part ' + i + ' of ' + ACTS);
-    b.addEventListener('click', () => {
-      const target = document.querySelector('.act[data-act="' + i + '"]');
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    dotsEl.appendChild(b);
+  /* ── REVEAL ──
+     The site's own engine (site/assets/js/reveal.js), inlined rather than
+     imported so the demo costs one request instead of five ES modules that
+     also boot the homepage's hero field and sequences. Same contract:
+     [data-reveal] gains .is-in, its .reveal-child descendants get a stagger. */
+  function startReveal() {
+    const groups = document.querySelectorAll('[data-reveal]');
+    if (!('IntersectionObserver' in window)) {
+      groups.forEach((g) => g.classList.add('is-in'));
+      document.querySelectorAll('.reveal').forEach((node) => node.classList.add('is-in'));
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.add('is-in');
+        io.unobserve(entry.target);
+      }
+    }, { rootMargin: '0px 0px -12% 0px', threshold: 0.08 });
+
+    for (const group of groups) {
+      const step = Number(group.dataset.stagger || 70);
+      Array.from(group.querySelectorAll('.reveal-child'))
+        .filter((node) => node.closest('[data-reveal]') === group)
+        .forEach((node, i) => { node.style.setProperty('--d', Math.min(i, 10) * step + 'ms'); });
+      io.observe(group);
+    }
+    document.querySelectorAll('.reveal').forEach((node) => io.observe(node));
   }
 
-  function markDots(current) {
-    dotsEl.querySelectorAll('.dot').forEach((d) => {
-      const i = Number(d.dataset.i);
-      d.classList.toggle('on', i === current);
-      d.classList.toggle('done', i < current);
-    });
+  /* The header condenses, and the hairline reports the scroll. Both are
+     presentational; neither is load-bearing. */
+  function startChrome() {
+    const hdr = document.getElementById('hdr');
+    const bar = document.getElementById('progress');
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const y = window.scrollY || 0;
+      hdr.classList.toggle('is-stuck', y > 24);
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.width = (max > 0 ? Math.min(100, (y / max) * 100) : 0) + '%';
+    };
+    window.addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(update);
+    }, { passive: true });
+    update();
   }
 
-  // ── SCROLL BEHAVIOUR ──
-  // Two observers, both purely presentational: one reveals a block as it comes
-  // into view, one keeps the dots honest about which act is on screen.
-  function startObservers() {
-    const reveal = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        entry.target.classList.add('in');
-        reveal.unobserve(entry.target);
-      });
-    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.1 });
-    document.querySelectorAll('.rv').forEach((el) => reveal.observe(el));
-
-    const acts = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) markDots(Number(entry.target.dataset.act));
-      });
-    }, { rootMargin: '-45% 0px -45% 0px' });
-    document.querySelectorAll('.act').forEach((el) => acts.observe(el));
-
-    markDots(1);
-  }
-
-  // ── CTA ──
-  // The calendar's data-url is set in the markup above, so Calendly's own
-  // auto-init mounts it regardless of when its script lands.
-  //
-  // BOTH CTAs LAND HERE — the closing button and the compact one in the top
-  // chrome. One booking flow, one telemetry signal.
-  //
-  // KNOWN MISMATCH, DELIBERATE FOR NOW: the supporting copy says "30 minutes"
-  // and the link is the existing, known-live /10min event type. Kept this way
-  // on purpose rather than pointing at a /30min slug nobody has created - a
-  // calendar that 404s costs every booking on the page. Create a 30-minute
-  // event type and swap the slug here to close it.
+  /* ── CTA ──
+     BOTH BUTTONS LAND HERE - the closing one and the compact one in the
+     header. One booking flow, one telemetry signal, and the calendar's
+     data-url is set in the markup so Calendly's own auto-init mounts it
+     whenever its script lands. */
   function revealCalendly() {
     const wrap = document.getElementById('calendly-wrap');
-    wrap.classList.add('show');
-    setTimeout(() => { wrap.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60);
+    wrap.classList.add('is-open');
+    setTimeout(() => { wrap.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 80);
     track('cta_click');
   }
   window.revealCalendly = revealCalendly;
 
-  // Telemetry is fire-and-forget: it must never delay or block the CTA. The
-  // route records the FIRST click only, so a reload is not a second signal.
+  /* Fire-and-forget: telemetry must never delay or block the CTA. The route
+     records the FIRST click only, so a reload is not a second signal. */
   function track(action) {
     if (!demoSlug) return;
     try {
@@ -911,238 +928,173 @@
     } catch (_) { /* telemetry is never load-bearing */ }
   }
 
-  // Calendly posts a message when a meeting is actually booked — that is the
-  // outcome this whole demo exists to produce, so it is recorded separately
-  // from the click that opened the calendar.
+  /* Calendly posts a message when a meeting is actually booked - the outcome
+     this whole page exists to produce, recorded separately from the click
+     that opened the calendar. */
   window.addEventListener('message', (e) => {
     if (!e.data || typeof e.data !== 'object') return;
     if (e.data.event === 'calendly.event_scheduled') track('meeting_booked');
   });
 
-  // ── RENDER ──
-
-  // ONE STAGE OF ACT 3 — the claim, then its supporting line under a hairline.
-  // /api/demo derives all three from the row's own ordinals (CONTEXT and
-  // INTELLIGENCE describe a capability and never vary; EXECUTION is composed
-  // from what this probe actually established), so the shell writes what it is
-  // given and asserts nothing of its own.
-  function renderStage(containerId, items) {
-    const el = document.getElementById(containerId);
-    if (!el) return 0;
-    el.innerHTML = '';
-    const list = Array.isArray(items) ? items : [];
-    let written = 0;
-    for (const item of list) {
-      const label = copy(item && item.label);
-      if (!label) continue;
-      const detail = copy(item && item.detail);
-      const owner = txt(item && item.owner).toLowerCase();
-      const ownerChip = owner === 'novus'
-        ? '<span class="stage-owner novus">NOVUS</span>'
-        : (owner === 'team' ? '<span class="stage-owner team">Your team</span>' : '');
-      const block = document.createElement('div');
-      block.innerHTML =
-        '<p class="stage-claim">' + ownerChip + esc(label) + '</p>' +
-        (detail ? '<p class="stage-detail">' + esc(detail) + '</p>' : '');
-      while (block.firstChild) el.appendChild(block.firstChild);
-      written += 1;
-    }
-    return written;
-  }
-
-  function toneOf(item, allowed) {
-    const tone = txt(item && item.tone);
-    return allowed.includes(tone) ? tone : 'neutral';
-  }
-
-  // ── ACT 2: three facts, one chronology, one finding ──
-  //
-  // NOTHING HERE IS AUTHORED IN THE SHELL. summary_facts is /api/demo's own
-  // three-fact reading of this probe, and the chronology is the stored
-  // observed_events in the order they happened. This fixes the STRUCTURE -
-  // which is identical on every demo - and writes only what the row carries,
-  // so a probe with two events renders two steps rather than a gap where an
-  // invented one would go.
-  //
-  // The two tones are the section's whole job: what the agency genuinely did
-  // (teal, a tick) and what stayed unprogressed (coral, an unfinished mark).
-  function renderFacts(facts) {
-    const el = document.getElementById('facts');
-    const list = Array.isArray(facts) ? facts : [];
-    el.innerHTML = '';
-    let written = 0;
-    for (const fact of list) {
-      const label = copy(fact && fact.label);
-      if (!label) continue;
-      const detail = copy(fact && fact.detail);
-      const tone = toneOf(fact, ['positive', 'negative']);
-      const cell = document.createElement('div');
-      cell.className = 'fact ' + tone;
-      cell.innerHTML =
-        '<span class="fact-icon">' + iconMarkup(FACT_ICONS[tone]) + '</span>' +
-        '<span class="fact-label">' + esc(label) + '</span>' +
-        (detail ? '<span class="fact-detail">' + esc(detail) + '</span>' : '');
-      el.appendChild(cell);
-      written += 1;
-    }
-    // Two facts share the row rather than leaving a hole where a third would be.
-    el.style.setProperty('--facts', String(Math.max(written, 1)));
-    el.classList.toggle('hidden', written === 0);
-    return written;
-  }
-
-  // The chronology. `kind: 'metric'` entries are the row's own quantified
-  // summary, which summary_facts reads and selects from — they are not steps
-  // in the story, so they never appear here. A row compiled before `kind`
-  // existed carries none, and every one of its events is a step.
-  function renderTimeline(events) {
-    const el = document.getElementById('timeline');
-    const list = Array.isArray(events) ? events : [];
-    el.innerHTML = '';
-    let written = 0;
-    for (const event of list) {
-      const label = copy(event && event.label);
-      if (!label || txt(event && event.kind) === 'metric') continue;
-      const detail = copy(event && event.detail);
-      const icon = txt(event && event.icon);
-      const step = document.createElement('div');
-      step.className = 'step ' + toneOf(event, ['good', 'gap']);
-      if (EVENT_ICONS.has(icon)) step.dataset.icon = icon;
-      step.innerHTML =
-        '<span class="step-icon">' + (EVENT_ICONS.has(icon) ? iconMarkup(icon) : iconMarkup('dot')) + '</span>' +
-        '<span class="step-body">' +
-          '<span class="step-label">' + esc(label) + '</span>' +
-          (detail ? '<span class="step-detail">' + esc(detail) + '</span>' : '') +
-        '</span>';
-      el.appendChild(step);
-      written += 1;
-    }
-    return written;
-  }
+  /* ── RENDER ── */
 
   function renderProperty(demo) {
-    setField('property-price', demo.property_price);
-    setField('property-address', demo.property_address || 'The property in your enquiry', { hideWhenEmpty: false });
-    setField('property-agency-name', demo.agency_name || 'your team', { hideWhenEmpty: false });
+    setField('prop-address', demo.property_address || 'The property in your enquiry', { keepEmpty: true });
+    /* PROBES stores some prices with pence and some without. A house is not
+       priced to the penny, so a trailing ".00" is dropped for display only -
+       the row itself is never rewritten. */
+    setField('prop-price', txt(demo.property_price).replace(/\.00\b/, ''));
 
-    const when = [demo.enquiry_date, demo.enquiry_time].filter(Boolean).join(' at ');
-    setField('property-enquiry-when', when ? 'on ' + when : '');
+    const PORTALS = { rightmove: 'Rightmove', zoopla: 'Zoopla', onthemarket: 'OnTheMarket' };
+    setField('prop-source', PORTALS[txt(demo.portal).toLowerCase()] ? 'Listed on ' + PORTALS[txt(demo.portal).toLowerCase()] : '');
 
-    const link = document.getElementById('property-link');
+    const link = document.getElementById('prop-link');
     if (txt(demo.property_url)) {
       link.href = demo.property_url;
-      link.classList.remove('hidden');
+      link.hidden = false;
     }
 
-    // The stored image is used as-is and NEVER re-derived here — the browser
-    // makes no request to Rightmove. A load error simply leaves the drawn
-    // placeholder in place.
-    const photo = document.getElementById('property-photo');
+    /* The stored image is used as-is and NEVER re-derived here - the browser
+       makes no request to Rightmove. A load error simply leaves the drawn
+       placeholder in place. */
+    const photo = document.getElementById('prop-photo');
     const src = txt(demo.property_image_url);
-    if (src) {
-      photo.addEventListener('load', () => {
-        photo.classList.remove('hidden');
-        photo.classList.add('loaded');
-      });
-      photo.addEventListener('error', () => { photo.remove(); });
-      photo.src = src;
-      photo.alt = txt(demo.property_address) ? 'Photograph of ' + demo.property_address : '';
-    } else {
-      photo.remove();
+    if (!src) { photo.remove(); return; }
+    photo.addEventListener('load', () => { photo.classList.add('is-loaded'); });
+    photo.addEventListener('error', () => { photo.remove(); });
+    photo.src = src;
+    photo.alt = txt(demo.property_address) ? 'Photograph of ' + demo.property_address : '';
+  }
+
+  /* SECTION 1 — the factual record. Times and events, in order. */
+  function renderLog(items) {
+    const wrap = document.getElementById('s1-log');
+    wrap.innerHTML = '';
+    let written = 0;
+    for (const item of (Array.isArray(items) ? items : [])) {
+      const mark = copy(item && item.mark);
+      const text = copy(item && item.text);
+      if (!mark || !text) continue;
+      const row = el('div', 'd-log__row');
+      row.append(el('span', 'd-log__t', mark), el('span', 'd-log__e', text));
+      wrap.appendChild(row);
+      written += 1;
     }
+    wrap.hidden = written === 0;
+  }
+
+  /* SECTION 2 — what NOVUS picked up. Value first, at scale; label under it.
+     The accent tone comes from the row's own reading, never from this file. */
+  function renderSignals(items) {
+    const wrap = document.getElementById('s2-signals');
+    wrap.innerHTML = '';
+    let written = 0;
+    for (const item of (Array.isArray(items) ? items : [])) {
+      const value = copy(item && item.value);
+      const label = copy(item && item.label);
+      if (!value || !label) continue;
+      const tone = txt(item && item.tone);
+      const cell = el('div', 'd-sig' + (tone === 'accent' || tone === 'open' ? ' d-sig--' + tone : ''));
+      cell.append(el('p', 'd-sig__v', value), el('p', 'd-sig__l', label));
+      wrap.appendChild(cell);
+      written += 1;
+    }
+    /* The grid composes itself around how many facts this row actually had -
+       see .d-sigs[data-count] - so a thin probe is a square rather than a
+       three-across row with one signal stranded under it. */
+    wrap.dataset.count = String(written);
+    wrap.hidden = written === 0;
+  }
+
+  /* SECTION 2 — what the conversation left open, and what the record shows.
+     The note is where an agency that DID ask gets the credit for asking. */
+  function renderUnresolved(items) {
+    const block = document.getElementById('s2-open');
+    const list = document.getElementById('s2-open-list');
+    list.innerHTML = '';
+    let written = 0;
+    for (const item of (Array.isArray(items) ? items : [])) {
+      const text = copy(item && item.text);
+      if (!text) continue;
+      const row = el('div', 'd-open-q__item');
+      row.appendChild(el('p', 'd-open-q__t', text));
+      const note = copy(item && item.note);
+      if (note) row.appendChild(el('p', 'd-open-q__n', note));
+      list.appendChild(row);
+      written += 1;
+    }
+    block.hidden = written === 0;
+  }
+
+  /* SECTION 3 — the next steps, numbered so the sequence reads as one plan
+     rather than as three options. */
+  function renderActions(items) {
+    const wrap = document.getElementById('s3-actions');
+    wrap.innerHTML = '';
+    let written = 0;
+    for (const item of (Array.isArray(items) ? items : [])) {
+      const title = copy(item && item.title);
+      if (!title) continue;
+      const row = el('div', 'd-act');
+      row.append(
+        el('span', 'd-act__i', String(written + 1).padStart(2, '0')),
+        el('p', 'd-act__t', title),
+      );
+      const detail = copy(item && item.detail);
+      if (detail) row.appendChild(el('p', 'd-act__d', detail));
+      wrap.appendChild(row);
+      written += 1;
+    }
+    wrap.hidden = written === 0;
   }
 
   function render(demo, needsReview) {
     demoSlug = txt(demo.demo_slug) || demoSlug;
-
     const agency = txt(demo.agency_name);
-    document.title = agency ? 'NOVUS - ' + agency : 'NOVUS';
-    setField('chrome-agency-name', agency);
-    show('review-flag', !!needsReview);
 
-    // ── ACT 1 ──
-    setField('b1-eyebrow', agency ? agency + ' · one real enquiry' : 'One real enquiry', { hideWhenEmpty: false });
-    // NO SHELL DEFAULT. The hero is one of four fixed headlines, selected from
-    // the strongest commercial finding in lib/demo-journeys.mjs and served on
-    // demo_headline for every row — including rows compiled before the four
-    // existed, which /api/demo derives on the way out. A headline written here
-    // would be a second, findings-blind source of truth for the one line the
-    // prospect reads first.
-    setField('b1-heading', demo.demo_headline, { hideWhenEmpty: false });
-    setField('b1-hook', demo.demo_hook);
+    document.title = agency ? 'NOVUS - ' + agency : 'NOVUS';
+    setField('hdr-agency', agency);
+    document.getElementById('review-flag').hidden = !needsReview;
+
+    /* ── 01 ── Their agency, their property, their enquiry. No analysis. */
+    /* The eyebrow carries the DATE, not the agency name: the name is already
+       in the sentence below it and in the header, and the date is the piece
+       of evidence a reader has not been given yet. */
+    setField('s1-eyebrow', ['The enquiry', txt(demo.enquiry_date)].filter(Boolean).join(' · '), { keepEmpty: true });
+    setField('s1-agency', agency || 'your agency', { keepEmpty: true });
     renderProperty(demo);
 
-    const provenance = ['We sent this enquiry ourselves, as a test'];
-    if (txt(demo.enquiry_date)) provenance.push('on ' + demo.enquiry_date);
-    if (txt(demo.property_address)) provenance.push('about ' + demo.property_address);
-    setField('provenance', provenance.join(' ') + '. Everything below is what actually happened.', { hideWhenEmpty: false });
+    /* ── 01 / 02 / 03 ── The reading /api/demo derived from this row's own
+       ordinals: the record, the signals, what is unresolved, what is next. */
+    const r = (demo && demo.reading) || {};
+    renderLog(r.timeline);
+    setField('s2-credit', r.credit);
+    renderSignals(r.signals);
+    renderUnresolved(r.unresolved);
+    renderActions(r.actions);
+    const wroteMessage = setField('s3-msg-body', r.message);
+    document.getElementById('s3-msg').hidden = !wroteMessage;
 
-    // ── ACT 2 ──
-    renderFacts(demo.summary_facts);
-    const timelineSteps = renderTimeline(demo.observed_events);
-    // The finding names itself — the label is chosen from the same commercial
-    // priority as the hero, by /api/demo, from this probe's ordinals.
-    setField('verdict-label', demo.verdict_label);
-    setField('demo-reveal', demo.demo_reveal);
-    // The consequence is the "so what". main_finding stands in only where
-    // PERSONALISATION never produced one — showing both says the same thing
-    // twice. demo_reveal_support is the journey's own last resort, used only
-    // where PERSONALISATION produced neither sentence for this probe.
-    setField(
-      'commercial-consequence',
-      txt(demo.commercial_consequence) || txt(demo.main_finding) || demo.demo_reveal_support,
-    );
-    // No conclusion to draw and no sequence to show means no container at all,
-    // rather than an empty panel with a border round it.
-    show('verdict', !!txt(demo.demo_reveal));
-    show('walkthrough', timelineSteps > 0 || !!txt(demo.demo_reveal));
-
-    // ── ACT 3 ──
-    // THE HEADING AND THE TURN ARE FIXED, on every demo. This act makes one
-    // argument - NOVUS understands the enquiry, knows the next move, makes it
-    // happen - and the row's own novus_transition / scale_line are older,
-    // per-journey wordings of the same two lines. They stay on the row (the
-    // snapshot is not rewritten) and are simply not read here, so every demo
-    // opens and closes this act on the same words. What DOES vary is
-    // EXECUTION's supporting line, which /api/demo composes from this probe.
-    const detected = renderStage('novus-detected', demo.novus_detected);
-    const decisions = renderStage('novus-decisions', demo.novus_decisions);
-    const actions = renderStage('novus-actions', demo.novus_actions);
-    [['novus-detected', detected], ['novus-decisions', decisions], ['novus-actions', actions]].forEach(([id, count]) => {
-      if (count > 0) return;
-      const card = document.getElementById(id).closest('.stage-card');
-      if (card) card.remove();
-    });
-    // Removing a stage would otherwise leave its connector joining nothing.
-    const nodes = [...document.querySelectorAll('#stages > *')];
-    nodes.forEach((node, i) => {
-      if (!node.classList.contains('stage-join')) return;
-      const prev = nodes[i - 1];
-      const next = nodes[i + 1];
-      const joinsTwoStages = prev && next
-        && prev.classList.contains('stage-card') && next.classList.contains('stage-card');
-      if (!joinsTwoStages) node.remove();
-    });
-    // Renumber, so a demo whose first stage was dropped doesn't open at "2".
-    [...document.querySelectorAll('#stages .stage-num')].forEach((el, i) => { el.textContent = String(i + 1); });
-
-    // ── ACT 4 ──
-    // The CTA copy is fixed, not composed from the row: it stays the same ask
-    // on every demo. The row's own cta_headline is left unused by the shell.
-    setField('systemic-bridge', demo.systemic_bridge);
-
-    document.getElementById('boot').classList.add('hide');
-    document.getElementById('stage').classList.remove('hidden');
-    document.getElementById('dots').classList.remove('hidden');
-    show('chrome-cta', true);
-    startObservers();
+    document.getElementById('stage').hidden = false;
+    document.getElementById('hdr-cta').hidden = false;
+    document.getElementById('boot').classList.add('is-gone');
+    startReveal();
+    startChrome();
   }
 
   function fail(message) {
-    document.getElementById('boot-ring').classList.add('hidden');
-    document.getElementById('boot-msg').innerHTML =
-      '<span class="boot-title">This demo link isn\'t available.</span><br/><br/>' + esc(message) +
-      '<br/><br/><a href="https://getnovus.co.uk" style="color:#7DD3FC;font-weight:600;text-decoration:none">getnovus.co.uk &#8599;</a>';
+    document.getElementById('boot-ring').hidden = true;
+    const msg = document.getElementById('boot-msg');
+    msg.innerHTML = '';
+    const title = document.createElement('span');
+    title.className = 'd-boot__title';
+    title.textContent = "This demo link isn't available.";
+    const body = document.createElement('span');
+    body.textContent = message;
+    const link = document.createElement('a');
+    link.href = 'https://getnovus.co.uk';
+    link.textContent = 'getnovus.co.uk ↗';
+    msg.append(title, body, document.createElement('br'), document.createElement('br'), link);
   }
 
   (async function boot() {

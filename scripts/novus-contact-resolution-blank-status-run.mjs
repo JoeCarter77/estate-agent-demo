@@ -1,14 +1,16 @@
 #!/usr/bin/env node
-// LIVE NEEDS_RESEARCH recheck against the DEPLOYED NOVUS application.
+// LIVE contact-resolution rechecks against the DEPLOYED NOVUS application.
 // No local Google credentials/WIF needed — this script only speaks HTTP to
 // two EXISTING, unmodified-in-behaviour endpoints:
 //
 //   GET  /api/novus/contacts/resolution-backlog  (rewrite -> personalisation.js)
 //   POST /api/novus/contacts/resolve              (rewrite -> personalisation.js)
 //
-// Target: exactly AGENCIES.contact_resolution_status == NEEDS_RESEARCH on a
-// physical Google Sheets row > 180. sheet_row_number comes from the server's
-// repo record metadata, not array position, agency order or timestamps.
+// Modes are selected by an explicit confirmation value:
+//   RESOLVE_NEEDS_RESEARCH_AFTER_ROW_180 — NEEDS_RESEARCH, physical row > 180
+//   RESOLVE_BLANK_AFTER_ROW_247           — blank status, physical row >= 247
+// sheet_row_number comes from the server's repo record metadata, not array
+// position, agency order or timestamps.
 //
 // The script only decides which agency_id to POST next, one per call, exactly
 // the endpoint's
@@ -24,7 +26,7 @@
 //
 // Usage:
 //   node scripts/novus-contact-resolution-blank-status-run.mjs \
-//     --confirm RESOLVE_NEEDS_RESEARCH_AFTER_ROW_180 [--limit 5|--limit=5] [--base=...] [--user=...] [--pass=...]
+//     --confirm RESOLVE_BLANK_AFTER_ROW_247 [--limit 5|--limit=5] [--base=...] [--user=...] [--pass=...]
 //
 // Requires (same production auth already used elsewhere in this repo):
 //   NOVUS_BASE_URL (or --base)                — defaults to https://demo.getnovus.co.uk
@@ -33,9 +35,12 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const CONFIRMATION = 'RESOLVE_NEEDS_RESEARCH_AFTER_ROW_180';
-export const TARGET_STATUS = 'NEEDS_RESEARCH';
-export const MIN_EXCLUSIVE_SHEET_ROW = 180;
+// CONFIRMATION remains the original NEEDS_RESEARCH mode for existing callers.
+export const NEEDS_RESEARCH_CONFIRMATION = 'RESOLVE_NEEDS_RESEARCH_AFTER_ROW_180';
+export const BLANK_STATUS_CONFIRMATION = 'RESOLVE_BLANK_AFTER_ROW_247';
+export const CONFIRMATION = NEEDS_RESEARCH_CONFIRMATION;
+export const NEEDS_RESEARCH_MIN_EXCLUSIVE_SHEET_ROW = 180;
+export const MIN_INCLUSIVE_SHEET_ROW = 247;
 const DEFAULT_BASE = 'https://demo.getnovus.co.uk';
 const DEFAULT_THROTTLE_MS = 1000;
 const RATE_LIMIT_RETRY_DELAYS_MS = [1000, 2000, 4000];
@@ -59,14 +64,38 @@ export function parseArgs(argv) {
   return flags;
 }
 
-export function isEligibleAgency(row) {
-  return String(row?.contact_resolution_status || '').trim() === TARGET_STATUS
-    && Number(row?.sheet_row_number) > MIN_EXCLUSIVE_SHEET_ROW;
+export function isBlankStatusEligible(row) {
+  return !String(row?.contact_resolution_status || '').trim()
+    && Number(row?.sheet_row_number) >= MIN_INCLUSIVE_SHEET_ROW;
+}
+
+export function isNeedsResearchEligible(row) {
+  return String(row?.contact_resolution_status || '').trim() === 'NEEDS_RESEARCH'
+    && Number(row?.sheet_row_number) > NEEDS_RESEARCH_MIN_EXCLUSIVE_SHEET_ROW;
+}
+
+// Kept for callers of the original NEEDS_RESEARCH recheck runner.
+export const isEligibleAgency = isNeedsResearchEligible;
+
+export function partitionBlankStatus(rows) {
+  const blankStatus = (Array.isArray(rows) ? rows : [])
+    .filter((row) => !String(row?.contact_resolution_status || '').trim());
+  for (const row of blankStatus) {
+    const sheetRow = Number(row?.sheet_row_number);
+    if (!Number.isInteger(sheetRow) || sheetRow < 1) {
+      throw new Error(`Missing valid physical sheet_row_number for agency ${row?.agency_id || 'UNKNOWN'}`);
+    }
+  }
+  return {
+    blankStatus,
+    excluded: blankStatus.filter((row) => Number(row.sheet_row_number) < MIN_INCLUSIVE_SHEET_ROW),
+    eligible: blankStatus.filter(isBlankStatusEligible),
+  };
 }
 
 export function partitionNeedsResearch(rows) {
   const needsResearch = (Array.isArray(rows) ? rows : [])
-    .filter((row) => String(row?.contact_resolution_status || '').trim() === TARGET_STATUS);
+    .filter((row) => String(row?.contact_resolution_status || '').trim() === 'NEEDS_RESEARCH');
   for (const row of needsResearch) {
     const sheetRow = Number(row?.sheet_row_number);
     if (!Number.isInteger(sheetRow) || sheetRow < 1) {
@@ -75,9 +104,35 @@ export function partitionNeedsResearch(rows) {
   }
   return {
     needsResearch,
-    excluded: needsResearch.filter((row) => Number(row.sheet_row_number) <= MIN_EXCLUSIVE_SHEET_ROW),
-    eligible: needsResearch.filter(isEligibleAgency),
+    excluded: needsResearch.filter((row) => Number(row.sheet_row_number) <= NEEDS_RESEARCH_MIN_EXCLUSIVE_SHEET_ROW),
+    eligible: needsResearch.filter(isNeedsResearchEligible),
   };
+}
+
+function modeForConfirmation(confirmation) {
+  if (confirmation === NEEDS_RESEARCH_CONFIRMATION) {
+    return {
+      confirmation,
+      partition: partitionNeedsResearch,
+      isEligible: isNeedsResearchEligible,
+      totalLabel: 'Total NEEDS_RESEARCH rows',
+      excludedLabel: `Excluded at sheet row <= ${NEEDS_RESEARCH_MIN_EXCLUSIVE_SHEET_ROW}`,
+      eligibleLabel: `Eligible at sheet row > ${NEEDS_RESEARCH_MIN_EXCLUSIVE_SHEET_ROW}`,
+    };
+  }
+  if (confirmation === BLANK_STATUS_CONFIRMATION) {
+    return {
+      confirmation,
+      partition: partitionBlankStatus,
+      isEligible: isBlankStatusEligible,
+      totalLabel: 'Total blank-status rows',
+      excludedLabel: `Excluded at sheet row < ${MIN_INCLUSIVE_SHEET_ROW}`,
+      eligibleLabel: `Eligible at sheet row >= ${MIN_INCLUSIVE_SHEET_ROW}`,
+    };
+  }
+  throw new Error(
+    `This spends live Hunter credits and writes to AGENCIES/CONTACTS. Re-run with --confirm ${NEEDS_RESEARCH_CONFIRMATION} or --confirm ${BLANK_STATUS_CONFIRMATION}`,
+  );
 }
 
 function numericFlag(flags, name, fallback) {
@@ -123,19 +178,19 @@ async function fetchAgencySnapshot(cfg, options = {}) {
 
 export async function main(argv = process.argv.slice(2), dependencies = {}) {
   const flags = parseArgs(argv);
-  if (flags.confirm !== CONFIRMATION) {
-    throw new Error(`This spends live Hunter credits and writes to AGENCIES/CONTACTS. Re-run with --confirm ${CONFIRMATION}`);
-  }
+  const mode = modeForConfirmation(flags.confirm);
   const limit = numericFlag(flags, 'limit', Infinity);
   const throttleMs = numericFlag(flags, 'throttle-ms', DEFAULT_THROTTLE_MS);
   const cfg = httpConfig(flags);
 
   const initialRows = await fetchAgencySnapshot(cfg, dependencies);
-  const { needsResearch, excluded, eligible } = partitionNeedsResearch(initialRows);
+  const partitioned = mode.partition(initialRows);
+  const total = partitioned.blankStatus || partitioned.needsResearch || [];
+  const { excluded, eligible } = partitioned;
   const targets = eligible.slice(0, limit);
-  console.log(`Total NEEDS_RESEARCH rows: ${needsResearch.length}`);
-  console.log(`Excluded at sheet row <= ${MIN_EXCLUSIVE_SHEET_ROW}: ${excluded.length}`);
-  console.log(`Eligible at sheet row > ${MIN_EXCLUSIVE_SHEET_ROW}: ${eligible.length}`);
+  console.log(`${mode.totalLabel}: ${total.length}`);
+  console.log(`${mode.excludedLabel}: ${excluded.length}`);
+  console.log(`${mode.eligibleLabel}: ${eligible.length}`);
   console.log('First 10 eligible rows:');
   for (const row of eligible.slice(0, 10)) {
     console.log(`  row ${row.sheet_row_number}  ${row.agency_id}  ${row.agency_name}  ${row.contact_resolution_status}`);
@@ -156,12 +211,12 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
   for (const target of targets) {
     try {
       // Re-check immediately before spending credits: fetch the backlog fresh
-      // and confirm status is STILL NEEDS_RESEARCH and physical row is STILL >180.
+      // and confirm the mode's status and physical-row predicate still hold.
       const current = await fetchAgencySnapshot(cfg, dependencies);
       const row = current.find((agency) => agency.agency_id === target.agency_id);
       const freshStatus = row ? String(row.contact_resolution_status || '').trim() : '';
       const freshSheetRow = Number(row?.sheet_row_number);
-      if (!row || !isEligibleAgency(row)) {
+      if (!row || !mode.isEligible(row)) {
         skippedRace += 1;
         console.log(`SKIP  ${target.agency_id}  recheck failed (status=${freshStatus || 'MISSING'}, sheet_row=${Number.isFinite(freshSheetRow) ? freshSheetRow : 'MISSING'})`);
         continue;

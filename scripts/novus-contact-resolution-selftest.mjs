@@ -45,10 +45,13 @@ import {
   verifyEmail as verifyHunterEmail,
 } from '../lib/hunter.mjs';
 import {
-  CONFIRMATION as RECHECK_CONFIRMATION,
-  isEligibleAgency as isRecheckEligible,
-  main as runNeedsResearchRecheck,
+  BLANK_STATUS_CONFIRMATION,
+  NEEDS_RESEARCH_CONFIRMATION,
+  isBlankStatusEligible,
+  isNeedsResearchEligible,
+  main as runContactResolutionRecheck,
   parseArgs as parseRecheckArgs,
+  partitionBlankStatus,
   partitionNeedsResearch,
   requestJson as recheckRequestJson,
 } from './novus-contact-resolution-blank-status-run.mjs';
@@ -1811,30 +1814,45 @@ await test('backlog listing covers probed-unresolved agencies only and resolves 
   assert.equal(rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER).length, 0);
 });
 
-await test('NEEDS_RESEARCH recheck targets exact status only on physical rows after 180', () => {
+await test('NEEDS_RESEARCH recheck mode remains limited to physical rows after 180', () => {
   const rows = [
-    { sheet_row_number: 179, agency_id: 'ag_179', contact_resolution_status: 'NEEDS_RESEARCH' },
     { sheet_row_number: 180, agency_id: 'ag_180', contact_resolution_status: 'NEEDS_RESEARCH' },
     { sheet_row_number: 181, agency_id: 'ag_181', contact_resolution_status: 'NEEDS_RESEARCH' },
-    { sheet_row_number: 182, agency_id: 'ag_direct', contact_resolution_status: 'RESOLVED_DIRECT' },
-    { sheet_row_number: 183, agency_id: 'ag_generic', contact_resolution_status: 'RESOLVED_GENERIC' },
-    { sheet_row_number: 184, agency_id: 'ag_blank', contact_resolution_status: '' },
-    { sheet_row_number: 185, agency_id: 'ag_other', contact_resolution_status: 'NO_VALID_EMAIL' },
+    { sheet_row_number: 247, agency_id: 'ag_blank', contact_resolution_status: '' },
+    { sheet_row_number: 248, agency_id: 'ag_direct', contact_resolution_status: 'RESOLVED_DIRECT' },
   ];
   const partitioned = partitionNeedsResearch(rows);
-  assert.deepEqual(partitioned.needsResearch.map((row) => row.agency_id), ['ag_179', 'ag_180', 'ag_181']);
-  assert.deepEqual(partitioned.excluded.map((row) => row.agency_id), ['ag_179', 'ag_180']);
+  assert.deepEqual(partitioned.needsResearch.map((row) => row.agency_id), ['ag_180', 'ag_181']);
+  assert.deepEqual(partitioned.excluded.map((row) => row.agency_id), ['ag_180']);
   assert.deepEqual(partitioned.eligible.map((row) => row.agency_id), ['ag_181']);
-  assert.equal(isRecheckEligible(rows[1]), false, 'physical row 180 is excluded');
-  assert.equal(isRecheckEligible(rows[2]), true, 'physical row 181 is eligible');
+  assert.equal(isNeedsResearchEligible(rows[0]), false);
+  assert.equal(isNeedsResearchEligible(rows[1]), true);
 });
 
-await test('NEEDS_RESEARCH runner accepts both --limit 5 and --limit=5', () => {
+await test('blank-status recheck targets only blank statuses on physical rows from 247', () => {
+  const rows = [
+    { sheet_row_number: 246, agency_id: 'ag_246', contact_resolution_status: '' },
+    { sheet_row_number: 247, agency_id: 'ag_247', contact_resolution_status: '' },
+    { sheet_row_number: 248, agency_id: 'ag_needs', contact_resolution_status: 'NEEDS_RESEARCH' },
+    { sheet_row_number: 249, agency_id: 'ag_direct', contact_resolution_status: 'RESOLVED_DIRECT' },
+    { sheet_row_number: 250, agency_id: 'ag_generic', contact_resolution_status: 'RESOLVED_GENERIC' },
+    { sheet_row_number: 251, agency_id: 'ag_blank', contact_resolution_status: '   ' },
+    { sheet_row_number: 252, agency_id: 'ag_other', contact_resolution_status: 'NO_VALID_EMAIL' },
+  ];
+  const partitioned = partitionBlankStatus(rows);
+  assert.deepEqual(partitioned.blankStatus.map((row) => row.agency_id), ['ag_246', 'ag_247', 'ag_blank']);
+  assert.deepEqual(partitioned.excluded.map((row) => row.agency_id), ['ag_246']);
+  assert.deepEqual(partitioned.eligible.map((row) => row.agency_id), ['ag_247', 'ag_blank']);
+  assert.equal(isBlankStatusEligible(rows[0]), false, 'physical row 246 is excluded');
+  assert.equal(isBlankStatusEligible(rows[1]), true, 'physical row 247 is eligible');
+});
+
+await test('blank-status runner accepts both --limit 5 and --limit=5', () => {
   assert.equal(parseRecheckArgs(['--limit', '5']).limit, '5');
   assert.equal(parseRecheckArgs(['--limit=5']).limit, '5');
 });
 
-await test('NEEDS_RESEARCH runner retries HTTP 429 with bounded exponential backoff', async () => {
+await test('blank-status runner retries HTTP 429 with bounded exponential backoff', async () => {
   let calls = 0;
   const delays = [];
   const { response, result } = await recheckRequestJson('https://example.test', {}, {
@@ -1851,12 +1869,12 @@ await test('NEEDS_RESEARCH runner retries HTTP 429 with bounded exponential back
   assert.deepEqual(delays, [1000, 2000]);
 });
 
-await test('NEEDS_RESEARCH runner rechecks physical row and status immediately before each resolve', async () => {
+await test('blank-status runner rechecks physical row and status immediately before each resolve', async () => {
   const initial = [
-    { sheet_row_number: 180, agency_id: 'ag_excluded', agency_name: 'Excluded', contact_resolution_status: 'NEEDS_RESEARCH' },
-    { sheet_row_number: 181, agency_id: 'ag_moved', agency_name: 'Moved', contact_resolution_status: 'NEEDS_RESEARCH' },
-    { sheet_row_number: 182, agency_id: 'ag_live', agency_name: 'Live', contact_resolution_status: 'NEEDS_RESEARCH' },
-    { sheet_row_number: 183, agency_id: 'ag_blank', agency_name: 'Blank', contact_resolution_status: '' },
+    { sheet_row_number: 246, agency_id: 'ag_excluded', agency_name: 'Excluded', contact_resolution_status: '' },
+    { sheet_row_number: 247, agency_id: 'ag_moved', agency_name: 'Moved', contact_resolution_status: '' },
+    { sheet_row_number: 248, agency_id: 'ag_live', agency_name: 'Live', contact_resolution_status: '' },
+    { sheet_row_number: 249, agency_id: 'ag_needs', agency_name: 'Needs', contact_resolution_status: 'NEEDS_RESEARCH' },
   ];
   let getCount = 0;
   const posted = [];
@@ -1866,8 +1884,8 @@ await test('NEEDS_RESEARCH runner rechecks physical row and status immediately b
   console.log = (...args) => { logs.push(args.join(' ')); };
   console.error = (...args) => { logs.push(args.join(' ')); };
   try {
-    const summary = await runNeedsResearchRecheck([
-      '--confirm', RECHECK_CONFIRMATION, '--limit=2', '--throttle-ms=1', '--user=test', '--pass=test', '--base=https://example.test',
+    const summary = await runContactResolutionRecheck([
+      '--confirm', BLANK_STATUS_CONFIRMATION, '--limit=2', '--throttle-ms=1', '--user=test', '--pass=test', '--base=https://example.test',
     ], {
       sleepImpl: async () => {},
       fetchImpl: async (url, init = {}) => {
@@ -1876,7 +1894,7 @@ await test('NEEDS_RESEARCH runner rechecks physical row and status immediately b
           const rows = getCount === 1
             ? initial
             : getCount === 2
-              ? initial.map((row) => row.agency_id === 'ag_moved' ? { ...row, sheet_row_number: 180 } : row)
+              ? initial.map((row) => row.agency_id === 'ag_moved' ? { ...row, sheet_row_number: 246 } : row)
               : initial;
           return { ok: true, status: 200, json: async () => ({ agencies: rows }) };
         }
@@ -1886,13 +1904,38 @@ await test('NEEDS_RESEARCH runner rechecks physical row and status immediately b
     });
     assert.deepEqual(posted, [{ agency_id: 'ag_live', dry_run: false }]);
     assert.deepEqual(summary, { processed: 1, skipped_recheck: 1, failed: 0, targeted: 2, eligible_at_start: 2 });
-    assert.ok(logs.includes('Total NEEDS_RESEARCH rows: 3'));
-    assert.ok(logs.includes('Excluded at sheet row <= 180: 1'));
-    assert.ok(logs.includes('Eligible at sheet row > 180: 2'));
-    assert.ok(logs.some((line) => line.includes('row 181  ag_moved  Moved  NEEDS_RESEARCH')));
+    assert.ok(logs.includes('Total blank-status rows: 3'));
+    assert.ok(logs.includes('Excluded at sheet row < 247: 1'));
+    assert.ok(logs.includes('Eligible at sheet row >= 247: 2'));
+    assert.ok(logs.some((line) => line.includes('row 247  ag_moved  Moved')));
   } finally {
     console.log = originalLog;
     console.error = originalError;
+  }
+});
+
+await test('NEEDS_RESEARCH confirmation remains accepted by the existing recheck mode', async () => {
+  const rows = [{ sheet_row_number: 181, agency_id: 'ag_needs', agency_name: 'Needs', contact_resolution_status: 'NEEDS_RESEARCH' }];
+  const posted = [];
+  const originalLog = console.log;
+  console.log = () => {};
+  try {
+    const summary = await runContactResolutionRecheck([
+      '--confirm', NEEDS_RESEARCH_CONFIRMATION, '--limit', '1', '--user=test', '--pass=test', '--base=https://example.test',
+    ], {
+      sleepImpl: async () => {},
+      fetchImpl: async (url, init = {}) => {
+        if (String(url).includes('resolution-backlog')) {
+          return { ok: true, status: 200, json: async () => ({ agencies: rows }) };
+        }
+        posted.push(JSON.parse(init.body));
+        return { ok: true, status: 200, json: async () => ({ contact_resolution_status: 'NEEDS_RESEARCH', selected_contact: null }) };
+      },
+    });
+    assert.deepEqual(posted, [{ agency_id: 'ag_needs', dry_run: false }]);
+    assert.equal(summary.processed, 1);
+  } finally {
+    console.log = originalLog;
   }
 });
 

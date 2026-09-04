@@ -53,12 +53,17 @@ import {
   summaryFacts, verdictLabelForRow,
 } from '../lib/demos.mjs';
 import { compileDemos, compileDecision } from '../lib/demo-compile.mjs';
+import { buildShortDemoSlug } from '../lib/demo-slug.mjs';
 import { runRebuildPass } from '../lib/rebuild-pass.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import { extractPropertyImageUrl, fetchPropertyImageUrl, isUsablePropertyImage } from '../lib/property-image.mjs';
 import {
   journeySupport, SUPPORTED_HERO_JOURNEYS, commercialPriority, heroTitle, HERO_TITLES,
   executionDetail,
+  // The six-section reading the demo renders, selected from the row's own
+  // ordinals - see Part T.
+  replyMoment, enquiryTimeline, readingSignals, readingUnresolved,
+  readingCredit, readingActions, readingMessage,
 } from '../lib/demo-journeys.mjs';
 
 // ── live-shaped headers ──────────────────────────────────────────────────────
@@ -179,6 +184,16 @@ const mockRes = () => ({
 
 let passed = 0;
 const ok = (msg) => { passed += 1; console.log('  ✓ ' + msg); };
+
+// THE SLUG THE COMPILER GIVES THE FIXTURE. Public demo URLs use the short
+// house style (lib/demo-slug.mjs), not the long readable form buildDemoSlug()
+// still produces for its own callers - so a demo compiled from seedWeakSeller
+// is at /ensum-38, and every assertion below that opens it goes through this
+// one name rather than through twenty copies of the literal. The value itself
+// is pinned in Part G.
+const WEAK_SELLER_SLUG = buildShortDemoSlug({
+  agencyName: 'Ensum Brown', probeReference: 'RM-0042', probeId: 'prb_demo_001',
+});
 
 // ── the fixture: one real-shaped weak_seller_qualification probe ─────────────
 function seedWeakSeller(store, {
@@ -376,10 +391,24 @@ const anImage = async () => 'https://media.rightmove.co.uk/dir/1/IMG_01_0000_max
 // compile step that runs immediately afterwards makes no AI call of its own:
 // if it did, this fake would blow up the pass rather than silently pass.
 let personalisationAiCalls = 0;
+// PERSONALISATION now reaches the model twice: once to realise the canonical
+// PERSONALISATION_FACTS as email sentences (lib/fact-constrained-personalisation.mjs)
+// and once to record the story. Both are PERSONALISATION's calls. Part L's
+// point is that DEMOS compilation adds NONE of its own, so anything outside
+// this pair still throws.
+const PERSONALISATION_TOOLS = ['realise_personalisation_facts', 'record_probe_personalisation'];
+
 async function fakePersonalisationAi({ tool }) {
   personalisationAiCalls += 1;
-  if (tool?.name !== 'record_probe_personalisation') {
-    throw new Error(`Part L should only need the personalisation call, got "${tool?.name}"`);
+  if (!PERSONALISATION_TOOLS.includes(tool?.name)) {
+    throw new Error(`Part L should only need PERSONALISATION's own calls, got "${tool?.name}"`);
+  }
+  if (tool.name === 'realise_personalisation_facts') {
+    return {
+      email_observation: 'You replied within half an hour and progressed the viewing, but the property I said I had to sell was never taken any further.',
+      email_commercial_hook: 'That meant that a potential valuation opportunity was left without a next step.',
+      email_commercial_hook_email_2: 'Two opportunities were present in the same enquiry and only one of them was progressed.',
+    };
   }
   return {
     story_reasoning: 'The viewing moved; the declared sale did not.',
@@ -969,8 +998,9 @@ async function run() {
     });
     assert.strictEqual(compiled.demos_created, 1);
     assert.strictEqual(compiled.demos_ready, 1);
-    assert.strictEqual(compiled.results[0].demo_slug, 'ensum-brown-rm-0042');
-    assert.strictEqual(compiled.results[0].demo_url, '/demo/ensum-brown-rm-0042');
+    assert.strictEqual(WEAK_SELLER_SLUG, 'ensum-38');
+    assert.strictEqual(compiled.results[0].demo_slug, WEAK_SELLER_SLUG);
+    assert.strictEqual(compiled.results[0].demo_url, `/demo/${WEAK_SELLER_SLUG}`);
     assert.strictEqual(demoRowsOf(store).length, 1);
     ok('the pipeline step writes exactly one DEMOS row and returns /demo/{slug}');
 
@@ -983,7 +1013,7 @@ async function run() {
 
     // GET — the prospect's request.
     const getRes = mockRes();
-    await demoHandler(mockReq({ method: 'GET', query: { slug: 'ensum-brown-rm-0042' }, auth: false }), getRes);
+    await demoHandler(mockReq({ method: 'GET', query: { slug: WEAK_SELLER_SLUG }, auth: false }), getRes);
     assert.strictEqual(getRes.statusCode, 200);
     assert.strictEqual(getRes.body.needs_review, false);
     assert.strictEqual(getRes.body.demo.agency_name, 'Ensum Brown');
@@ -995,18 +1025,18 @@ async function run() {
     assert.strictEqual(demoRowsOf(store)[0].view_count, '1');
     const firstViewedAt = demoRowsOf(store)[0].first_viewed_at;
     assert.ok(firstViewedAt, 'first_viewed_at is stamped on the first view');
-    await demoHandler(mockReq({ method: 'GET', query: { slug: 'ensum-brown-rm-0042' }, auth: false }), mockRes());
+    await demoHandler(mockReq({ method: 'GET', query: { slug: WEAK_SELLER_SLUG }, auth: false }), mockRes());
     assert.strictEqual(demoRowsOf(store)[0].view_count, '2');
     assert.strictEqual(demoRowsOf(store)[0].first_viewed_at, firstViewedAt);
     ok('each view increments view_count; first_viewed_at is stamped once');
 
-    await demoHandler(mockReq({ method: 'GET', query: { slug: 'ensum-brown-rm-0042', preview: '1' }, auth: false }), mockRes());
+    await demoHandler(mockReq({ method: 'GET', query: { slug: WEAK_SELLER_SLUG, preview: '1' }, auth: false }), mockRes());
     assert.strictEqual(demoRowsOf(store)[0].view_count, '2');
     ok('?preview=1 lets us open our own demo without inflating the count');
 
     // Case-insensitive slug: a link pasted with different casing still resolves.
     const casedRes = mockRes();
-    await demoHandler(mockReq({ method: 'GET', query: { slug: 'Ensum-Brown-RM-0042', preview: '1' }, auth: false }), casedRes);
+    await demoHandler(mockReq({ method: 'GET', query: { slug: WEAK_SELLER_SLUG.toUpperCase(), preview: '1' }, auth: false }), casedRes);
     assert.strictEqual(casedRes.statusCode, 200);
     ok('a slug typed with different casing still resolves');
 
@@ -1016,14 +1046,14 @@ async function run() {
     ok('an unknown slug is a clean 404');
 
     console.log('\nPart I — CTA telemetry');
-    await demoHandler(mockReq({ body: { action: 'cta_click', slug: 'ensum-brown-rm-0042' }, auth: false }), mockRes());
+    await demoHandler(mockReq({ body: { action: 'cta_click', slug: WEAK_SELLER_SLUG }, auth: false }), mockRes());
     const clickedAt = demoRowsOf(store)[0].cta_clicked_at;
     assert.ok(clickedAt, 'the CTA click is recorded');
-    await demoHandler(mockReq({ body: { action: 'cta_click', slug: 'ensum-brown-rm-0042' }, auth: false }), mockRes());
+    await demoHandler(mockReq({ body: { action: 'cta_click', slug: WEAK_SELLER_SLUG }, auth: false }), mockRes());
     assert.strictEqual(demoRowsOf(store)[0].cta_clicked_at, clickedAt);
     ok('the FIRST CTA click wins — a reload is not a second signal');
 
-    await demoHandler(mockReq({ body: { action: 'meeting_booked', slug: 'ensum-brown-rm-0042' }, auth: false }), mockRes());
+    await demoHandler(mockReq({ body: { action: 'meeting_booked', slug: WEAK_SELLER_SLUG }, auth: false }), mockRes());
     assert.ok(demoRowsOf(store)[0].meeting_booked_at);
     ok('a booked meeting is recorded separately from the click that opened the calendar');
 
@@ -1061,7 +1091,7 @@ async function run() {
     const recoveryRes = mockRes();
     await demoHandler(mockReq({ body: { action: 'build', probe_id: 'prb_demo_001' } }), recoveryRes);
     assert.strictEqual(recoveryRes.statusCode, 200, JSON.stringify(recoveryRes.body));
-    assert.strictEqual(recoveryRes.body.demo_slug, 'ensum-brown-rm-0042');
+    assert.strictEqual(recoveryRes.body.demo_slug, WEAK_SELLER_SLUG);
     assert.strictEqual(recoveryRes.body.demo_status, 'ready');
     assert.strictEqual(demoRowsOf(store).length, 1);
     assert.strictEqual(demoRowsOf(store)[0].view_count, before.view_count);
@@ -1077,14 +1107,14 @@ async function run() {
     await demoHandler(mockReq({ body: { action: 'archive', probe_id: 'prb_demo_001' } }), mockRes());
     assert.strictEqual(demoRowsOf(store)[0].demo_status, 'archived');
     const res = mockRes();
-    await demoHandler(mockReq({ method: 'GET', query: { slug: 'ensum-brown-rm-0042' }, auth: false }), res);
+    await demoHandler(mockReq({ method: 'GET', query: { slug: WEAK_SELLER_SLUG }, auth: false }), res);
     assert.strictEqual(res.statusCode, 404);
     ok('an archived demo is a 404');
 
     // Preserved exactly: archived stays gone even under the internal preview
     // mechanism — preview reveals an unfinished demo, never a retired one.
     const previewRes = mockRes();
-    await demoHandler(mockReq({ method: 'GET', query: { slug: 'ensum-brown-rm-0042', preview: '1' }, auth: false }), previewRes);
+    await demoHandler(mockReq({ method: 'GET', query: { slug: WEAK_SELLER_SLUG, preview: '1' }, auth: false }), previewRes);
     assert.strictEqual(previewRes.statusCode, 404);
     ok('?preview=1 does not resurrect an archived demo either');
 
@@ -1233,13 +1263,14 @@ async function run() {
     // select/rank/summarise evidence, fakePersonalisationAi would have thrown
     // on the unexpected tool name and this pass would already have failed;
     // this count makes the "zero" explicit rather than merely implied.
-    assert.strictEqual(personalisationAiCalls, 1, 'DEMOS compilation must add no AI calls beyond personalisation');
-    ok('exactly one AI call for the whole pass — DEMOS compilation made none');
+    assert.strictEqual(personalisationAiCalls, PERSONALISATION_TOOLS.length,
+      'DEMOS compilation must add no AI calls beyond PERSONALISATION\'s own two');
+    ok("only PERSONALISATION's own AI calls happened in the whole pass — DEMOS compilation made none");
 
     const demo = demoRowsOf(store)[0];
     assert.strictEqual(demo.probe_id, 'prb_auto_001');
     assert.strictEqual(demo.hero_journey, 'weak_seller_qualification');
-    assert.strictEqual(demo.demo_slug, 'auto-agency-rm-0099');
+    assert.strictEqual(demo.demo_slug, 'auto-1');   // the short house slug, from lib/demo-slug.mjs
     assert.strictEqual(demo.compiled_by, 'auto');
     assert.ok(demo.compiled_at);
     ok(`the compiled demo is live at /demo/${demo.demo_slug} with no human step`);
@@ -1368,7 +1399,7 @@ async function run() {
     // prospect's own request.
     reads.length = 0;
     const getRes = mockRes();
-    await demoHandler(mockReq({ method: 'GET', query: { slug: 'ensum-brown-rm-0042' }, auth: false }), getRes);
+    await demoHandler(mockReq({ method: 'GET', query: { slug: WEAK_SELLER_SLUG }, auth: false }), getRes);
     assert.strictEqual(getRes.statusCode, 200);
 
     assert.deepStrictEqual([...new Set(reads)], ['DEMOS'],
@@ -1394,7 +1425,7 @@ async function run() {
 
     // Telemetry is one write on the same row — never a read of another tab.
     reads.length = 0;
-    await demoHandler(mockReq({ body: { action: 'cta_click', slug: 'ensum-brown-rm-0042' }, auth: false }), mockRes());
+    await demoHandler(mockReq({ body: { action: 'cta_click', slug: WEAK_SELLER_SLUG }, auth: false }), mockRes());
     assert.deepStrictEqual([...new Set(reads)], ['DEMOS']);
     ok('CTA telemetry also touches DEMOS only');
   }
@@ -2400,10 +2431,12 @@ async function run() {
 
     // A slug that picked up a trailing space on its way into the sheet.
     const slugIdx = DEMOS_HEADER.indexOf('demo_slug');
-    const spaced = store.DEMOS.find((r) => r[slugIdx] === 'second-agency-rm-0043');
-    spaced[slugIdx] = 'second-agency-rm-0043 ';
+    const probeIdx = DEMOS_HEADER.indexOf('probe_id');
+    const rowFor = (probeId) => store.DEMOS.find((r) => r[probeIdx] === probeId);
+    const spaced = rowFor('prb_demo_002');
+    spaced[slugIdx] = `${spaced[slugIdx]} `;
     // And one whose status cell was cleared by hand.
-    store.DEMOS.find((r) => r[slugIdx] === 'fourth-agency-rm-0045')[DEMOS_HEADER.indexOf('demo_status')] = '';
+    rowFor('prb_demo_004')[DEMOS_HEADER.indexOf('demo_status')] = '';
     // The fourth is deliberately retired.
     await demoHandler(mockReq({ body: { action: 'archive', probe_id: 'prb_demo_001' } }), mockRes());
 
@@ -2418,9 +2451,10 @@ async function run() {
     ok('the audit tests every slug in DEMOS and names the personalised probe that has no row at all');
 
     // A slug with a stray space still resolves — it is the same demo.
-    assert.ok(audit.demos.find((d) => d.demo_slug.trim() === 'second-agency-rm-0043').resolves);
+    const audited = (probeId) => audit.demos.find((d) => d.probe_id === probeId);
+    assert.ok(audited('prb_demo_002').resolves);
     // A row whose status cell was blanked resolves on its own review_reasons.
-    const healed = audit.demos.find((d) => d.demo_slug === 'fourth-agency-rm-0045');
+    const healed = audited('prb_demo_004');
     assert.strictEqual(healed.demo_status, '');
     assert.strictEqual(healed.effective_status, 'ready');
     assert.ok(healed.resolves);
@@ -2442,7 +2476,7 @@ async function run() {
     for (const demo of audit.demos.filter((d) => !d.resolves)) {
       assert.ok(demo.reason, `${demo.demo_slug} must say why it does not resolve`);
     }
-    const unfinished = audit.demos.find((d) => d.demo_slug === 'third-agency-rm-0044');
+    const unfinished = audited('prb_demo_003');
     assert.ok(unfinished.reason.includes('commercial_consequence'));
     ok('every broken demo carries the reason it cannot be sent');
 
@@ -2456,10 +2490,10 @@ async function run() {
     assert.deepStrictEqual(fixed.missing_demo_rows, []);
     assert.ok(fixed.working >= 3, JSON.stringify(fixed.demos.map((d) => [d.demo_slug, d.resolves])));
     assert.strictEqual(
-      fixed.demos.find((d) => d.demo_slug === 'ensum-brown-rm-0042').effective_status, 'archived',
+      fixed.demos.find((d) => d.probe_id === 'prb_demo_001').effective_status, 'archived',
       'a deliberately retired demo is not resurrected by the fix',
     );
-    assert.ok(!fixed.demos.find((d) => d.demo_slug === 'third-agency-rm-0044').resolves);
+    assert.ok(!fixed.demos.find((d) => d.probe_id === 'prb_demo_003').resolves);
     assert.ok(fixed.fixed.still_broken >= 1);
     ok('--fix compiles the missing rows, leaves archived links retired, and still reports what it could not fix');
 
@@ -2467,6 +2501,205 @@ async function run() {
     assert.ok(fifth && fifth.resolves, 'the probe that never had a demo row now has a working link');
     ok('a personalised probe whose demo was never generated is compiled and resolves');
   }
+
+
+  // ══ Part T — the reading the demo actually renders ════════════════════════
+  //
+  // The six sections carry NO authored-per-agency copy: the record, the
+  // signals, the unresolved context, the actions and the example message are
+  // all SELECTED from the row's own ordinals. So this part fixes the
+  // SELECTION rather than the wording - put an agency's evidence in, and the
+  // page can only say the things that evidence supports.
+  console.log('\nPart T — the personalised reading: record, signals, unresolved, actions');
+  {
+    const ctx = (intelligence, {
+      sellerDeclared = true, responseTime = '', channelWords = '',
+      enquiryAt = '2026-08-11T21:35:00Z', enquiryTime = '22:35', price = '£425,000.00', portal = 'rightmove',
+    } = {}) => ({
+      sellerDeclared, responseTime, channelWords, enquiryAt, enquiryTime, price, portal, intelligence,
+    });
+
+    // ── THE FAIRNESS RULE THIS WHOLE FILE TURNS ON ──
+    // Every probe goes out late in the evening, so the median "10.4 hours" is
+    // an agency replying at about nine the next morning. Reported as a
+    // duration it reads as a failure; reported as a clock time it reads as
+    // what it is. The timeline reports the clock.
+    const nextMorning = replyMoment(ctx(
+      { human_contact: 'yes', response_hours: '11.24527778' },
+      { enquiryAt: '2026-08-11T21:35:17Z', responseTime: '11.2 hours' },
+    ));
+    assert.strictEqual(nextMorning.clock, '09:50');
+    assert.strictEqual(nextMorning.phrase, 'the next morning');
+    // A reply an hour after a late-evening enquiry has crossed a calendar day
+    // without crossing a night, and is never called "the next morning".
+    assert.strictEqual(replyMoment(ctx(
+      { human_contact: 'yes', response_hours: '1.04' }, { enquiryAt: '2026-08-17T22:36:00Z' },
+    )).phrase, 'the same night');
+    assert.strictEqual(replyMoment(ctx(
+      { human_contact: 'yes', response_hours: '63.5' }, { enquiryAt: '2026-08-11T21:12:00Z' },
+    )).phrase, '3 days later');
+    // Ten live rows carry a small NEGATIVE response_hours - the reply and the
+    // enquiry are stamped inside the same minute. Those agencies answered
+    // immediately and are treated as such; anything further below zero
+    // produces no timing claim at all rather than a guess.
+    assert.ok(replyMoment(ctx({ human_contact: 'yes', response_hours: '-0.00004583' })));
+    assert.strictEqual(replyMoment(ctx({ human_contact: 'yes', response_hours: '-0.11' })), null);
+    assert.strictEqual(replyMoment(ctx({ human_contact: 'yes', response_hours: '' })), null);
+    ok('a late-evening enquiry answered next morning is reported as a clock time, not as a delay');
+
+    // ── THE RECORD ──
+    // Times and events, in order, and nothing characterised as good or bad.
+    const record = enquiryTimeline(ctx(
+      { human_contact: 'yes', response_hours: '11.24527778', contact_attempts: '3', follow_ups: '2' },
+      { responseTime: '11.2 hours', channelWords: 'email and phone' },
+    ));
+    assert.deepStrictEqual(record.map((r) => r.mark), ['22:35', '09:49', '3 in total']);
+    assert.ok(!/hours|slow|delay|missed|failed/i.test(JSON.stringify(record)));
+    const silent = enquiryTimeline(ctx({ human_contact: 'none', contact_attempts: '0' }));
+    assert.strictEqual(silent.length, 2);
+    assert.ok(/No human reply recorded/.test(silent[1].text));
+    ok('the timeline is the event record only - clock, event, and no verdict');
+
+    // ── THE SIGNALS ──
+    // Four to six, and never a fact shown merely because the column is
+    // populated. In particular the elapsed time is NOT repeated out of the
+    // timeline unless the speed itself is the notable thing.
+    const strongSignals = readingSignals(ctx(
+      { human_contact: 'yes', response_hours: '0.229', contact_attempts: '5', follow_ups: '4',
+        viewing_progression: 'invited', seller_recognition: 'asked_position' },
+      { responseTime: '14 minutes', channelWords: 'email, SMS and phone' },
+    ));
+    assert.ok(strongSignals.length >= 4 && strongSignals.length <= 6);
+    assert.ok(strongSignals.some((s) => s.value === '£425k' && s.label === 'Buyer enquiry'));
+    // The declared sale is the signal that changes the reading of the
+    // enquiry, and it is the ONLY thing on the page given the accent.
+    assert.strictEqual(strongSignals.filter((s) => s.tone === 'accent').length, 1);
+    assert.strictEqual(strongSignals.find((s) => s.tone === 'accent').value, 'Property to sell');
+    // The address is reported as an address and never as a property to value.
+    const address = strongSignals.find((s) => s.value === 'Billericay');
+    assert.ok(address, 'the supplied address is one of the signals');
+    assert.ok(/address supplied/i.test(address.label));
+    assert.ok(!/valuation|instruction|selling|vendor/i.test(address.label),
+      'the supplied address is never described as the property being sold');
+    assert.ok(!strongSignals.some((s) => s.tone === 'open'), 'nothing is marked open on a strong probe');
+
+    // A longer wait is reported once, in the timeline, and does not come back
+    // here as a second beat on the same fact.
+    const slowSignals = readingSignals(ctx(
+      { human_contact: 'yes', response_hours: '15.42', contact_attempts: '1', follow_ups: '0' },
+      { responseTime: '15.4 hours' },
+    ));
+    assert.ok(!slowSignals.some((s) => /hour|minute|day/i.test(s.value)),
+      'the elapsed time is not repeated out of the timeline');
+    assert.ok(slowSignals.some((s) => s.value === 'Answered once'));
+    assert.ok(slowSignals.length >= 4, 'a thin probe still carries four signals');
+    ok('four to six signals, one accent, and no fact stated twice');
+
+    // ── WHAT IS STILL OPEN ──
+    // The half of the section that proves NOVUS is reading rather than
+    // pattern-matching. It must never call something unknown that the
+    // conversation settled.
+    const openQs = readingUnresolved(ctx({ human_contact: 'yes', seller_recognition: 'none', viewing_progression: 'none' }));
+    assert.ok(openQs.length >= 2 && openQs.length <= 3);
+    assert.ok(openQs.some((q) => /Billericay address is the property being sold/.test(q.text)));
+    for (const item of openQs) assert.ok(item.text && item.note && item.ask);
+
+    // AN AGENCY THAT ASKED IS CREDITED FOR ASKING. The question is still open
+    // - we deliberately never answered - but the note says who left it open.
+    const asked = readingUnresolved(ctx({ human_contact: 'yes', seller_recognition: 'asked_position' }));
+    assert.ok(/Your team raised the sale/.test(asked.find((q) => q.key === 'sale_address').note));
+    // AND ONE THAT PROGRESSED IT IS NOT ASKED ABOUT IT AT ALL.
+    const progressedSeller = readingUnresolved(ctx({ human_contact: 'yes', seller_recognition: 'valuation_offered' }));
+    assert.ok(!progressedSeller.some((q) => q.key === 'sale_address'),
+      'a valuation that was actually offered is not then listed as unresolved');
+    // A buyer who WAS given a next step is not asked whether they wanted one.
+    const progressedBuyer = readingUnresolved(ctx({ human_contact: 'yes', viewing_progression: 'slot_offered' }));
+    assert.ok(!progressedBuyer.some((q) => q.key === 'viewing_intent'));
+    ok('the unresolved list reflects what the conversation actually left open');
+
+    // ── THE CREDIT ──
+    // In the agency's own numbers where there is something true to say, and
+    // blank - never invented - where there is not.
+    assert.strictEqual(
+      readingCredit(ctx({ human_contact: 'yes', response_hours: '0.229', contact_attempts: '5' },
+        { responseTime: '14 minutes' })).line,
+      'Your team handled this well. They came back in 14 minutes and went back 5 times.',
+    );
+    assert.strictEqual(
+      readingCredit(ctx({ human_contact: 'yes', contact_attempts: '1', viewing_progression: 'invited' })).line,
+      'Your team moved the buyer towards a viewing.',
+    );
+    const noCredit = readingCredit(ctx({ human_contact: 'none', contact_attempts: '0' }));
+    assert.strictEqual(noCredit.line, '');
+    assert.strictEqual(noCredit.strong, false);
+    // A next-morning reply is not praised for its speed, and a strong agency
+    // is never handed a four-clause inventory.
+    assert.strictEqual(
+      readingCredit(ctx({ human_contact: 'yes', response_hours: '11.2', contact_attempts: '1' },
+        { responseTime: '11.2 hours' })).line, '',
+    );
+    const busy = readingCredit(ctx(
+      { human_contact: 'yes', response_hours: '0.4', contact_attempts: '5',
+        viewing_progression: 'invited', seller_recognition: 'valuation_offered' },
+      { responseTime: '24 minutes' },
+    ));
+    assert.strictEqual((busy.line.match(/,/g) || []).length, 1, 'at most three clauses');
+    ok('the credit is the agency\'s own numbers, and is blank rather than invented');
+
+    // ── THE ACTIONS AND THE MESSAGE ──
+    // Three at most, every one of them derived from something genuinely
+    // unresolved, and always closing on the step that takes the work off the
+    // team rather than handing it back.
+    const doneWell = ctx(
+      { human_contact: 'yes', response_hours: '0.4', contact_attempts: '4',
+        viewing_progression: 'slot_offered', seller_recognition: 'valuation_booked' },
+      { responseTime: '24 minutes' },
+    );
+    for (const probe of [doneWell, ctx({ human_contact: 'none', contact_attempts: '0' })]) {
+      const actions = readingActions(probe);
+      assert.ok(actions.length >= 1 && actions.length <= 3);
+      assert.strictEqual(actions[actions.length - 1].title, 'Keep the enquiry progressing');
+      for (const a of actions) assert.ok(a.title && a.detail);
+    }
+    // Nothing recommends work the conversation already did.
+    assert.ok(!readingActions(doneWell).some((a) => a.title === 'Clarify the sale position'));
+    assert.ok(readingActions(ctx({ human_contact: 'yes', seller_recognition: 'none' }))
+      .some((a) => a.title === 'Clarify the sale position'));
+
+    // ONE MESSAGE, TWO QUESTIONS - never five.
+    const message = readingMessage(ctx({ human_contact: 'yes', seller_recognition: 'none', viewing_progression: 'none' }));
+    assert.strictEqual((message.match(/\?/g) || []).length, 2);
+    assert.ok(message.startsWith("Is the Billericay address the property you're looking to sell?"));
+    ok('at most three next steps, all evidenced, and one two-question message');
+
+    // ── AND IT ALL ARRIVES THROUGH THE ROW ──
+    // No recompile: a snapshot compiled long before any of this existed
+    // serves its own reading, because every field the selection reads is
+    // already frozen on it.
+    const { store, repo } = makeWorkbook();
+    seedWeakSeller(store);
+    __setRepoForTests(repo);
+    await compileDemos(repo, { justPersonalised: ['prb_demo_001'], resolveImageUrl: noImage });
+    const res = mockRes();
+    await demoHandler(mockReq({ method: 'GET', query: { slug: WEAK_SELLER_SLUG }, auth: false }), res);
+    const served = res.body.demo.reading;
+    assert.ok(served, 'the reading reaches the browser');
+    assert.ok(Array.isArray(served.timeline) && served.timeline.length >= 2);
+    assert.ok(served.signals.length >= 4 && served.signals.length <= 6);
+    assert.ok(served.unresolved.length >= 2 && served.unresolved.length <= 3);
+    assert.ok(served.actions.length >= 1 && served.actions.length <= 3);
+    assert.ok(served.message);
+    // NOTHING ON THE PAGE ACCUSES. The words an owner would argue with never
+    // appear in any of it, whatever their evidence looked like.
+    assert.ok(!/\b(missed|failed|lost|should have|too slow|cost you)\b/i.test(JSON.stringify(served)));
+    // Everything the previous shell rendered is still on the payload, so an
+    // older consumer of /api/demo is unaffected by the reframe.
+    for (const field of ['demo_headline', 'demo_hook', 'demo_reveal', 'summary_facts', 'observed_events']) {
+      assert.ok(field in res.body.demo, `${field} must still be served`);
+    }
+    ok('the reading is derived from the stored row and served without a recompile');
+  }
+
 
   __setRepoForTests(null);
   console.log(`\n✅ novus-demo-selftest: ${passed} checks passed\n`);
