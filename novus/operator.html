@@ -112,7 +112,8 @@
         <div class="section">
           <div class="section-head">
             <div class="section-title">Needs you now</div>
-            <div class="section-note">Due and overdue manual sales work only — scheduled work is in Future, probing is in the Prober.</div>
+            <div class="section-note">Due and overdue manual sales work only — scheduled work is in Future, probing is in the Prober.
+              Owner <b>Joe</b>, queue <b>Manual</b>, recommended by <b>NOVUS</b>.</div>
             <button class="section-link" data-goto="actions" type="button">Open actions &rarr;</button>
           </div>
           <div class="card"><div class="tasks" id="ov-tasks"></div></div>
@@ -144,6 +145,9 @@
             later sits in <button class="section-link" data-goto="future" type="button"
               style="margin:0;padding:0">Future&nbsp;&rarr;</button>. Probe queue work and NOVUS-owned
             checkpoints are deliberately not here.</p>
+          <p class="page-sub">NOVUS recommends every action on this page; until an action type has a deliberately
+            enabled automated executor, <b>you</b> execute it. Owner <b>Joe</b> &middot; queue <b>Manual</b>
+            &middot; recommended by <b>NOVUS</b>.</p>
         </div>
         <div class="tabs" id="ac-tabs"></div>
         <div class="card"><div class="tasks" id="ac-list"></div></div>
@@ -156,7 +160,8 @@
           <p class="page-sub">Manual work with a real scheduled time still ahead of it. Nothing here is late and
             nothing here needs you today — each row moves into
             <button class="section-link" data-goto="actions" type="button" style="margin:0;padding:0">Actions&nbsp;&rarr;</button>
-            by itself once its stored <span class="mono">due_at</span> passes.</p>
+            by itself once its stored <span class="mono">due_at</span> passes. Owner <b>Joe</b> &middot;
+            queue <b>Manual</b> &middot; recommended by <b>NOVUS</b>.</p>
         </div>
         <div class="section">
           <div class="section-head">
@@ -187,7 +192,7 @@
             <div class="section-note" id="pl-list-note"></div>
           </div>
           <div class="card"><div class="tablewrap"><table>
-            <thead><tr><th>Agency</th><th>Contact</th><th>Stage</th><th class="col-lg">Next action</th><th class="col-md">Owner</th></tr></thead>
+            <thead><tr><th>Agency</th><th>Contact</th><th>Stage</th><th class="col-lg">Next action</th><th class="col-md">Queue</th></tr></thead>
             <tbody id="pl-rows"></tbody></table></div>
             <div id="pl-empty"></div>
           </div>
@@ -432,7 +437,12 @@ const ACTION_LABEL = {
   FOLLOW_UP_CONVERSATION:'Follow up conversation', SET_NEXT_STEP:'Set the next step',
   RESOLVE_EXCEPTION:'Resolve exception',
 };
-const QUEUE_LABEL = { JOE:'Needs you', PROBER:'Prober', SYSTEM:'NOVUS' };
+/* QUEUE = who executes. NOVUS may only own a queue it can actually execute,
+   so everything without an enabled automated executor is Manual (Joe's), even
+   when NOVUS is the one that recommended it. See the execution authority
+   registry in lib/acquisition-actions.mjs. */
+const QUEUE_LABEL = { JOE:'Manual', PROBER:'Prober', SYSTEM:'NOVUS' };
+const OWNER_LABEL = { JOE:'Joe', NOVUS:'NOVUS', SYSTEM:'NOVUS' };
 const QUEUE_TONE  = { JOE:'t-amber', PROBER:'t-blue', SYSTEM:'t-grey' };
 const PRIORITY_TONE = { CRITICAL:'t-red', HIGH:'t-amber', NORMAL:'t-blue', LOW:'t-grey' };
 const CONTACT_TONE  = { OWNER_DIRECT:'t-violet', NAMED_HUMAN:'t-blue', GENERIC:'t-grey', UNKNOWN:'t-grey' };
@@ -443,7 +453,7 @@ const ACTION_TABS = [
   { key:'replies',   label:'Replies',    types:['HUMAN_REPLY'] },
   { key:'calls',     label:'Calls',      types:['CALL_PROSPECT','RETRY_CALL'] },
   { key:'reviews',   label:'Reviews',    types:['MANUAL_REVIEW','RESOLVE_EXCEPTION'] },
-  { key:'followups', label:'Follow-ups', types:['FOLLOW_UP_CONVERSATION','SET_NEXT_STEP'] },
+  { key:'followups', label:'Follow-ups', types:['FOLLOW_UP_CONVERSATION','SET_NEXT_STEP','DEMO_UNOPENED_FOLLOWUP','DEMO_OPENED_FOLLOWUP'] },
 ];
 
 /* Pipeline bands. Mutually exclusive: a lead has exactly one canonical stage,
@@ -1084,8 +1094,9 @@ function nextActionBox(lead){
       <div style="text-align:right"><div class="nextbox-l">Queue</div>
         <div style="margin-top:6px">${lead.action_queue ? pill(QUEUE_LABEL[lead.action_queue], QUEUE_TONE[lead.action_queue]) : '&mdash;'}</div></div>
     </div>
-    <div class="nextbox-grid">
-      <div class="nextbox-cell"><div class="nextbox-l">Owner</div><div class="nextbox-cv">${dash(a.owner)}</div></div>
+    <div class="nextbox-grid three">
+      <div class="nextbox-cell"><div class="nextbox-l">Owner</div><div class="nextbox-cv">${dash(OWNER_LABEL[a.owner] || a.owner)}</div></div>
+      <div class="nextbox-cell"><div class="nextbox-l">Recommended by</div><div class="nextbox-cv">${dash(a.recommended_by)}</div></div>
       <div class="nextbox-cell"><div class="nextbox-l">Due</div>
         <div class="nextbox-cv ${due.cls === 'over' ? 'over' : ''}">${esc(due.text || '—')}</div></div>
     </div>

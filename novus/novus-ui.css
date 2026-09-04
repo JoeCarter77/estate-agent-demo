@@ -558,6 +558,7 @@ tbody tr:last-child td{border-bottom:none;}
 .nextbox-v{font-family:var(--serif);font-size:17px;font-weight:400;letter-spacing:-.014em;margin-top:7px;
   font-variation-settings:'SOFT' 0,'WONK' 0;}
 .nextbox-grid{display:grid;grid-template-columns:repeat(2,1fr);}
+.nextbox-grid.three{grid-template-columns:repeat(3,1fr);}
 .nextbox-cell{padding:12px 17px;border-top:1px solid var(--hair);}
 .nextbox-cell + .nextbox-cell{border-left:1px solid var(--hair);}
 .nextbox-why{padding:12px 17px;border-top:1px solid var(--hair);font-size:12.5px;color:var(--ink-3);line-height:1.55;}

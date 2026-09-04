@@ -2,7 +2,7 @@
 // live sends, real agency deletes, meetings, or call outcomes.
 import assert from 'node:assert/strict';
 import { resolveLifecycleStage } from '../lib/acquisition-stage.mjs';
-import { actionQueue, deriveExpectedActions, isManualSalesAction, MANUAL_SALES_ACTION_TYPES, reconcileActions } from '../lib/acquisition-actions.mjs';
+import { actionQueue, deriveExpectedActions, hasEnabledExecutor, isManualSalesAction, MANUAL_SALES_ACTION_TYPES, reconcileActions, resolveExecutionOwner } from '../lib/acquisition-actions.mjs';
 import { ACQUISITION_POLICY } from '../lib/acquisition-policy.mjs';
 import { ACTIONS_HEADER, appendAction, buildActionsSetupPlan } from '../lib/actions-store.mjs';
 import { buildAcquisitionDashboard, buildFunnelMetrics, enforceNextActionInvariant } from '../lib/operator-funnel.mjs';
@@ -175,8 +175,28 @@ console.log('\nManual action queue semantics (Needs your attention)');
       assert.equal(isManualSalesAction({ action_type: type, action_owner: 'SYSTEM', action_status: 'DUE' }), false);
     });
   }
-  check('a RESOLVE_EXCEPTION that NOVUS owns is not Joe\'s manual action', () =>
-    assert.equal(isManualSalesAction({ action_type: 'RESOLVE_EXCEPTION', action_owner: 'NOVUS', action_status: 'DUE' }), false));
+  // EXECUTION AUTHORITY. NOVUS is only ever the execution owner of an action
+  // type with a deliberately enabled executor. Everything else falls back to
+  // Joe (commercial) or SYSTEM (internal pipeline prep) — including a type the
+  // registry has never heard of, which must fail closed to the human.
+  check('SEND_DEMO keeps NOVUS: it has a real enabled executor', () => {
+    assert.equal(hasEnabledExecutor('SEND_DEMO'), true);
+    assert.equal(resolveExecutionOwner('SEND_DEMO', 'NOVUS'), 'NOVUS');
+  });
+  for (const type of ['DEMO_UNOPENED_FOLLOWUP', 'DEMO_OPENED_FOLLOWUP', 'HANDOFF_TO_INSTANTLY']) {
+    check(`${type} has no executor, so NOVUS cannot own it`, () => {
+      assert.equal(hasEnabledExecutor(type), false);
+      assert.equal(resolveExecutionOwner(type, 'NOVUS'), 'JOE');
+      assert.equal(queueOf(type, 'NOVUS'), 'JOE');
+      assert.equal(isManualSalesAction({ action_type: type, action_owner: 'NOVUS', action_status: 'DUE' }), true);
+    });
+  }
+  check('PREPARE_OUTREACH never contacts the prospect, so it stays a SYSTEM state', () =>
+    assert.equal(resolveExecutionOwner('PREPARE_OUTREACH', 'NOVUS'), 'SYSTEM'));
+  check('an unregistered NOVUS-owned type fails closed to Joe', () =>
+    assert.equal(resolveExecutionOwner('RESOLVE_EXCEPTION', 'NOVUS'), 'JOE'));
+  check('a JOE-owned action is never promoted to NOVUS', () =>
+    assert.equal(resolveExecutionOwner('SEND_DEMO', 'JOE'), 'JOE'));
   check('a completed manual action is no longer in the queue', () =>
     assert.equal(isManualSalesAction({ action_type: 'HUMAN_REPLY', action_owner: 'JOE', action_status: 'COMPLETED' }), false));
 }
@@ -221,6 +241,36 @@ console.log('\nManual action queue semantics (Needs your attention)');
   });
   check('needs_attention counts only manual sales actions', () =>
     assert.equal(dashboard.counts.needs_attention, 1));
+  // THE HENTON CASE, end to end. A demo sent 1h ago and never opened derives a
+  // DEMO_UNOPENED_FOLLOWUP due 23h from now. It is commercially meaningful
+  // outbound with no automated executor, so it must reach Joe as scheduled
+  // manual work — visible in Future actions — rather than vanishing into the
+  // SYSTEM queue as "NOVUS is handling it".
+  check('an unexecutable future demo follow-up is Joe\'s scheduled manual work, not NOVUS\'s', () => {
+    const demoTables = {
+      ...tables,
+      AGENCIES: { header: agenciesHeader, rows: [['ag_demo', 'Unopened Demo Agency', 'https://rightmove.test/demo', 'YES']] },
+      PROBES: { header: ['probe_id', 'agency_id', 'probe_status', 'observation_deadline'], rows: [['prb_demo', 'ag_demo', 'closed', hoursAgo(72)]] },
+      DEMOS: { header: ['demo_id', 'agency_id', 'probe_id', 'first_viewed_at', 'view_count'], rows: [['dm_demo', 'ag_demo', 'prb_demo', '', '0']] },
+      OUTBOUND: { header: ['outbound_id', 'agency_id', 'probe_id'], rows: [['out_demo', 'ag_demo', 'prb_demo']] },
+      REPLY_EVENTS: { header: ['reply_event_id', 'agency_id', 'classification', 'received_at'], rows: [] },
+      SALES_MESSAGES: { header: ['sales_message_id', 'agency_id', 'message_type', 'send_outcome', 'sent_at'], rows: [
+        ['sm_demo', 'ag_demo', 'DEMO_REPLY', 'SENT', hoursAgo(1)],
+      ] },
+    };
+    const board = buildAcquisitionDashboard(demoTables, { now: NOW, actionsAvailable: false });
+    const row = board.leads.find((entry) => entry.agency_id === 'ag_demo');
+    assert.equal(row.current_stage, 'DEMO_SENT_UNOPENED');
+    assert.equal(row.next_action.type, 'DEMO_UNOPENED_FOLLOWUP');
+    assert.equal(row.next_action.owner, 'JOE');
+    assert.equal(row.next_action.recommended_by, 'NOVUS');
+    assert.equal(row.next_action.requires_human, true);
+    assert.equal(row.action_queue, 'JOE');
+    assert.equal(row.needs_human, true);
+    // Genuinely future-dated, which is what puts it in Future actions rather
+    // than the live queue. The UI split is this one timestamp comparison.
+    assert.ok(Date.parse(row.next_action.due_at) > Date.parse(NOW));
+  });
   check('probe queue depth comes from the physical probe_sent cell', () => {
     assert.equal(dashboard.counts.probe_queue, 1);
     assert.equal(lead('ag_probe').probe_queue_eligible, true);
