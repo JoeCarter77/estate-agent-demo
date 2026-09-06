@@ -63,7 +63,7 @@ import {
   // The six-section reading the demo renders, selected from the row's own
   // ordinals - see Part T.
   replyMoment, enquiryTimeline, readingSignals, readingUnresolved,
-  readingCredit, readingActions, readingMessage,
+  readingCredit, readingHandling, readingCommercialMeaning, readingActions, readingMessage,
 } from '../lib/demo-journeys.mjs';
 
 // ── live-shaped headers ──────────────────────────────────────────────────────
@@ -715,27 +715,24 @@ async function run() {
     for (const journey of SUPPORTED_HERO_JOURNEYS) {
       assert.strictEqual(journeySupport(journey).supported, true, `${journey} should be supported`);
     }
-    ok(`all four shell journeys are supported: ${SUPPORTED_HERO_JOURNEYS.join(', ')}`);
+    ok(`all seven pipeline journeys are supported: ${SUPPORTED_HERO_JOURNEYS.join(', ')}`);
 
-    // The three the pipeline can still emit, which have no demo designed yet.
-    for (const journey of ['automated_ack_only', 'strong_handling_database_opportunity', 'strong_handling_no_opportunity']) {
-      const support = journeySupport(journey);
-      assert.strictEqual(support.supported, false);
-      assert.ok(support.reason.includes(journey));
-    }
-    ok('the three unsupported pipeline journeys are refused by name, not fudged');
+    const unsupported = journeySupport('not_a_journey');
+    assert.strictEqual(unsupported.supported, false);
+    assert.ok(unsupported.reason.includes('not_a_journey'));
+    ok('an unknown journey is refused by name, not fudged');
     assert.strictEqual(journeySupport('').supported, false);
     ok('a blank hero_journey is refused');
 
     for (const journey of SUPPORTED_HERO_JOURNEYS) {
       assert.strictEqual(journeySupport(journey).warning, undefined, `${journey} should be authored, not draft`);
     }
-    ok('all four shell journeys are authored - none of them holds a demo at needs_review on its own');
+    ok('all seven shell journeys are authored - none of them holds a demo at needs_review on its own');
   }
   {
     // The refusal has to happen BEFORE anything is written.
     const { store } = makeWorkbook();
-    seedWeakSeller(store, { heroJourney: 'strong_handling_no_opportunity' });
+    seedWeakSeller(store, { heroJourney: 'not_a_journey' });
     const probe = Object.fromEntries(PROBES_HEADER.map((k, i) => [k, store.PROBES[2][i] ?? '']));
     const personalisation = Object.fromEntries(PERSONALISATION_HEADER.map((k, i) => [k, store.PERSONALISATION[1][i] ?? '']));
     assert.throws(
@@ -1131,12 +1128,12 @@ async function run() {
   {
     // The 422 an unsupported journey produces at the route boundary.
     const { store, repo } = makeWorkbook();
-    seedWeakSeller(store, { heroJourney: 'automated_ack_only' });
+    seedWeakSeller(store, { heroJourney: 'not_a_journey' });
     __setRepoForTests(repo);
     const res = mockRes();
     await demoHandler(mockReq({ body: { action: 'build', probe_id: 'prb_demo_001' } }), res);
     assert.strictEqual(res.statusCode, 422);
-    assert.strictEqual(res.body.hero_journey, 'automated_ack_only');
+    assert.strictEqual(res.body.hero_journey, 'not_a_journey');
     assert.strictEqual(demoRowsOf(store).length, 0);
     ok('an unsupported journey is a 422 and writes no row');
 
@@ -1837,9 +1834,10 @@ async function run() {
 
   {
     // ── 1. FOUR DISTINCT STORIES FROM ONE ROUTE ──
+    const coreJourneys = ['complete_miss', 'slow_response_gap', 'fast_response_stalled_follow_up', 'weak_seller_qualification'];
     const shared = { sellerDeclared: true, sellerRecognition: 'none', viewingProgression: 'none' };
     const rows = Object.fromEntries(
-      SUPPORTED_HERO_JOURNEYS.map((j) => [j, journeyRow({ ...shared, heroJourney: j })]),
+      coreJourneys.map((j) => [j, journeyRow({ ...shared, heroJourney: j })]),
     );
     for (const [journey, r] of Object.entries(rows)) {
       assert.strictEqual(r.hero_journey, journey);
@@ -2035,7 +2033,7 @@ async function run() {
     // ── 6. THE ROUTE FAILS SAFE ──
     // A blank or unknown hero_journey never falls through to another journey's
     // narrative: no row is compiled at all, so the slug resolves to nothing.
-    for (const journey of ['', 'not_a_journey', 'automated_ack_only']) {
+    for (const journey of ['', 'not_a_journey']) {
       assert.throws(
         () => journeyRow({ heroJourney: journey }),
         (err) => err.code === 'unsupported_hero_journey',
@@ -2233,6 +2231,9 @@ async function run() {
       ['complete miss, buyer only',
         { heroJourney: 'complete_miss', sellerDeclared: false, humanContact: 'none', responseHours: '', contactAttempts: '0' },
         'complete_miss'],
+      ['strong handling, buyer progressed',
+        { heroJourney: 'strong_handling_no_opportunity', sellerDeclared: false, viewingProgression: 'booked', responseHours: '0.1', contactAttempts: '3', followUps: '2' },
+        'strong_handling'],
     ];
     const seen = new Set();
     for (const [name, evidence, expectedPriority] of cases) {
@@ -2240,11 +2241,11 @@ async function run() {
       assert.strictEqual(built.demo_headline, HERO_TITLES[expectedPriority], `hero title for ${name}`);
       seen.add(built.demo_headline);
     }
-    // All four lines are reachable, and nothing outside the four is ever
+    // All five lines are reachable, and nothing outside the five is ever
     // written onto a row.
-    assert.strictEqual(seen.size, 4, 'all four fixed headlines are reachable from real findings');
+    assert.strictEqual(seen.size, 5, 'all five fixed headlines are reachable from real findings');
     assert.deepStrictEqual([...seen].sort(), Object.values(HERO_TITLES).sort());
-    ok(`${cases.length} sets of findings select between the four fixed hero titles, and reach all four`);
+    ok(`${cases.length} sets of findings select between the five fixed hero titles, and reach all five`);
 
     // A DECLARED VENDOR DOES NOT AUTOMATICALLY WIN THE HERO. Same seller gap
     // in all three, three different strongest findings.
@@ -2569,18 +2570,14 @@ async function run() {
         viewing_progression: 'invited', seller_recognition: 'asked_position' },
       { responseTime: '14 minutes', channelWords: 'email, SMS and phone' },
     ));
-    assert.ok(strongSignals.length >= 4 && strongSignals.length <= 6);
+    assert.ok(strongSignals.length >= 3 && strongSignals.length <= 6);
     assert.ok(strongSignals.some((s) => s.value === '£425k' && s.label === 'Buyer enquiry'));
     // The declared sale is the signal that changes the reading of the
     // enquiry, and it is the ONLY thing on the page given the accent.
     assert.strictEqual(strongSignals.filter((s) => s.tone === 'accent').length, 1);
     assert.strictEqual(strongSignals.find((s) => s.tone === 'accent').value, 'Property to sell');
-    // The address is reported as an address and never as a property to value.
-    const address = strongSignals.find((s) => s.value === 'Billericay');
-    assert.ok(address, 'the supplied address is one of the signals');
-    assert.ok(/address supplied/i.test(address.label));
-    assert.ok(!/valuation|instruction|selling|vendor/i.test(address.label),
-      'the supplied address is never described as the property being sold');
+    assert.ok(!strongSignals.some((s) => s.value === 'Billericay'),
+      'the legacy fallback never hardcodes a contact address');
     assert.ok(!strongSignals.some((s) => s.tone === 'open'), 'nothing is marked open on a strong probe');
 
     // A longer wait is reported once, in the timeline, and does not come back
@@ -2592,8 +2589,8 @@ async function run() {
     assert.ok(!slowSignals.some((s) => /hour|minute|day/i.test(s.value)),
       'the elapsed time is not repeated out of the timeline');
     assert.ok(slowSignals.some((s) => s.value === 'Answered once'));
-    assert.ok(slowSignals.length >= 4, 'a thin probe still carries four signals');
-    ok('four to six signals, one accent, and no fact stated twice');
+    assert.ok(slowSignals.length >= 3, 'a thin legacy probe still carries its material signals');
+    ok('material signals, one accent, and no hardcoded address');
 
     // ── WHAT IS STILL OPEN ──
     // The half of the section that proves NOVUS is reading rather than
@@ -2601,8 +2598,8 @@ async function run() {
     // conversation settled.
     const openQs = readingUnresolved(ctx({ human_contact: 'yes', seller_recognition: 'none', viewing_progression: 'none' }));
     assert.ok(openQs.length >= 2 && openQs.length <= 3);
-    assert.ok(openQs.some((q) => /Billericay address is the property being sold/.test(q.text)));
-    for (const item of openQs) assert.ok(item.text && item.note && item.ask);
+    assert.ok(openQs.some((q) => /supplied address the property being sold/.test(q.text)));
+    for (const item of openQs) assert.ok(item.text && item.ask);
 
     // AN AGENCY THAT ASKED IS CREDITED FOR ASKING. The question is still open
     // - we deliberately never answered - but the note says who left it open.
@@ -2646,6 +2643,42 @@ async function run() {
     assert.strictEqual((busy.line.match(/,/g) || []).length, 1, 'at most three clauses');
     ok('the credit is the agency\'s own numbers, and is blank rather than invented');
 
+    // ── THE DIRECT SALES READING ──
+    // The page answers what happened, then translates only the supported
+    // unknowns into commercial meaning. Strong handling gets no fake "but".
+    const handling = readingHandling(ctx(
+      { human_contact: 'yes', response_hours: '0.4', contact_attempts: '3', follow_ups: '2',
+        viewing_progression: 'slot_offered', seller_recognition: 'asked_position' },
+      { responseTime: '24 minutes', channelWords: 'phone and email' },
+    ));
+    assert.ok(handling.some((item) => /24 minutes/.test(item.detail)));
+    assert.ok(handling.some((item) => /3 contact attempts by phone and email/.test(item.detail)));
+    assert.ok(handling.some((item) => item.label === 'Buyer progression'));
+    assert.ok(handling.some((item) => item.label === 'Seller recognition'));
+
+    const sellerMeaning = readingCommercialMeaning(ctx(
+      { human_contact: 'yes', viewing_progression: 'slot_offered', seller_recognition: 'none' },
+    ));
+    assert.match(sellerMeaning.lead, /potential seller/i);
+    assert.match(sellerMeaning.body, /sale and chain was still unknown/i);
+    assert.ok(!/£|revenue|fee|deal/i.test(JSON.stringify(sellerMeaning)));
+
+    const strongMeaning = readingCommercialMeaning(ctx(
+      { human_contact: 'yes', response_hours: '0.4', contact_attempts: '4',
+        viewing_progression: 'slot_offered', seller_recognition: 'valuation_booked' },
+      { responseTime: '24 minutes' },
+    ), true);
+    assert.strictEqual(strongMeaning.lead, 'Your team handled this well.');
+    assert.match(strongMeaning.body, /making that standard consistent/i);
+    assert.ok(!/but|missed|failed/i.test(JSON.stringify(strongMeaning)));
+    const delayedMeaning = readingCommercialMeaning(ctx(
+      { human_contact: 'yes', response_hours: '30', contact_attempts: '3', follow_ups: '2',
+        viewing_progression: 'booked', seller_recognition: 'valuation_booked' },
+      { responseTime: '1 day' },
+    ), true);
+    assert.match(delayedMeaning.lead, /meaningful wait/i);
+    ok('handling facts and commercial meaning adapt across mixed and strong enquiries without revenue claims');
+
     // ── THE ACTIONS AND THE MESSAGE ──
     // Three at most, every one of them derived from something genuinely
     // unresolved, and always closing on the step that takes the work off the
@@ -2669,7 +2702,7 @@ async function run() {
     // ONE MESSAGE, TWO QUESTIONS - never five.
     const message = readingMessage(ctx({ human_contact: 'yes', seller_recognition: 'none', viewing_progression: 'none' }));
     assert.strictEqual((message.match(/\?/g) || []).length, 2);
-    assert.ok(message.startsWith("Is the Billericay address the property you're looking to sell?"));
+    assert.ok(message.startsWith("Is the supplied address the property you're looking to sell?"));
     ok('at most three next steps, all evidenced, and one two-question message');
 
     // ── AND IT ALL ARRIVES THROUGH THE ROW ──
