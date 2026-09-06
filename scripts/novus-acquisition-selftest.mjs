@@ -202,12 +202,12 @@ console.log('\nManual action queue semantics (Needs your attention)');
 }
 {
   // End-to-end through the dashboard: probing must not reach needs_attention.
-  const agenciesHeader = ['agency_id', 'agency_name', 'rightmove_sales_branch_url', 'probe_sent'];
+  const agenciesHeader = ['agency_id', 'agency_name', 'rightmove_sales_branch_url', 'probe_sent', 'outreach_contact_email'];
   const tables = {
     AGENCIES: { header: agenciesHeader, rows: [
-      ['ag_probe', 'Unprobed Agency', 'https://rightmove.test/probe', ''],
-      ['ag_reply', 'Replied Agency', 'https://rightmove.test/reply', 'YES'],
-      ['ag_done', 'Probed Agency', 'https://rightmove.test/done', 'YES'],
+      ['ag_probe', 'Unprobed Agency', 'https://rightmove.test/probe', '', 'probe@example.test'],
+      ['ag_reply', 'Replied Agency', 'https://rightmove.test/reply', 'YES', 'reply@example.test'],
+      ['ag_done', 'Probed Agency', 'https://rightmove.test/done', 'YES', 'done@example.test'],
     ] },
     PROBES: { header: ['probe_id', 'agency_id', 'probe_status', 'observation_deadline'], rows: [
       ['prb_done', 'ag_done', 'observing', hoursAgo(-48)],
@@ -249,7 +249,7 @@ console.log('\nManual action queue semantics (Needs your attention)');
   check('an unexecutable future demo follow-up is Joe\'s scheduled manual work, not NOVUS\'s', () => {
     const demoTables = {
       ...tables,
-      AGENCIES: { header: agenciesHeader, rows: [['ag_demo', 'Unopened Demo Agency', 'https://rightmove.test/demo', 'YES']] },
+      AGENCIES: { header: agenciesHeader, rows: [['ag_demo', 'Unopened Demo Agency', 'https://rightmove.test/demo', 'YES', 'demo@example.test']] },
       PROBES: { header: ['probe_id', 'agency_id', 'probe_status', 'observation_deadline'], rows: [['prb_demo', 'ag_demo', 'closed', hoursAgo(72)]] },
       DEMOS: { header: ['demo_id', 'agency_id', 'probe_id', 'first_viewed_at', 'view_count'], rows: [['dm_demo', 'ag_demo', 'prb_demo', '', '0']] },
       OUTBOUND: { header: ['outbound_id', 'agency_id', 'probe_id'], rows: [['out_demo', 'ag_demo', 'prb_demo']] },
@@ -275,6 +275,19 @@ console.log('\nManual action queue semantics (Needs your attention)');
     assert.equal(dashboard.counts.probe_queue, 1);
     assert.equal(lead('ag_probe').probe_queue_eligible, true);
     assert.equal(lead('ag_done').probe_queue_eligible, false);
+  });
+  check('probe queue also requires a non-blank outreach_contact_email', () => {
+    const noEmailTables = {
+      ...tables,
+      AGENCIES: { header: agenciesHeader, rows: [
+        ['ag_probe', 'Unprobed Agency', 'https://rightmove.test/probe', '', ''],
+        ['ag_reply', 'Replied Agency', 'https://rightmove.test/reply', 'YES', 'reply@example.test'],
+        ['ag_done', 'Probed Agency', 'https://rightmove.test/done', 'YES', 'done@example.test'],
+      ] },
+    };
+    const board = buildAcquisitionDashboard(noEmailTables, { now: NOW, actionsAvailable: false });
+    assert.equal(board.counts.probe_queue, 0);
+    assert.equal(board.leads.find((e) => e.agency_id === 'ag_probe').probe_queue_eligible, false);
   });
 }
 
