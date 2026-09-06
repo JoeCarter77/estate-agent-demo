@@ -163,6 +163,12 @@ function seedHistoricalDiagnosedProbes(store) {
       probe_id: probeId, agency_id: `agc_${probeId}`, strengths: 'Pre-existing strength.',
       novus_opportunity: 'Core (front desk)', diagnosis_summary: `Pre-existing diagnosis for ${probeId}.`,
     }));
+    store.DIAGNOSIS_FINDINGS.push(row(DIAGNOSIS_FINDINGS_HEADER, {
+      probe_id: probeId, finding_index: 1, finding_type: 'problem',
+      finding: 'No follow-up was recorded after the first response.',
+      evidence: 'Contact attempts: 1; follow-ups: 0.',
+      significance_note: 'The enquiry received no second attempt.',
+    }));
   }
 }
 
@@ -178,8 +184,10 @@ function installAiStub() {
       const m = prompt.match(/prb_hist_\d+/);
       if (m) diagnosedProbeIds.push(m[0]);
       return {
-        findings: [{ finding_type: 'problem', finding: 'Stub finding.', evidence: 'Stub evidence.', significance_note: 'Stub significance.' }],
+        findings: [{ finding_type: 'problem', finding: 'No follow-up was sent after the first reply.', evidence: 'Human contact: yes; contact attempts: 1; follow-ups: 0.', significance_note: 'The enquiry received no second attempt.' }],
         positive_findings: [{ finding: 'Stub positive.', evidence: 'Stub positive evidence.', significance_note: 'Stub positive significance.' }],
+        enquiry_signals: [], unresolved_context: [], recommended_actions: [],
+        handling_summary: 'The response received no recorded follow-up.', handling_quality: 'mixed',
         strengths: 'Stub strengths.', missed_opportunities: '', commercial_implication: 'Stub implication.',
         novus_opportunity: 'Core (front desk)', diagnosis_summary: 'Freshly regenerated diagnosis.',
       };
@@ -215,6 +223,13 @@ function installAiStub() {
         email_commercial_hook_email_2: 'The reply itself was fine — the part worth a look is that you still know nothing about what we were actually after.',
       };
     }
+    if (tool?.name === 'realise_personalisation_facts') {
+      personaliseCalls += 1;
+      return {
+        email_observation: 'Your team made one human contact attempt, with no recorded follow-up.',
+        email_commercial_hook: 'The interaction is worth seeing because the team handled the known context well.',
+      };
+    }
     interpretCalls += 1;
     return {
       viewing_progression: 'none', buyer_questions_asked: [], seller_recognition: 'none',
@@ -246,9 +261,10 @@ async function run() {
     const summary = await runRebuildPass(repo, { maxAiCalls: 100 });
 
     assert.strictEqual(summary.diagnosis.ai_diagnoses_run, 1, 'only the one unfrozen probe gets a fresh Diagnosis call');
-    assert.strictEqual(summary.personalisation.ai_personalisations_run, HISTORICAL_IDS.length,
-      'but EVERY historical probe gets personalised — reproducing the reported bug');
-    assert.strictEqual(stub.counts().personaliseCalls, HISTORICAL_IDS.length);
+    assert.strictEqual(summary.personalisation.personalisations_with_findings, HISTORICAL_IDS.length,
+      'every historical probe reaches Personalisation — reproducing the reported unscoped sweep');
+    assert.ok(stub.counts().personaliseCalls >= HISTORICAL_IDS.length && stub.counts().personaliseCalls <= HISTORICAL_IDS.length * 2,
+      'each personalised probe stays within the bounded one-repair AI budget');
     ok('reproduced: unfreezing one probe\'s Diagnosis, then running an untargeted rebuild, personalises every already-diagnosed probe on the sheet — confirms the reported root cause');
   }
 
@@ -269,13 +285,14 @@ async function run() {
     const summary = await runRebuildPass(repo, { maxAiCalls: 100, probeIds: targets });
 
     assert.strictEqual(summary.diagnosis.ai_diagnoses_run, targets.length, 'only the targeted, unfrozen probes get diagnosed');
-    assert.strictEqual(summary.personalisation.ai_personalisations_run, targets.length,
+    assert.strictEqual(summary.personalisation.personalisations_processed, targets.length,
       'and ONLY those same probes get personalised — not the rest of the sheet');
+    assert.ok(summary.personalisation.ai_personalisations_run >= targets.length
+      && summary.personalisation.ai_personalisations_run <= targets.length * 2,
+    'the scoped probes stay within the bounded one-repair AI budget');
     assert.deepStrictEqual(new Set(stub.diagnosedProbeIds), new Set(targets));
-    assert.deepStrictEqual(new Set(stub.personalisedProbeIds), new Set(targets));
-
     const personalisedIds = probeIdsIn(store, 'PERSONALISATION', PERSONALISATION_HEADER);
-    assert.strictEqual(personalisedIds.size, targets.length, 'exactly the targeted probes have a PERSONALISATION row');
+    assert.strictEqual(personalisedIds.size, targets.length, `exactly the targeted probes have a PERSONALISATION row: ${JSON.stringify(summary.personalisation)}`);
     for (const probeId of targets) assert.ok(personalisedIds.has(probeId), `${probeId} was personalised`);
     for (const probeId of HISTORICAL_IDS) {
       if (targets.includes(probeId)) continue;
@@ -289,6 +306,7 @@ async function run() {
     const { store, repo } = makeFakeSheet();
     __setRepoForTests(repo);
     seedHistoricalDiagnosedProbes(store);
+    store.DIAGNOSIS_FINDINGS = [DIAGNOSIS_FINDINGS_HEADER.slice()];
     installAiStub();
 
     const targets = ['prb_hist_0001', 'prb_hist_0005'];
@@ -318,7 +336,9 @@ async function run() {
     const summary = await runRebuildPass(repo, { maxAiCalls: 100, probeIds: ['prb_hist_0001', 'prb_hist_0002'] });
 
     assert.strictEqual(summary.diagnosis.ai_diagnoses_run, 0, 'a targeted but already-frozen probe is not re-diagnosed');
-    assert.strictEqual(summary.personalisation.ai_personalisations_run, 2, 'but it is still eligible for its first Personalisation, since that has never run');
+    assert.strictEqual(summary.personalisation.personalisations_processed, 2, 'but it is still eligible for its first Personalisation, since that has never run');
+    assert.ok(summary.personalisation.ai_personalisations_run >= 2 && summary.personalisation.ai_personalisations_run <= 4,
+      'the two scoped rows stay within the bounded one-repair AI budget');
     assert.strictEqual(stub.counts().diagnoseCalls, 0);
     ok('naming an already-diagnosed probe in probeIds never re-diagnoses it — the frozen check still applies inside the target list, only the SCOPE narrows');
   }

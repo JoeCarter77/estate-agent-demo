@@ -107,18 +107,18 @@ async function run() {
     }
     ok('no DIAGNOSIS or DIAGNOSIS_FINDINGS field attributes the £450,000 enquiry price to the seller opportunity');
 
-    // The findings themselves survive — this is a price strip, not a finding
-    // strip. The commercial point is still made, just unpriced.
+    // A seller declaration plus no valuation is not an opportunity at all.
+    // Both manufactured seller findings are dropped; the factual positive
+    // survives.
     const findings = parseDiagnosisFindings(result);
-    assert.strictEqual(findings.length, 3, 'all three evidenced findings are still written');
-    assert.match(findings[0].finding, /valuation opportunity/i, 'the seller finding survives, without its invented figure');
-    assert.strictEqual(findings[0].finding_type, 'opportunity', 'finding_type is untouched');
-    assert.strictEqual(findings[2].finding_type, 'positive', 'the positive is still appended last');
+    assert.strictEqual(findings.length, 1, 'only the factual positive is written');
+    assert.strictEqual(findings[0].finding_type, 'positive');
     assert.ok(findings.every((f) => f.finding && f.evidence), 'no finding was emptied into a drop by the guard');
-    assert.strictEqual(result.novus_opportunity, 'Growth (valuation list / seller conversion)', 'novus_opportunity is untouched');
+    assert.strictEqual(result.novus_opportunity, 'None evidenced',
+      'the legacy seller-conversion route is not activated by a declaration alone');
     assert.ok(result.strengths && result.missed_opportunities && result.commercial_implication && result.diagnosis_summary,
       'no prose field was emptied — the strip is surgical, not sentence-level');
-    ok('the seller-side findings and every prose field survive unpriced — nothing is dropped, only the figure goes');
+    ok('manufactured valuation opportunities are dropped while factual prose remains safely de-priced');
   }
 
   // ── The legitimate BUYER-side use of the very same figure is untouched. ──
@@ -170,9 +170,10 @@ async function run() {
   //    so the deterministic strip is a net rather than the only defence. ──
   {
     const prompt = _internal.SYSTEM_PROMPT;
-    assert.match(prompt, /NEVER PRICE THE SELLER OPPORTUNITY/, 'the system prompt carries the provenance rule');
+    assert.match(prompt, /NEVER PRICE SELLER CONTEXT/, 'the system prompt carries the provenance rule');
     assert.match(prompt, /AS A BUYER/, 'the brief states what the figure actually is');
-    assert.match(prompt, /valuation opportunity/i, 'the brief gives the unpriced seller phrasings to use instead');
+    assert.match(prompt, /call it an opportunity only when evidence genuinely establishes one/i,
+      'the brief forbids automatic seller-opportunity classification');
     ok('the diagnosis brief states the price provenance and bans seller-side use of the figure');
   }
 
@@ -196,12 +197,10 @@ async function run() {
       diagnosis_summary: 'Strong front desk, wrong hours.',
     }));
     const findings = parseDiagnosisFindings(await diagnoseProbe(INTELLIGENCE, PROBE));
-    assert.strictEqual(findings.length, 4, 'evidence-less finding dropped, story cap 3 and positive cap 1 still applied, four per probe');
-    assert.deepStrictEqual(findings.map((f) => f.finding_type), ['opportunity', 'problem', 'problem', 'positive'],
-      'story findings still come first in order, positive still appended last');
-    assert.strictEqual(findings[0].finding, 'A declared seller opportunity was never converted.',
-      'an already-unpriced seller finding passes through byte-for-byte');
-    ok('finding selection, evidence guard, caps, ordering and typing are all unchanged');
+    assert.strictEqual(findings.length, 3, 'evidence-less and declaration-only opportunity findings are dropped');
+    assert.deepStrictEqual(findings.map((f) => f.finding_type), ['problem', 'problem', 'positive'],
+      'remaining story findings come first and the positive is appended last');
+    ok('finding evidence, opportunity support, caps, ordering and typing are enforced together');
   }
 
   console.log(`\n${passed} checks passed.`);

@@ -169,6 +169,13 @@ function installAiStub() {
   diagnoseCallCount = 0;
   personaliseCallCount = 0;
   __setAiCallerForTests(async ({ tool, prompt }) => {
+    if (tool?.name === 'realise_personalisation_facts') {
+      personaliseCallCount += 1;
+      return {
+        email_observation: 'The enquiry received no human response during the observation window.',
+        email_commercial_hook: 'The absence of human handling is the clearest part of this interaction worth examining.',
+      };
+    }
     if (tool?.name === 'record_probe_personalisation') {
       personaliseCallCount += 1;
       return {

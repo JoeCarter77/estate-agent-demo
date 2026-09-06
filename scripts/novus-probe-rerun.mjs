@@ -56,16 +56,7 @@ function standIn(fixture) {
           ? 'So the buyer side moved forward, while the potential seller was missed entirely.'
           : 'That vendor was not a name on a cold list — they were already talking to you as a buyer.';
 
-  // EMAIL 2 — the extra thing neither line above said.
-  const hook2 = noReply
-    ? 'The issue here was not qualification or follow-up quality — the enquiry never got a genuine human response at all.'
-    : attempts > 1
-      ? `${attempts} contact attempts shows real persistence; the gap is that every one of them worked the same side of the enquiry.`
-      : worked > 0
-        ? 'You handled the buying side well; the part worth a look is that the same message had already given you a second reason to call.'
-        : 'The speed was fine — what got lost was the second reason that person was worth ringing back.';
-
-  return { observation, hook, hook2, twoSided, worked };
+  return { observation, hook, twoSided, worked };
 }
 
 function blankReason(field, fixture, row) {
@@ -85,7 +76,7 @@ function blankReason(field, fixture, row) {
   return 'UNEXPLAINED';
 }
 
-const FIELDS = ['email_observation', 'email_commercial_hook', 'email_commercial_hook_email_2',
+const FIELDS = ['email_observation', 'email_commercial_hook',
   'fair_observation', 'main_finding', 'commercial_consequence'];
 
 async function main() {
@@ -108,14 +99,12 @@ async function main() {
             ...fixture.recorded_model_output,
             email_observation: sim.observation,
             email_commercial_hook: sim.hook,
-            email_commercial_hook_email_2: sim.hook2,
           };
         }
         repaired.push(...tool.input_schema.required);
         return Object.fromEntries(tool.input_schema.required.map((f) => [f,
           f === 'email_commercial_hook' ? sim.hook
-            : f === 'email_commercial_hook_email_2' ? sim.hook2
-              : f === 'email_observation' ? sim.observation
+            : f === 'email_observation' ? sim.observation
               : f === 'commercial_consequence'
                 ? (sim.twoSided ? 'the potential seller in that same enquiry was never taken to a valuation conversation.'
                   : 'the buyer enquiry itself never reached a next step.')

@@ -149,12 +149,18 @@ for (const [label, overrides, reason] of [
   ok(`${label} is skipped`);
 }
 
-for (const field of ['email_observation', 'email_commercial_hook', 'email_commercial_hook_email_2']) {
+for (const field of ['email_observation', 'email_commercial_hook']) {
   const { result } = await dryRun({ personalisation: { [field]: '   ' } });
   assert.equal(result.eligible_count, 0);
   assert(result.skipped[0].reasons.includes(`missing ${field}`));
 }
-ok('each required personalisation field is independently gated');
+ok('each active personalisation field is independently gated');
+
+{
+  const { result } = await dryRun({ personalisation: { email_commercial_hook_email_2: '   ' } });
+  assert.equal(result.eligible_count, 1);
+  ok('deprecated Hook 2 does not affect OUTBOUND eligibility');
+}
 
 for (const field of ['enquiry_date', 'enquiry_time']) {
   const { result } = await dryRun({ demo: { [field]: '' } });

@@ -135,12 +135,10 @@ async function run() {
 
     assert.strictEqual(findings.length, 4, 'still four');
     assert.ok(findings[0].finding.startsWith('The conversation never established my position'), 'the main story keeps index 1');
-    assert.strictEqual(findings[1].finding_type, 'opportunity', 'the evidenced seller/valuation opportunity is retained as the wider beat');
-    assert.ok(findings[1].finding.includes('no valuation was ever offered'), 'with its own evidence intact');
+    assert.ok(!findings.some((f) => /valuation was ever offered/i.test(f.finding)),
+      'seller declaration plus no valuation is not promoted to an opportunity');
     assert.strictEqual(findings.filter((f) => f.finding_type === 'positive').length, 1, 'the genuine positive is retained rather than squeezed out by problem findings');
-    assert.ok(!findings.some((f) => f.finding === 'Nobody asked about my budget.'),
-      'and the lowest-ranked restatement of the main finding is the one that falls outside the budget');
-    ok('PRIORITY OVER COMPLETENESS — the main story, the evidenced seller opportunity and the genuine positive all survive; an overlapping lower-ranked restatement is what the cap drops');
+    ok('seller declaration alone never creates the former valuation-opportunity beat');
   }
 
   // ── The instruction the model is actually given: consolidate, don't duplicate ──
@@ -150,12 +148,12 @@ async function run() {
     assert.strictEqual(TOOL.input_schema.properties.findings.maxItems, 3, 'the schema allows at most three problem/opportunity findings');
     assert.strictEqual(TOOL.input_schema.properties.positive_findings.maxItems, 1, '...and exactly one positive');
     assert.ok(/consolidate/i.test(storyDescription), 'the schema tells the model to consolidate two findings that are the same underlying issue');
-    assert.ok(/THE MAIN STORY/.test(storyDescription) && /WIDER COMMERCIAL OPPORTUNITY/.test(storyDescription) && /OPTIONAL SUPPORTING PROBLEM/.test(storyDescription),
-      'and states the three roles the slots exist for, rather than asking for a list of everything wrong');
+    assert.ok(/Unknown context is not an opportunity/.test(storyDescription) && /seller declaration alone is never a valuation opportunity/i.test(storyDescription),
+      'and distinguishes unresolved context from evidence-supported opportunity');
     assert.ok(/FOUR FINDINGS PER PROBE, MAXIMUM/.test(SYSTEM_PROMPT), 'the system prompt states the per-probe budget');
     assert.ok(/Never invent a wider opportunity, a supporting problem or a positive to fill a slot/.test(SYSTEM_PROMPT),
       'and that an empty slot is never filled by invention');
-    ok('THE BRIEF ITSELF — the schema and prompt ask for four role-shaped findings, consolidation over duplication, and nothing invented to fill a slot');
+    ok('THE BRIEF ITSELF — the schema and prompt separate unknown context from opportunity and invent nothing to fill a slot');
   }
 
   // ── Fewer than four is a complete answer ──────────────────────────────────

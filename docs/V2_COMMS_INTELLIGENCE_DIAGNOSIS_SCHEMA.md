@@ -287,11 +287,9 @@ for the sales call. All four are deprecated **in place** and marked
 NON-AUTHORITATIVE at source: no column is dropped and no historical data is
 migrated, because safe deprecation beats unnecessary migration risk.
 
-Pinned by Section C of
-`scripts/novus-master-personalisation-contract-selftest.mjs`: a `DIAGNOSIS`
-row whose every prose field contradicts the findings must produce a
-byte-identical `PERSONALISATION` row, spend the same AI budget, and leak no
-prose token into the model or the sheet.
+Pinned by `scripts/novus-diagnosis-personalisation-v2-selftest.mjs`: active
+personalisation is selected from evidence-led facts, exposes only the two
+email fields, and does not revive the retired second-hook contract.
 
 ### Relationship and provenance validation (rules 41-48)
 
@@ -356,27 +354,38 @@ Code validates the index types, finding types and main/second distinctness.
 than accepted as an independent model answer. `evidence` is likewise rebuilt
 from the selected findings' stored evidence.
 
-That selection is authoritative for `email_observation`,
-`email_commercial_hook` and `email_commercial_hook_email_2`. The prompt
-requires all three lines to use all and only that story. Code rejects any of
-them if distinctive vocabulary reveals an unselected diagnosis finding. The
+That selection is authoritative for `email_observation` and
+`email_commercial_hook`. The prompt requires both lines to use all and only
+that story. Code rejects either if distinctive vocabulary reveals an
+unselected diagnosis finding. The
 model receives at most one bounded correction with the exact failed field and
 previous selection; it cannot switch to a separate commercial-classification
 path.
 
-### The three email fields do three different jobs
+### The two active email fields do different jobs
 
 | Field | Answers |
 |---|---|
 | `email_observation` | What objectively happened in the probe |
 | `email_commercial_hook` | Why that observed behaviour matters commercially |
-| `email_commercial_hook_email_2` | The one additional fact or implication that makes the reader reassess the enquiry |
 
-Code enforces that they stay apart: the hook may not restate the observation
-(`hookFailureAgainstObservation`), and the Email 2 hook may not restate either
-Email 1 line (`secondHookFailure`, which also caps it at one point rather than
-a paragraph). Whether a well-formed line genuinely *adds* meaning is carried by
-the prompt, not by a heuristic.
+Code enforces that the hook does not restate the observation
+(`hookFailureAgainstObservation`). Hook 2 is deprecated: its historical Sheet
+column remains in place, but active generation, validation, OUTBOUND eligibility
+and Instantly mapping ignore it.
+
+Both active fields cross a hard prospect-language boundary. Internal terms such
+as “observation window”, “probe”, “finding”, “diagnosis”, “several signals” and
+“unresolved context” are rejected. The observation is one concise factual
+sentence, normally no more than 25 words, using the real response time or review
+duration where available. The hook must add one different, supported idea rather
+than paraphrasing the observation. The same plain-language rewrite is applied to
+the structured reading and handling summary before DEMOS exposes them.
+
+`unresolved_context` is deduplicated by underlying unknown: seller-property
+identity precedes location or condition detail. `recommended_actions` treats
+three as a maximum, filters generic CRM/priority/escalation housekeeping, and
+does not turn a seller declaration into a valuation or dual-sided-lead action.
 
 ### The probe rule
 
@@ -399,7 +408,7 @@ allowed: no response, slow first response, no follow-up, no viewing offer, no
 qualifying questions, generic handling, a declared seller never acknowledged,
 weak personalisation, weak persistence.
 
-### The 21 columns
+### Personalisation columns
 
 | # | Field | Derivation / consumer |
 |---|---|---|
@@ -421,9 +430,14 @@ weak personalisation, weak persistence.
 | 16 | `property_reference` | DET from `PROBES.property_address` + `probe_timestamp`, Europe/London |
 | 17 | `email_observation` | AI concise Instantly variable from the authoritative selected findings |
 | 18 | `email_commercial_hook` | AI Instantly variable (Email 1) explaining why the observed behaviour matters commercially |
-| 19 | `email_commercial_hook_email_2` | AI Instantly variable (Email 2) adding the one extra fact/implication, from the same selected findings |
+| 19 | `email_commercial_hook_email_2` | **Deprecated historical column.** Preserved in place; not generated, required or sent |
 | 20 | `created_at` | DET timestamp |
 | 21 | `updated_at` | DET timestamp |
+| 22 | `enquiry_signals` | JSON projection of `DIAGNOSIS.enquiry_signals` (0–6 concise known facts) |
+| 23 | `unresolved_context` | JSON projection of genuine unanswered context (0–3) |
+| 24 | `recommended_actions` | JSON projection of minimal evidence-led next actions (0–3) |
+| 25 | `handling_summary` | One factual whole-enquiry handling summary |
+| 26 | `handling_quality` | `weak`, `mixed` or `strong`; independent of the A–H grade |
 
 ### `property_reference`
 
@@ -442,24 +456,19 @@ If either part is unresolved, the value is blank. BST and GMT are handled by
 A complete valid result costs one Personalisation call. A second and final call
 is made only for a fixable selection/coherence failure: invalid selection,
 blank/overlong observation, fake praise in a no-response case, criticism of an
-outcome that needed the enquirer's reply, an Instantly variable introducing an
-unselected finding, or an Email 2 hook that repeats one of the Email 1 lines.
+outcome that needed the enquirer's reply, or an Instantly variable introducing
+an unselected finding.
 
 The retained demo prose does not trigger an email retry. There is no full-email
 sendability contract, email-body reassembly loop, variant repair, wider
 paragraph repair, or consequence-only repair tool.
 
-### Adding the column to an existing workbook
+### Existing workbooks
 
-`email_commercial_hook_email_2` is one of the fields
-`lib/personalisation-rebuild.mjs` treats as mandatory, so a row written before
-it existed is regenerated once, in place, on the next rebuild pass — no
-unfreezing and no manual backfill. That check is skipped for any mandatory
-field the `PERSONALISATION` tab has no column for, because a value written for
-a missing column goes nowhere and would read back blank on every subsequent
-pass, re-personalising every probe for ever. **Add the column to the workbook
-first**; until then the step behaves exactly as it did before the field
-existed.
+Do not delete or reposition `email_commercial_hook_email_2`: historical rows
+may still contain it. Append the five new structured columns to DIAGNOSIS and
+PERSONALISATION when deploying the schema. Until present, header-driven writes
+skip them safely; existing sent/history rows remain frozen.
 
 Regression suites: `npm run novus:email-personalisation-selftest` and
 `npm run novus:personalisation-contract-selftest`.
@@ -469,8 +478,8 @@ Regression suites: `npm run novus:email-personalisation-selftest` and
 ## 4c. The Instantly email contract
 
 Instantly owns the fixed templates. NOVUS supplies only
-`property_reference`, `email_observation` and `email_commercial_hook` for
-Email 1, plus `email_commercial_hook_email_2` for Email 2:
+`property_reference`, `email_observation` and `email_commercial_hook` as its
+active personalised prose:
 
 ```
 Hi {{first_name}},
@@ -487,12 +496,6 @@ Worth sending it over?
 
 Joe
 ```
-
-Email 2 reuses the same fixed-template arrangement and takes
-`{{email_commercial_hook_email_2}}` as its one NOVUS-supplied prose line: the
-additional fact or implication that makes the same enquiry read differently.
-It is generated in the same single Personalisation call, from the same selected
-findings, and is never a summary of Email 1.
 
 NOVUS does not generate a greeting, CTA, sign-off, email variant, date/address
 paragraph, wider email paragraphs or complete body. A no-response probe uses the

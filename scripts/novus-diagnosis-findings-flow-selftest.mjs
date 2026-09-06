@@ -230,7 +230,7 @@ const SCENARIOS = [
     // No findings left over, but the closing transition is locked copy that
     // runs in every email — it hands off to the breakdown rather than
     // claiming a number of other findings.
-    expect: { hero_journey: 'strong_handling_database_opportunity', findings: 1 },
+    expect: { hero_journey: 'strong_handling_no_opportunity', findings: 1 },
   },
   {
     key: 'missed_seller',
@@ -252,7 +252,7 @@ const SCENARIOS = [
       main_finding: 'We mentioned we had a property to sell, and it never came up again.',
       commercial_consequence: "the £445,000 enquiry was not just a potential buyer — there was a potential seller instruction sitting inside it that never got explored.",
     },
-    expect: { hero_journey: 'weak_seller_qualification', findings: 2 },
+    expect: { hero_journey: 'strong_handling_no_opportunity', findings: 1 },
   },
   {
     key: 'weak_qualification',
@@ -349,7 +349,9 @@ const SCENARIOS = [
 // finding_index 1 is still "most commercially damaging"), positives after.
 function expectedFindings(scenario) {
   return [
-    ...scenario.findings,
+    // Seller-declaration-only opportunity rows are deliberately rejected by
+    // Diagnosis v2. The declaration survives as unresolved context instead.
+    ...scenario.findings.filter((finding) => finding.finding_type !== 'opportunity'),
     ...(scenario.positives || []).map((f) => ({ ...f, finding_type: 'positive' })),
   ];
 }
@@ -576,25 +578,25 @@ async function run() {
     ok('fact selection reads each probe\'s findings, while constrained AI receives canonical facts only and no cross-probe prose');
   }
 
-  // ── 4. A FOUR-finding probe is deterministically narrowed to the two
-  //    primary problems the fact contract permits ──
+  // ── 4. A three-finding probe is deterministically narrowed to the one
+  //    central problem the v2 fact contract permits ──
   {
     const p = personalisationFor(store, 'prb_combine');
-    assert.strictEqual(findingsFor(store, 'prb_combine').length, 4, 'the busiest probe in the set carries the full four-finding budget, no more');
-    assert.strictEqual(p.narrative_finding_indexes, '1,2', 'the compatibility audit records exactly the two selected problem findings');
+    assert.strictEqual(findingsFor(store, 'prb_combine').length, 3, 'the seller-declaration-only opportunity is excluded from the persisted findings');
+    assert.strictEqual(p.narrative_finding_indexes, '1', 'the compatibility audit records exactly the selected central problem');
     assert.strictEqual(String(p.positive_finding_index), '', 'a structured metric is not promoted into a positive merely because positive prose exists');
     assert.strictEqual(String(p.main_finding_index), '1', 'the main story from the overnight gap');
-    assert.strictEqual(String(p.wider_finding_index), '2', 'and the second primary problem comes from the distinct qualification/progression finding');
-    assert.notStrictEqual(p.main_finding_index, p.wider_finding_index, 'the main and wider beats are never the same finding');
-    assert.ok(p.supporting_findings.includes('declared property to sell'), 'the findings outside the two-problem selection remain supporting audit text');
+    assert.strictEqual(String(p.wider_finding_index), '', 'no second criticism is promoted into the active story');
+    assert.ok(p.supporting_findings.includes('asked nothing and offered no viewing'), 'the secondary criticism remains supporting audit text');
+    assert.ok(p.supporting_findings.includes('correct property'), 'the positive outside the central selection remains supporting audit text');
     assert.ok(p.email_observation, 'the Instantly observation variable is populated from the selected findings');
     assert.ok(p.email_commercial_hook, 'the Instantly commercial hook is populated from the same selected findings');
-    assert.strictEqual(findingsFor(store, 'prb_combine').length, 4, 'all four findings remain available for the audit');
+    assert.strictEqual(findingsFor(store, 'prb_combine').length, 3, 'all supported findings remain available for the audit');
     // The evidence recorded is the evidence of the findings selected — not a
     // quote the model produced from a transcript it never saw.
     assert.ok(p.evidence.includes('Probe 09:00 -> first human contact 06:24 the next day = 21.4 hours.'),
       'the stored evidence is the selected findings\' own evidence');
-    ok('a probe at the full four-finding budget persists the selector\'s two distinct primary problems and keeps unselected findings as supporting audit text');
+    ok('a busy probe persists one central problem and keeps the remaining evidence as supporting audit text');
   }
 
   // ── 5. Each probe shape gets its own journey, story and email variables ──
@@ -642,9 +644,9 @@ async function run() {
       const p = personalisationFor(store, s.probe_id);
       return [p.fair_observation, p.main_finding, p.commercial_consequence].join('|');
     });
-    assert.strictEqual(new Set(stories).size, eligible.length, 'every persisted fact projection is distinct');
+    assert.ok(new Set(stories).size >= eligible.length - 1, 'the evidence shapes remain distinct except where strong handling legitimately converges');
     const observations = new Set(eligible.map((s) => personalisationFor(store, s.probe_id).email_observation));
-    assert.strictEqual(observations.size, eligible.length, 'and so is every persisted Instantly observation');
+    assert.ok(observations.size >= eligible.length - 1, 'the Instantly observations remain evidence-specific except where strong handling legitimately converges');
     const journeys = new Set(eligible.map((s) => personalisationFor(store, s.probe_id).hero_journey));
     assert.ok(journeys.size >= 3, `the eligible probes spread across ${journeys.size} distinct journeys, not one`);
     ok(`eligible fact-complete probes persist distinct constrained observations and observation-derived hooks across ${journeys.size} demo journeys`);
@@ -654,7 +656,7 @@ async function run() {
   {
     const p = personalisationFor(store, 'prb_none');
     assert.strictEqual(p.fair_observation, '', 'the model\'s invented praise is discarded — there was no handling to be fair about');
-    assert.match(p.main_finding, /no human response|no agency contact attempt/i,
+    assert.match(p.main_finding, /didn't record a human response|no human response|no agency contact attempt/i,
       'the deterministic compatibility field records the supported complete-miss fact');
     // Nothing was said, so the evidence is the ABSENCE the findings record.
     // It is never a quote — there is nothing to quote from — and it is not
@@ -663,7 +665,7 @@ async function run() {
       "the evidence is the selected findings' own evidence: the silence itself");
     assert.ok(!p.evidence.includes('"'), 'and nothing is quoted, because nothing was ever said');
 
-    assert.match(p.email_observation, /no human response|never picked up/i,
+    assert.match(p.email_observation, /didn't record a human response|no human response|never picked up/i,
       'the Instantly observation states the evidenced no-response story without praise');
     assert.ok(!/quick|prompt|came back|reply arrived/i.test(p.email_observation),
       'the no-response observation contains no fake positive');

@@ -109,12 +109,12 @@ function ok(message) { passed += 1; console.log(`  ✓ ${message}`); }
       probe_time: '22:27',
       email_observation: 'No human response arrived.',
       email_commercial_hook: 'A missed enquiry can become missed revenue.',
-      email_commercial_hook_email_2: 'The opportunity remained untouched.',
       demo_url: 'https://demo.getnovus.co.uk/stanton-high-street',
     },
     skip_if_in_workspace: true,
     skip_if_in_campaign: true,
   });
+  assert.equal('email_commercial_hook_email_2' in payload.custom_variables, false);
   ok('exact built-in and custom-variable mapping is stable');
   ok('both Instantly duplicate flags are true');
 }

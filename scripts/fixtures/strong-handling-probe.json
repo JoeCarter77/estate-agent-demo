@@ -1,0 +1,32 @@
+{
+  "fixture_type": "test_only_synthetic",
+  "agency_name": "Synthetic Excellent Handling Agency",
+  "probe": {
+    "probe_id": "prb_test_strong_handling",
+    "agency_id": "ag_test_strong_handling",
+    "property_address": "12 Example Close, Chelmsford",
+    "property_price": "£500,000",
+    "probe_timestamp": "2026-09-01T09:00:00.000Z",
+    "observation_deadline": "2026-09-05T09:00:00.000Z",
+    "enquiry_text": "I'd like to view 12 Example Close. I have a flat in Chelmsford to sell; it is not the Billericay contact address and is not yet on the market. I need to sell before buying and hope to move within three months."
+  },
+  "intelligence": {
+    "probe_id": "prb_test_strong_handling",
+    "observation_status": "closed",
+    "human_contact": "yes",
+    "response_hours": 0.0833333333,
+    "contact_attempts": 3,
+    "follow_ups": 2,
+    "channels_used": "phone,email",
+    "viewing_progression": "slot_offered",
+    "buyer_qualification": "thorough",
+    "buyer_questions_asked": "finance position; current chain position; preferred viewing time",
+    "seller_recognition": "acknowledged",
+    "communication_quality": "strong",
+    "did_well": "A named team member replied in about five minutes, referred specifically to 12 Example Close, acknowledged that the property to sell was the Chelmsford flat rather than the Billericay contact address, checked finance and chain position, offered a Saturday viewing slot, followed up appropriately and left one clear next step to confirm the slot.",
+    "missed": "",
+    "evidence": "[email_1] Thanks for your enquiry about 12 Example Close. I understand the flat you need to sell is in Chelmsford and is not your Billericay contact address. Could you let me know your finance and current chain position? I can offer Saturday at 10:30 for the viewing. [phone_1] A brief call was attempted to progress the viewing. [email_2] Saturday at 10:30 remains available; reply or call me to confirm and I will book it for you.",
+    "grade": "A",
+    "grade_reason": "Human response in approximately five minutes, with appropriate follow-up."
+  }
+}

@@ -1,2 +1,2 @@
-diagnosis_id,agency_id,probe_id,findings,strengths,missed_opportunities,commercial_implication,novus_opportunity,diagnosis_summary,created_at,updated_at
+diagnosis_id,agency_id,probe_id,findings,strengths,missed_opportunities,commercial_implication,novus_opportunity,diagnosis_summary,created_at,updated_at,enquiry_signals,unresolved_context,recommended_actions,handling_summary,handling_quality
 SCHEMA NOTE,Fixture export in live workbook shape (V2).,,,,,,,,,

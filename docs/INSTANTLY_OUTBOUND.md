@@ -3,6 +3,11 @@
 Google Sheets `OUTBOUND` is the source of truth. Instantly is only the outbound
 execution layer. Uploading a lead never changes `outbound_status` to `SENT`.
 
+The active custom-variable payload contains `property_street`, `probe_date`,
+`probe_time`, `email_observation`, `email_commercial_hook` and `demo_url`.
+`email_commercial_hook_email_2` is deprecated: its historical Sheet column is
+preserved, but it is neither required for eligibility nor sent to Instantly.
+
 ## Server-side environment
 
 Configure these in the Vercel project environment for every deployment target

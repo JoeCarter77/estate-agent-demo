@@ -181,7 +181,17 @@ async function run() {
     created_at: '2020-01-06T00:00:00.000Z', updated_at: '2020-01-06T00:00:00.000Z',
   }));
 
-  __setAiCallerForTests(async ({ tool }) => {
+  __setAiCallerForTests(async ({ tool, prompt }) => {
+    if (tool.name === 'realise_personalisation_facts') {
+      const line = (label) => {
+        const value = prompt.match(new RegExp(`^${label}: (.*)$`, 'm'))?.[1] || '';
+        return value.startsWith('(empty because') ? '' : value;
+      };
+      return {
+        email_observation: line('Observation'),
+        email_commercial_hook: line('Commercial hook'),
+      };
+    }
     if (tool.name === 'record_probe_personalisation') {
       return {
         story_reasoning: 'Finding 1 is the selected story.',
@@ -229,7 +239,7 @@ async function run() {
   assert.ok(personRow.property_reference, 'the deterministic property reference is populated');
   assert.ok(personRow.email_observation, 'the Instantly observation variable is populated');
   assert.ok(personRow.email_commercial_hook, 'the Instantly commercial hook is populated');
-  assert.ok(personRow.email_commercial_hook_email_2, 'and so is the Email 2 hook the row was missing');
+  assert.strictEqual(personRow.email_commercial_hook_email_2, '', 'the deprecated Email 2 hook is not backfilled');
   ok('the existing row is fully populated after the fix — not left blank, not duplicated alongside a second, complete row');
 
   console.log(`\n${passed} checks passed.`);
