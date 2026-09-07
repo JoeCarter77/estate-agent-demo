@@ -179,7 +179,10 @@ function installAiStub() {
   const diagnosedProbeIds = [];
   const personalisedProbeIds = [];
   __setAiCallerForTests(async ({ tool, prompt }) => {
-    if (tool?.name === 'record_probe_diagnosis') {
+    // The merged final assessment (lib/probe-assessment.mjs) returns the
+    // diagnosis fields under its own tool name; the retired standalone diagnosis
+    // call still uses the old one. Both are answered by this branch.
+    if (tool?.name === 'record_probe_diagnosis' || tool?.name === 'record_probe_assessment') {
       diagnoseCalls += 1;
       const m = prompt.match(/prb_hist_\d+/);
       if (m) diagnosedProbeIds.push(m[0]);
@@ -260,11 +263,11 @@ async function run() {
 
     const summary = await runRebuildPass(repo, { maxAiCalls: 100 });
 
-    assert.strictEqual(summary.diagnosis.ai_diagnoses_run, 1, 'only the one unfrozen probe gets a fresh Diagnosis call');
+    assert.strictEqual(summary.assessment.ai_calls_used, 1, 'only the one unfrozen probe gets a fresh assessment call');
     assert.strictEqual(summary.personalisation.personalisations_with_findings, HISTORICAL_IDS.length,
       'every historical probe reaches Personalisation — reproducing the reported unscoped sweep');
-    assert.ok(stub.counts().personaliseCalls >= HISTORICAL_IDS.length && stub.counts().personaliseCalls <= HISTORICAL_IDS.length * 2,
-      'each personalised probe stays within the bounded one-repair AI budget');
+    assert.strictEqual(stub.counts().personaliseCalls, 0,
+      'and it does so for free — Personalisation is deterministic, so an unscoped sweep is now a cost problem that no longer costs anything');
     ok('reproduced: unfreezing one probe\'s Diagnosis, then running an untargeted rebuild, personalises every already-diagnosed probe on the sheet — confirms the reported root cause');
   }
 
@@ -284,12 +287,11 @@ async function run() {
 
     const summary = await runRebuildPass(repo, { maxAiCalls: 100, probeIds: targets });
 
-    assert.strictEqual(summary.diagnosis.ai_diagnoses_run, targets.length, 'only the targeted, unfrozen probes get diagnosed');
+    assert.strictEqual(summary.assessment.ai_calls_used, targets.length, 'only the targeted, unfrozen probes get assessed');
     assert.strictEqual(summary.personalisation.personalisations_processed, targets.length,
       'and ONLY those same probes get personalised — not the rest of the sheet');
-    assert.ok(summary.personalisation.ai_personalisations_run >= targets.length
-      && summary.personalisation.ai_personalisations_run <= targets.length * 2,
-    'the scoped probes stay within the bounded one-repair AI budget');
+    assert.strictEqual(summary.personalisation.ai_personalisations_run, 0,
+      'Personalisation spends no AI budget at all, scoped or not');
     assert.deepStrictEqual(new Set(stub.diagnosedProbeIds), new Set(targets));
     const personalisedIds = probeIdsIn(store, 'PERSONALISATION', PERSONALISATION_HEADER);
     assert.strictEqual(personalisedIds.size, targets.length, `exactly the targeted probes have a PERSONALISATION row: ${JSON.stringify(summary.personalisation)}`);
@@ -335,10 +337,10 @@ async function run() {
 
     const summary = await runRebuildPass(repo, { maxAiCalls: 100, probeIds: ['prb_hist_0001', 'prb_hist_0002'] });
 
-    assert.strictEqual(summary.diagnosis.ai_diagnoses_run, 0, 'a targeted but already-frozen probe is not re-diagnosed');
+    assert.strictEqual(summary.assessment.ai_calls_used, 0, 'a targeted but already-frozen probe is not reassessed');
     assert.strictEqual(summary.personalisation.personalisations_processed, 2, 'but it is still eligible for its first Personalisation, since that has never run');
-    assert.ok(summary.personalisation.ai_personalisations_run >= 2 && summary.personalisation.ai_personalisations_run <= 4,
-      'the two scoped rows stay within the bounded one-repair AI budget');
+    assert.strictEqual(summary.personalisation.ai_personalisations_run, 0,
+      'and it costs nothing: the two scoped rows are rendered deterministically');
     assert.strictEqual(stub.counts().diagnoseCalls, 0);
     ok('naming an already-diagnosed probe in probeIds never re-diagnoses it — the frozen check still applies inside the target list, only the SCOPE narrows');
   }

@@ -313,8 +313,12 @@ async function run() {
       maxAiCalls: 15, probeIds: TARGETS,
     });
 
-    assert.strictEqual(stub.counts().personaliseCalls, TARGETS.length * 2,
-      'every target reaches the fact-constrained validator and its one bounded facts-only correction');
+    // ZERO. The correction round-trip this suite was written around does not
+    // exist any more: Personalisation renders the canonical facts
+    // deterministically and runs the identical validator over the result, so
+    // there is no first draft to reject and no correction call to fail.
+    assert.strictEqual(stub.counts().personaliseCalls, 0,
+      'no target reaches a model at all — the copy is rendered deterministically');
     assert.deepStrictEqual(summary.personalisation.problems, [], 'a failed correction is not a failed probe');
     assert.strictEqual(summary.personalisation.personalisation_created, TARGETS.length,
       'all five eligible targeted probes regenerate PERSONALISATION');
@@ -324,12 +328,12 @@ async function run() {
     for (const probeId of TARGETS) {
       const written = personalised.get(probeId);
       assert.ok(written, `${probeId} has a PERSONALISATION row`);
-      assert.ok(String(written.primary_narrative).trim(), `${probeId} has the finalised signal set`);
+      assert.strictEqual(String(written.primary_narrative).trim(), '', `${probeId} does not repopulate the retired narrative column`);
       assert.ok(String(written.email_commercial_hook).trim(),
         `${probeId} persists a supplied deterministic consequence`);
-      assert.ok(String(written.email_observation).trim(), `${probeId} keeps its email observation`);
+      assert.ok(String(written.email_observation).trim(), `${probeId} uses the live email observation as its finalised signal`);
     }
-    ok('all targeted fact-complete probes reject invented first drafts and regenerate complete constrained PERSONALISATION rows');
+    ok('all five targeted probes regenerate complete, validated PERSONALISATION rows deterministically — no model, no correction round-trip');
 
     // 2. The demos.
     assert.strictEqual(summary.demos.demos_created, TARGETS.length, 'the five DEMOS compile in the same pass');
@@ -340,8 +344,9 @@ async function run() {
 
     // 3. The counters report the constrained calls actually spent.
     const p = summary.personalisation;
-    assert.strictEqual(p.ai_personalisations_run, stub.counts().personaliseCalls + stub.counts().correctionCalls,
-      'ai_personalisations_run reports every AI call actually spent, correction calls included');
+    assert.strictEqual(p.ai_personalisations_run, 0,
+      'ai_personalisations_run is structurally zero in normal production');
+    assert.strictEqual(p.validator_refusals, 0, 'and nothing was refused: every rendering passed the unchanged validator');
     assert.strictEqual(p.personalisations_processed, TARGETS.length);
     assert.strictEqual(p.personalisations_with_findings, TARGETS.length,
       'personalisations_with_findings counts probes personalised WITH findings, not probes that merely reached the attempt');
@@ -350,7 +355,7 @@ async function run() {
     assert.strictEqual(p.skipped_not_diagnosed, 0);
     assert.strictEqual(summary.probes_finalized_skipped, TARGETS.length,
       'the frozen five are still never re-interpreted or re-diagnosed');
-    assert.strictEqual(summary.diagnosis.ai_diagnoses_run, 0, 'no Diagnosis is regenerated');
+    assert.strictEqual(summary.assessment.ai_calls_used, 0, 'no assessment is regenerated');
     assert.strictEqual(summary.complete, true);
     ok('the counters describe what happened — AI calls spent, probes written, nothing left remaining');
 
@@ -375,27 +380,49 @@ async function run() {
     ok('the targeted rebuild is idempotent in steady state — one row per probe, no duplicates, no AI');
   }
 
-  // ── 6. The half-record rule is unchanged ──
-  //    A FIRST answer that never produced a usable record still fails loudly:
-  //    no row (so the next pass retries it), a problem recorded, and no
-  //    counter inflated by the attempt.
+  // ── 6. THE LOUD-FAILURE RULE IS UNCHANGED, AT ITS NEW SITE ──
+  //    There is no truncated model answer to fail on any more, but the rule it
+  //    protected is untouched: a probe that cannot produce BOTH mandatory email
+  //    variables is REFUSED, not repaired and not half-written. No row (so the
+  //    next pass retries it), a problem recorded with the exact blank fields,
+  //    and no counter inflated by the attempt.
+  //
+  //    The state that triggers it now is a diagnosed probe whose findings and
+  //    INTELLIGENCE supply no selectable facts at all: the canonical renderer
+  //    correctly produces an empty observation rather than inventing one, and
+  //    the terminal invariant refuses the write.
   {
     const { store, repo } = makeFakeSheet();
     __setRepoForTests(repo);
     seed(store, TARGETS.slice(0, 1), { withPersonalisation: false });
-    const stub = installAiStub({ firstAnswerFails: true });
+    const stub = installAiStub();
+
+    // Strip every fact source: no findings rows, and an INTELLIGENCE row with
+    // nothing objectively derivable on it.
+    store.DIAGNOSIS_FINDINGS = [store.DIAGNOSIS_FINDINGS[0]];
+    const intelProbeIdx = INTELLIGENCE_HEADER.indexOf('probe_id');
+    for (const intelRow of store.INTELLIGENCE.slice(1)) {
+      if (String(intelRow[intelProbeIdx] || '').trim() !== TARGETS[0]) continue;
+      for (const field of ['human_contact', 'response_hours', 'contact_attempts', 'follow_ups',
+        'viewing_progression', 'buyer_qualification', 'seller_recognition', 'communication_quality',
+        'did_well', 'missed', 'evidence']) {
+        const idx = INTELLIGENCE_HEADER.indexOf(field);
+        if (idx >= 0) intelRow[idx] = '';
+      }
+    }
 
     const summary = await runRebuildPass(repo, {
       maxAiCalls: 15, probeIds: TARGETS.slice(0, 1),
     });
 
-    assert.strictEqual(stub.counts().personaliseCalls, 1, 'a transport-level failure stops before any candidate can be persisted');
+    assert.strictEqual(stub.counts().personaliseCalls, 0, 'a refusal costs no AI call either');
     assert.strictEqual(summary.personalisation.personalisation_created, 0, 'no half row is persisted');
     assert.strictEqual(summary.personalisation.problems.length, 1, 'the probe is reported as a problem');
     assert.strictEqual(summary.personalisation.personalisations_with_findings, 0,
       'and the summary never claims a personalisation that did not happen');
     assert.strictEqual(rowsOf(store, 'PERSONALISATION', PERSONALISATION_HEADER).length, 0);
-    ok('a probe whose first answer is truncated or unusable still fails loudly with no row written — the retry-next-pass rule is unchanged');
+    ok('a probe with no selectable facts is refused loudly with no row written — the retry-next-pass rule is unchanged');
+
   }
 
   console.log(`\n${passed} checks passed.`);

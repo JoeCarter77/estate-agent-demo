@@ -12,8 +12,11 @@
 // rebuilt as a sequence of bounded requests instead of one unbounded one.
 //
 // Checks:
-//   - a dataset of 25 never-interpreted probes, rebuilt in batches of 10,
-//     takes exactly 3 calls (10 + 10 + 5) to reach remaining_interpretations: 0
+//   - the deterministic observation step completes a 26-probe dataset in ONE
+//     call with ZERO AI calls, whatever the budget — it has no AI call to
+//     bound any more (see lib/intelligence-rebuild.mjs)
+//   - the FINAL ASSESSMENT step is now where the budget lives: 25 closed,
+//     unassessed probes at a budget of 10 take exactly 3 calls (10 + 10 + 5)
 //   - every batch call only ever runs <= the budget's worth of AI calls
 //   - after all batches, every probe has exactly one INTELLIGENCE row (no
 //     duplicates) and every row is fully AI-interpreted
@@ -35,6 +38,7 @@ import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import { rebuildAllIntelligence } from '../lib/intelligence-rebuild.mjs';
 import { rebuildAllDiagnosis } from '../lib/diagnosis-rebuild.mjs';
+import { rebuildAllAssessments } from '../lib/assessment-rebuild.mjs';
 
 const PROBES_HEADER = [
   'probe_id', 'probe_reference', 'agency_id', 'portal', 'property_address', 'property_url',
@@ -161,77 +165,121 @@ async function run() {
     };
   });
 
-  // ── Drive intelligence rebuild in bounded batches, exactly like
-  // repeated calls to POST /api/novus/intelligence/rebuild-all would ──
-  let batchCalls = 0;
-  let totalInterpretationsRun = 0;
-  let remaining = Infinity;
-  while (remaining !== 0) {
-    const summary = await rebuildAllIntelligence(repo, { maxAiCalls: BATCH_SIZE });
-    batchCalls += 1;
-    assert.ok(summary.ai_interpretations_run <= BATCH_SIZE, `batch ${batchCalls} must not exceed the ${BATCH_SIZE}-call budget`);
-    totalInterpretationsRun += summary.ai_interpretations_run;
-    remaining = summary.remaining_interpretations;
-    if (batchCalls > 20) throw new Error('runaway loop — batching never completed');
-  }
-  assert.strictEqual(batchCalls, 3, '25 never-interpreted probes at a budget of 10 takes exactly 3 calls (10 + 10 + 5)');
-  assert.strictEqual(totalInterpretationsRun, PROBE_COUNT, 'every never-interpreted probe gets exactly one AI interpretation across all batches');
-  assert.strictEqual(aiCallCount, PROBE_COUNT, 'prb_pre never triggers an AI call across the whole batched run');
-  ok('a dataset larger than one bounded call completes in the expected number of budget-sized calls, each respecting the budget');
+  // ── Deterministic observation: ONE call, no budget, no AI ──
+  // This used to be the batched step. It no longer makes an AI call at all, so
+  // a dataset of any size completes in a single pass — there is nothing left
+  // for maxAiCalls to bound here.
+  const deterministic = await rebuildAllIntelligence(repo, { maxAiCalls: BATCH_SIZE });
+  assert.strictEqual(deterministic.ai_interpretations_run, 0);
+  assert.strictEqual(deterministic.remaining_interpretations, 0, 'nothing is ever left over: the step is free, so it always finishes');
+  assert.strictEqual(aiCallCount, 0, 'not one Anthropic call from the whole 26-probe deterministic pass');
+  ok('deterministic observation completes a dataset larger than any budget in one call, with zero AI calls');
 
   const intelRecords = store.INTELLIGENCE.slice(2).map((r) => toObj(INTELLIGENCE_HEADER, r));
   assert.strictEqual(intelRecords.length, totalProbes, 'exactly one INTELLIGENCE row per probe — no duplicates from running multiple batches');
-  assert.ok(intelRecords.every((r) => String(r.communication_quality || '').trim()), 'every probe ends up fully AI-interpreted once batching completes');
   const pre = intelRecords.find((r) => r.probe_id === 'prb_pre');
-  assert.strictEqual(pre.evidence, 'stubbed from before batching began', 'a probe already interpreted before batching started is never overwritten by a later batch');
-  ok('batching produces exactly one row per probe, with pre-existing interpretations preserved verbatim');
+  assert.strictEqual(pre.evidence, 'stubbed from before batching began', 'a pre-existing interpretation is never overwritten by the deterministic step');
+  ok('the deterministic pass produces exactly one row per probe, with pre-existing interpretations preserved verbatim');
 
-  // ── Rerun after completion: fully idempotent, zero further AI calls ──
+  // ── Rerun: fully idempotent, still zero AI calls ──
   aiCallCount = 0;
   const rerun = await rebuildAllIntelligence(repo, { maxAiCalls: BATCH_SIZE });
   assert.strictEqual(rerun.ai_interpretations_run, 0);
   assert.strictEqual(rerun.remaining_interpretations, 0);
   assert.strictEqual(aiCallCount, 0);
-  ok('rerunning the batched rebuild (e.g. clicking the button again) after completion makes zero further AI calls');
+  ok('rerunning the deterministic pass (e.g. clicking the button again) makes zero AI calls');
 
-  // ── Diagnosis: same batching pattern off the now-closed INTELLIGENCE rows ──
-  const probeRecords = await repo.getRecords('PROBES', 'probe_id');
-  const probesById = new Map(probeRecords.map((r) => [r.obj.probe_id, r.obj]));
-
-  let diagnosisAiCallCount = 0;
+  // ── THE BUDGET NOW LIVES ON THE FINAL ASSESSMENT, and batches identically ──
+  // All 26 closed probes are unassessed (the fixture pre-seeds an INTELLIGENCE
+  // interpretation for prb_pre but no DIAGNOSIS row), so at a budget of 10 the
+  // drain must take exactly 3 calls — 10 + 10 + 6 — each respecting the budget.
+  const probeRecordsForAssessment = await repo.getRecords('PROBES', 'probe_id');
+  const probesForAssessment = new Map(probeRecordsForAssessment.map((r) => [r.obj.probe_id, r.obj]));
+  let assessmentAiCalls = 0;
   __setAiCallerForTests(async () => {
-    diagnosisAiCallCount += 1;
+    assessmentAiCalls += 1;
     return {
-      findings: [],
+      viewing_progression: 'invited',
+      buyer_questions_asked: [],
+      seller_recognition: 'none',
+      communication_quality: 'competent',
+      did_well: 'Responded and offered a viewing.',
+      missed: '',
+      evidence: [],
+      findings: [], positive_findings: [], enquiry_signals: [],
+      unresolved_context: [], recommended_actions: [],
+      handling_summary: 'The team responded quickly.', handling_quality: 'strong',
       strengths: 'Fast, warm response.', missed_opportunities: '',
-      commercial_implication: 'Specific to this agency.', novus_opportunity: 'None evidenced',
+      commercial_implication: 'Specific to this agency.',
+      novus_opportunity: 'None evidenced',
       diagnosis_summary: 'Good outcome, nothing to flag.',
     };
   });
 
-  let diagBatchCalls = 0;
-  let totalDiagnosesRun = 0;
-  let remainingDiag = Infinity;
-  while (remainingDiag !== 0) {
-    const summary = await rebuildAllDiagnosis(repo, probesById, { maxAiCalls: BATCH_SIZE });
-    diagBatchCalls += 1;
-    assert.ok(summary.ai_diagnoses_run <= BATCH_SIZE, `diagnosis batch ${diagBatchCalls} must not exceed the ${BATCH_SIZE}-call budget`);
-    totalDiagnosesRun += summary.ai_diagnoses_run;
-    remainingDiag = summary.remaining_diagnoses;
-    if (diagBatchCalls > 20) throw new Error('runaway loop — diagnosis batching never completed');
+  let assessmentBatches = 0;
+  let totalAssessments = 0;
+  let remainingAssessments = Infinity;
+  while (remainingAssessments !== 0) {
+    const summary = await rebuildAllAssessments(repo, probesForAssessment, { maxAiCalls: BATCH_SIZE });
+    assessmentBatches += 1;
+    assert.ok(summary.ai_calls_used <= BATCH_SIZE, `assessment batch ${assessmentBatches} must not exceed the ${BATCH_SIZE}-call budget`);
+    totalAssessments += summary.assessments_created;
+    remainingAssessments = summary.assessments_remaining;
+    if (assessmentBatches > 20) throw new Error('runaway loop — assessment batching never completed');
   }
-  assert.strictEqual(totalDiagnosesRun, totalProbes, 'every closed probe (including prb_pre, once its INTELLIGENCE closed) gets exactly one diagnosis across all batches');
+  assert.strictEqual(assessmentBatches, 3, '26 closed unassessed probes at a budget of 10 take exactly 3 calls (10 + 10 + 6)');
+  assert.strictEqual(totalAssessments, totalProbes, 'every closed unassessed probe is assessed exactly once across all batches');
+  assert.strictEqual(assessmentAiCalls, totalProbes, 'ONE Anthropic call per closed probe — never two, never one per stage');
+  ok('the final assessment batches within its budget and costs exactly one AI call per closed probe');
 
+  const rerunAssessments = await rebuildAllAssessments(repo, probesForAssessment, { maxAiCalls: BATCH_SIZE });
+  assert.strictEqual(rerunAssessments.assessments_created, 0, 'a finalised assessment is frozen: rerunning creates nothing');
+  assert.strictEqual(rerunAssessments.ai_calls_used, 0);
+  ok('assessments are frozen once written — a rerun spends nothing');
+
+  // A failed Anthropic request still consumes an invocation budget slot. If
+  // failures were counted only after a successful response, one bad provider
+  // period could attempt every eligible probe despite maxAiCalls.
+  {
+    const { store: failedStore, repo: failedRepo } = makeFakeSheet();
+    const failedProbes = new Map();
+    for (let i = 0; i < 4; i++) {
+      const probeId = `prb_failed_${i}`;
+      const probe = { probe_id: probeId, agency_id: 'agc_failed' };
+      failedProbes.set(probeId, probe);
+      failedStore.PROBES.push(row(PROBES_HEADER, probe));
+      failedStore.INTELLIGENCE.push(row(INTELLIGENCE_HEADER, {
+        intelligence_id: `itl_failed_${i}`,
+        probe_id: probeId,
+        agency_id: 'agc_failed',
+        observation_status: 'closed',
+      }));
+    }
+
+    let attempts = 0;
+    const failed = await rebuildAllAssessments(failedRepo, failedProbes, {
+      maxAiCalls: 2,
+      assess: async () => {
+        attempts += 1;
+        throw new Error('simulated Anthropic failure');
+      },
+    });
+    assert.strictEqual(attempts, 2, 'failed assessment attempts still stop at maxAiCalls');
+    assert.strictEqual(failed.ai_calls_used, 2, 'the summary reports both consumed attempt slots');
+    assert.strictEqual(failed.problems.length, 2, 'each attempted failure is reported');
+    assert.strictEqual(failed.assessments_remaining, 2, 'unattempted eligible probes remain for the next pass');
+  }
+  ok('failed Anthropic attempts also consume the bounded invocation budget');
+
+  // The old DIAGNOSIS batching block that stood here is gone with the stage it
+  // tested: there is no separate AI diagnosis pass any more, so by this point
+  // every probe already has its DIAGNOSIS row — written by the SAME assessment
+  // call above. lib/diagnosis-rebuild.mjs keeps its own dedicated coverage in
+  // scripts/novus-diagnosis-selftest.mjs.
   const diagRecords = store.DIAGNOSIS.slice(2).map((r) => toObj(DIAGNOSIS_HEADER, r));
-  assert.strictEqual(diagRecords.length, totalProbes, 'exactly one DIAGNOSIS row per probe — no duplicates from running multiple batches');
-  ok('DIAGNOSIS batches the same way and produces exactly one row per eligible probe, no duplicates');
-
-  diagnosisAiCallCount = 0;
-  const diagRerun = await rebuildAllDiagnosis(repo, probesById, { maxAiCalls: BATCH_SIZE });
-  assert.strictEqual(diagRerun.ai_diagnoses_run, 0);
-  assert.strictEqual(diagRerun.remaining_diagnoses, 0);
-  assert.strictEqual(diagnosisAiCallCount, 0);
-  ok('rerunning the batched diagnosis rebuild after completion makes zero further AI calls');
+  assert.strictEqual(diagRecords.length, totalProbes, 'exactly one DIAGNOSIS row per probe — no duplicates from running multiple assessment batches');
+  assert.ok(diagRecords.every((r) => String(r.diagnosis_summary || '').trim()), 'every probe ends up with a written, frozen assessment');
+  ok('batched assessment produces exactly one DIAGNOSIS row per probe, no duplicates');
 
   // ── A batch that fails outright before it can write loses no progress
   // already committed by earlier batches ──
@@ -252,37 +300,48 @@ async function run() {
       }));
     }
     __setAiCallerForTests(async () => ({
-      viewing_progression: 'invited', buyer_qualification: 'minimal',
-      buyer_questions_asked: [], seller_recognition: 'none',
+      viewing_progression: 'invited', buyer_questions_asked: [], seller_recognition: 'none',
       communication_quality: 'competent', did_well: 'Responded promptly.', missed: '', evidence: [],
+      findings: [], positive_findings: [], enquiry_signals: [],
+      unresolved_context: [], recommended_actions: [],
+      handling_summary: 'The team responded promptly.', handling_quality: 'strong',
+      strengths: 'Prompt.', missed_opportunities: '', commercial_implication: 'Specific to this agency.',
+      novus_opportunity: 'None evidenced', diagnosis_summary: 'Good outcome, nothing to flag.',
     }));
 
-    // Batch 1 (budget 5) succeeds and commits 5 rows.
-    const b1 = await rebuildAllIntelligence(repo2, { maxAiCalls: 5 });
-    assert.strictEqual(b1.ai_interpretations_run, 5);
-    assert.strictEqual(store2.INTELLIGENCE.slice(2).length, 5, 'batch 1 commits its 5 rows');
+    // The deterministic pass writes all 15 INTELLIGENCE rows for free.
+    const det2 = await rebuildAllIntelligence(repo2);
+    assert.strictEqual(det2.ai_interpretations_run, 0);
+    assert.strictEqual(store2.INTELLIGENCE.slice(2).length, 15, 'the deterministic pass commits every row in one call');
 
-    // Batch 2 completes its 5 AI calls successfully but then the write
-    // itself fails (simulating the Sheets API erroring, or the invocation
-    // being killed between finishing its AI calls and its single batched
-    // write) — the whole call rejects, and because the write is one atomic
-    // batchUpdate, nothing from this batch lands: batch 1's already-
-    // committed 5 rows are untouched, and none of batch 2's 5 are half-written.
+    const probes2 = new Map((await repo2.getRecords('PROBES', 'probe_id')).map((r) => [r.obj.probe_id, r.obj]));
+
+    // Batch 1 (budget 5) succeeds and commits 5 assessments.
+    const a1 = await rebuildAllAssessments(repo2, probes2, { maxAiCalls: 5 });
+    assert.strictEqual(a1.assessments_created, 5);
+    assert.strictEqual(store2.DIAGNOSIS.slice(2).length, 5, 'batch 1 commits its 5 DIAGNOSIS rows');
+
+    // Batch 2 completes its 5 AI calls successfully but then the write itself
+    // fails (the Sheets API erroring, or the invocation being killed between
+    // finishing its AI calls and its single batched write) — the whole call
+    // rejects, and because the write is one atomic batchUpdate, nothing from
+    // this batch lands: batch 1's committed 5 rows are untouched, and none of
+    // batch 2's 5 are half-written.
     const realWriteRowsBatch = repo2.writeRowsBatch.bind(repo2);
     repo2.writeRowsBatch = async () => { throw new Error('simulated Sheets API failure mid-write'); };
-    await assert.rejects(() => rebuildAllIntelligence(repo2, { maxAiCalls: 5 }));
-    assert.strictEqual(store2.INTELLIGENCE.slice(2).length, 5, 'a batch whose write fails commits nothing and does not lose batch 1\'s committed rows');
+    await assert.rejects(() => rebuildAllAssessments(repo2, probes2, { maxAiCalls: 5 }));
+    assert.strictEqual(store2.DIAGNOSIS.slice(2).length, 5, 'a batch whose write fails commits nothing and does not lose batch 1\'s committed rows');
     repo2.writeRowsBatch = realWriteRowsBatch;
 
-    // Batch 2, retried now that writes succeed again, resumes from exactly
-    // where batch 1 left off (the 5 already-interpreted probes are untouched,
-    // and the 5 AI calls the failed attempt made are simply redone).
-    const b2 = await rebuildAllIntelligence(repo2, { maxAiCalls: 5 });
-    assert.strictEqual(b2.ai_interpretations_run, 5, 'retrying the crashed batch processes the next 5 probes, not the already-done 5');
-    const b3 = await rebuildAllIntelligence(repo2, { maxAiCalls: 5 });
-    assert.strictEqual(b3.ai_interpretations_run, 5);
-    assert.strictEqual(b3.remaining_interpretations, 0, 'all 15 probes are done after resuming past the crashed batch');
-    assert.strictEqual(store2.INTELLIGENCE.slice(2).length, 15, 'exactly 15 rows total — the crash never produced a duplicate or a lost probe');
+    // Retried now that writes succeed again, it resumes from exactly where
+    // batch 1 left off — the 5 already-assessed probes are untouched, and the
+    // 5 AI calls the failed attempt made are simply redone.
+    const a2 = await rebuildAllAssessments(repo2, probes2, { maxAiCalls: 5 });
+    assert.strictEqual(a2.assessments_created, 5, 'retrying the crashed batch processes the next 5 probes, not the already-done 5');
+    const a3 = await rebuildAllAssessments(repo2, probes2, { maxAiCalls: 5 });
+    assert.strictEqual(a3.assessments_created, 5);
+    assert.strictEqual(a3.assessments_remaining, 0, 'all 15 probes are assessed after resuming past the crashed batch');
+    assert.strictEqual(store2.DIAGNOSIS.slice(2).length, 15, 'exactly 15 rows total — the crash never produced a duplicate or a lost probe');
   }
   ok('a batch that crashes before writing loses no already-committed progress, and resuming completes the rest with no duplicates');
 

@@ -3,7 +3,10 @@
 // operations. No new Vercel Serverless Function is created.
 
 import { getRepo } from '../../../lib/sheets.mjs';
+import { createSnapshotRepo } from '../../../lib/pipeline-snapshot.mjs';
 import { runRebuildPass } from '../../../lib/rebuild-pass.mjs';
+import { backfillPropertyStreet } from '../../../lib/property-reference.mjs';
+import { reconcileActionEngine } from '../../../lib/action-engine.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 import { rebuildOutbound } from '../../../lib/outbound.mjs';
 import {
@@ -157,6 +160,36 @@ export default async function handler(req, res) {
 
   const probeId = String(body.probe_id || '').trim();
 
+  // ONE-OFF RECOVERY: fill PROBES.property_street from property_address wherever
+  // the cell is blank. A nonblank value is NEVER overwritten, and a probe with
+  // no usable address is left alone rather than given an invented street. Safe
+  // to run repeatedly — a second run finds nothing left to do. OUTBOUND no
+  // longer depends on this having been run (lib/property-reference.mjs derives
+  // the same value on demand); this simply makes the sheet itself tidy.
+  if (body.operation === 'backfill_property_street') {
+    try {
+      const result = await backfillPropertyStreet(getRepo(), { dryRun: body.dry_run !== false });
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error('property_street backfill error:', err);
+      return res.status(500).json({ error: err.message || 'Failed to backfill property_street' });
+    }
+  }
+
+  // EXPLICIT FULL RECOVERY for the acquisition action ledger. The nightly cron
+  // reconciles only the agencies whose evidence changed; this sweeps every
+  // agency, and is deliberately a separate, human-triggered operation rather
+  // than the routine expensive path.
+  if (body.operation === 'reconcile_actions') {
+    try {
+      const result = await reconcileActionEngine(createSnapshotRepo(getRepo()));
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error('action reconciliation error:', err);
+      return res.status(500).json({ error: err.message || 'Failed to reconcile actions' });
+    }
+  }
+
   if (body.operation === 'rebuild_outbound') {
     try {
       const result = await rebuildOutbound(getRepo(), { dryRun: body.dry_run !== false });
@@ -216,7 +249,10 @@ export default async function handler(req, res) {
     : Number(process.env.NOVUS_REBUILD_BATCH_SIZE) || DEFAULT_BATCH_SIZE;
 
   try {
-    const repo = getRepo();
+    // ONE invocation-scoped snapshot for this request. Each core tab is
+    // downloaded once for the whole pass instead of once per stage; the cache
+    // dies with the response and is never shared between requests.
+    const repo = createSnapshotRepo(getRepo());
     if (probeId) {
       const result = await recomputeProbeObservation(repo, probeId);
       if (!result) return res.status(404).json({ error: `Probe ${probeId} not found` });

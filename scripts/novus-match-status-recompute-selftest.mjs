@@ -20,7 +20,10 @@ import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 
 __setAiCallerForTests(async ({ tool }) => {
-  if (tool.name === 'record_probe_diagnosis') {
+  // The merged final assessment (lib/probe-assessment.mjs) returns the
+  // diagnosis fields under its own tool name; the retired standalone diagnosis
+  // call still uses the old one. Both are answered by this branch.
+  if (tool.name === 'record_probe_diagnosis' || tool.name === 'record_probe_assessment') {
     return {
       findings: [],
       strengths: '', missed_opportunities: '', commercial_implication: '',

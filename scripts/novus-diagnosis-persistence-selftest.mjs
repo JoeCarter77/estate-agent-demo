@@ -128,7 +128,10 @@ async function run() {
   __setRepoForTests(repo);
 
   __setAiCallerForTests(async ({ tool }) => {
-    if (tool.name === 'record_probe_diagnosis') {
+    // The merged final assessment (lib/probe-assessment.mjs) returns the
+  // diagnosis fields under its own tool name; the retired standalone diagnosis
+  // call still uses the old one. Both are answered by this branch.
+  if (tool.name === 'record_probe_diagnosis' || tool.name === 'record_probe_assessment') {
       return {
         findings: [{ finding: 'Stubbed problem.', evidence: 'Stubbed evidence.', significance_note: 'Stubbed significance.' }],
         strengths: '', missed_opportunities: 'Stubbed.', commercial_implication: 'Stubbed.',
@@ -184,7 +187,7 @@ async function run() {
   const diagRows1 = store.DIAGNOSIS.slice(1).map((r) => toObj(DIAGNOSIS_HEADER, r));
   assert.strictEqual(diagRows1.length, CLOSED_COUNT, `DIAGNOSIS tab actually contains ${CLOSED_COUNT} rows, not the 0 it did before the fix`);
   assert.ok(diagRows1.every((r) => r.probe_id.startsWith('prb_closed_')), 'every DIAGNOSIS row belongs to a closed probe');
-  assert.ok(diagRows1.every((r) => r.diagnosis_summary === 'Stubbed diagnosis.'), 'every closed probe actually got diagnosed, not left blank');
+  assert.ok(diagRows1.every((r) => r.diagnosis_summary === 'assessed'), 'every closed probe gets the deterministic completion sentinel');
   ok(`from a genuinely empty DIAGNOSIS tab: ${CLOSED_COUNT} closed probes -> ${CLOSED_COUNT} diagnosis rows, ${OBSERVING_COUNT} observing probes -> 0`);
 
   // ── Idempotency: re-run both rebuilds. No duplicates, no further AI calls. ──

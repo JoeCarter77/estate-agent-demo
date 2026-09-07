@@ -4,11 +4,14 @@
 // automatically closes/finalises probes once their 4-day observation window
 // has elapsed — the probe lifecycle:
 //
-//   PROBE SENT -> communications arrive -> INTELLIGENCE updates in real time
-//   (api/novus/webhooks/*.js -> lib/observation-recompute.mjs, unchanged)
-//   -> 4 days after the probe was sent, the probe closes -> final
-//   INTELLIGENCE is calculated from everything received during those 4 days
-//   -> final DIAGNOSIS is generated once -> DIAGNOSIS is frozen.
+//   PROBE SENT -> communications arrive -> INTELLIGENCE's DETERMINISTIC fields
+//   update in real time (api/novus/webhooks/*.js ->
+//   lib/observation-recompute.mjs), with NO model call while the window is open
+//   -> 4 days after the probe was sent, the probe closes -> ONE final
+//   assessment (lib/probe-assessment.mjs) reads everything received during
+//   those 4 days and produces both the semantic INTELLIGENCE fields and the
+//   commercial DIAGNOSIS -> DIAGNOSIS is frozen -> everything after it
+//   (Personalisation, DEMOS, OUTBOUND) is deterministic and free.
 //
 // WHY A CRON, AND WHY *THIS* ENDPOINT: closing a probe on schedule needs
 // something to actually run at/after its deadline even when nothing else
@@ -19,20 +22,20 @@
 // communications during its window has nothing to trigger a recompute at
 // all — lib/grading.mjs's grade for it stays 'pending' forever unless
 // something re-evaluates it after the deadline passes. This endpoint is that
-// "something": it is exactly lib/rebuild-pass.mjs's runRebuildPass() (the
-// SAME combined Intelligence-then-Diagnosis pass the human "Rebuild
-// Intelligence" button runs) called on a Cron schedule instead of a click.
-// No new evidence pipeline, no new close logic — every closed-and-diagnosed
-// probe here went through the identical lib/intelligence-fields.mjs +
-// lib/probe-diagnosis.mjs code the rest of the system already uses.
+// "something": it is exactly lib/rebuild-pass.mjs's runRebuildPass() (the SAME
+// pass the human "Rebuild Intelligence" button runs) called on a Cron schedule
+// instead of a click.
+// No new evidence pipeline, no new close logic — every closed-and-assessed
+// probe here went through the identical lib/intelligence-fields.mjs grading and
+// the identical lib/probe-diagnosis.mjs commercial guards the rest of the
+// system uses.
 //
 // Calling this repeatedly is cheap and safe: lib/intelligence-rebuild.mjs
-// only spends an AI call on a probe that's never been interpreted (or is
-// forced — this endpoint never forces), lib/diagnosis-rebuild.mjs only ever
-// diagnoses a probe once (never regenerates a written diagnosis_summary, no
-// matter how many times this fires), and a finalised probe (closed + a
-// non-blank DIAGNOSIS.diagnosis_summary) is skipped entirely by both steps —
-// it is frozen. Bounded to `batch_size` AI calls per invocation, same
+// makes no AI call at all, lib/assessment-rebuild.mjs assesses a probe exactly
+// once (never regenerating a written diagnosis_summary, no matter how many
+// times this fires), and a finalised probe (closed + a non-blank
+// DIAGNOSIS.diagnosis_summary) is skipped entirely by both steps — it is
+// frozen. Bounded to `batch_size` AI calls per invocation, same
 // reasoning as api/novus/intelligence/rebuild-all.js's BATCHING note: if a
 // tick can't finish everything newly-eligible for closure, the next tick
 // simply continues where this one left off (idempotent upsert-by-probe_id,
@@ -65,6 +68,7 @@
 
 import crypto from 'node:crypto';
 import { getRepo } from '../../../lib/sheets.mjs';
+import { createSnapshotRepo } from '../../../lib/pipeline-snapshot.mjs';
 import { runRebuildPass } from '../../../lib/rebuild-pass.mjs';
 import { uploadEligibleOutboundLeads } from '../../../lib/instantly-outbound.mjs';
 import { reconcileActionEngine } from '../../../lib/action-engine.mjs';
@@ -75,10 +79,30 @@ export const maxDuration = 60;
 // DEFAULT_BATCH_SIZE.
 const DEFAULT_BATCH_SIZE = 15;
 
+// ── WHAT THE 3AM RUN DOES, IN PRIORITY ORDER ────────────────────────────────
+//
+//   A. Close every probe whose observation window expired, and recompute every
+//      deterministic field. Zero AI calls.
+//   B. Perform the final assessments that are actually required, bounded by
+//      batchSize. This is the ONLY thing the budget governs.
+//   C. Deterministically drain everything downstream — Personalisation, DEMOS,
+//      OUTBOUND — for every probe already assessed, WHETHER OR NOT the budget
+//      in B was exhausted. Steps A and C are inside runRebuildPass().
+//   D. Hand eligible OUTBOUND rows to Instantly.
+//   E. Reconcile ONLY the acquisition actions for agencies whose evidence
+//      changed in this run.
+//
+// If 15 assessments cannot all complete, that is fine and expected — the next
+// tick continues where this one stopped, because "needs an assessment" is a
+// state on the sheet (a blank diagnosis_summary on a closed probe), not a
+// cursor. What must never happen again is an assessment backlog preventing 50
+// already-assessed leads from becoming Personalisation -> Demo -> OUTBOUND in
+// the same run, which is exactly what the old shared sequential budget did.
 export async function runNightlyFinalizer(repo, {
   batchSize = DEFAULT_BATCH_SIZE,
   rebuild = runRebuildPass,
   handoff = uploadEligibleOutboundLeads,
+  reconcile = reconcileActionEngine,
   instantlyOptions = {},
 } = {}) {
   const summary = await rebuild(repo, {
@@ -87,11 +111,37 @@ export async function runNightlyFinalizer(repo, {
   });
   if (!summary?.outbound) throw new Error('Nightly OUTBOUND rebuild did not complete');
 
-  // This is intentionally last. The shared handoff re-reads the OUTBOUND tab
-  // produced above and applies the same marker-based eligibility rules used
-  // by the protected manual bulk operation.
+  // D. Deliberately after the deterministic drain. The shared handoff applies
+  // the same marker-based eligibility rules as the protected manual bulk
+  // operation, so a lead already carrying an instantly_lead_id is skipped and
+  // can never be uploaded twice.
   const instantly = await handoff(repo, instantlyOptions);
-  return { ...summary, instantly, batch_size: batchSize };
+
+  // E. Failure-isolated and SCOPED. It projects evidence the pipeline above
+  // just wrote, so it can never be allowed to prevent probe finalisation or the
+  // Instantly handoff — and it reconciles only the agencies this run actually
+  // touched, rather than sweeping every agency on the sheet every night. A full
+  // sweep remains available by calling reconcileActionEngine() with no agency
+  // filter, as an explicit recovery operation.
+  let actions;
+  try {
+    actions = await reconcile(repo, { agencyIds: summary.affected_agency_ids || [] });
+  } catch (err) {
+    console.error('nightly action reconciliation failed:', err?.message || err);
+    actions = { available: false, error: err?.message || 'action reconciliation failed' };
+  }
+
+  return {
+    ...summary,
+    instantly,
+    instantly_uploaded: instantly?.uploaded_rows ?? 0,
+    instantly_failed: instantly?.failed_rows ?? 0,
+    actions,
+    batch_size: batchSize,
+    // Restated AFTER the handoff and reconciliation, so the reported request
+    // counts cover the whole invocation rather than the rebuild alone.
+    sheets: typeof repo.snapshotStats === 'function' ? repo.snapshotStats() : summary.sheets,
+  };
 }
 
 function safeEqual(a, b) {
@@ -125,7 +175,11 @@ export default async function handler(req, res) {
   const batchSize = Number(process.env.NOVUS_REBUILD_BATCH_SIZE) || DEFAULT_BATCH_SIZE;
 
   try {
-    const repo = getRepo();
+    // ONE invocation-scoped snapshot for the whole nightly run: the rebuild,
+    // the Instantly handoff and the action reconciliation all read through it,
+    // so each core tab is downloaded once instead of once per stage. Created
+    // here and discarded with the response — never shared across requests.
+    const repo = createSnapshotRepo(getRepo());
     const summary = await runNightlyFinalizer(repo, {
       batchSize,
       instantlyOptions: {
@@ -133,16 +187,7 @@ export default async function handler(req, res) {
         campaignId: process.env.INSTANTLY_CAMPAIGN_ID,
       },
     });
-    // Periodic reconciliation is deliberately last and failure-isolated: it
-    // projects the evidence the existing nightly pipeline just wrote, but can
-    // never prevent probe finalisation or Instantly handoff.
-    let actions;
-    try { actions = await reconcileActionEngine(repo); }
-    catch (err) {
-      console.error('nightly action reconciliation failed:', err?.message || err);
-      actions = { available: false, error: err?.message || 'action reconciliation failed' };
-    }
-    return res.status(200).json({ ...summary, actions });
+    return res.status(200).json(summary);
   } catch (err) {
     console.error('intelligence finalize (cron) error:', err);
     return res.status(500).json({ error: err.message || 'Failed to finalise expired probes' });

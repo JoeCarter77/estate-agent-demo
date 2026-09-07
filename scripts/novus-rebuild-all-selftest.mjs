@@ -8,12 +8,14 @@
 //   - deterministic fields (grade, human_contact, response_hours, contact
 //     attempts/follow-ups, channels) are computed correctly, unchanged from
 //     the old A-H engine
-//   - AI interpretation runs exactly once per probe that has never been
-//     interpreted (communication_quality blank) — a probe already carrying
-//     an interpretation is left untouched on a routine rebuild
-//   - a second rebuild makes ZERO further AI calls (the idempotency
-//     invariant the whole no-fingerprint design depends on)
-//   - force_ai:true re-runs every probe regardless
+//   - this step makes ZERO AI calls, for every probe, always: semantic
+//     interpretation moved into the single final assessment at probe close
+//     (lib/probe-assessment.mjs), so nothing is spent reading an enquiry that
+//     has not finished
+//   - a never-assessed probe's semantic columns stay blank, and an
+//     already-interpreted probe's are carried forward verbatim
+//   - a second rebuild is byte-identical (the idempotency invariant)
+//   - forceAi:true is inert
 //   - COMMUNICATIONS only ever gets automated_or_human patched — none of
 //     the retired columns (human_contact, follow_up, booking_attempt, …)
 //
@@ -146,9 +148,14 @@ async function run() {
 
   const first = await rebuildAllIntelligence(repo);
   assert.strictEqual(first.probes_processed, 2);
-  assert.strictEqual(first.ai_interpretations_run, 1, 'only prb_a (never interpreted) triggers an AI call; prb_b is already interpreted');
-  assert.strictEqual(aiCallCount, 1);
-  ok('AI interpretation runs only for the probe that has never been interpreted before');
+  // THE CONTRACT CHANGED, DELIBERATELY. This step used to AI-interpret any
+  // probe whose INTELLIGENCE row had never been interpreted — including probes
+  // still inside their observation window. Semantic interpretation now happens
+  // exactly once, at close, inside the single final assessment
+  // (lib/probe-assessment.mjs). This step is deterministic and free.
+  assert.strictEqual(first.ai_interpretations_run, 0, 'deterministic observation makes NO AI call, ever');
+  assert.strictEqual(aiCallCount, 0, 'not one Anthropic call reaches the wire from this step');
+  ok('deterministic observation runs with zero AI calls, for interpreted and never-interpreted probes alike');
 
   const intelRecords = store.INTELLIGENCE.slice(2).map((r) => toObj(INTELLIGENCE_HEADER, r));
   const a = intelRecords.find((r) => r.probe_id === 'prb_a');
@@ -157,34 +164,39 @@ async function run() {
   assert.strictEqual(a.human_contact, 'yes');
   assert.strictEqual(a.grade, 'C', 'very fast (<=1h) human contact with 0 follow-ups grades C — the unchanged A-H engine');
   assert.ok(Number(a.response_hours) < 1, 'prb_a response_hours reflects the 30-minute lag');
-  assert.strictEqual(a.viewing_progression, 'invited', 'AI-derived field written through from the stub');
-  assert.strictEqual(a.buyer_qualification, 'minimal', '1 genuine question floors qualification to minimal');
-  ok('deterministic fields (human_contact, response_hours) and AI fields are both written correctly for the newly-interpreted probe');
+  ok('every deterministic field is computed for a probe that has never been interpreted');
 
-  assert.strictEqual(b.communication_quality, 'generic', 'prb_b keeps its prior AI interpretation untouched');
-  assert.strictEqual(b.evidence, 'stubbed from a prior run', 'a routine rebuild never overwrites an existing AI interpretation');
-  assert.strictEqual(b.human_contact, 'yes', 'deterministic fields still recompute even when the AI fields are reused');
-  ok('a probe already interpreted keeps its AI fields verbatim while its deterministic fields still recompute');
+  assert.strictEqual(a.viewing_progression, '', 'a never-assessed probe keeps its semantic columns blank until it closes');
+  assert.strictEqual(a.communication_quality, '', 'communication_quality is written by the final assessment, not here');
+  ok('semantic columns stay blank on a probe that has not reached its final assessment');
+
+  assert.strictEqual(b.communication_quality, 'generic', 'prb_b keeps its prior interpretation untouched');
+  assert.strictEqual(b.evidence, 'stubbed from a prior run', 'a deterministic rebuild never overwrites an existing interpretation');
+  assert.strictEqual(b.human_contact, 'yes', 'deterministic fields still recompute even when the semantic fields are carried forward');
+  ok('an already-interpreted probe keeps its semantic fields verbatim while its deterministic fields still recompute');
 
   // COMMUNICATIONS: only automated_or_human should ever be patched.
   const commA = toObj(COMMUNICATIONS_HEADER, store.COMMUNICATIONS.slice(2).find((r) => r[0] === 'com_a1'));
   assert.strictEqual(commA.automated_or_human, 'human', 'automated_or_human is the one per-message fact still written');
   ok('COMMUNICATIONS rows are patched with automated_or_human only — no retired column is ever written');
 
-  // ── Second rebuild: zero further AI calls (idempotency) ──
+  // ── Second rebuild: still zero AI calls, still identical rows ──
   aiCallCount = 0;
   const second = await rebuildAllIntelligence(repo);
-  assert.strictEqual(second.ai_interpretations_run, 0, 'a second rebuild over an already-interpreted sheet makes no AI calls');
+  assert.strictEqual(second.ai_interpretations_run, 0);
   assert.strictEqual(aiCallCount, 0);
   const stripTimestamps = (records) => records.map(({ updated_at, ...rest }) => rest);
   const intelRecords2 = store.INTELLIGENCE.slice(2).map((r) => toObj(INTELLIGENCE_HEADER, r));
-  assert.deepStrictEqual(stripTimestamps(intelRecords2), stripTimestamps(intelRecords), 'a second rebuild changes nothing (besides updated_at) — same invariant as the old pipeline');
+  assert.deepStrictEqual(stripTimestamps(intelRecords2), stripTimestamps(intelRecords), 'a second rebuild changes nothing (besides updated_at)');
   ok('a second rebuild is fully idempotent: zero AI calls, identical rows');
 
-  // ── force_ai: true re-runs every probe regardless ──
+  // ── forceAi is accepted and inert: there is no AI call left to force ──
   const forced = await rebuildAllIntelligence(repo, { forceAi: true });
-  assert.strictEqual(forced.ai_interpretations_run, 2, 'force_ai re-interprets every probe, including the already-interpreted one');
-  ok('force_ai:true re-runs AI interpretation for every probe');
+  assert.strictEqual(forced.ai_interpretations_run, 0, 'forceAi cannot conjure an AI call into a deterministic step');
+  assert.strictEqual(aiCallCount, 0);
+  const intelRecords3 = store.INTELLIGENCE.slice(2).map((r) => toObj(INTELLIGENCE_HEADER, r));
+  assert.deepStrictEqual(stripTimestamps(intelRecords3), stripTimestamps(intelRecords), 'forceAi does not blank or rewrite a carried-forward interpretation either');
+  ok('forceAi:true is inert — no AI call, and no existing interpretation disturbed');
 
   console.log(`\n${passed} checks passed.`);
 }

@@ -1196,11 +1196,12 @@ async function run() {
     ok('a probe with no PERSONALISATION row is refused with a 409, not a half-demo');
   }
   {
-    // A PERSONALISATION row that exists but was never finalised (no
-    // primary_narrative) is NOT a story — compiling from it would put a demo
+    // A PERSONALISATION row that exists but was never finalised (no live
+    // email_observation) is NOT a story — compiling from it would put a demo
     // in front of a prospect built on half an answer.
     const { store, repo } = makeWorkbook();
     seedWeakSeller(store);
+    store.PERSONALISATION[1][PERSONALISATION_HEADER.indexOf('email_observation')] = '';
     store.PERSONALISATION[1][PERSONALISATION_HEADER.indexOf('primary_narrative')] = '';
     __setRepoForTests(repo);
     const summary = await compileDemos(repo, { resolveImageUrl: noImage });
@@ -1255,14 +1256,15 @@ async function run() {
     assert.strictEqual(summary.demos.results[0].reason, 'personalisation_completed');
     ok('ONE pass: PERSONALISATION completes and the DEMOS row is compiled in the same invocation');
 
-    // ZERO AI IN DEMOS COMPILATION: exactly one AI call happened in the whole
-    // pass — the personalisation call. If compileDemos() had called AI to
-    // select/rank/summarise evidence, fakePersonalisationAi would have thrown
-    // on the unexpected tool name and this pass would already have failed;
-    // this count makes the "zero" explicit rather than merely implied.
-    assert.strictEqual(personalisationAiCalls, PERSONALISATION_TOOLS.length,
-      'DEMOS compilation must add no AI calls beyond PERSONALISATION\'s own two');
-    ok("only PERSONALISATION's own AI calls happened in the whole pass — DEMOS compilation made none");
+    // ZERO AI IN THE WHOLE TAIL OF THE PIPELINE. This used to allow
+    // PERSONALISATION its own calls and assert only that DEMOS added none.
+    // Personalisation is deterministic now, so the honest assertion is
+    // stronger: from the finalised assessment onwards, not one Anthropic call
+    // is made. If either step reached a model, fakePersonalisationAi would
+    // have been invoked and this count would be non-zero.
+    assert.strictEqual(personalisationAiCalls, 0,
+      'PERSONALISATION and DEMOS together make ZERO AI calls');
+    ok('no AI call happens anywhere after the final assessment — PERSONALISATION and DEMOS are both free');
 
     const demo = demoRowsOf(store)[0];
     assert.strictEqual(demo.probe_id, 'prb_auto_001');

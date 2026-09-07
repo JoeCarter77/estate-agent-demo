@@ -154,7 +154,7 @@ function findingsFor(store, probeId) {
 function stubFindings(n, tag) {
   const shapes = [
     ['Buyer qualification recorded none', 'No buyer qualification questions were asked'],
-    ['The declared seller opportunity was not recognised', 'Seller recognition was recorded as none'],
+    ['No follow-up was recorded', 'Contact attempts were recorded as one'],
     ['No viewing was offered', 'Viewing progression was recorded as none'],
     ['The enquiry received a human response within three hours', 'Response time was recorded as three hours'],
   ];
@@ -218,7 +218,10 @@ function installAi(findingsByTag) {
         email_commercial_hook_email_2: line('Hook 2'),
       };
     }
-    if (tool.name === 'record_probe_diagnosis') {
+    // The merged final assessment (lib/probe-assessment.mjs) returns the
+  // diagnosis fields under its own tool name; the retired standalone diagnosis
+  // call still uses the old one. Both are answered by this branch.
+  if (tool.name === 'record_probe_diagnosis' || tool.name === 'record_probe_assessment') {
       diagnoseCalls += 1;
       const tag = Object.keys(findingsByTag).find((t) => prompt.includes(t)) || Object.keys(findingsByTag)[0];
       // Diagnosis's per-probe budget is 3 problem/opportunity findings plus 1
@@ -299,8 +302,8 @@ async function run() {
     assert.strictEqual(dataRows(store, 'DIAGNOSIS', DIAGNOSIS_HEADER).length, 1, 'ONE DIAGNOSIS row for the probe');
     assert.strictEqual(dataRows(store, 'PERSONALISATION', PERSONALISATION_HEADER).length, 1, 'ONE PERSONALISATION row for the probe');
     assert.strictEqual(diagnoseCalls, 1, 'and the probe was diagnosed ONCE — the duplicate visit cost no second AI call either');
-    assert.strictEqual(summary.diagnosis.findings_written, 4, 'the summary counts the findings once, per probe');
-    assert.strictEqual(summary.diagnosis.duplicate_intelligence_rows_skipped, 1, 'the duplicate INTELLIGENCE row is reported, not silently absorbed');
+    assert.strictEqual(summary.assessment.findings_written, 4, 'the summary counts the findings once, per probe');
+    assert.strictEqual(summary.assessment.duplicate_intelligence_rows_skipped, 1, 'the duplicate INTELLIGENCE row is reported, not silently absorbed');
     assert.strictEqual(summary.personalisation.duplicate_intelligence_rows_skipped, 1, 'and Personalisation skips it the same way');
     ok('the reported bug: duplicate INTELLIGENCE rows for one probe no longer duplicate its findings inside a single rebuild');
   }
@@ -487,8 +490,8 @@ async function run() {
     assert.strictEqual(new Set(keys).size, keys.length, 'every (probe_id, finding_index) still appears exactly once');
     assert.strictEqual(dataRows(store, 'DIAGNOSIS', DIAGNOSIS_HEADER).length, 4, 'one DIAGNOSIS row per probe');
     assert.strictEqual(dataRows(store, 'PERSONALISATION', PERSONALISATION_HEADER).length, 4, 'one PERSONALISATION row per probe');
-    assert.strictEqual(diagnoseCalls, 4, 'one diagnosis AI call per probe across the whole run');
-    assert.strictEqual(personaliseCalls, 4, 'and one personalisation AI call per probe');
+    assert.strictEqual(diagnoseCalls, 4, 'one assessment AI call per probe across the whole run — and only one');
+    assert.strictEqual(personaliseCalls, 0, 'and ZERO personalisation AI calls: the copy is rendered deterministically');
     ok('a rebuild spread across several bounded invocations — one click of the button — still lands on exactly one row per finding');
   }
 

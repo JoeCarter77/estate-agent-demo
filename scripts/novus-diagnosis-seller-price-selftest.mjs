@@ -116,9 +116,9 @@ async function run() {
     assert.ok(findings.every((f) => f.finding && f.evidence), 'no finding was emptied into a drop by the guard');
     assert.strictEqual(result.novus_opportunity, 'None evidenced',
       'the legacy seller-conversion route is not activated by a declaration alone');
-    assert.ok(result.strengths && result.missed_opportunities && result.commercial_implication && result.diagnosis_summary,
-      'no prose field was emptied — the strip is surgical, not sentence-level');
-    ok('manufactured valuation opportunities are dropped while factual prose remains safely de-priced');
+    assert.strictEqual(result.strengths, undefined, 'retired prose is not produced');
+    assert.strictEqual(result.diagnosis_summary, 'assessed', 'completion uses the deterministic sentinel');
+    ok('manufactured valuation opportunities are dropped and retired prose is not produced');
   }
 
   // ── The legitimate BUYER-side use of the very same figure is untouched. ──
@@ -143,10 +143,8 @@ async function run() {
     assert.strictEqual(findings.length, 1);
     assert.strictEqual(findings[0].finding, 'The £450,000 enquiry went unanswered for 17.8 hours.');
     assert.strictEqual(findings[0].evidence, 'First human contact came 17.85 hours after the enquiry on a £450,000 property.');
-    assert.strictEqual(findings[0].significance_note, 'A £450,000 buyer was left waiting most of a day.');
-    assert.strictEqual(result.commercial_implication, 'A £450,000 Chevington enquiry sat for 17.8 hours.');
-    assert.strictEqual(result.diagnosis_summary, 'A £450,000 enquiry waited most of a day for a reply.');
-    ok('buyer-side use of the £450,000 enquiry price survives verbatim in findings and prose');
+    assert.strictEqual(result.diagnosis_summary, 'assessed');
+    ok('buyer-side use of the £450,000 enquiry price survives verbatim in retained findings');
   }
 
   // ── Co-occurrence is not attribution: one sentence may carry the buyer price
@@ -161,18 +159,18 @@ async function run() {
       diagnosis_summary: line,
     }));
     const result = await diagnoseProbe(INTELLIGENCE, PROBE);
-    assert.strictEqual(parseDiagnosisFindings(result)[0].finding, line, 'a price and a seller mention in separate clauses attribute nothing');
-    assert.strictEqual(result.commercial_implication, line);
-    ok('a buyer price and a seller mention in separate clauses of one sentence are both kept');
+    assert.strictEqual(parseDiagnosisFindings(result).length, 0,
+      'without finding types, the seller/valuation evidence gate applies safely to every story finding');
+    ok('seller-related story findings are held to the seller evidence gate regardless of wording');
   }
 
   // ── The brief itself states the provenance and forbids the seller-side use,
   //    so the deterministic strip is a net rather than the only defence. ──
   {
     const prompt = _internal.SYSTEM_PROMPT;
-    assert.match(prompt, /NEVER PRICE SELLER CONTEXT/, 'the system prompt carries the provenance rule');
-    assert.match(prompt, /AS A BUYER/, 'the brief states what the figure actually is');
-    assert.match(prompt, /call it an opportunity only when evidence genuinely establishes one/i,
+    assert.match(prompt, /listed property's address and asking price belong only to the buyer enquiry/i, 'the system prompt carries the provenance rule');
+    assert.match(prompt, /buyer enquiry/, 'the brief states what the figure actually is');
+    assert.match(prompt, /must itself contain evidence beyond the declaration/i,
       'the brief forbids automatic seller-opportunity classification');
     ok('the diagnosis brief states the price provenance and bans seller-side use of the figure');
   }

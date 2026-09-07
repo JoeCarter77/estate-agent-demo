@@ -84,7 +84,8 @@ const DIAGNOSIS_HEADER = [
   'diagnosis_id', 'agency_id', 'probe_id',
   'findings',
   'strengths', 'missed_opportunities', 'commercial_implication', 'novus_opportunity',
-  'diagnosis_summary', 'created_at', 'updated_at',
+  'diagnosis_summary', 'created_at', 'updated_at', 'enquiry_signals', 'unresolved_context',
+  'recommended_actions', 'handling_summary', 'handling_quality',
 ];
 const PERSONALISATION_HEADER = [
   'personalisation_id', 'agency_id', 'probe_id', 'hero_journey', 'primary_narrative',
@@ -200,7 +201,10 @@ function installAiStub() {
       return Object.fromEntries(tool.input_schema.required
         .map((field) => [field, 'So a buyer already in front of you stayed a name in the inbox rather than someone you knew anything about.']));
     }
-    if (tool?.name === 'record_probe_diagnosis') {
+    // The merged final assessment (lib/probe-assessment.mjs) returns the
+    // diagnosis fields under its own tool name; the retired standalone diagnosis
+    // call still uses the old one. Both are answered by this branch.
+    if (tool?.name === 'record_probe_diagnosis' || tool?.name === 'record_probe_assessment') {
       diagnoseCallCount += 1;
       const zeroContact = /Human contact: none/.test(prompt);
       return zeroContact
@@ -268,8 +272,12 @@ async function run() {
   assert.strictEqual(r1.observation_status, 'observing', 'probe stays open — window has not elapsed');
   assert.strictEqual(r1.diagnosis_id, null, 'no Diagnosis for an open probe');
   assert.strictEqual(r1.finalized, false);
-  assert.strictEqual(diagnoseCallCount, 0, 'no AI diagnosis call while open');
-  assert.strictEqual(interpretCallCount, 1);
+  assert.strictEqual(diagnoseCallCount, 0, 'no AI assessment call while open');
+  // ZERO, not one. This path used to AI-interpret on every arriving
+  // communication — reading an enquiry that had not finished, and paying for it
+  // again on the next message. Semantic interpretation now happens once, at
+  // close, inside the single final assessment.
+  assert.strictEqual(interpretCallCount, 0, 'an observing probe costs no Anthropic call at all');
   let intel = findRow(store, 'INTELLIGENCE', INTELLIGENCE_HEADER, 'prb_open');
   assert.strictEqual(intel.contact_attempts, 1);
   assert.strictEqual(intel.follow_ups, 0);
@@ -330,7 +338,7 @@ async function run() {
 
   const expireDiag = findRow(store, 'DIAGNOSIS', DIAGNOSIS_HEADER, 'prb_expire');
   assert.ok(expireDiag && expireDiag.diagnosis_summary, 'closing the probe produced a final Diagnosis in the same pass');
-  assert.strictEqual(passResult.diagnosis.ai_diagnoses_run, 1);
+  assert.strictEqual(passResult.assessment.ai_calls_used, 1);
   ok('closing a probe triggers its final Intelligence AND its final Diagnosis, generated exactly once (requirement 4)');
 
   // ── 5: Zero-communication probe still gets a final Diagnosis ────────────
@@ -351,7 +359,9 @@ async function run() {
   assert.strictEqual(silentIntel.grade, 'H', 'zero evidence + elapsed window grades H, the unchanged A-H engine');
   const silentDiag = findRow(store, 'DIAGNOSIS', DIAGNOSIS_HEADER, 'prb_silent');
   assert.ok(silentDiag && silentDiag.diagnosis_summary, 'a zero-communication probe still gets a final Diagnosis');
-  assert.match(silentDiag.diagnosis_summary, /zero agency contact/i, 'the Diagnosis explicitly reflects zero agency contact, not a blank/skipped row');
+  assert.strictEqual(silentDiag.diagnosis_summary, 'assessed', 'Diagnosis completion is a deterministic sentinel');
+  assert.match(silentDiag.handling_summary, /No human contact was recorded/i,
+    'the deterministic handling summary explicitly reflects zero agency contact');
   ok('a probe with zero communications during its window still receives a final Diagnosis explicitly reflecting zero agency contact (requirement 5)');
 
   // ── 6: Late communications stored but never change a closed probe ───────
@@ -435,11 +445,14 @@ async function run() {
   await waitForNewMillisecond(openBeforeForce.updated_at);
   const forced = await runRebuildPass(repo, { forceAi: true });
 
-  assert.strictEqual(forced.diagnosis.ai_diagnoses_run, 1, 'the not-yet-finalised prb_undiagnosed gets diagnosed');
+  assert.strictEqual(forced.assessment.ai_calls_used, 1, 'the not-yet-finalised prb_undiagnosed gets assessed');
   const undiagResult = findRow(store, 'DIAGNOSIS', DIAGNOSIS_HEADER, 'prb_undiagnosed');
   assert.ok(undiagResult.diagnosis_summary, 'prb_undiagnosed now has a real Diagnosis');
 
-  assert.ok(interpretCallCount > beforeForce.interpret, 'force_ai still re-interprets the still-open, not-yet-finalised prb_open');
+  // forceAi is inert now — there is no interpretation call left for it to
+  // force, and an open probe must never reach a model. Only the deterministic
+  // fields are rewritten, which is what the updated_at check below measures.
+  assert.strictEqual(interpretCallCount, beforeForce.interpret, 'forceAi does not conjure an AI call for the still-open prb_open');
   const openAfterForce = findRow(store, 'INTELLIGENCE', INTELLIGENCE_HEADER, 'prb_open');
   assert.notDeepStrictEqual(openAfterForce.updated_at, openBeforeForce.updated_at, 'prb_open was actually re-touched by the forced rebuild');
 
@@ -449,17 +462,20 @@ async function run() {
   assert.deepStrictEqual(findRow(store, 'DIAGNOSIS', DIAGNOSIS_HEADER, 'prb_silent'), silentDiag, 'force_ai never resurrects an already-finalised Diagnosis (prb_silent)');
   ok('a forced rebuild only affects probes that have not been finalised yet — finalised probes stay frozen even under force_ai (requirement 8)');
 
-  // ── 9: Batching still works with the finalised-probe freeze in place ────
-  // A tiny AI-call budget, spent entirely by prb_open (still needs AI): the
-  // three already-finalised probes (prb_expire, prb_silent, prb_undiagnosed)
-  // must not consume any of that budget — freeze is checked BEFORE the
-  // budget check, so it's free, not merely "first in line".
+  // ── 9: The finalised-probe freeze, with no budget left to interact with ──
+  // The deterministic step has no AI call to bound, so a budget cannot starve
+  // it and a frozen probe cannot consume one. What must still hold is the
+  // freeze itself: the three already-finalised probes (prb_expire, prb_silent,
+  // prb_undiagnosed) are skipped before anything else and nothing is queued
+  // behind them. Full budget batching now lives on the final assessment —
+  // npm run novus:rebuild-batching-selftest.
   installAiStub(); // reset counters
   const budgeted = await rebuildAllIntelligence(repo, { forceAi: true, maxAiCalls: 1 });
-  assert.strictEqual(budgeted.ai_interpretations_run, 1, 'the one AI call in budget goes to prb_open, the only non-finalised probe left needing one');
-  assert.strictEqual(budgeted.remaining_interpretations, 0, 'no finalised probe counts as "remaining" work — they are frozen, not queued');
-  assert.ok(budgeted.probes_finalized_skipped >= 3, 'finalised probes are reported as skipped, not as spending budget');
-  ok('AI-call batching (the 504-timeout fix) still holds with the finalised-probe freeze layered on top — frozen probes cost nothing from the budget (requirement 9; full batching regression: npm run novus:rebuild-batching-selftest)');
+  assert.strictEqual(budgeted.ai_interpretations_run, 0, 'the deterministic step spends nothing, budget or no budget');
+  assert.strictEqual(budgeted.remaining_interpretations, 0, 'and nothing is ever left queued behind a budget that governs nothing here');
+  assert.ok(budgeted.probes_finalized_skipped >= 3, 'finalised probes are reported as skipped, and are never touched');
+  assert.strictEqual(interpretCallCount, 0, 'not one Anthropic call from the whole pass');
+  ok('the finalised-probe freeze holds, and the AI budget can no longer starve deterministic observation (requirement 9)');
 
   // ── 10: Blank observation_deadline backfill for historical probes ───────
   // Historical probe A: past deadline once derived (probe_timestamp+4days),

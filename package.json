@@ -72,7 +72,8 @@
     "novus:outreach-execution-selftest": "node scripts/novus-outreach-execution-selftest.mjs",
     "novus:historical-replay": "node scripts/novus-historical-replay.mjs",
     "novus:anthropic-env-selftest": "node scripts/novus-anthropic-env-selftest.mjs",
-    "novus:probe-rerun": "node scripts/novus-probe-rerun.mjs"
+    "novus:probe-rerun": "node scripts/novus-probe-rerun.mjs",
+    "novus:pipeline-v3-selftest": "node scripts/novus-pipeline-v3-selftest.mjs"
   },
   "dependencies": {
     "@vercel/oidc": "^3.8.4",

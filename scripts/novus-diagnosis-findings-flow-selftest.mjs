@@ -387,7 +387,10 @@ function installAiStub() {
     const scenario = SCENARIOS.find((s) => prompt.includes(s.address) || prompt.includes(s.probe_id));
     assert.ok(scenario, `the prompt names a known probe (tool ${tool?.name})`);
 
-    if (tool.name === 'record_probe_diagnosis') {
+    // The merged final assessment (lib/probe-assessment.mjs) returns the
+  // diagnosis fields under its own tool name; the retired standalone diagnosis
+  // call still uses the old one. Both are answered by this branch.
+  if (tool.name === 'record_probe_diagnosis' || tool.name === 'record_probe_assessment') {
       diagnoseCalls += 1;
       return {
         findings: scenario.findings,
@@ -501,7 +504,7 @@ async function run() {
   seed(store);
 
   const first = await runRebuildPass(repo, { maxAiCalls: 100 });
-  assert.deepStrictEqual(first.diagnosis.problems, [], 'no diagnosis problems');
+  assert.deepStrictEqual(first.assessment.problems, [], 'no assessment problems');
   const unsupported = new Set();
   assert.deepStrictEqual(
     new Set(first.personalisation.problems.map((problem) => problem.probe_id)),
@@ -514,8 +517,8 @@ async function run() {
     const expectedTotal = SCENARIOS.reduce((n, s) => n + expectedFindings(s).length, 0);
     const allRows = rowsOf(store, 'DIAGNOSIS_FINDINGS', DIAGNOSIS_FINDINGS_HEADER);
     assert.strictEqual(allRows.length, expectedTotal, `DIAGNOSIS_FINDINGS holds all ${expectedTotal} findings`);
-    assert.strictEqual(first.diagnosis.findings_written, expectedTotal, 'the rebuild reports the same count it wrote');
-    assert.strictEqual(first.diagnosis.findings_tab_available, true, 'the tab was found');
+    assert.strictEqual(first.assessment.findings_written, expectedTotal, 'the rebuild reports the same count it wrote');
+    assert.strictEqual(first.assessment.findings_tab_available, true, 'the tab was found');
 
     for (const s of SCENARIOS) {
       const rows = findingsFor(store, s.probe_id);
@@ -557,25 +560,29 @@ async function run() {
     ok('the whole-probe DIAGNOSIS row is unaffected — findings live in DIAGNOSIS_FINDINGS, exactly as the live sheet is shaped');
   }
 
-  // ── 3. Personalisation selects facts from the complete set, but the
-  //    constrained AI boundary receives no raw findings prose ──
+  // ── 3. NOTHING CROSSES AN AI BOUNDARY AT ALL IN PERSONALISATION ──
+  //
+  // This block used to assert that raw finding/evidence prose never reached the
+  // constrained surface realiser's prompt. That property is now structural
+  // rather than checked: there is no prompt, because there is no call.
+  // Personalisation renders the canonical facts deterministically
+  // (lib/fact-constrained-personalisation.mjs's renderCanonicalFactCopy) and
+  // runs the identical validator over the result. So the assertion is the
+  // stronger one — no findings prose can leak into a model that was never
+  // asked anything.
   {
+    assert.strictEqual(personalisationPrompts.size, 0,
+      'no Personalisation prompt exists, because Personalisation makes no AI call');
+    assert.strictEqual(first.personalisation.ai_personalisations_run, 0,
+      'and the summary reports it: zero AI personalisations in normal production');
     for (const s of SCENARIOS) {
-      const prompt = personalisationPrompts.get(s.probe_id);
-      assert.ok(prompt, `${s.key}: Personalisation ran`);
-      for (const f of expectedFindings(s)) {
-        assert.ok(!prompt.includes(f.finding), `${s.key}: raw finding prose did not reach constrained AI`);
-        assert.ok(!prompt.includes(f.evidence), `${s.key}: raw evidence did not reach constrained AI`);
-      }
-      // And no other probe's findings leaked into it.
-      for (const other of SCENARIOS) {
-        if (other.probe_id === s.probe_id) continue;
-        for (const f of other.findings) {
-          assert.ok(!prompt.includes(f.finding), `${s.key}: no finding from ${other.key} leaked in`);
-        }
-      }
+      const written = rowsOf(store, 'PERSONALISATION', PERSONALISATION_HEADER)
+        .find((r) => String(r.probe_id).trim() === s.probe_id);
+      assert.ok(written, `${s.key}: a PERSONALISATION row was still written`);
+      assert.ok(String(written.email_observation).trim(), `${s.key}: the observation sentence is present`);
+      assert.ok(String(written.email_commercial_hook).trim(), `${s.key}: the commercial hook is present`);
     }
-    ok('fact selection reads each probe\'s findings, while constrained AI receives canonical facts only and no cross-probe prose');
+    ok('Personalisation reaches no model at all, and still writes a complete, validated row for every probe');
   }
 
   // ── 4. A three-finding probe is deterministically narrowed to the one
@@ -583,20 +590,13 @@ async function run() {
   {
     const p = personalisationFor(store, 'prb_combine');
     assert.strictEqual(findingsFor(store, 'prb_combine').length, 3, 'the seller-declaration-only opportunity is excluded from the persisted findings');
-    assert.strictEqual(p.narrative_finding_indexes, '1', 'the compatibility audit records exactly the selected central problem');
-    assert.strictEqual(String(p.positive_finding_index), '', 'a structured metric is not promoted into a positive merely because positive prose exists');
-    assert.strictEqual(String(p.main_finding_index), '1', 'the main story from the overnight gap');
-    assert.strictEqual(String(p.wider_finding_index), '', 'no second criticism is promoted into the active story');
-    assert.ok(p.supporting_findings.includes('asked nothing and offered no viewing'), 'the secondary criticism remains supporting audit text');
-    assert.ok(p.supporting_findings.includes('correct property'), 'the positive outside the central selection remains supporting audit text');
+    for (const field of ['narrative_finding_indexes', 'positive_finding_index', 'main_finding_index', 'wider_finding_index', 'supporting_findings', 'evidence']) {
+      assert.strictEqual(String(p[field]), '', `${field} is retained only as an unwritten historical column`);
+    }
     assert.ok(p.email_observation, 'the Instantly observation variable is populated from the selected findings');
     assert.ok(p.email_commercial_hook, 'the Instantly commercial hook is populated from the same selected findings');
     assert.strictEqual(findingsFor(store, 'prb_combine').length, 3, 'all supported findings remain available for the audit');
-    // The evidence recorded is the evidence of the findings selected — not a
-    // quote the model produced from a transcript it never saw.
-    assert.ok(p.evidence.includes('Probe 09:00 -> first human contact 06:24 the next day = 21.4 hours.'),
-      'the stored evidence is the selected findings\' own evidence');
-    ok('a busy probe persists one central problem and keeps the remaining evidence as supporting audit text');
+    ok('a busy probe persists its live story fields without repopulating retired audit columns');
   }
 
   // ── 5. Each probe shape gets its own journey, story and email variables ──
@@ -612,15 +612,14 @@ async function run() {
       if (s.expect.fair_observation !== undefined) {
         assert.strictEqual(p.fair_observation, s.expect.fair_observation, `${s.key}: fair observation`);
       }
-      assert.ok(p.primary_narrative, `${s.key}: has a primary narrative`);
+      assert.strictEqual(p.primary_narrative, '', `${s.key}: retired primary_narrative is not newly populated`);
       for (const [field, expected] of Object.entries(s.expect)) {
         if (['hero_journey', 'findings', 'narrative_finding_indexes'].includes(field)) continue;
         assert.strictEqual(p[field], expected, `${s.key}: ${field}`);
       }
 
-      // The deterministic reference and the two variables Instantly consumes.
-      assert.strictEqual(p.property_reference, `${s.address} on 1 January at 09:00`,
-        `${s.key}: property_reference is derived from this probe without AI`);
+      // The two live variables Instantly consumes.
+      assert.strictEqual(p.property_reference, '', `${s.key}: retired property_reference is not newly populated`);
       assert.ok(p.email_observation, `${s.key}: email_observation is populated`);
       assert.ok(p.email_commercial_hook, `${s.key}: email_commercial_hook is populated`);
       if (p.main_finding_index && s.key !== 'no_response') {
@@ -658,12 +657,7 @@ async function run() {
     assert.strictEqual(p.fair_observation, '', 'the model\'s invented praise is discarded — there was no handling to be fair about');
     assert.match(p.main_finding, /didn't record a human response|no human response|no agency contact attempt/i,
       'the deterministic compatibility field records the supported complete-miss fact');
-    // Nothing was said, so the evidence is the ABSENCE the findings record.
-    // It is never a quote — there is nothing to quote from — and it is not
-    // empty either: the consequence of the silence still rests on something.
-    assert.ok(p.evidence.includes('Zero communications recorded across the full 4-day observation window.'),
-      "the evidence is the selected findings' own evidence: the silence itself");
-    assert.ok(!p.evidence.includes('"'), 'and nothing is quoted, because nothing was ever said');
+    assert.strictEqual(p.evidence, '', 'the retired compatibility evidence column is not populated');
 
     assert.match(p.email_observation, /didn't record a human response|no human response|never picked up/i,
       'the Instantly observation states the evidenced no-response story without praise');
@@ -680,13 +674,13 @@ async function run() {
     const personaliseBefore = personaliseCalls;
 
     const second = await runRebuildPass(repo, { maxAiCalls: 100 });
-    assert.strictEqual(second.diagnosis.ai_diagnoses_run, 0, 'no diagnosis is regenerated');
-    assert.strictEqual(second.personalisation.ai_personalisations_run, unsupported.size,
-      'persisted rows remain frozen and require no further Personalisation calls');
-    assert.strictEqual(second.diagnosis.findings_written, 0, 'no findings rows are rewritten');
+    assert.strictEqual(second.assessment.ai_calls_used, 0, 'no assessment is regenerated');
+    assert.strictEqual(second.personalisation.ai_personalisations_run, 0,
+      'persisted rows remain frozen, and Personalisation never spends AI in any case');
+    assert.strictEqual(second.assessment.findings_written, 0, 'no findings rows are rewritten');
     assert.strictEqual(diagnoseCalls, diagnoseBefore, 'no further diagnosis AI calls');
-    assert.strictEqual(personaliseCalls, personaliseBefore + unsupported.size,
-      'no persisted shape receives another constrained call');
+    assert.strictEqual(personaliseCalls, personaliseBefore,
+      'no persisted shape receives another constrained call — and no shape receives one at all');
 
     const findingsRows = rowsOf(store, 'DIAGNOSIS_FINDINGS', DIAGNOSIS_FINDINGS_HEADER);
     const keys = findingsRows.map((f) => `${f.probe_id}#${f.finding_index}`);
@@ -695,39 +689,38 @@ async function run() {
     ok('a second rebuild leaves persisted rows and findings byte-identical');
   }
 
-  // ── 8. Exactly one AI call per probe per layer — no extra call was added ──
+  // ── 8. EXACTLY ONE AI CALL PER PROBE, FOR THE WHOLE PIPELINE ──
+  // Not one per layer: one, total. The interpretation and the commercial
+  // assessment are the same call, and Personalisation makes none.
   {
-    assert.strictEqual(diagnoseCalls, SCENARIOS.length, 'one Diagnosis call per probe');
-    assert.strictEqual(personaliseCalls, SCENARIOS.length + unsupported.size,
-      'one constrained call per probe');
-    ok('the first flow costs one Diagnosis and one constrained Personalisation call per probe');
+    assert.strictEqual(diagnoseCalls, SCENARIOS.length, 'one final assessment call per probe');
+    assert.strictEqual(personaliseCalls, 0, 'and zero Personalisation calls, for every probe');
+    ok('the whole flow costs exactly ONE Anthropic call per probe — down from three');
   }
 
-  // ── 9. Personalisation never silently falls back to the Diagnosis prose ──
-  //    An empty findings list is a REAL state — it means Diagnosis found no
-  //    genuine problem, and the prompt says exactly that. So missing
-  //    DIAGNOSIS_FINDINGS rows must never look like it: that would quietly
-  //    tell the model a badly-handled enquiry was handled perfectly and let it
-  //    write the story off the Diagnosis prose instead. A diagnosed probe with
-  //    no rows falls back to the SAME findings out of its own DIAGNOSIS row's
-  //    findings cell — and says so in the summary.
+  // ── 9. THE FINDINGS SOURCE, AND ITS FALLBACK, BOTH DIRECTIONS ──
+  //
+  // The canonical structured record is the DIAGNOSIS row's own findings JSON —
+  // one record per probe, already loaded with the DIAGNOSIS table, so the large
+  // granular DIAGNOSIS_FINDINGS tab is no longer read on the active path.
+  //
+  // An empty findings list remains a REAL state (Diagnosis found no genuine
+  // problem), so "the record is missing" must never look like it. Where the
+  // canonical cell is absent — a workbook whose DIAGNOSIS header predates the
+  // findings column, exactly the shape this suite's fixture models — the
+  // DIAGNOSIS_FINDINGS rows are read instead, and the summary says so.
   {
+    // 9a. CANONICAL FIRST. A frozen probe whose DIAGNOSIS row carries the
+    // findings JSON is personalised from it, and the findings tab is never
+    // consulted.
     const { store: store2, repo: repo2 } = makeFakeSheet();
     __setRepoForTests(repo2);
     installAiStub();
     seed(store2);
 
     const scenario = byAddress.get('Compound Gardens');
-    // The workbook this suite models has no DIAGNOSIS.findings column (it
-    // mirrors the live V2 header, where the findings live in their own tab).
-    // Recovery reads that cell, so this case adds it — which is also exactly
-    // the shape a probe diagnosed before DIAGNOSIS_FINDINGS existed has.
     const DIAGNOSIS_HEADER_WITH_FINDINGS = [...DIAGNOSIS_HEADER, 'findings'];
     store2.DIAGNOSIS[0] = DIAGNOSIS_HEADER_WITH_FINDINGS.slice();
-
-    // A probe finalised by a path that never wrote its findings rows: a
-    // non-blank diagnosis_summary (so it is frozen, and the rebuild will never
-    // regenerate it) with the findings only in the DIAGNOSIS row's own cell.
     store2.DIAGNOSIS.push(row(DIAGNOSIS_HEADER_WITH_FINDINGS, {
       probe_id: scenario.probe_id, agency_id: `agc_${scenario.key}`,
       findings: JSON.stringify(scenario.findings),
@@ -737,28 +730,26 @@ async function run() {
     }));
 
     const pass2 = await runRebuildPass(repo2, { maxAiCalls: 100, probeIds: [scenario.probe_id] });
-    assert.strictEqual(pass2.diagnosis.ai_diagnoses_run, 0, 'the probe is frozen, so it is not re-diagnosed');
-    assert.strictEqual(findingsFor(store2, scenario.probe_id).length, 0, 'and it genuinely has no DIAGNOSIS_FINDINGS rows');
-    assert.strictEqual(pass2.personalisation.findings_recovered_from_diagnosis_row, 1,
-      'the missing rows are reported, not absorbed in silence');
+    assert.strictEqual(pass2.assessment.ai_calls_used, 0, 'the probe is frozen, so it is not reassessed');
+    assert.strictEqual(pass2.personalisation.ai_personalisations_run, 0, 'and Personalisation costs nothing');
+    assert.strictEqual(pass2.personalisation.findings_recovered_from_findings_tab, 0,
+      'the canonical DIAGNOSIS record was enough — the granular tab was never needed');
     assert.strictEqual(pass2.personalisation.personalisations_with_findings, 1,
       'and Personalisation ran WITH findings, not with an empty list');
+    ok('the canonical DIAGNOSIS findings record drives Personalisation, without reading the granular findings tab');
 
-    const prompt = [...personalisationPrompts.values()][0];
-    for (const f of scenario.findings) {
-      assert.ok(!prompt.includes(f.finding), 'recovered raw finding prose does not reach constrained AI');
-      assert.ok(!prompt.includes(f.evidence), 'recovered raw evidence does not reach constrained AI');
-    }
-    assert.match(prompt, /OBSERVATION_FACTS/, 'the recovered rows are deterministically selected before the AI boundary');
-
-    // And the primary path is unchanged: where the ROWS exist, they are what
-    // is used, and nothing is recovered from the diagnosis row.
-    assert.strictEqual(first.personalisation.findings_recovered_from_diagnosis_row, 0,
-      'the first pass, where every probe had its rows, recovered nothing');
-    assert.strictEqual(first.personalisation.personalisations_with_findings,
-      SCENARIOS.filter((s) => expectedFindings(s).length > 0).length,
+    // 9b. THE FALLBACK. `first` above ran on the fixture's live-shaped
+    // DIAGNOSIS header, which has NO findings column at all — so every probe
+    // in it had to recover its findings from the DIAGNOSIS_FINDINGS rows.
+    // Nothing historical is dropped; the expensive read is simply no longer
+    // the default.
+    assert.ok(!DIAGNOSIS_HEADER.includes('findings'), 'the fixture models a workbook with no canonical findings column');
+    const withFindings = SCENARIOS.filter((s) => expectedFindings(s).length > 0).length;
+    assert.strictEqual(first.personalisation.findings_recovered_from_findings_tab, withFindings,
+      'every probe whose canonical cell is absent recovers the same findings from its rows, and is counted');
+    assert.strictEqual(first.personalisation.personalisations_with_findings, withFindings,
       'and every probe that has findings was personalised with them — including the well-handled one, whose findings are all positives');
-    ok('Personalisation is driven by the persisted DIAGNOSIS_FINDINGS rows, and a diagnosed probe missing them recovers the same findings from its DIAGNOSIS row rather than silently reading as "no problem found"');
+    ok('a workbook with no canonical findings column still personalises from its DIAGNOSIS_FINDINGS rows, reported rather than silent');
   }
 
   console.log(`\n${passed} checks passed.`);

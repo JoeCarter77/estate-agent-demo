@@ -41,7 +41,10 @@ import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 // content instead (see the worked examples in
 // docs/V2_COMMS_INTELLIGENCE_DIAGNOSIS_SCHEMA.md §7).
 __setAiCallerForTests(async ({ tool }) => {
-  if (tool.name === 'record_probe_diagnosis') {
+  // The merged final assessment (lib/probe-assessment.mjs) returns the
+  // diagnosis fields under its own tool name; the retired standalone diagnosis
+  // call still uses the old one. Both are answered by this branch.
+  if (tool.name === 'record_probe_diagnosis' || tool.name === 'record_probe_assessment') {
     return {
       findings: [{ finding: 'Stubbed finding for pipeline-regression.', evidence: 'Stubbed evidence.', significance_note: 'Stubbed significance.' }],
       strengths: 'Stubbed strengths.', missed_opportunities: 'Stubbed missed opportunity.',

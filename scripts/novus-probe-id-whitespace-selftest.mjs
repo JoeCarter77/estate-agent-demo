@@ -221,8 +221,8 @@ async function run() {
 
   const summary = await runRebuildPass(repo, { maxAiCalls: 10 });
 
-  assert.strictEqual(summary.diagnosis.ai_diagnoses_run, 0, 'DIAGNOSIS is already finalised (frozen) — no AI call, whitespace or not');
-  assert.strictEqual(summary.personalisation.ai_personalisations_run, 1, 'PERSONALISATION regenerates once to backfill its missing Instantly variables');
+  assert.strictEqual(summary.assessment.ai_calls_used, 0, 'the assessment is already finalised (frozen) — no AI call, whitespace or not');
+  assert.strictEqual(summary.personalisation.ai_personalisations_run, 0, 'PERSONALISATION is deterministic now: it backfills the missing Instantly variables for free');
   assert.strictEqual(summary.personalisation.personalisation_created, 0, 'THE FIX: this is an UPDATE to the existing row...');
   assert.strictEqual(summary.personalisation.personalisation_updated, 1, '...not the creation of a new one');
 
@@ -234,9 +234,10 @@ async function run() {
 
   const personRow = personRows[0];
   assert.strictEqual(personRow.personalisation_id, 'psn_existing', 'the SAME row was updated, not replaced with a new id');
-  assert.ok(personRow.primary_narrative, 'primary_narrative is now populated');
+  assert.strictEqual(personRow.primary_narrative, 'Legacy narrative from the previous email schema.',
+    'historical primary_narrative is preserved rather than overwritten');
   assert.ok(personRow.main_finding, 'main_finding is populated');
-  assert.ok(personRow.property_reference, 'the deterministic property reference is populated');
+  assert.strictEqual(personRow.property_reference, '', 'retired property_reference is not backfilled');
   assert.ok(personRow.email_observation, 'the Instantly observation variable is populated');
   assert.ok(personRow.email_commercial_hook, 'the Instantly commercial hook is populated');
   assert.strictEqual(personRow.email_commercial_hook_email_2, '', 'the deprecated Email 2 hook is not backfilled');

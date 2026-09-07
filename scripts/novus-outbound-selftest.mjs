@@ -9,7 +9,7 @@ const AGENCIES_HEADER = [
   'agency_id', 'clean_agency_name', 'outreach_contact_name',
   'outreach_contact_email', 'email_verification_status',
 ];
-const PROBES_HEADER = ['agency_id', 'probe_id', 'property_street'];
+const PROBES_HEADER = ['agency_id', 'probe_id', 'property_street', 'property_address'];
 const PERSONALISATION_HEADER = [
   'agency_id', 'probe_id', 'email_observation', 'email_commercial_hook',
   'email_commercial_hook_email_2',
@@ -114,6 +114,39 @@ function ok(message) { passed += 1; console.log(`  ✓ ${message}`); }
   ok('fully eligible prospect compiles to a new READY row');
 }
 
+// THE property_street REGRESSION. New probes store property_address and never
+// write property_street, and the old gate killed every one of them at this last
+// step. A blank property_street with a usable property_address must compile,
+// and the queue value must be the street derived from that address.
+{
+  const { result } = await dryRun({ probe: { property_street: '', property_address: 'Whitmore Way, Basildon, SS14' } });
+  assert.equal(result.eligible_count, 1, 'blank property_street with a valid property_address is eligible');
+  assert.equal(result.rows_to_create[0].property_street, 'Whitmore Way');
+  ok('blank property_street + valid property_address compiles, street derived from the address');
+}
+
+// A REAL HISTORICAL ADDRESS FORMAT: the house number as its own leading
+// component ("4,High Street, Billericay") rather than joined to the street
+// ("4 High Street, Billericay"). Found in a real production probe during
+// pipeline-v3 validation — the naive first-component split discarded the bare
+// number and derived '', blocking a probe that plainly has a usable street.
+{
+  const { result } = await dryRun({ probe: { property_street: '', property_address: '4,High Street, Billericay' } });
+  assert.equal(result.eligible_count, 1, 'a house-number-only leading component is folded into the street, not discarded');
+  assert.equal(result.rows_to_create[0].property_street, '4 High Street');
+  ok('a leading bare house-number address component derives the same street a human would write');
+}
+
+// AND THE OTHER DIRECTION: a nonblank historical property_street is the human-
+// maintained value and always wins, even when the address would derive a
+// different street. It is never recomputed and never overwritten.
+{
+  const { result } = await dryRun({ probe: { property_street: '10 High Street', property_address: 'Whitmore Way, Basildon, SS14' } });
+  assert.equal(result.eligible_count, 1);
+  assert.equal(result.rows_to_create[0].property_street, '10 High Street');
+  ok('nonblank historical property_street is preserved over the derivable address');
+}
+
 for (const [label, overrides, reason] of [
   ['demo not ready', { demo: { demo_status: 'needs_review' } }, 'demo_status != ready'],
   ['property image not ok', { demo: { property_image_status: 'missing' } }, 'property_image_status != ok'],
@@ -140,7 +173,9 @@ ok('UNKNOWN, blank and other verification statuses are skipped');
 
 for (const [label, overrides, reason] of [
   ['missing clean agency name', { agency: { clean_agency_name: '  ' } }, 'missing clean_agency_name'],
-  ['missing property street', { probe: { property_street: '' } }, 'missing property_street'],
+  // Blank property_street AND no property_address: nothing to derive from, so
+  // the probe genuinely has no street reference and is correctly blocked.
+  ['no property reference at all', { probe: { property_street: '' } }, 'missing property reference (no property_street and no usable property_address)'],
   ['missing demo slug', { demo: { demo_slug: '' } }, 'missing demo_slug'],
 ]) {
   const { result } = await dryRun(overrides);

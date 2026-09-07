@@ -53,8 +53,8 @@ async function run() {
   {
     __setAiCallerForTests(async () => ({
       findings: [
-        { finding: 'Nothing reached the enquiry for 17.8 hours.', evidence: '', significance_note: 'Should be dropped.' }, // missing evidence, on purpose
-        { finding: 'The seller thread stalled after the position question.', evidence: 'No valuation or market appraisal was ever offered in either message.', significance_note: 'An instruction lead recognised and never converted.' },
+        { issue: 'Nothing reached the enquiry for 17.8 hours.', evidence: '' }, // missing evidence, on purpose
+        { issue: 'The buyer enquiry stalled after the first response.', evidence: 'No viewing invitation or availability request appeared in either message.' },
       ],
       strengths: 'Once engaged, asked eight structured qualification questions.',
       missed_opportunities: 'The declared vendor opportunity was recognised and not converted.',
@@ -65,15 +65,15 @@ async function run() {
     const result = await diagnoseProbe(baseIntelligence(), PROBE);
     const findings = parseDiagnosisFindings(result);
     assert.strictEqual(findings.length, 1, 'the evidence-less finding is dropped, the evidenced one survives');
-    assert.strictEqual(findings[0].finding, 'The seller thread stalled after the position question.');
-    assert.strictEqual(findings[0].evidence, 'No valuation or market appraisal was ever offered in either message.');
+    assert.strictEqual(findings[0].finding, 'The buyer enquiry stalled after the first response.');
+    assert.strictEqual(findings[0].evidence, 'No viewing invitation or availability request appeared in either message.');
     ok('a finding with no evidence field is never written, while a properly-evidenced finding survives untouched');
   }
 
   // ── Evidence without a finding is dropped too (the guard is symmetric) ──
   {
     __setAiCallerForTests(async () => ({
-      findings: [{ finding: '', evidence: 'This should never be written since there is no finding statement.', significance_note: '' }],
+      findings: [{ issue: '', evidence: 'This should never be written since there is no issue statement.' }],
       strengths: 'Handled well throughout.',
       missed_opportunities: '',
       commercial_implication: 'No implication — handled well.',
@@ -97,8 +97,8 @@ async function run() {
   // enforced in code as well as in the schema.
   {
     __setAiCallerForTests(async () => ({
-      findings: [1, 2, 3, 4, 5, 6].map((n) => ({ finding_type: 'problem', finding: `Finding ${n}`, evidence: `Evidence ${n}`, significance_note: `Significance ${n}` })),
-      positive_findings: [1, 2].map((n) => ({ finding: `Positive ${n}`, evidence: `Positive evidence ${n}`, significance_note: `Positive significance ${n}` })),
+      findings: [1, 2, 3, 4, 5, 6].map((n) => ({ issue: `Finding ${n}`, evidence: `Evidence ${n}` })),
+      positive_findings: [1, 2].map((n) => ({ positive: `Positive ${n}`, evidence: `Positive evidence ${n}` })),
       strengths: '', missed_opportunities: '', commercial_implication: 'Specific to this agency and probe.',
       novus_opportunity: 'Core (front desk)', diagnosis_summary: 'Multiple genuine findings.',
     }));
@@ -118,14 +118,14 @@ async function run() {
   {
     __setAiCallerForTests(async () => ({
       findings: [
-        { finding_type: 'problem', finding: 'The conversation never established my position — no budget, funding or timescale question was asked.', evidence: 'No qualification question appears in either message.', significance_note: 'The enquiry was never qualified.' },
-        { finding_type: 'opportunity', finding: 'A property of my own to sell was declared and no valuation was ever offered.', evidence: 'The enquiry declared a property to sell; no valuation appears in any reply.', significance_note: 'A seller instruction was left on the table.' },
+        { issue: 'The conversation never established my position — no budget, funding or timescale question was asked.', evidence: 'No qualification question appears in either message.' },
+        { issue: 'A property of my own to sell was declared and no valuation was ever offered.', evidence: 'The enquiry declared a property to sell; no valuation appears in any reply.' },
         // Two lower-ranked restatements of the first finding, worded
         // differently — the shape the cap has to survive.
-        { finding_type: 'problem', finding: 'My timescale was never asked about.', evidence: 'No timescale question appears.', significance_note: 'Same qualification gap.' },
-        { finding_type: 'problem', finding: 'Nobody asked about my budget.', evidence: 'No budget question appears.', significance_note: 'Same qualification gap.' },
+        { issue: 'My timescale was never asked about.', evidence: 'No timescale question appears.' },
+        { issue: 'Nobody asked about my budget.', evidence: 'No budget question appears.' },
       ],
-      positive_findings: [{ finding: 'The team followed up quickly.', evidence: 'Three attempts across phone and email within one day.', significance_note: 'Shows strong persistence.' }],
+      positive_findings: [{ positive: 'The team followed up quickly.', evidence: 'Three attempts across phone and email within one day.' }],
       strengths: 'Persistent follow-up.', missed_opportunities: 'The declared vendor opportunity.',
       commercial_implication: 'A £375,000 Chevington enquiry was never qualified.',
       novus_opportunity: 'Growth (valuation list / seller conversion)', diagnosis_summary: 'Qualification gap with a live seller opportunity behind it.',
@@ -150,8 +150,8 @@ async function run() {
     assert.ok(/consolidate/i.test(storyDescription), 'the schema tells the model to consolidate two findings that are the same underlying issue');
     assert.ok(/Unknown context is not an opportunity/.test(storyDescription) && /seller declaration alone is never a valuation opportunity/i.test(storyDescription),
       'and distinguishes unresolved context from evidence-supported opportunity');
-    assert.ok(/FOUR FINDINGS PER PROBE, MAXIMUM/.test(SYSTEM_PROMPT), 'the system prompt states the per-probe budget');
-    assert.ok(/Never invent a wider opportunity, a supporting problem or a positive to fill a slot/.test(SYSTEM_PROMPT),
+    assert.ok(/never exceed three issues plus one positive/i.test(SYSTEM_PROMPT), 'the system prompt states the per-probe budget');
+    assert.ok(/Never manufacture a problem to fill the response/.test(SYSTEM_PROMPT),
       'and that an empty slot is never filled by invention');
     ok('THE BRIEF ITSELF — the schema and prompt separate unknown context from opportunity and invent nothing to fill a slot');
   }
@@ -191,8 +191,7 @@ async function run() {
     const responses = new Map([
       ['weak', {
         findings: [
-          { finding: 'Two and a half days to any human contact, and a holding line when it came.', evidence: '63.6 hours to first contact; the reply asked for nothing and offered nothing.', significance_note: 'The clearest front-desk gap in the set short of total silence.' },
-          { finding: 'The declared seller was never mentioned in any message.', evidence: 'Zero mentions of selling, valuation or appraisal across the one message sent.', significance_note: 'An instruction lead that was never even acknowledged.' },
+          { issue: 'Two and a half days to any human contact, and a holding line when it came.', evidence: '63.6 hours to first contact; the reply asked for nothing and offered nothing.' },
         ],
         strengths: 'Limited — the message named the correct property.',
         missed_opportunities: 'Both opportunities: no viewing proposed, no valuation offered.',
@@ -218,7 +217,7 @@ async function run() {
     const weakResult = await diagnoseProbe(baseIntelligence({ grade: 'F' }), { ...PROBE, property_address: 'Chalmers test property' });
     const strongResult = await diagnoseProbe(baseIntelligence({ grade: 'F' }), PROBE);
 
-    assert.notStrictEqual(weakResult.diagnosis_summary, strongResult.diagnosis_summary);
+    assert.notDeepStrictEqual(parseDiagnosisFindings(weakResult), parseDiagnosisFindings(strongResult));
     assert.strictEqual(weakResult.novus_opportunity, 'Core (front desk)');
     assert.strictEqual(parseDiagnosisFindings(strongResult).length, 0, 'the strong probe finds no forced finding despite sharing a grade with the weak one');
     ok('two probes sharing the same grade produce genuinely different diagnoses, driven by evidence, not the grade letter');

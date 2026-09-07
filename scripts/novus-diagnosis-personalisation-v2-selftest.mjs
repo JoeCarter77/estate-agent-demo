@@ -67,7 +67,7 @@ const shapes = [
     name: 'fast but shallow',
     intelligence: { human_contact: 'yes', response_hours: 0.2, contact_attempts: 1, follow_ups: 0, channels_used: 'email', viewing_progression: 'mentioned', buyer_qualification: 'none', buyer_questions_asked: '', seller_recognition: 'none', communication_quality: 'generic', grade: 'B' },
     ai: answer({
-      findings: [{ finding_type: 'problem', finding: 'Useful moving context remained unresolved.', evidence: 'No buyer questions were recorded and seller recognition was none.', significance_note: 'The response added little understanding.' }],
+      findings: [{ finding_type: 'problem', finding: 'Useful buyer context remained unresolved.', evidence: 'No buyer questions were recorded.', significance_note: 'The response added little understanding.' }],
       positive_findings: [{ finding: 'The team replied quickly.', evidence: 'Human response after 12 minutes.', significance_note: 'Response speed was strong.' }],
       handling_summary: 'The team replied quickly, but established little useful context.', handling_quality: 'mixed',
     }),
@@ -108,21 +108,18 @@ for (const shape of shapes) {
   assert.equal(diagnosis.handling_quality, shape.quality, shape.name);
   assert.ok(JSON.parse(diagnosis.enquiry_signals).length >= 4);
   assert.ok(JSON.parse(diagnosis.unresolved_context).length <= 3);
-  assert.ok(JSON.parse(diagnosis.recommended_actions).length <= 3);
+  assert.equal(diagnosis.recommended_actions, undefined, 'retired action prose is not produced');
   assert.equal(containsInternalProspectLanguage(diagnosis.handling_summary), false, shape.name);
   assert.doesNotMatch(JSON.stringify(diagnosis), /£425,?000[^.!?]*(?:seller|valuation)|(?:seller|valuation)[^.!?]*£425,?000/i);
   assert.doesNotMatch(JSON.stringify(parseDiagnosisFindings(diagnosis)), /valuation opportunity was missed/i);
   if (shape.name === 'strong handling') {
     assert.deepEqual(parseDiagnosisFindings(diagnosis).filter((f) => f.finding_type !== 'positive'), []);
     assert.deepEqual(JSON.parse(diagnosis.unresolved_context), [], 'answered timescale is not unresolved');
-    assert.deepEqual(JSON.parse(diagnosis.recommended_actions), []);
   }
   if (shape.name === 'complete miss') {
     const unresolved = JSON.parse(diagnosis.unresolved_context);
-    const actions = JSON.parse(diagnosis.recommended_actions);
     assert.equal(unresolved.length, 2, 'overlapping seller-property detail is removed');
     assert.doesNotMatch(JSON.stringify(unresolved), /condition/i);
-    assert.deepEqual(actions.map((item) => item.title), ['Respond to the viewing enquiry', 'Clarify the seller position']);
     assert.match(diagnosis.handling_summary, /four days after the enquiry/i);
   }
 
@@ -147,7 +144,7 @@ for (const shape of shapes) {
   }
 }
 
-assert.match(diagnosisInternal.SYSTEM_PROMPT, /BILLERICAY RULE/);
+assert.match(diagnosisInternal.SYSTEM_PROMPT, /Billericay contact address/);
 assert.doesNotMatch(diagnosisInternal.SYSTEM_PROMPT, /always creates exactly two opportunities/i);
 assert.equal(diagnosisInternal.questionAlreadyAnswered('What timescale are they working towards?', {}, {
   enquiry_text: 'We are hoping to move within 3 months.',
