@@ -1,79 +1,23 @@
-// api/novus/intelligence/finalize.js — GET /api/novus/intelligence/finalize
+// api/novus/intelligence/finalize.js — nightly acquisition finaliser.
 //
-// Vercel Cron entry point (see the "crons" entry in vercel.json) that
-// automatically closes/finalises probes once their 4-day observation window
-// has elapsed — the probe lifecycle:
-//
-//   PROBE SENT -> communications arrive -> INTELLIGENCE updates in real time
-//   (api/novus/webhooks/*.js -> lib/observation-recompute.mjs, unchanged)
-//   -> 4 days after the probe was sent, the probe closes -> final
-//   INTELLIGENCE is calculated from everything received during those 4 days
-//   -> final DIAGNOSIS is generated once -> DIAGNOSIS is frozen.
-//
-// WHY A CRON, AND WHY *THIS* ENDPOINT: closing a probe on schedule needs
-// something to actually run at/after its deadline even when nothing else
-// happens to it. A probe that receives communications gets recomputed every
-// time one arrives (lib/observation-recompute.mjs, unchanged by this file),
-// and that recompute already closes+diagnoses it the moment a recompute
-// happens to land on/after the deadline. But a probe that receives ZERO
-// communications during its window has nothing to trigger a recompute at
-// all — lib/grading.mjs's grade for it stays 'pending' forever unless
-// something re-evaluates it after the deadline passes. This endpoint is that
-// "something": it is exactly lib/rebuild-pass.mjs's runRebuildPass() (the
-// SAME combined Intelligence-then-Diagnosis pass the human "Rebuild
-// Intelligence" button runs) called on a Cron schedule instead of a click.
-// No new evidence pipeline, no new close logic — every closed-and-diagnosed
-// probe here went through the identical lib/intelligence-fields.mjs +
-// lib/probe-diagnosis.mjs code the rest of the system already uses.
-//
-// Calling this repeatedly is cheap and safe: lib/intelligence-rebuild.mjs
-// only spends an AI call on a probe that's never been interpreted (or is
-// forced — this endpoint never forces), lib/diagnosis-rebuild.mjs only ever
-// diagnoses a probe once (never regenerates a written diagnosis_summary, no
-// matter how many times this fires), and a finalised probe (closed + a
-// non-blank DIAGNOSIS.diagnosis_summary) is skipped entirely by both steps —
-// it is frozen. Bounded to `batch_size` AI calls per invocation, same
-// reasoning as api/novus/intelligence/rebuild-all.js's BATCHING note: if a
-// tick can't finish everything newly-eligible for closure, the next tick
-// simply continues where this one left off (idempotent upsert-by-probe_id,
-// no cursor needed).
-//
-// AUTH: Cron requests aren't a human with the NOVUS_BASIC_AUTH password, and
-// they aren't a provider webhook with a payload to verify either — Vercel
-// calls this on its own schedule. Verified with a shared secret sent as
-// `Authorization: Bearer <secret>`, matching Vercel's own documented
-// convention for securing Cron Job endpoints. Vercel ONLY auto-attaches that
-// header — on both its scheduled firing AND the dashboard's manual "Run"
-// button — when the env var holding the secret is named EXACTLY
-// `CRON_SECRET` (see https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs).
-// A differently-named var (e.g. the NOVUS_CRON_SECRET this endpoint used to
-// check) never gets attached at all, so every invocation — cron or manual
-// Run — 401s before runRebuildPass() ever runs, silently leaving every
-// probe stuck at 'observing' no matter how expired its deadline is. Set
-// CRON_SECRET as a Vercel env var. NOVUS_CRON_SECRET is still accepted as a
-// fallback name (for anyone who already configured it under the old name),
-// but only CRON_SECRET gets Vercel's automatic header — this handler checks
-// it explicitly either way, the same requireIngestSecret-style pattern
-// api/novus/webhooks/email-inbound.js uses.
-//
-// Schedule granularity: see the "crons" entry in vercel.json. Vercel Hobby
-// projects are limited to once-daily Cron invocations; Pro/Enterprise allow
-// much finer granularity. Whichever cadence is configured, a probe closes
-// correctly and idempotently the next time this fires at/after its deadline
-// — the schedule only controls how much lateness ("4 days" becomes "4 days
-// plus up to one tick") is acceptable, never correctness.
+// Closes expired probe windows, completes the acquisition assets, hands newly
+// eligible rows to Instantly, then reconciles operator actions. The whole
+// invocation shares one request-scoped Sheets cache so those stages do not
+// repeatedly download the same tabs.
 
 import crypto from 'node:crypto';
 import { getRepo } from '../../../lib/sheets.mjs';
+import { createCachedRepo } from '../../../lib/cached-repo.mjs';
 import { runRebuildPass } from '../../../lib/rebuild-pass.mjs';
 import { uploadEligibleOutboundLeads } from '../../../lib/instantly-outbound.mjs';
 import { reconcileActionEngine } from '../../../lib/action-engine.mjs';
 
 export const maxDuration = 60;
-
-// Same conservative reasoning as api/novus/intelligence/rebuild-all.js's
-// DEFAULT_BATCH_SIZE.
-const DEFAULT_BATCH_SIZE = 15;
+// Acquisition now has only one AI call per closed probe with communications,
+// and those calls run with bounded concurrency. Forty keeps pace with the
+// intended daily probing volume without resurrecting the old three-stage AI
+// backlog. NOVUS_REBUILD_BATCH_SIZE can still override this operationally.
+const DEFAULT_BATCH_SIZE = 40;
 
 export async function runNightlyFinalizer(repo, {
   batchSize = DEFAULT_BATCH_SIZE,
@@ -81,16 +25,16 @@ export async function runNightlyFinalizer(repo, {
   handoff = uploadEligibleOutboundLeads,
   instantlyOptions = {},
 } = {}) {
-  const summary = await rebuild(repo, {
+  const workRepo = createCachedRepo(repo);
+  const summary = await rebuild(workRepo, {
     maxAiCalls: batchSize,
     rebuildOutbound: true,
   });
   if (!summary?.outbound) throw new Error('Nightly OUTBOUND rebuild did not complete');
 
-  // This is intentionally last. The shared handoff re-reads the OUTBOUND tab
-  // produced above and applies the same marker-based eligibility rules used
-  // by the protected manual bulk operation.
-  const instantly = await handoff(repo, instantlyOptions);
+  // OUTBOUND writes are mirrored into the request cache, so the handoff sees
+  // the exact freshly-compiled state without another Google Sheets GET.
+  const instantly = await handoff(workRepo, instantlyOptions);
   return { ...summary, instantly, batch_size: batchSize };
 }
 
@@ -102,9 +46,6 @@ function safeEqual(a, b) {
 }
 
 function requireCronSecret(req, res) {
-  // CRON_SECRET must come first: it's the only name Vercel will ever
-  // auto-attach an Authorization header for. NOVUS_CRON_SECRET is a
-  // fallback for a value already configured under the old name.
   const expected = process.env.CRON_SECRET || process.env.NOVUS_CRON_SECRET;
   if (!expected) {
     res.status(500).json({ error: 'CRON_SECRET is not configured' });
@@ -125,7 +66,9 @@ export default async function handler(req, res) {
   const batchSize = Number(process.env.NOVUS_REBUILD_BATCH_SIZE) || DEFAULT_BATCH_SIZE;
 
   try {
-    const repo = getRepo();
+    // One cache for rebuild -> OUTBOUND -> Instantly marker writes -> ACTIONS.
+    // createCachedRepo is idempotent, so runRebuildPass can safely call it too.
+    const repo = createCachedRepo(getRepo());
     const summary = await runNightlyFinalizer(repo, {
       batchSize,
       instantlyOptions: {
@@ -133,12 +76,11 @@ export default async function handler(req, res) {
         campaignId: process.env.INSTANTLY_CAMPAIGN_ID,
       },
     });
-    // Periodic reconciliation is deliberately last and failure-isolated: it
-    // projects the evidence the existing nightly pipeline just wrote, but can
-    // never prevent probe finalisation or Instantly handoff.
+
     let actions;
-    try { actions = await reconcileActionEngine(repo); }
-    catch (err) {
+    try {
+      actions = await reconcileActionEngine(repo);
+    } catch (err) {
       console.error('nightly action reconciliation failed:', err?.message || err);
       actions = { available: false, error: err?.message || 'action reconciliation failed' };
     }
