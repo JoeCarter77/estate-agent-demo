@@ -61,12 +61,9 @@ const DEMO_URL = 'https://demo.getnovus.co.uk/test-1';
 const NOW = '2026-09-01T10:00:00.000Z';
 
 const EXPECTED_BODY = [
-  'Absolutely — here it is:',
-  '',
-  DEMO_URL,
-  '',
-  'I’ve based it on what happened after the enquiry we sent through.',
-  '',
+  'Of course — here is the breakdown: ' + DEMO_URL,
+  'I built this around what we saw after the enquiry we sent through. Even if it’s not something you’d be interested in, we’re still early in building NOVUS, so I’d genuinely value any thoughts on whether it feels useful, misses the mark, or there’s anything we should be looking at differently.',
+  'Thanks,',
   'Joe',
 ].join('\n');
 
@@ -101,7 +98,7 @@ const RAW_NOVUS_DEMO_SENT = {
   ...RAW_NOVUS_OUTBOUND,
   id: 'novus-outbound-demo',
   timestamp_email: '2026-09-01T10:00:01.000Z',
-  content_preview: `Absolutely — here it is: ${DEMO_URL} I’ve based it on what happened after the enquiry we sent through. Joe`,
+  content_preview: `Of course — here is the breakdown: ${DEMO_URL} I built this around what we saw after the enquiry we sent through. Joe`,
 };
 
 function replyRow(overrides = {}) {

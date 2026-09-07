@@ -107,7 +107,7 @@ const REPLY_2 = rawEmail({ id: EMAIL_ID_2, threadId: THREAD_2, leadEmail: LEAD_2
 const NOVUS_OFFER_1 = rawEmail({ id: 'novus-1', threadId: THREAD, leadEmail: LEAD, ueType: 1, body: 'We sent an enquiry through. Want me to send the breakdown?', timestamp: '2026-09-01T08:00:00.000Z' });
 const NOVUS_OFFER_2 = rawEmail({ id: 'novus-2', threadId: THREAD_2, leadEmail: LEAD_2, ueType: 1, body: 'We sent an enquiry through. Want me to send the breakdown?', timestamp: '2026-09-01T08:00:00.000Z' });
 // Our own demo reply, as Instantly reports it on a LATER sweep.
-const NOVUS_DEMO_SENT_1 = rawEmail({ id: 'novus-demo-1', threadId: THREAD, leadEmail: LEAD, ueType: 1, body: `Absolutely — here it is: ${DEMO_URL} I’ve based it on what happened after the enquiry we sent through. Joe`, timestamp: '2026-09-01T10:00:01.000Z' });
+const NOVUS_DEMO_SENT_1 = rawEmail({ id: 'novus-demo-1', threadId: THREAD, leadEmail: LEAD, ueType: 1, body: `Of course — here is the breakdown: ${DEMO_URL} I built this around what we saw after the enquiry we sent through. Joe`, timestamp: '2026-09-01T10:00:01.000Z' });
 
 __setAiCallerForTests(async ({ prompt }) => {
   if (prompt.includes('MARKER_SEND_DEMO')) {

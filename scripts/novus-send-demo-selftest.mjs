@@ -77,7 +77,7 @@ const RAW_NOVUS_OUTBOUND = {
 const RAW_NOVUS_WITH_DEMO = {
   ...RAW_NOVUS_OUTBOUND,
   id: 'novus-outbound-2',
-  content_preview: `Absolutely — here it is: ${DEMO_URL}`,
+  content_preview: `Of course — here is the breakdown: ${DEMO_URL}`,
 };
 
 function replyRow(overrides = {}) {
@@ -154,21 +154,28 @@ check(() => assert.equal(eligible.eaccount, EACCOUNT));
 check(() => assert.equal(eligible.demo_sent_evidence, 'NOT_SENT'));
 
 // The copy is EXACT and carries the exact demo URL. No CTA, no meeting ask, no
-// second link, no generated prose.
+// second link, no generated prose. The fixture OUTBOUND row has no first_name,
+// so the greeting line is omitted — see the first_name case below for the
+// greeting-present variant.
 const EXPECTED_BODY = [
-  'Absolutely — here it is:',
-  '',
-  DEMO_URL,
-  '',
-  'I’ve based it on what happened after the enquiry we sent through.',
-  '',
+  'Of course — here is the breakdown: ' + DEMO_URL,
+  'I built this around what we saw after the enquiry we sent through. Even if it’s not something you’d be interested in, we’re still early in building NOVUS, so I’d genuinely value any thoughts on whether it feels useful, misses the mark, or there’s anything we should be looking at differently.',
+  'Thanks,',
   'Joe',
 ].join('\n');
 check(() => assert.equal(eligible.reply_body.text, EXPECTED_BODY));
 check(() => assert.equal(eligible.reply_body.html, EXPECTED_BODY.split('\n').join('<br/>')));
 check(() => assert.equal(eligible.reply_body.text.includes(DEMO_URL), true));
-check(() => assert.match(eligible.reply_body.text, /^Absolutely — here it is:/));
+check(() => assert.match(eligible.reply_body.text, /^Of course — here is the breakdown:/));
 check(() => assert.equal(/call|meeting|book|chat|pricing|reply to this/i.test(eligible.reply_body.text), false));
+
+// When the resolved OUTBOUND row carries a first_name (see deriveFirstName in
+// lib/outbound.mjs), the greeting is prepended and nothing else about the copy
+// changes.
+const withName = gate({ outboundRecords: [outboundRecord({ first_name: 'Priya' })] });
+check(() => assert.equal(withName.eligible, true));
+check(() => assert.equal(withName.reply_body.text, `Hi Priya,\n${EXPECTED_BODY}`));
+check(() => assert.equal(withName.reply_body.html, `Hi Priya,<br/>${EXPECTED_BODY.split('\n').join('<br/>')}`));
 
 // ===========================================================================
 console.log('--- blocked cases ---');

@@ -209,8 +209,9 @@ console.log('--- 1 & 3. newly persisted, semantic POSITIVE_SEND_DEMO -> exactly 
 
   const post = instantly.posts()[0];
   const EXPECTED_BODY = [
-    'Absolutely — here it is:', '', DEMO_URL, '',
-    'I’ve based it on what happened after the enquiry we sent through.', '', 'Joe',
+    'Of course — here is the breakdown: ' + DEMO_URL,
+    'I built this around what we saw after the enquiry we sent through. Even if it’s not something you’d be interested in, we’re still early in building NOVUS, so I’d genuinely value any thoughts on whether it feels useful, misses the mark, or there’s anything we should be looking at differently.',
+    'Thanks,', 'Joe',
   ].join('\n');
   check(() => assert.equal(post.body.body.text, EXPECTED_BODY, 'exact existing template, not paraphrased'));
   check(() => assert.equal(post.body.reply_to_uuid, 'ev-1'));
@@ -320,7 +321,7 @@ console.log('--- 10. DEMO_ALREADY_SENT is a safe blocked/idempotent auto-send re
   // simulating a manual send that happened before this poll pass ran.
   const alreadySentMsg = rawEmail({
     id: 'novus-already-sent', threadId: THREAD, leadEmail: LEAD, ueType: 1, timestamp: '2026-09-01T10:00:00.000Z',
-    body: `Absolutely — here it is: ${DEMO_URL} I’ve based it on what happened after the enquiry we sent through. Joe`,
+    body: `Of course — here is the breakdown: ${DEMO_URL} I built this around what we saw after the enquiry we sent through. Joe`,
   });
   const instantly = makeInstantlyStub({ sweep: [reply, alreadySentMsg], reply: OK_REPLY_RESPONSE });
   globalThis.fetch = instantly.impl;
@@ -459,7 +460,7 @@ console.log('--- 15. repeat poll after a successful send: zero duplicate sends -
   // consumed) plus our own now-sent reply in the thread.
   const sentReplyMsg = rawEmail({
     id: 'sent-uuid-1', threadId: THREAD, leadEmail: LEAD, ueType: 1, timestamp: '2026-09-01T10:11:00.000Z',
-    body: `Absolutely — here it is: ${DEMO_URL} I’ve based it on what happened after the enquiry we sent through. Joe`,
+    body: `Of course — here is the breakdown: ${DEMO_URL} I built this around what we saw after the enquiry we sent through. Joe`,
   });
   const second = makeInstantlyStub({ sweep: [reply, offer, sentReplyMsg], reply: OK_REPLY_RESPONSE });
   globalThis.fetch = second.impl;
