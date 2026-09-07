@@ -9,7 +9,7 @@ const AGENCIES_HEADER = [
   'agency_id', 'clean_agency_name', 'outreach_contact_name',
   'outreach_contact_email', 'email_verification_status',
 ];
-const PROBES_HEADER = ['agency_id', 'probe_id', 'property_street'];
+const PROBES_HEADER = ['agency_id', 'probe_id', 'property_street', 'property_address'];
 const PERSONALISATION_HEADER = [
   'agency_id', 'probe_id', 'email_observation', 'email_commercial_hook',
   'email_commercial_hook_email_2',
@@ -38,6 +38,7 @@ function makeWorkbook(overrides = {}, { outboundRows = [] } = {}) {
   };
   const probe = {
     agency_id: 'ag_1', probe_id: 'prb_1', property_street: '10 High Street',
+    property_address: '10 High Street, Chelmsford, Essex',
     ...(overrides.probe || {}),
   };
   const personalisation = {
@@ -116,7 +117,6 @@ function ok(message) { passed += 1; console.log(`  ✓ ${message}`); }
 
 for (const [label, overrides, reason] of [
   ['demo not ready', { demo: { demo_status: 'needs_review' } }, 'demo_status != ready'],
-  ['property image not ok', { demo: { property_image_status: 'missing' } }, 'property_image_status != ok'],
   ['missing contact email', { agency: { outreach_contact_email: '' } }, 'missing outreach_contact_email'],
 ]) {
   const { result } = await dryRun(overrides);
@@ -124,6 +124,12 @@ for (const [label, overrides, reason] of [
   assert(result.skipped[0].reasons.includes(reason));
   ok(`${label} is skipped`);
 }
+
+for (const imageStatus of ['unavailable', 'pending', 'none', '']) {
+  const { result } = await dryRun({ demo: { property_image_status: imageStatus } });
+  assert.equal(result.eligible_count, 1);
+}
+ok('property image state is presentation-only and never blocks OUTBOUND');
 
 for (const status of ['VALID', 'RISKY']) {
   const { result } = await dryRun({ agency: { email_verification_status: status } });
@@ -140,13 +146,20 @@ ok('UNKNOWN, blank and other verification statuses are skipped');
 
 for (const [label, overrides, reason] of [
   ['missing clean agency name', { agency: { clean_agency_name: '  ' } }, 'missing clean_agency_name'],
-  ['missing property street', { probe: { property_street: '' } }, 'missing property_street'],
+  ['missing property reference', { probe: { property_street: '', property_address: '' } }, 'missing property_street_or_address'],
   ['missing demo slug', { demo: { demo_slug: '' } }, 'missing demo_slug'],
 ]) {
   const { result } = await dryRun(overrides);
   assert.equal(result.eligible_count, 0);
   assert(result.skipped[0].reasons.includes(reason));
   ok(`${label} is skipped`);
+}
+
+{
+  const { result } = await dryRun({ probe: { property_street: '', property_address: '23 New Road, Billericay, Essex' } });
+  assert.equal(result.eligible_count, 1);
+  assert.equal(result.rows_to_create[0].property_street, '23 New Road');
+  ok('new probes derive property_street from canonical property_address');
 }
 
 for (const field of ['email_observation', 'email_commercial_hook']) {
