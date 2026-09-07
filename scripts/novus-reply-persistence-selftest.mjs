@@ -57,7 +57,7 @@ const REAL_REPLY = {
 };
 
 // ue_type claims received, addresses disagree -> UNKNOWN.
-const CONTRADICTORY = { ...REAL_REPLY, id: 'contradictory-1', from_address_email: 'stranger@elsewhere.com' };
+const CONTRADICTORY = { ...REAL_REPLY, id: 'contradictory-1', from_address_email: 'stranger@elsewhere.com', to_address_email_list: 'outsider@elsewhere.com' };
 const UNMATCHED_REPLY = { ...REAL_REPLY, id: 'unmatched-1', from_address_email: 'nobody@nowhere.com', lead: 'nobody@nowhere.com' };
 
 function outboundRow(overrides = {}) {
@@ -212,27 +212,30 @@ check(() => assert.equal(summary.duplicates_skipped, 1, 'the set is updated the 
 check(() => assert.equal(repo.appended.length, 1));
 check(() => assert.equal(repo.calls.filter((c) => c[0] === 'getTable').length, 1, 'still one read for the pass'));
 
-// --- 4. UNMATCHED appends nothing -------------------------------------------
+// --- 4. UNMATCHED is persisted as unresolved evidence -----------------------
 repo = fakeRepo({ outbound: [MATCHING_OUTBOUND] });
 ({ impl } = stubFetch([UNMATCHED_REPLY]));
 summary = await pollInstantlyReplies(live({ repo, fetchImpl: impl }));
 
 check(() => assert.equal(summary.inbound_confirmed, 1));
 check(() => assert.equal(summary.unmatched, 1));
-check(() => assert.equal(summary.persisted, 0));
-check(() => assert.equal(summary.events.length, 0));
-check(() => assert.equal(repo.appended.length, 0));
-check(() => assert.ok(repo.calls.every((c) => c[0] !== 'appendRecord'), 'no append attempted'));
+check(() => assert.equal(summary.persisted, 1));
+check(() => assert.equal(summary.events.length, 1));
+check(() => assert.equal(repo.appended.length, 1));
+check(() => assert.equal(repo.appended[0].error, 'UNRESOLVED_INBOUND_UNMATCHED'));
+check(() => assert.equal(repo.appended[0].action_status, 'REVIEW'));
 
-// --- 5. AMBIGUOUS appends nothing and chooses nothing -----------------------
+// --- 5. AMBIGUOUS persists but chooses no journey ---------------------------
 repo = fakeRepo({ outbound: [MATCHING_OUTBOUND, DUPLICATE_OUTBOUND] });
 ({ impl } = stubFetch([REAL_REPLY]));
 summary = await pollInstantlyReplies(live({ repo, fetchImpl: impl }));
 
 check(() => assert.equal(summary.ambiguous, 1));
 check(() => assert.equal(summary.matched, 0));
-check(() => assert.equal(summary.persisted, 0));
-check(() => assert.equal(repo.appended.length, 0));
+check(() => assert.equal(summary.persisted, 1));
+check(() => assert.equal(repo.appended.length, 1));
+check(() => assert.equal(repo.appended[0].agency_id, ''));
+check(() => assert.equal(repo.appended[0].error, 'UNRESOLVED_INBOUND_AMBIGUOUS'));
 check(() => assert.equal(summary.skipped[0].reason, 'ambiguous_outbound_match'));
 check(() => assert.equal(summary.skipped[0].candidates.length, 2, 'both listed, neither chosen'));
 check(() => assert.equal(summary.skipped[0].needs_manual_review, true));

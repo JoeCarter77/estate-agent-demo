@@ -384,6 +384,9 @@ const LEADS_URL        = '/api/novus/personalisation?novus_operation=operator-da
 const RECONCILE_URL    = '/api/novus/personalisation?novus_operation=operator-actions-reconcile';
 const MEETING_URL      = '/api/novus/personalisation?novus_operation=operator-mark-meeting-booked';
 const CALL_URL         = '/api/novus/personalisation?novus_operation=operator-call-outcome';
+const ACTION_CREATE_URL   = '/api/novus/personalisation?novus_operation=operator-action-create';
+const ACTION_COMPLETE_URL = '/api/novus/personalisation?novus_operation=operator-action-complete';
+const ACTION_SNOOZE_URL   = '/api/novus/personalisation?novus_operation=operator-action-snooze';
 const CONVERSATION_URL = '/api/novus/personalisation?novus_operation=operator-conversation';
 const MANUAL_REPLY_URL = '/api/novus/personalisation?novus_operation=operator-manual-reply';
 /* READ-ONLY dry run. classify=0 keeps it zero-cost: no AI call, no write. */
@@ -435,7 +438,8 @@ const ACTION_LABEL = {
   DEMO_UNOPENED_FOLLOWUP:'Follow up unopened demo', DEMO_OPENED_FOLLOWUP:'Follow up opened demo',
   CALL_PROSPECT:'Call prospect', RETRY_CALL:'Retry the call',
   FOLLOW_UP_CONVERSATION:'Follow up conversation', SET_NEXT_STEP:'Set the next step',
-  RESOLVE_EXCEPTION:'Resolve exception',
+  RESOLVE_EXCEPTION:'Resolve exception', REPLY:'Reply', FOLLOW_UP:'Follow up', CALL:'Call',
+  EMAIL:'Email', REVIEW:'Review', BOOK_MEETING:'Book meeting', OTHER:'Other',
 };
 /* QUEUE = who executes. NOVUS may only own a queue it can actually execute,
    so everything without an enabled automated executor is Manual (Joe's), even
@@ -450,10 +454,10 @@ const CONTACT_TONE  = { OWNER_DIRECT:'t-violet', NAMED_HUMAN:'t-blue', GENERIC:'
 /* Actions workspace tabs. Types are canonical; grouping is presentation. */
 const ACTION_TABS = [
   { key:'all',       label:'All',        types:null },
-  { key:'replies',   label:'Replies',    types:['HUMAN_REPLY'] },
-  { key:'calls',     label:'Calls',      types:['CALL_PROSPECT','RETRY_CALL'] },
-  { key:'reviews',   label:'Reviews',    types:['MANUAL_REVIEW','RESOLVE_EXCEPTION'] },
-  { key:'followups', label:'Follow-ups', types:['FOLLOW_UP_CONVERSATION','SET_NEXT_STEP','DEMO_UNOPENED_FOLLOWUP','DEMO_OPENED_FOLLOWUP'] },
+  { key:'replies',   label:'Replies',    types:['HUMAN_REPLY','REPLY','EMAIL'] },
+  { key:'calls',     label:'Calls',      types:['CALL_PROSPECT','RETRY_CALL','CALL'] },
+  { key:'reviews',   label:'Reviews',    types:['MANUAL_REVIEW','RESOLVE_EXCEPTION','REVIEW'] },
+  { key:'followups', label:'Follow-ups', types:['FOLLOW_UP_CONVERSATION','SET_NEXT_STEP','DEMO_UNOPENED_FOLLOWUP','DEMO_OPENED_FOLLOWUP','FOLLOW_UP'] },
 ];
 
 /* Pipeline bands. Mutually exclusive: a lead has exactly one canonical stage,
@@ -477,7 +481,7 @@ const EXCEPTION_INFO = {
   AMBIGUOUS_SEND:{ t:'Send outcome unconfirmed', w:'A NOVUS message may or may not have reached the prospect. Resending risks a duplicate.', f:'Open the conversation and confirm what actually sent before doing anything else.' },
   MISSING_DEMO:{ t:'No demo record', w:'Outreach preparation is running but this agency has no DEMOS row, so there is nothing to send.', f:'Build the demo for this probe before the lead can move to outreach.' },
   MISSING_CONTACT:{ t:'No contact email', w:'Outreach preparation is running with no resolved contact email, so nothing can be sent.', f:'Resolve a verified contact for this agency.' },
-  UNMATCHED_REPLY:{ t:'Reply matched no journey', w:'Inbound replies exist that the poller could not attribute to a single outreach journey, so they are unhandled.', f:'Run the unrouted-reply check below and route them manually.' },
+  UNMATCHED_REPLY:{ t:'Unresolved inbound reply — needs matching', w:'A genuine received email is safely stored in REPLY_EVENTS but could not be attributed to one outreach journey.', f:'Open the unresolved-reply review and match it manually.' },
   STATE_CONFLICT:{ t:'Conflicting state', w:'Stored evidence for this agency disagrees with itself, so the lifecycle resolved to ERROR.', f:'Open the lead, read the stage reason, and correct the underlying record.' },
   ACTION_LEDGER_UNAVAILABLE:{ t:'Action ledger unavailable', w:'The ACTIONS tab is missing or its header is wrong. Actions are being projected but not stored, so nothing is durable.', f:'Run npm run novus:actions-setup, then reconcile.' },
 };
@@ -616,7 +620,14 @@ function renderView(){
    recomputes it — that is exactly the mistake that put probing in here. */
 function manualActions(){
   return LEADS.filter((l) => l.needs_human)
-    .sort((a, b) => (Date.parse(a.next_action.due_at||'') || Infinity) - (Date.parse(b.next_action.due_at||'') || Infinity));
+    .sort((a, b) => {
+      const ad = Date.parse(a.next_action.due_at||''); const bd = Date.parse(b.next_action.due_at||'');
+      const ab = Number.isFinite(ad) && ad < Date.now() ? 0 : 1;
+      const bb = Number.isFinite(bd) && bd < Date.now() ? 0 : 1;
+      const ar = {CRITICAL:0,HIGH:1,NORMAL:2,LOW:3}[a.next_action.priority || a.priority] ?? 2;
+      const br = {CRITICAL:0,HIGH:1,NORMAL:2,LOW:3}[b.next_action.priority || b.priority] ?? 2;
+      return ab-bb || ar-br || (Number.isFinite(ad)?ad:Infinity) - (Number.isFinite(bd)?bd:Infinity);
+    });
 }
 
 /* ── DUE NOW vs SCHEDULED FOR LATER ───────────────────────────────────────
@@ -763,6 +774,9 @@ function taskHtml(lead){
     <div class="task-side">
       <div class="task-when ${due.cls}">${esc(due.text)}</div>
       ${lead.reply.received_at ? `<div class="task-when" style="font-weight:500">Replied ${esc(ago(lead.reply.received_at))}</div>` : ''}
+      ${a.id ? `<div class="btnrow"><button class="btn btn-secondary btn-sm action-complete" data-action="${esc(a.id)}" type="button">Complete</button>
+        <button class="btn btn-quiet btn-sm action-complete-next" data-action="${esc(a.id)}" type="button">Complete + next</button>
+        <button class="btn btn-quiet btn-sm action-snooze" data-action="${esc(a.id)}" type="button">Snooze</button></div>` : ''}
     </div></div>`;
 }
 
@@ -1221,14 +1235,26 @@ function paneDemo(lead){
 
 function paneActions(lead){
   const history = lead.action_history || [];
-  if(!history.length) return blk('Action history', '<div class="note">No durable action history yet. Reconcile actions to create the ledger entries for this agency.</div>');
-  const tone = { COMPLETED:'t-green', CANCELLED:'t-grey', FAILED:'t-red', DUE:'t-amber', PENDING:'t-blue', IN_PROGRESS:'t-blue' };
-  return blk('Action history', kv(history.slice(0, 20).map((a) => [
-    actionLabel(a.action_type),
-    `${pill(String(a.action_status||'').toLowerCase(), tone[String(a.action_status||'').toUpperCase()], true)}
+  const tone = { COMPLETED:'t-green', CANCELLED:'t-grey', FAILED:'t-red', DUE:'t-amber', PENDING:'t-blue', IN_PROGRESS:'t-blue', SNOOZED:'t-grey' };
+  const now = Date.now();
+  const status = (a) => String(a.action_status||'').toUpperCase();
+  const due = (a) => Date.parse(a.due_at||'');
+  const active = history.filter((a) => ['PENDING','DUE','IN_PROGRESS'].includes(status(a))
+    && (!Number.isFinite(due(a)) || due(a) <= now));
+  const upcoming = history.filter((a) => ['PENDING','SNOOZED'].includes(status(a))
+    && Number.isFinite(due(a)) && due(a) > now).sort((a,b) => due(a)-due(b));
+  const completed = history.filter((a) => status(a) === 'COMPLETED').slice(0, 8);
+  const actionRows = (items, controls=false) => items.length ? kv(items.map((a) => [
+    a.title || actionLabel(a.action_type),
+    `${pill(status(a).toLowerCase(), tone[status(a)], true)}
      <div class="sub">${esc(a.action_owner || '')}${a.due_at ? ` · due ${esc(when(a.due_at))}` : ''}</div>
-     <div class="sub">${esc(humaniseReason(a.completion_reason || a.reason || ''))}</div>`,
-  ])));
+     <div class="sub">${esc(a.note || humaniseReason(a.completion_reason || a.reason || ''))}</div>
+     ${controls ? `<div class="btnrow"><button class="btn btn-secondary btn-sm action-complete" data-action="${esc(a.action_id)}" type="button">Complete</button><button class="btn btn-quiet btn-sm action-complete-next" data-action="${esc(a.action_id)}" type="button">Complete + next</button><button class="btn btn-quiet btn-sm action-snooze" data-action="${esc(a.action_id)}" type="button">Snooze</button></div>` : ''}`,
+  ])) : '<div class="note">None.</div>';
+  return blk('Actions', `<div class="btnrow"><button class="btn btn-secondary btn-sm create-action" data-agency="${esc(lead.agency_id)}" type="button">+ Action</button></div>
+    <h4>Active action</h4>${actionRows(active, true)}
+    <h4>Upcoming actions</h4>${actionRows(upcoming)}
+    <h4>Recently completed actions</h4>${actionRows(completed)}`);
 }
 
 function renderDrawerPane(){
@@ -1664,6 +1690,55 @@ async function recordCallOutcome(actionId, outcome){
   closeDrawer(); await load(true);
 }
 
+function quickDueAt(label){
+  const raw = label || window.prompt('When? Tomorrow, 2 days, 3 days, 5 days, 7 days, or a date/time', '3 days');
+  if(!raw) return '';
+  const presets = { tomorrow:1, '2 days':2, '3 days':3, '5 days':5, '7 days':7 };
+  const key = raw.trim().toLowerCase();
+  if(presets[key]){
+    const d = new Date(); d.setDate(d.getDate() + presets[key]);
+    if(key === 'tomorrow') d.setHours(9,0,0,0);
+    return d.toISOString();
+  }
+  const parsed = new Date(raw);
+  if(Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()){ window.alert('Choose a valid future date/time.'); return ''; }
+  return parsed.toISOString();
+}
+
+async function completeAction(actionId, withNext){
+  if(SEND_IN_FLIGHT){ window.alert('Wait for the email send result before completing its action.'); return; }
+  let nextAction = null;
+  if(withNext){
+    const actionType = (window.prompt('Next action type: Follow up, Call, Email, Review, Other', 'Follow up') || '').trim().toUpperCase().replace(/\s+/g,'_');
+    const mapped = {FOLLOW_UP:'FOLLOW_UP',CALL:'CALL',EMAIL:'EMAIL',REVIEW:'REVIEW',OTHER:'OTHER'}[actionType];
+    if(!mapped) return;
+    const dueAt = quickDueAt(); if(!dueAt) return;
+    const note = window.prompt('Optional note', '') || '';
+    nextAction = { action_type:mapped, due_at:dueAt, note };
+  }
+  await postWorkflow(ACTION_COMPLETE_URL, { action_id:actionId, next_action:nextAction, confirm:'COMPLETE_ACTION' });
+  closeDrawer(); await load(true);
+}
+
+async function snoozeAction(actionId){
+  const dueAt = quickDueAt(); if(!dueAt) return;
+  await postWorkflow(ACTION_SNOOZE_URL, { action_id:actionId, due_at:dueAt, confirm:'SNOOZE_ACTION' });
+  closeDrawer(); await load(true);
+}
+
+async function createAction(lead){
+  const rawType = (window.prompt('Action type: Follow up, Call, Email, Review, Other', 'Follow up') || '').trim().toUpperCase().replace(/\s+/g,'_');
+  const actionType = {FOLLOW_UP:'FOLLOW_UP',CALL:'CALL',EMAIL:'EMAIL',REVIEW:'REVIEW',OTHER:'OTHER'}[rawType];
+  if(!actionType) return;
+  const dueAt = quickDueAt(); if(!dueAt) return;
+  const note = window.prompt('Optional note', '') || '';
+  await postWorkflow(ACTION_CREATE_URL, {
+    agency_id:lead.agency_id, outbound_id:lead.outbound_id || '', probe_id:lead.probe_id || '',
+    reply_event_id:lead.reply?.reply_event_id || '', action_type:actionType, due_at:dueAt, note, confirm:'CREATE_ACTION',
+  });
+  await load(true); OPEN_LEAD = LEADS.find((row) => row.agency_id === lead.agency_id); renderDrawerPane();
+}
+
 /* ═══ WIRING ════════════════════════════════════════════════════════════ */
 
 window.addEventListener('hashchange', () => showView(routeFromHash(), { push:false }));
@@ -1704,6 +1779,10 @@ document.addEventListener('click', (e) => {
     recordCallOutcome(e.target.dataset.action, e.target.dataset.outcome).catch((err) => window.alert(err.message));
     return;
   }
+  if(e.target.classList.contains('action-complete')){ completeAction(e.target.dataset.action, false).catch((err) => window.alert(err.message)); return; }
+  if(e.target.classList.contains('action-complete-next')){ completeAction(e.target.dataset.action, true).catch((err) => window.alert(err.message)); return; }
+  if(e.target.classList.contains('action-snooze')){ snoozeAction(e.target.dataset.action).catch((err) => window.alert(err.message)); return; }
+  if(e.target.classList.contains('create-action')){ if(OPEN_LEAD) createAction(OPEN_LEAD).catch((err) => window.alert(err.message)); return; }
 
   /* A row/task click opens the record. Anything that is itself a link or a
      button inside the row keeps its own behaviour. */

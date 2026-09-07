@@ -123,7 +123,7 @@ function fixture(){
   const tables = {
     AGENCIES: { header: AG_HEADER, rows: [
       // Ready to probe — physical probe_sent blank. Must NOT reach Actions.
-      ['ag_probe','Unprobed Ltd','Chelmsford','https://rightmove.test/a','', '','','','01245 000000',''],
+      ['ag_probe','Unprobed Ltd','Chelmsford','https://rightmove.test/a','', '','owner@unprobed.test','VALID','01245 000000',''],
       // A real question from a prospect — this IS Joe's work.
       ['ag_reply','Henton Kirkman Residential','Brentwood','https://rightmove.test/b','YES','Nick Henton','nick@hk.test','VALID','01277 000000',''],
       // A demo-engaged lead with a due call — also Joe's work.

@@ -52,7 +52,8 @@ const OUR_SENT_COPY = {
 };
 
 // ue_type says received, addresses disagree -> UNKNOWN -> skipped.
-const CONTRADICTORY = { ...REAL_REPLY, id: 'contradictory-1', from_address_email: 'stranger@elsewhere.com' };
+const ALTERNATE_SENDER = { ...REAL_REPLY, id: 'alternate-1', from_address_email: 'colleague@agency.com' };
+const CONTRADICTORY = { ...REAL_REPLY, id: 'contradictory-1', from_address_email: 'stranger@elsewhere.com', to_address_email_list: 'outsider@elsewhere.com' };
 
 function outboundRow(overrides = {}) {
   const obj = Object.fromEntries(OUTBOUND_HEADER.map((k) => [k, '']));
@@ -94,9 +95,9 @@ function stubFetch(emails, { ok = true, status = 200, body } = {}) {
 const url = buildReceivedEmailsUrl();
 check(() => assert.ok(url.startsWith('https://api.instantly.ai/api/v2/emails?')));
 check(() => assert.ok(url.includes('email_type=received'), 'asks the API for received mail only'));
-check(() => assert.ok(url.includes('limit=50')));
+check(() => assert.ok(url.includes('limit=100')));
 check(() => assert.ok(url.includes('sort_order=desc')));
-check(() => assert.equal(DEFAULT_POLL_LIMIT, 50, 'bounded batch, not the whole mailbox'));
+check(() => assert.equal(DEFAULT_POLL_LIMIT, 100, 'uses the provider page maximum'));
 // latest_of_thread would hide a second reply on a thread; one email = one row.
 check(() => assert.ok(!url.includes('latest_of_thread')));
 check(() => assert.ok(buildReceivedEmailsUrl({ limit: 10 }).includes('limit=10')));
@@ -209,7 +210,7 @@ check(() => assert.equal(proposed.persisted, false, 'nothing persisted in dry-ru
 // NO LIVE WRITES: only reads reached the repo.
 check(() => assert.ok(repo.calls.every((c) => ['getRecords', 'findById'].includes(c[0])), 'reads only'));
 check(() => assert.deepEqual(repo.calls[0], ['getRecords', 'OUTBOUND']));
-check(() => assert.deepEqual(repo.calls[1], ['findById', 'REPLY_EVENTS', 'instantly_email_id', '01a0596e-d338-72e6-a586-98eac9e4ba20']));
+check(() => assert.deepEqual(repo.calls.at(-1), ['findById', 'REPLY_EVENTS', 'instantly_email_id', '01a0596e-d338-72e6-a586-98eac9e4ba20']));
 
 // --- 4. Duplicate REPLY_EVENTS skip ------------------------------------------
 repo = fakeRepo({
@@ -232,7 +233,8 @@ summary = await pollInstantlyReplies({ repo, apiKey: 'SECRET', fetchImpl: impl, 
 check(() => assert.equal(summary.inbound_confirmed, 1));
 check(() => assert.equal(summary.unmatched, 1));
 check(() => assert.equal(summary.matched, 0));
-check(() => assert.equal(summary.proposed_events.length, 0, 'UNMATCHED never guesses a row'));
+check(() => assert.equal(summary.proposed_events.length, 1, 'UNMATCHED still produces durable evidence'));
+check(() => assert.equal(summary.proposed_events[0].row.error, 'UNRESOLVED_INBOUND_UNMATCHED'));
 check(() => assert.equal(summary.skipped[0].reason, 'no_outbound_match'));
 check(() => assert.equal(summary.skipped[0].match_method, 'EMAIL_ONLY'));
 
@@ -244,7 +246,8 @@ repo = fakeRepo({
 summary = await pollInstantlyReplies({ repo, apiKey: 'SECRET', fetchImpl: impl, now: 'T' });
 check(() => assert.equal(summary.ambiguous, 1));
 check(() => assert.equal(summary.matched, 0));
-check(() => assert.equal(summary.proposed_events.length, 0));
+check(() => assert.equal(summary.proposed_events.length, 1));
+check(() => assert.equal(summary.proposed_events[0].row.error, 'UNRESOLVED_INBOUND_AMBIGUOUS'));
 check(() => assert.equal(summary.skipped[0].reason, 'ambiguous_outbound_match'));
 check(() => assert.equal(summary.skipped[0].needs_manual_review, true));
 check(() => assert.equal(summary.skipped[0].candidates.length, 2));
@@ -261,6 +264,14 @@ check(() => assert.equal(summary.skipped[0].reason, 'direction_outbound', 'our o
 check(() => assert.equal(summary.skipped[1].reason, 'direction_unknown', 'contradictory ue_type is skipped'));
 // Skipped-for-direction never reaches the idempotency read.
 check(() => assert.ok(!repo.calls.some((c) => c[0] === 'findById'), 'no lookup for non-inbound mail'));
+
+// An exact Instantly received event delivered to the sending account remains
+// inbound when a colleague/alias replies instead of the enrolled lead address.
+repo = fakeRepo({ outbound: [MATCHING_OUTBOUND] });
+({ impl } = stubFetch([ALTERNATE_SENDER]));
+summary = await pollInstantlyReplies({ repo, apiKey: 'SECRET', fetchImpl: impl, now: 'T' });
+check(() => assert.equal(summary.inbound_confirmed, 1));
+check(() => assert.equal(summary.proposed_events.length, 1));
 
 // --- 8. Mixed batch ----------------------------------------------------------
 repo = fakeRepo({ outbound: [MATCHING_OUTBOUND] });
@@ -283,8 +294,9 @@ check(() => assert.equal(optOut.row.suppression_type, 'PERMANENT'));
 check(() => assert.equal(optOut.row.next_action, 'NONE'));
 check(() => assert.equal(optOut.row.confidence, '1'));
 check(() => assert.equal(optOut.row.action_status, 'PENDING', 'NOVUS still owes a suppression write'));
-// OUTBOUND is read ONCE for the whole batch.
-check(() => assert.equal(repo.calls.filter((c) => c[0] === 'getRecords').length, 1));
+// OUTBOUND is read ONCE for the whole batch (the second bulk read is durable
+// reply history used by the stronger thread matcher).
+check(() => assert.equal(repo.calls.filter((c) => c[0] === 'getRecords' && c[1] === 'OUTBOUND').length, 1));
 // Still no writes anywhere.
 check(() => assert.ok(repo.calls.every((c) => ['getRecords', 'findById'].includes(c[0]))));
 
@@ -304,6 +316,39 @@ summary = await pollInstantlyReplies({ repo, apiKey: 'SECRET', fetchImpl: impl, 
 check(() => assert.equal(summary.fetched, 0));
 check(() => assert.equal(summary.proposed_events.length, 0));
 check(() => assert.deepEqual(repo.calls, [], 'an empty batch does not even read OUTBOUND'));
+
+// --- 11. Pagination: an inbound after item 50 is still examined --------------
+repo = fakeRepo({ outbound: [MATCHING_OUTBOUND] });
+let pageCall = 0;
+const pagedFetch = async (requestedUrl) => {
+  pageCall += 1;
+  if (pageCall === 1) {
+    return { ok: true, status: 200, text: async () => JSON.stringify({
+      items: Array.from({ length: 100 }, (_, i) => ({ ...REAL_REPLY, id: `page1-${i}` })),
+      next_starting_after: 'cursor-100',
+    }) };
+  }
+  check(() => assert.ok(requestedUrl.includes('starting_after=cursor-100')));
+  return { ok: true, status: 200, text: async () => JSON.stringify({ items: [{ ...REAL_REPLY, id: 'reply-101' }] }) };
+};
+summary = await pollInstantlyReplies({ repo, apiKey: 'SECRET', fetchImpl: pagedFetch, now: 'T' });
+check(() => assert.equal(summary.pages, 2));
+check(() => assert.equal(summary.fetched, 101));
+check(() => assert.ok(summary.proposed_events.some((event) => event.row.instantly_email_id === 'reply-101')));
+
+let continuationUrl = '';
+const continued = await fetchReceivedEmails({
+  apiKey: 'SECRET', startingAfter: 'resume-here', maxPages: 1,
+  fetchImpl: async (requestedUrl) => {
+    continuationUrl = requestedUrl;
+    return { ok: true, status: 200, text: async () => JSON.stringify({
+      items: [{ ...REAL_REPLY, id: 'continued-1' }], next_starting_after: 'resume-next',
+    }) };
+  },
+});
+check(() => assert.ok(continuationUrl.includes('starting_after=resume-here')));
+check(() => assert.equal(continued.truncated, true));
+check(() => assert.equal(continued.next_starting_after, 'resume-next'));
 
 globalThis.fetch = originalFetch;
 console.log(`\n✅ NOVUS Instantly reply-poll self-test passed (${assertions} focused assertions).`);

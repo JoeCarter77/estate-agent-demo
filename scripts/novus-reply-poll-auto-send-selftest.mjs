@@ -285,7 +285,7 @@ console.log('--- 4-9 & 14. mixed batch: only the SEND_DEMO-eligible reply auto-e
   const res = await callPoll(repo);
 
   check(() => assert.equal(res.statusCode, 200));
-  check(() => assert.equal(res.body.persisted, cases.length, 'every non-duplicate matched reply is persisted, including non-actionable ones'));
+  check(() => assert.equal(res.body.persisted, cases.length + 2, 'every non-duplicate inbound is persisted, including unmatched and ambiguous evidence'));
   check(() => assert.equal(res.body.duplicates_skipped, 1));
   check(() => assert.equal(res.body.unmatched, 1));
   check(() => assert.equal(res.body.ambiguous, 1));
@@ -294,6 +294,8 @@ console.log('--- 4-9 & 14. mixed batch: only the SEND_DEMO-eligible reply auto-e
   check(() => assert.equal(instantly.posts().length, 1, 'only one Instantly send for the whole batch'));
 
   const rows = rowsAsObjects();
+  check(() => assert.equal(rows.find((r) => r.instantly_email_id === 'ev-unmatched')?.error, 'UNRESOLVED_INBOUND_UNMATCHED'));
+  check(() => assert.equal(rows.find((r) => r.instantly_email_id === 'ev-ambiguous')?.error, 'UNRESOLVED_INBOUND_AMBIGUOUS'));
   for (const c of cases) {
     const row = rows.find((r) => r.instantly_email_id === `ev-batch-${c.key}`);
     check(() => assert.ok(row, `${c.key}: row persisted`));

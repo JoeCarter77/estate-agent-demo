@@ -21,6 +21,11 @@ const PROBES_HEADER = [
 // ── In-memory fake of the Google Sheets values API ────────────────────────────
 function makeFakeSheet() {
   const store = {
+    AGENCIES: [
+      ['agency_id','agency_name','probe_sent','outreach_contact_email'],
+      ['SCHEMA NOTE','','',''],
+      ['ag_test','Test Agency','','owner@test-agency.example'],
+    ],
     PROBES: [
       PROBES_HEADER.slice(),
       ['SCHEMA NOTE', 'One row per actual probe. probe_reference is the human-readable identifier.'],
@@ -30,6 +35,11 @@ function makeFakeSheet() {
   function startRowOf(range) {
     const m = String(range).match(/!\D+(\d+)/); // e.g. PROBES!A3:U3 -> 3
     return m ? parseInt(m[1], 10) : null;
+  }
+  function startColOf(range) {
+    const m = String(range).match(/!([A-Z]+)/i);
+    if (!m) return 0;
+    return [...m[1].toUpperCase()].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0) - 1;
   }
   const valuesApi = {
     async get(range) {
@@ -45,8 +55,12 @@ function makeFakeSheet() {
     async update(range, rows) {
       const tab = tabOf(range);
       const start = startRowOf(range); // 1-based sheet row
+      const col = startColOf(range);
       store[tab] = store[tab] || [];
-      rows.forEach((r, i) => { store[tab][start - 1 + i] = r.slice(); });
+      rows.forEach((r, i) => {
+        store[tab][start - 1 + i] = store[tab][start - 1 + i] || [];
+        r.forEach((value, j) => { store[tab][start - 1 + i][col + j] = value; });
+      });
       return { updatedRows: rows.length };
     },
   };
@@ -146,7 +160,7 @@ async function run() {
 
     // Create draft (real fetch to Rightmove will fail/blank in this sandbox — fine).
     const cRes = mockRes();
-    await createHandler(mockReq({ body: { action: 'create', url: 'https://www.rightmove.co.uk/properties/159273000' } }), cRes);
+    await createHandler(mockReq({ body: { action: 'create', agency_id: 'ag_test', url: 'https://www.rightmove.co.uk/properties/159273000' } }), cRes);
     assert.strictEqual(cRes.statusCode, 200, 'create returned 200');
     const probe = cRes.body.probe;
     assert.ok(probe.probe_id.startsWith('prb_'), 'probe_id generated');
@@ -197,7 +211,7 @@ async function run() {
 
     // Second probe increments the reference.
     const c2 = mockRes();
-    await createHandler(mockReq({ body: { action: 'create', url: 'https://www.rightmove.co.uk/properties/2' } }), c2);
+    await createHandler(mockReq({ body: { action: 'create', agency_id: 'ag_test', url: 'https://www.rightmove.co.uk/properties/2' } }), c2);
     assert.strictEqual(c2.body.probe.probe_reference, 'RM-0002', 'second reference is RM-0002');
     ok('a second probe gets RM-0002');
 

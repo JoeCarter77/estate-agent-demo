@@ -143,16 +143,17 @@ check(() => assert.ok(DIRECTIONS.includes(inbound.direction)));
 check(() => assert.equal(outbound.ue_type, 1));
 check(() => assert.equal(outbound.direction, 'OUTBOUND', 'ue_type 1 + outbound addresses'));
 
-// ue_type=2 + CONTRADICTORY addresses => UNKNOWN, never INBOUND.
+// ue_type=2 + exact NOVUS recipient accepts an alternate human sender. The
+// enrolled lead address is matching evidence, not a safe direction gate.
 check(() => assert.equal(normalizeInstantlyEmail({
   ...REAL_INBOUND, from_address_email: 'someone.else@agency.com',
-}).direction, 'UNKNOWN', 'sender is not the lead'));
+}).direction, 'INBOUND', 'alternate sender still reached the exact NOVUS account'));
 check(() => assert.equal(normalizeInstantlyEmail({
   ...REAL_INBOUND, to_address_email_list: 'stranger@elsewhere.com', eaccount: '',
   }, { mailboxes: ['joe@novushq.co.uk'] }).direction, 'UNKNOWN', 'recipient is not the NOVUS account'));
 check(() => assert.equal(normalizeInstantlyEmail({
   ...REAL_INBOUND, lead: 'different.lead@agency.com',
-}).direction, 'UNKNOWN', 'lead does not match the sender'));
+}).direction, 'INBOUND', 'provider lead mismatch does not discard a received message'));
 
 // ue_type 1/3/4 can NEVER produce INBOUND, even with inbound-shaped addresses.
 for (const ueType of [1, 3, 4]) {
@@ -240,9 +241,9 @@ check(() => assert.equal(inbound.provider_hints.ue_type, 2));
 check(() => assert.equal(inbound.provider_hints.eaccount, 'joe@novushq.co.uk'));
 check(() => assert.equal(inbound.provider_hints.message_id, '<CAF=inbound@mail.gmail.com>'));
 const contradicted = normalizeInstantlyEmail({ ...REAL_INBOUND, from_address_email: 'someone.else@agency.com' });
-check(() => assert.equal(contradicted.direction, 'UNKNOWN'));
-check(() => assert.equal(contradicted.provider_hints.ue_type, 2, 'the rejected claim is still auditable'));
-check(() => assert.equal(contradicted.ue_type, 2, 'normalised ue_type survives an UNKNOWN verdict'));
+check(() => assert.equal(contradicted.direction, 'INBOUND'));
+check(() => assert.equal(contradicted.provider_hints.ue_type, 2, 'the accepted provider claim remains auditable'));
+check(() => assert.equal(contradicted.ue_type, 2, 'normalised ue_type survives an alternate sender'));
 // Fields we must never route on are still captured for audit.
 const noisy = normalizeInstantlyEmail({ ...REAL_INBOUND, i_status: 3, ai_interest_value: 1, is_focused: 1 });
 check(() => assert.equal(noisy.provider_hints.i_status, 3));

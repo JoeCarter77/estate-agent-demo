@@ -339,7 +339,7 @@ console.log('\nF. HTTP and browser contracts');
   assert.match(html, /This may have sent\./);
   assert.match(html, /Do not resend yet\. Refresh\/check the conversation first\./);
   assert.match(html, /Reply sent\./);
-  assert.ok(!/<select[^>]*(sender|eaccount|reply)/i.test(html));
+  assert.ok(!/<select[^>]*(sender|eaccount|reply[_-]?to)/i.test(html));
   assert.ok(!/NOVUS_REPLY_POLLER_SECRET|X-NOVUS-REPLY-POLLER-SECRET|action secret/i.test(html));
   assert.ok(!/Generate Response/i.test(html));
   assert.ok(!/callAi|model invocation|openai/i.test(html));

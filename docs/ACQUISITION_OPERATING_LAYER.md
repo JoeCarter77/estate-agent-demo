@@ -86,6 +86,22 @@ Do not add sample data. The nightly existing finalizer performs periodic
 reconciliation; reply ingestion, manual reply and probe-send paths also perform
 failure-isolated event reconciliation.
 
+## Action Lifecycle V2
+
+The existing audited 19-column ACTIONS schema remains unchanged. System tasks
+continue to use the deterministic lifecycle `dedupe_key`. Operator-created
+title, note and CRITICAL/HIGH/NORMAL/LOW priority values are stored in
+`metadata_json`, with `manual:true`; their agency/outbound/probe/reply context
+uses the existing relational columns.
+
+Completing an action writes `COMPLETED` plus `completed_at` and never deletes
+the row. Reconciliation treats a completed identical dedupe key as settled, so
+refresh/rebuild cannot recreate it. “Complete + next” creates the requested
+future action before completing the current action and compensating-cancels it
+if completion fails. Snooze writes `SNOOZED` with a future `due_at`; it becomes
+due on read once that time passes. Manual actions are never cancelled merely
+because lifecycle-derived work changes.
+
 ## Evidence limits in the current workbook
 
 - `OUTBOUND` has no first-email-sent timestamp or Instantly step field. A row

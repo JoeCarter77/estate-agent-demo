@@ -297,8 +297,8 @@ async function handleInstantlyRepliesTest(req, res) {
 // GET /api/novus/personalisation?novus_operation=instantly-reply-poll-dry-run
 // (also reachable via the /api/novus/instantly/reply-poll-dry-run rewrite).
 //
-// READ-ONLY. One GET to Instantly for received emails only, plus Google Sheets
-// READS (OUTBOUND once per pass, REPLY_EVENTS per candidate) to match and to
+// READ-ONLY. It follows Instantly's received-email cursor through a bounded
+// recent window, plus one OUTBOUND and one REPLY_EVENTS read to match and
 // de-duplicate. It proposes REPLY_EVENTS rows and writes none.
 //
 // dryRun is hard-coded true and is NOT taken from the query string: there is no
@@ -318,15 +318,30 @@ async function handleInstantlyReplyPollDryRun(req, res) {
   }
 
   const requested = Number(req.query?.limit);
-  const limit = Number.isInteger(requested) && requested > 0 && requested <= 100 ? requested : 50;
+  const limit = Number.isInteger(requested) && requested > 0 && requested <= 100 ? requested : 100;
+  const days = Math.max(1, Math.min(30, Number(req.query?.days) || 7));
+  const minTimestampCreated = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const startingAfter = String(req.query?.starting_after || '').trim();
 
   try {
     // Semantic classification is opt-in and only runs when a key exists. In
     // dry-run it classifies and reports what it WOULD write; it updates
     // nothing. ?classify=0 turns it off for a pure zero-cost pass.
     const classify = hasAnthropicApiKey() ? req.query?.classify !== '0' : false;
-    const summary = await pollInstantlyReplies({ repo: getRepo(), apiKey, limit, dryRun: true, classify });
-    return res.status(200).json({ success: true, ...summary });
+    const summary = await pollInstantlyReplies({ repo: getRepo(), apiKey, limit, dryRun: true, classify, minTimestampCreated, startingAfter });
+    return res.status(200).json({
+      success: true,
+      ...summary,
+      reconciliation_report: {
+        instantly_received_examined: summary.inbound_confirmed,
+        already_persisted: summary.duplicates_skipped,
+        missing_confidently_matched: summary.matched,
+        unmatched: summary.unmatched,
+        ambiguous: summary.ambiguous,
+        would_classify_positive_send_demo: summary.events.filter((event) => event.classification?.classification === 'POSITIVE_SEND_DEMO').length,
+        historical_auto_execution: false,
+      },
+    });
   } catch (err) {
     // Never echo the API key, on any path.
     if (err?.instantly_status) {
@@ -349,9 +364,9 @@ async function handleInstantlyReplyPollDryRun(req, res) {
 // which never reaches summary.events at all (see the duplicate-skip branch in
 // pollInstantlyReplies) — AND whose classification this same pass produced is
 // exactly POSITIVE_SEND_DEMO. No extra confidence/source check is needed:
-// classifyReply() can only return POSITIVE_SEND_DEMO via a genuine AI verdict
-// (source:'AI'), because every failure/low-confidence/fallback path in
-// lib/reply-classification.mjs is hardcoded to OTHER_UNCLEAR.
+// classifyReply() only returns that class from an accepted semantic verdict or
+// the stricter deterministic previous-CTA rule; every failure,
+// low-confidence and generic fallback path is OTHER_UNCLEAR.
 //
 // Reuses executeSendDemo() from lib/reply-send-demo.mjs UNCHANGED — it
 // re-reads/re-derives the row, the OUTBOUND match and the Instantly thread
@@ -392,8 +407,9 @@ async function runAutoSendDemo({ repo, apiKey, events }) {
 // (also reachable via the /api/novus/instantly/reply-poll rewrite).
 //
 // The ONLY REPLY_EVENTS write this performs directly is APPENDING rows for
-// confirmed inbound replies that matched exactly one OUTBOUND row and were
-// not already processed; it changes no outbound_status, writes no
+// confirmed inbound replies not already processed. Unmatched and ambiguous
+// replies are deliberately included with blank journey ids and a durable
+// manual-resolution state; it changes no outbound_status, writes no
 // suppression, and calls no Instantly write endpoint itself. It DOES, after
 // that append+classify pass, invoke runAutoSendDemo() above for any row this
 // SAME pass just persisted and classified as POSITIVE_SEND_DEMO — which is the
@@ -421,7 +437,8 @@ async function handleInstantlyReplyPoll(req, res) {
   }
 
   const requested = Number(req.query?.limit);
-  const limit = Number.isInteger(requested) && requested > 0 && requested <= 100 ? requested : 50;
+  const limit = Number.isInteger(requested) && requested > 0 && requested <= 100 ? requested : 100;
+  const startingAfter = String(req.query?.starting_after || '').trim();
 
   try {
     // Classification runs AFTER each raw row is appended, and updates only the
@@ -430,7 +447,7 @@ async function handleInstantlyReplyPoll(req, res) {
     // runAutoSendDemo for the one thing that runs after it.
     const classify = hasAnthropicApiKey() ? req.query?.classify !== '0' : false;
     const repo = getRepo();
-    const summary = await pollInstantlyReplies({ repo, apiKey, limit, dryRun: false, classify });
+    const summary = await pollInstantlyReplies({ repo, apiKey, limit, dryRun: false, classify, startingAfter });
     const autoSend = await runAutoSendDemo({ repo, apiKey, events: summary.events });
     if (summary.persisted > 0) invalidateOperatorCaches();
     const affectedAgencyIds = [...new Set((summary.events || []).map((event) => String(event.row?.agency_id || '').trim()).filter(Boolean))];
@@ -446,6 +463,9 @@ async function handleInstantlyReplyPoll(req, res) {
       success: true,
       dry_run: false,
       fetched: summary.fetched,
+      pages: summary.pages,
+      truncated: summary.truncated,
+      next_starting_after: summary.next_starting_after,
       inbound_confirmed: summary.inbound_confirmed,
       skipped_not_inbound: summary.skipped_not_inbound,
       duplicates_skipped: summary.duplicates_skipped,
@@ -507,6 +527,60 @@ async function handleInstantlyReplyPoll(req, res) {
     }
     console.error('instantly-reply-poll error:', err);
     return res.status(500).json({ success: false, error: err?.message || 'Reply poll failed' });
+  }
+}
+
+// Historical reconciliation/backfill, LIVE WRITES BUT NEVER SENDS.
+// This is intentionally separate from the normal live poll so an operator can
+// approve the dry-run report, persist the missing evidence, and still know the
+// first historical pass cannot reach executeSendDemo. A later ordinary poll
+// sees these ids as duplicates, so it cannot send them indirectly either.
+async function handleInstantlyReplyReconcile(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  if (String(req.body?.confirm || '').trim() !== 'RECONCILE_REPLIES_NO_SEND') {
+    return res.status(400).json({ success: false, error: 'Missing confirm=RECONCILE_REPLIES_NO_SEND' });
+  }
+  const apiKey = process.env.INSTANTLY_REPLY_API_KEY;
+  if (!apiKey) return res.status(500).json({ success: false, error: 'INSTANTLY_REPLY_API_KEY is not set in this environment.' });
+  const days = Math.max(1, Math.min(30, Number(req.body?.days) || 7));
+  const minTimestampCreated = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const startingAfter = String(req.body?.starting_after || '').trim();
+  try {
+    const repo = getRepo();
+    const classify = hasAnthropicApiKey();
+    const summary = await pollInstantlyReplies({
+      repo, apiKey, limit: 100, dryRun: false, classify, minTimestampCreated, startingAfter,
+    });
+    if (summary.persisted > 0) invalidateOperatorCaches();
+    const affectedAgencyIds = [...new Set(summary.events
+      .map((event) => String(event.row?.agency_id || '').trim()).filter(Boolean))];
+    let actionReconciliation = { available: true, agencies: 0 };
+    if (affectedAgencyIds.length) {
+      try { actionReconciliation = await reconcileActionEngine(repo, { agencyIds: affectedAgencyIds }); }
+      catch (err) { actionReconciliation = { available: false, error: err?.message || 'reconciliation failed' }; }
+    }
+    return res.status(200).json({
+      success: true,
+      reconciliation_report: {
+        instantly_received_examined: summary.inbound_confirmed,
+        already_persisted: summary.duplicates_skipped,
+        missing_confidently_matched: summary.matched,
+        unmatched: summary.unmatched,
+        ambiguous: summary.ambiguous,
+        classified_positive_send_demo: summary.events.filter((event) => event.classification?.classification === 'POSITIVE_SEND_DEMO').length,
+        persisted: summary.persisted,
+        failed: summary.failed,
+        pages: summary.pages,
+        truncated: summary.truncated,
+        next_starting_after: summary.next_starting_after,
+        historical_auto_execution: false,
+        auto_send_attempts: 0,
+      },
+      action_reconciliation: actionReconciliation,
+    });
+  } catch (err) {
+    if (err?.instantly_status) return res.status(502).json({ success: false, error: 'Instantly API returned an error', instantly_status: err.instantly_status, instantly_error: err.instantly_error });
+    return res.status(500).json({ success: false, error: err?.message || 'Reply reconciliation failed' });
   }
 }
 
@@ -790,6 +864,121 @@ async function handleOperatorActionReconcile(req, res) {
     return res.status(result.available ? 200 : 409).json({ success: result.available, ...result });
   } catch (err) {
     return res.status(500).json({ success: false, error: err?.message || 'Action reconciliation failed' });
+  }
+}
+
+const OPERATOR_ACTION_TYPES = new Set(['REPLY', 'FOLLOW_UP', 'CALL', 'EMAIL', 'REVIEW', 'BOOK_MEETING', 'OTHER']);
+const OPERATOR_PRIORITIES = new Set(['CRITICAL', 'HIGH', 'NORMAL', 'LOW']);
+const activeActionStatus = (value) => ['PENDING', 'DUE', 'IN_PROGRESS', 'SNOOZED'].includes(String(value || '').trim().toUpperCase());
+
+function manualActionRow(input, context, now, parentActionId = '') {
+  const actionType = String(input?.action_type || '').trim().toUpperCase();
+  const priority = String(input?.priority || 'NORMAL').trim().toUpperCase();
+  const dueAt = String(input?.due_at || '').trim();
+  if (!OPERATOR_ACTION_TYPES.has(actionType)) throw new Error('Invalid action_type');
+  if (!OPERATOR_PRIORITIES.has(priority)) throw new Error('Invalid priority');
+  if (dueAt && !Number.isFinite(Date.parse(dueAt))) throw new Error('due_at must be a valid date/time');
+  const nonce = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  return {
+    agency_id: context.agency_id,
+    outreach_id: context.outreach_id || '',
+    probe_id: context.probe_id || '',
+    reply_event_id: context.reply_event_id || '',
+    action_type: actionType,
+    action_owner: 'JOE',
+    action_status: 'PENDING',
+    due_at: dueAt,
+    reason: String(input?.note || input?.title || `Manual ${actionType.toLowerCase().replace(/_/g, ' ')}`).trim(),
+    source_stage: 'MANUAL',
+    dedupe_key: `${context.agency_id}:MANUAL:${nonce}`,
+    metadata_json: JSON.stringify({
+      manual: true,
+      title: String(input?.title || '').trim(),
+      note: String(input?.note || '').trim(),
+      priority,
+      ...(parentActionId ? { parent_action_id: parentActionId } : {}),
+    }),
+  };
+}
+
+async function handleOperatorActionCreate(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  if (String(req.body?.confirm || '') !== 'CREATE_ACTION') return res.status(400).json({ success: false, error: 'Missing confirm=CREATE_ACTION' });
+  const agencyId = String(req.body?.agency_id || '').trim();
+  if (!agencyId) return res.status(400).json({ success: false, error: 'agency_id is required' });
+  try {
+    const repo = getRepo();
+    const agency = await repo.findById('AGENCIES', 'agency_id', agencyId);
+    if (!agency) return res.status(404).json({ success: false, error: 'Agency not found' });
+    const now = new Date().toISOString();
+    const row = manualActionRow(req.body, {
+      agency_id: agencyId,
+      outreach_id: String(req.body?.outreach_id || '').trim(),
+      probe_id: String(req.body?.probe_id || '').trim(),
+      reply_event_id: String(req.body?.reply_event_id || '').trim(),
+    }, now);
+    const created = await appendAction(repo, row, now);
+    invalidateOperatorCaches();
+    return res.status(201).json({ success: true, action: created.row });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err?.message || 'Could not create action' });
+  }
+}
+
+async function handleOperatorActionComplete(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  if (String(req.body?.confirm || '') !== 'COMPLETE_ACTION') return res.status(400).json({ success: false, error: 'Missing confirm=COMPLETE_ACTION' });
+  const actionId = String(req.body?.action_id || '').trim();
+  if (!actionId) return res.status(400).json({ success: false, error: 'action_id is required' });
+  try {
+    const repo = getRepo();
+    const read = await readActions(repo);
+    if (!read.available) return res.status(409).json({ success: false, error: read.error });
+    const action = read.rows.find((row) => String(row.action_id).trim() === actionId);
+    if (!action) return res.status(404).json({ success: false, error: 'Action not found' });
+    if (!activeActionStatus(action.action_status)) return res.status(409).json({ success: false, error: 'Action is no longer active' });
+    const now = new Date().toISOString();
+    let future = null;
+    if (req.body?.next_action) {
+      const nextRow = manualActionRow(req.body.next_action, action, now, actionId);
+      const created = await appendAction(repo, nextRow, now);
+      future = created.row;
+    }
+    try {
+      await patchAction(repo, actionId, {
+        action_status: 'COMPLETED', completed_at: now, updated_at: now,
+        completion_reason: String(req.body?.completion_note || 'Completed by operator').trim(),
+      });
+    } catch (err) {
+      // Compensate so the operator never ends up with a future task created
+      // while the current task remained active.
+      if (future?.action_id) await patchAction(repo, future.action_id, { action_status: 'CANCELLED', cancelled_at: now, updated_at: now, completion_reason: 'Rolled back after parent completion failed' }).catch(() => null);
+      throw err;
+    }
+    invalidateOperatorCaches();
+    return res.status(200).json({ success: true, action_id: actionId, completed_at: now, next_action: future });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err?.message || 'Could not complete action' });
+  }
+}
+
+async function handleOperatorActionSnooze(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  if (String(req.body?.confirm || '') !== 'SNOOZE_ACTION') return res.status(400).json({ success: false, error: 'Missing confirm=SNOOZE_ACTION' });
+  const actionId = String(req.body?.action_id || '').trim();
+  const dueAt = String(req.body?.due_at || '').trim();
+  if (!actionId || !Number.isFinite(Date.parse(dueAt)) || Date.parse(dueAt) <= Date.now()) return res.status(400).json({ success: false, error: 'action_id and a future due_at are required' });
+  try {
+    const repo = getRepo();
+    const read = await readActions(repo);
+    const action = read.rows.find((row) => String(row.action_id).trim() === actionId);
+    if (!action || !activeActionStatus(action.action_status)) return res.status(409).json({ success: false, error: 'Action is not active' });
+    const now = new Date().toISOString();
+    await patchAction(repo, actionId, { action_status: 'SNOOZED', due_at: dueAt, updated_at: now });
+    invalidateOperatorCaches();
+    return res.status(200).json({ success: true, action_id: actionId, due_at: dueAt });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err?.message || 'Could not snooze action' });
   }
 }
 
@@ -1521,6 +1710,18 @@ export default async function handler(req, res) {
     if (!requireAuth(req, res)) return;
     return handleOperatorActionReconcile(req, res);
   }
+  if (req.method === 'POST' && req.query?.novus_operation === 'operator-action-create') {
+    if (!requireAuth(req, res)) return;
+    return handleOperatorActionCreate(req, res);
+  }
+  if (req.method === 'POST' && req.query?.novus_operation === 'operator-action-complete') {
+    if (!requireAuth(req, res)) return;
+    return handleOperatorActionComplete(req, res);
+  }
+  if (req.method === 'POST' && req.query?.novus_operation === 'operator-action-snooze') {
+    if (!requireAuth(req, res)) return;
+    return handleOperatorActionSnooze(req, res);
+  }
   if (req.method === 'POST' && req.query?.novus_operation === 'operator-mark-meeting-booked') {
     if (!requireAuth(req, res)) return;
     return handleOperatorMarkMeetingBooked(req, res);
@@ -1535,6 +1736,13 @@ export default async function handler(req, res) {
     if (!requireAuth(req, res)) return;
     if (!requireReplyPollerSecret(req, res)) return;
     return handleInstantlyReplyPoll(req, res);
+  }
+  if (req.method === 'POST' && req.query?.novus_operation === 'instantly-reply-reconcile') {
+    // Same write authority as the live poller, plus an explicit no-send
+    // confirmation checked by the handler.
+    if (!requireAuth(req, res)) return;
+    if (!requireReplyPollerSecret(req, res)) return;
+    return handleInstantlyReplyReconcile(req, res);
   }
   if (req.method === 'POST' && req.query?.novus_operation === 'send-demo') {
     // TWO layers, in order, both before any Instantly read, any Sheets access

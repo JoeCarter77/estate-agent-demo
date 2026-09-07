@@ -74,6 +74,15 @@ function livePollReq(headers = {}) {
   };
 }
 
+function reconcileReq(headers = {}, body = {}) {
+  return {
+    method: 'POST',
+    query: { novus_operation: 'instantly-reply-reconcile' },
+    headers: { authorization: BASIC, ...headers },
+    body,
+  };
+}
+
 // Asserts the guard blocked BEFORE touching anything external, and leaked nothing.
 function assertBlockedCleanly(res, label) {
   const serialised = JSON.stringify(res.body ?? {});
@@ -167,6 +176,17 @@ const serialised = JSON.stringify(res.body ?? {});
 check(() => assert.ok(!serialised.includes(SECRET), 'secret absent from the error path'));
 check(() => assert.ok(!serialised.includes('instantly-key')));
 check(() => assert.ok(!serialised.includes('basic-pass')));
+
+// The historical write path has the same two auth layers and a third explicit
+// no-send confirmation. A missing confirmation stops before every external
+// read/write, so it cannot accidentally degrade into the ordinary auto-send
+// poll operation.
+reset();
+res = fakeRes();
+await handler(reconcileReq({ [REPLY_POLLER_SECRET_HEADER]: SECRET }), res);
+check(() => assert.equal(res.statusCode, 400));
+check(() => assert.equal(res.body.error, 'Missing confirm=RECONCILE_REPLIES_NO_SEND'));
+assertBlockedCleanly(res, 'historical reconciliation missing confirmation');
 
 // --- 6. The dry-run operation does NOT require the poller secret -------------
 delete process.env.NOVUS_REPLY_POLLER_SECRET;
