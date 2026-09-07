@@ -43,6 +43,7 @@ import { _internal as assessmentInternal } from '../lib/probe-assessment.mjs';
 import { DEMOS_HEADER } from '../lib/demos.mjs';
 import { OUTBOUND_HEADER } from '../lib/outbound.mjs';
 import { ACTIONS_HEADER } from '../lib/actions-store.mjs';
+import { normalizeMaxAiCalls } from '../api/novus/intelligence/rebuild-all.js';
 
 const PROBES_HEADER = [
   'agency_id', 'probe_id', 'probe_reference', 'portal', 'property_address', 'property_street',
@@ -290,6 +291,13 @@ const ok = (msg) => { passed += 1; console.log(`  ✓ ${msg}`); };
 
 async function run() {
   console.log('simplified acquisition pipeline — hermetic regression suite\n');
+
+  assert.strictEqual(normalizeMaxAiCalls({ maxAiCalls: 0 }), 0,
+    'an explicit zero-AI direct rebuild must not fall back to the production default');
+  assert.strictEqual(normalizeMaxAiCalls({ batch_size: 0 }), 0,
+    'the historical batch_size spelling also preserves an explicit zero');
+  assert.throws(() => normalizeMaxAiCalls({ maxAiCalls: -1 }), /non-negative integer/);
+  ok('the production handler preserves an explicit zero-AI rebuild budget');
 
   {
     const expected = [

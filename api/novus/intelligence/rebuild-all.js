@@ -25,6 +25,19 @@ import { fetchTwilioRecording } from '../../../lib/twilio-recording.mjs';
 export const maxDuration = 60;
 const DEFAULT_BATCH_SIZE = 15;
 
+// Accept the library option's native spelling for direct/operator calls while
+// retaining the historical batch_size spelling used by the Apps Script. Zero
+// is deliberate and valid: it drains every deterministic downstream stage
+// without permitting an assessment call.
+export function normalizeMaxAiCalls(body = {}, fallback = DEFAULT_BATCH_SIZE) {
+  const raw = body.maxAiCalls ?? body.max_ai_calls ?? body.batch_size;
+  const value = raw === undefined ? Number(fallback) : Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error('maxAiCalls must be a non-negative integer');
+  }
+  return value;
+}
+
 function parseBody(req) {
   const raw = req.body;
   if (raw === undefined || raw === null || raw === '') return {};
@@ -244,9 +257,15 @@ export default async function handler(req, res) {
   }
   const probeIds = probeIdsField.ids;
   const forceAi = body.force_ai === true;
-  const batchSize = Number.isFinite(Number(body.batch_size)) && Number(body.batch_size) > 0
-    ? Number(body.batch_size)
-    : Number(process.env.NOVUS_REBUILD_BATCH_SIZE) || DEFAULT_BATCH_SIZE;
+  let batchSize;
+  try {
+    batchSize = normalizeMaxAiCalls(
+      body,
+      Number(process.env.NOVUS_REBUILD_BATCH_SIZE) || DEFAULT_BATCH_SIZE,
+    );
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
 
   try {
     // ONE invocation-scoped snapshot for this request. Each core tab is
@@ -266,7 +285,12 @@ export default async function handler(req, res) {
       rebuildOutbound: true,
     });
 
-    return res.status(200).json({ ...summary, batch_size: batchSize, ...(probeIds ? { targeted_probe_ids: probeIds } : {}) });
+    return res.status(200).json({
+      ...summary,
+      max_ai_calls: batchSize,
+      batch_size: batchSize,
+      ...(probeIds ? { targeted_probe_ids: probeIds } : {}),
+    });
   } catch (err) {
     console.error('intelligence rebuild-all error:', err);
     return res.status(500).json({ error: err.message || 'Failed to rebuild intelligence' });
