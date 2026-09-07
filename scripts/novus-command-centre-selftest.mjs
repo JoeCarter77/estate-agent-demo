@@ -156,16 +156,26 @@ function fixture(){
 }
 
 // ── load the page script into the shim ─────────────────────────────────────
-function bootPage(payload){
+// `payloadOrGetter` is normally a static fixture object, but a test that needs
+// the dashboard to change between one load() and the next (e.g. Complete
+// removing an action, then a later refresh proving it stays gone) can instead
+// pass a () => payload getter and mutate what it returns between calls.
+function bootPage(payloadOrGetter, { onPost } = {}){
   const dom = makeDom();
   const script = HTML.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/)[1];
   const fetchCalls = [];
   const mutations = [];
+  const currentPayload = () => typeof payloadOrGetter === 'function' ? payloadOrGetter() : payloadOrGetter;
   const fakeFetch = async (url, opts) => {
-    fetchCalls.push({ url: String(url), method: opts?.method || 'GET' });
-    if(String(opts?.method || 'GET') !== 'GET') mutations.push(String(url));
+    const method = opts?.method || 'GET';
+    fetchCalls.push({ url: String(url), method });
+    if(method !== 'GET') {
+      mutations.push(String(url));
+      if(onPost) onPost(String(url), opts?.body ? JSON.parse(opts.body) : null);
+      return { ok:true, status:200, json: async () => ({ success:true }) };
+    }
     if(String(url).includes('operator-dashboard')) {
-      return { ok:true, status:200, json: async () => ({ success:true, ...payload }) };
+      return { ok:true, status:200, json: async () => ({ success:true, ...currentPayload() }) };
     }
     if(String(url).includes('probe?queue=1')) {
       return { ok:true, status:200, json: async () => ({ queue:{ remaining: 1, completed_today: 3 } }) };
@@ -173,7 +183,7 @@ function bootPage(payload){
     return { ok:true, status:200, json: async () => ({ success:true }) };
   };
   const api = new Function('document','window','fetch','Date','console','encodeURIComponent','exportBridge',
-    script + '\n;exportBridge({ showView:()=>VIEW, go:showView, load, renderAll, manualActions, exceptionItems, openDrawer, closeDrawer, renderDrawerPane, setPane:(p)=>{DRAWER_PANE=p;}, setStage:(s)=>{PIPELINE_STAGE=s;}, setActionTab:(t)=>{ACTION_TAB=t;}, dueActions, futureActions, renderFuture, renderPipeline, renderActions, renderProber, renderLeads, renderAnalytics, renderExceptions, renderOverview, stageLabel, actionLabel, getLeads:()=>LEADS });');
+    script + '\n;exportBridge({ showView:()=>VIEW, go:showView, load, renderAll, manualActions, exceptionItems, openDrawer, closeDrawer, renderDrawerPane, setPane:(p)=>{DRAWER_PANE=p;}, setStage:(s)=>{PIPELINE_STAGE=s;}, setActionTab:(t)=>{ACTION_TAB=t;}, dueActions, futureActions, renderFuture, renderPipeline, renderActions, renderProber, renderLeads, renderAnalytics, renderExceptions, renderOverview, stageLabel, actionLabel, getLeads:()=>LEADS, completeAction, snoozeAction });');
   let bridge = null;
   api(dom.document, dom.window, fakeFetch, Date, { error(){}, warn(){}, log(){} }, encodeURIComponent, (b) => { bridge = b; });
   return { dom, bridge, fetchCalls, mutations, text: (id) => dom.stripTags(dom.document.getElementById(id).innerHTML || dom.document.getElementById(id).textContent) };
@@ -256,6 +266,80 @@ check('system-owned work never enters the Actions view', () => {
   assert.ok(!html.includes('Observed Ltd'));
   assert.ok(!html.includes('Observation running'));
 });
+
+console.log('\nComplete — clicking it fires the API request and the card disappears without a reload');
+await (async () => {
+  // Mutable fixture: the same shape buildAcquisitionDashboard would produce
+  // for ag_reply, but the test flips it to "no active action" itself to
+  // stand in for the server-side effect of a real COMPLETE_ACTION call —
+  // exercising exactly what load(true) after Complete must render.
+  let live = structuredClone(payload);
+  const posts = [];
+  const completeApp = bootPage(() => live, { onPost: (url, body) => posts.push({ url, body }) });
+  await completeApp.bridge.load(false);
+  completeApp.bridge.go('actions');
+  check('the action is visible before Complete is clicked', () => {
+    assert.ok(completeApp.dom.document.getElementById('ac-list').innerHTML.includes('Henton Kirkman Residential'));
+  });
+  await check('Complete posts confirm=COMPLETE_ACTION with the action id, then refreshes', async () => {
+    const replyLead = live.leads.find((l) => l.agency_id === 'ag_reply');
+    const actionId = replyLead.next_action.id;
+    // What the server would do: the completed action drops out of the
+    // projection entirely (exactly the operator-funnel.mjs fix under test —
+    // a completed dedupe_key must not be resurrected from expected/projected
+    // evidence with no active row left).
+    live = structuredClone(payload);
+    const stillReply = live.leads.find((l) => l.agency_id === 'ag_reply');
+    stillReply.next_action = { id:null, type:null, title:'', note:'', priority:'', status:null, owner:null, recommended_by:null, due_at:null, reason:'', queue:null, requires_human:false };
+    stillReply.needs_human = false;
+    await completeApp.bridge.completeAction(actionId, false);
+    assert.equal(posts.length, 1);
+    assert.ok(posts[0].url.includes('operator-action-complete'));
+    assert.equal(posts[0].body.confirm, 'COMPLETE_ACTION');
+    assert.equal(posts[0].body.action_id, actionId);
+  });
+  check('after Complete, the card is gone from the Actions view with no manual reload', () => {
+    completeApp.bridge.go('actions');
+    const html = completeApp.dom.document.getElementById('ac-list').innerHTML;
+    assert.ok(!html.includes('Henton Kirkman Residential'), 'the completed action must disappear immediately');
+  });
+  await check('a later, independent refresh still does not bring it back', async () => {
+    await completeApp.bridge.load(true);
+    completeApp.bridge.go('actions');
+    const html = completeApp.dom.document.getElementById('ac-list').innerHTML;
+    assert.ok(!html.includes('Henton Kirkman Residential'), 'the completed action stays gone after refresh');
+  });
+})();
+
+console.log('\nOOO follow-up — future, not lost, and out of the active queue until due');
+await (async () => {
+  // What buildAcquisitionDashboard now derives for an OOO_AUTOMATED reply: a
+  // JOE-owned FOLLOW_UP scheduled days out, never HUMAN_REPLY/MANUAL_REVIEW
+  // and never due today.
+  const oooPayload = structuredClone(payload);
+  const oooLead = oooPayload.leads.find((l) => l.agency_id === 'ag_reply');
+  const dueAt = new Date(Date.now() + 6 * 24 * 3600000).toISOString();
+  oooLead.current_stage = 'REPLIED_NEEDS_HUMAN';
+  oooLead.next_action = { id:'act_ooo', type:'FOLLOW_UP', title:'', note:'', priority:'', status:'PENDING',
+    owner:'JOE', recommended_by:'NOVUS', due_at: dueAt,
+    reason:'Automated out-of-office reply with no clear return date; default 7-day follow-up so the lead is not lost',
+    queue:'JOE', requires_human:true };
+  oooLead.needs_human = true;
+  const oooApp = bootPage(oooPayload);
+  await oooApp.bridge.load(false);
+  check('the future OOO follow-up is not in the active Actions queue before it is due', () => {
+    oooApp.bridge.go('actions');
+    const html = oooApp.dom.document.getElementById('ac-list').innerHTML;
+    assert.ok(!html.includes('Henton Kirkman Residential'), 'a not-yet-due follow-up must not appear as work due today');
+    assert.ok(!oooApp.bridge.dueActions().some((l) => l.agency_id === 'ag_reply'));
+  });
+  check('it is visible in Upcoming instead', () => {
+    oooApp.bridge.go('future');
+    const html = oooApp.dom.document.getElementById('fu-list').innerHTML;
+    assert.ok(html.includes('Henton Kirkman Residential'), 'the follow-up must not be lost — it belongs in Upcoming');
+    assert.ok(oooApp.bridge.futureActions().some((l) => l.agency_id === 'ag_reply'));
+  });
+})();
 
 console.log('\nActions vs Future actions — the split is a timestamp, not a wording');
 // A second app instance whose payload carries one due action and one action

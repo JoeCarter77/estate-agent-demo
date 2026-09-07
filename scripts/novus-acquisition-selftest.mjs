@@ -69,16 +69,26 @@ check('manual reply ignored 48h -> Joe follow-up', () => {
   const e = base({ salesMessages: [{ sales_message_id: 'm1', message_type: 'MANUAL_REPLY', send_outcome: 'SENT', sent_at: hoursAgo(48) }] });
   assert.equal(expectedFor(e)[0].action_type, 'FOLLOW_UP_CONVERSATION'); assert.equal(expectedFor(e)[0].action_owner, 'JOE');
 });
-check('OOO creates a 48h SYSTEM checkpoint and replaces a stale human call', () => {
+check('OOO with no clear return date creates a 7-day JOE follow-up and replaces a stale human call', () => {
   const e = base({
-    replyEvents: [{ reply_event_id: 'ooo1', classification: 'OOO_AUTOMATED', received_at: hoursAgo(1) }],
+    replyEvents: [{ reply_event_id: 'ooo1', classification: 'OOO_AUTOMATED', received_at: hoursAgo(1), body_text: 'I am currently unavailable.' }],
     actions: [{ action_id: 'call1', action_type: 'CALL_PROSPECT', action_owner: 'JOE', action_status: 'DUE', due_at: hoursAgo(2), created_at: hoursAgo(3), dedupe_key: 'old-call' }],
   });
   const expectedRows = expectedFor(e);
-  assert.equal(expectedRows[0].action_type, 'OUT_OF_OFFICE_CHECKPOINT');
-  assert.equal(expectedRows[0].action_owner, 'SYSTEM');
-  assert.equal(expectedRows[0].due_at, hoursAgo(-47));
+  assert.equal(expectedRows[0].action_type, 'FOLLOW_UP');
+  assert.equal(expectedRows[0].action_owner, 'JOE');
+  assert.equal(expectedRows[0].due_at, hoursAgo(1 - 7 * 24));
   assert.equal(reconcileActions(e.actions, expectedRows, NOW).cancel[0].action_id, 'call1');
+});
+check('OOO with a clear return date schedules the follow-up for the next business day after', () => {
+  // NOW is 2026-09-03 (a Thursday). Return date 2026-09-05 is a Saturday, so
+  // the next business day after it is Monday 2026-09-07.
+  const e = base({
+    replyEvents: [{ reply_event_id: 'ooo2', classification: 'OOO_AUTOMATED', received_at: hoursAgo(1), body_text: 'I am out of the office and will be back on 5 September 2026.' }],
+  });
+  const expectedRows = expectedFor(e);
+  assert.equal(expectedRows[0].action_type, 'FOLLOW_UP');
+  assert.equal(expectedRows[0].due_at, '2026-09-07T00:00:00.000Z');
 });
 check('new inbound replaces and cancels stale no-reply action', () => {
   const expectedRows = expectedFor(base({ replyEvents: [question] }));
@@ -153,6 +163,41 @@ check('agency-wide dashboard never drops a pre-OUTBOUND lead and enforces the ne
   const ready = dashboard.leads.find((lead) => lead.agency_id === 'ag_ready');
   assert.equal(ready.current_stage, 'READY_TO_PROBE'); assert.equal(ready.current_action.action_type, 'PROBE_AGENCY');
   assert.equal(dashboard.global_exceptions[0].type, 'ACTION_LEDGER_UNAVAILABLE');
+});
+check('completing the only active action removes it from the queue, and it stays gone on a later rebuild (no page reload)', () => {
+  const table = (header, objects = []) => ({ header, rows: objects.map((obj) => header.map((key) => obj[key] ?? '')) });
+  const agencies = table(['agency_id', 'agency_name', 'rightmove_sales_branch_url'], [
+    { agency_id: 'ag_reply2', agency_name: 'Reply Two', rightmove_sales_branch_url: 'https://rightmove.test/reply2' },
+  ]);
+  const replyEvents = table(['reply_event_id', 'agency_id', 'classification', 'received_at'], [
+    { reply_event_id: 'rq1', agency_id: 'ag_reply2', classification: 'QUESTION', received_at: hoursAgo(1) },
+  ]);
+  const commonTables = {
+    AGENCIES: agencies, PROBES: table(['probe_id', 'agency_id']), INTELLIGENCE: table(['intelligence_id', 'probe_id']),
+    PERSONALISATION: table(['probe_id', 'agency_id']), DEMOS: table(['demo_id', 'agency_id', 'probe_id']),
+    OUTBOUND: table(['outbound_id', 'agency_id', 'probe_id']), REPLY_EVENTS: replyEvents, SALES_MESSAGES: table([], []),
+  };
+  // Before Complete: the expected HUMAN_REPLY action is live.
+  const before = buildAcquisitionDashboard({ ...commonTables, ACTIONS: table([], []) }, { now: NOW, actionsAvailable: true });
+  const lead = before.leads.find((l) => l.agency_id === 'ag_reply2');
+  assert.equal(lead.next_action.type, 'HUMAN_REPLY');
+  // Operator clicks Complete: exactly what handleOperatorActionComplete persists
+  // (action_status=COMPLETED, completed_at set), no other evidence changes.
+  const completedAction = { ...Object.fromEntries(ACTIONS_HEADER.map((k) => [k, ''])),
+    action_id: 'act_1', agency_id: 'ag_reply2', action_type: 'HUMAN_REPLY', action_owner: 'JOE',
+    action_status: 'COMPLETED', dedupe_key: 'ag_reply2:HUMAN_REPLY:rq1', created_at: hoursAgo(1),
+    updated_at: NOW, completed_at: NOW };
+  const actionsAfter = table([...ACTIONS_HEADER], [completedAction]);
+  // "Refresh" = rebuild the dashboard from the same underlying evidence, exactly
+  // what the Command Centre does after Complete and on every later page load.
+  const after = buildAcquisitionDashboard({ ...commonTables, ACTIONS: actionsAfter }, { now: NOW, actionsAvailable: true });
+  const leadAfter = after.leads.find((l) => l.agency_id === 'ag_reply2');
+  assert.notEqual(leadAfter.next_action.type, 'HUMAN_REPLY', 'the completed action must not be resurrected from expected/projected evidence');
+  assert.equal(leadAfter.needs_human, false);
+  // A second, later rebuild (simulating a subsequent manual refresh) still
+  // does not bring it back.
+  const stillAfter = buildAcquisitionDashboard({ ...commonTables, ACTIONS: actionsAfter }, { now: NOW, actionsAvailable: true });
+  assert.notEqual(stillAfter.leads.find((l) => l.agency_id === 'ag_reply2').next_action.type, 'HUMAN_REPLY');
 });
 
 console.log('\nManual action queue semantics (Needs your attention)');
