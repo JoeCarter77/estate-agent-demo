@@ -13,7 +13,11 @@ import { uploadEligibleOutboundLeads } from '../../../lib/instantly-outbound.mjs
 import { reconcileActionEngine } from '../../../lib/action-engine.mjs';
 
 export const maxDuration = 60;
-const DEFAULT_BATCH_SIZE = 15;
+// Acquisition now has only one AI call per closed probe with communications,
+// and those calls run with bounded concurrency. Forty keeps pace with the
+// intended daily probing volume without resurrecting the old three-stage AI
+// backlog. NOVUS_REBUILD_BATCH_SIZE can still override this operationally.
+const DEFAULT_BATCH_SIZE = 40;
 
 export async function runNightlyFinalizer(repo, {
   batchSize = DEFAULT_BATCH_SIZE,
