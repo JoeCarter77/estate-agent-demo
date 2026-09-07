@@ -761,8 +761,6 @@ async function run() {
     const cases = [
       ['agency_name', { agency_name: '' }, 'agency_name'],
       ['property_address', { property_address: '' }, 'property_address'],
-      ['commercial_consequence', { commercial_consequence: '' }, 'commercial_consequence'],
-      ['positive_observation (with human contact)', { positive_observation: '' }, 'positive_observation'],
       ['novus_detected', { novus_detected_json: '[]' }, 'novus_detected'],
       ['observed_events', { observed_events_json: JSON.stringify([{ label: 'a' }]) }, 'observed events'],
     ];
@@ -773,8 +771,16 @@ async function run() {
     }
     ok('each missing critical field is named as a review reason and forces needs_review');
 
-    // The one exception that stops every complete_miss demo being flagged for
-    // a positive that genuinely does not exist.
+    // commercial_consequence and positive_observation are legacy prose the
+    // live page never reads (beat 2/3 render from reading.credit /
+    // reading.commercialMeaning, derived from this row's own ordinals) — so a
+    // demo missing either, or both, is still ready.
+    const blankProse = { ...complete, commercial_consequence: '', positive_observation: '' };
+    assert.deepStrictEqual(reviewReasonsFor(blankProse), []);
+    ok('blank commercial_consequence / positive_observation no longer force needs_review');
+
+    // The one exception that always held: a no-contact probe never had a
+    // positive to credit, and never had to be flagged for missing one.
     const noContact = { ...complete, positive_observation: '', human_contact: 'none' };
     assert.deepStrictEqual(reviewReasonsFor(noContact), []);
     ok('a blank positive observation is fine where nobody responded (human_contact=none)');
@@ -1149,16 +1155,16 @@ async function run() {
     // An incomplete story compiles, but is held at needs_review.
     const { store, repo } = makeWorkbook();
     seedWeakSeller(store);
-    // PERSONALISATION never produced the payoff sentence for this probe, so
-    // beat 2 has no "so what" — the demo is compiled and flagged rather than
-    // silently sent.
-    store.PERSONALISATION[1][PERSONALISATION_HEADER.indexOf('commercial_consequence')] = '';
+    // AGENCIES never carried a name for this agency, so the demo cannot
+    // address the agency by name — compiled and flagged rather than silently
+    // sent.
+    store.AGENCIES[1][AGENCIES_HEADER.indexOf('agency_name')] = '';
     __setRepoForTests(repo);
     const summary = await compileDemos(repo, { justPersonalised: ['prb_demo_001'], resolveImageUrl: noImage });
     assert.strictEqual(summary.demos_compiled, 1);
     assert.strictEqual(summary.demos_needs_review, 1);
     assert.strictEqual(demoRowsOf(store)[0].demo_status, 'needs_review');
-    assert.ok(demoRowsOf(store)[0].review_reasons.includes('commercial_consequence'));
+    assert.ok(demoRowsOf(store)[0].review_reasons.includes('agency_name'));
     assert.strictEqual(demoRowsOf(store)[0].ready_at, '', 'a demo that was never ready has no ready_at');
     ok('an incomplete story compiles to needs_review with the reason on the row');
 
@@ -2420,9 +2426,10 @@ async function run() {
       probeId: 'prb_demo_005', probeReference: 'RM-0046',
       agencyId: 'agc_five', agencyName: 'Fifth Agency', propertyUrl: '',
     });
-    // The third demo never got its payoff sentence, so it compiles to
+    // The third demo's agency never got a name, so it compiles to
     // needs_review and 404s for a prospect.
-    store.PERSONALISATION[3][PERSONALISATION_HEADER.indexOf('commercial_consequence')] = '';
+    const thirdAgency = store.AGENCIES.find((r) => r[AGENCIES_HEADER.indexOf('agency_id')] === 'agc_three');
+    thirdAgency[AGENCIES_HEADER.indexOf('agency_name')] = '';
     __setRepoForTests(repo);
 
     await compileDemos(repo, {
@@ -2480,7 +2487,7 @@ async function run() {
       assert.ok(demo.reason, `${demo.demo_slug} must say why it does not resolve`);
     }
     const unfinished = audited('prb_demo_003');
-    assert.ok(unfinished.reason.includes('commercial_consequence'));
+    assert.ok(unfinished.reason.includes('agency_name'));
     ok('every broken demo carries the reason it cannot be sent');
 
     // ── 4. --fix REPAIRS THROUGH THE COMPILER, NEVER BY PATCHING A URL ──
