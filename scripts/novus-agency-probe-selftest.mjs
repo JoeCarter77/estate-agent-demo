@@ -21,7 +21,7 @@ import { isProbeQueueEligible } from '../lib/acquisition-stage.mjs';
 const AGENCIES_HEADER = [
   'agency_id','agency_name','website','domain','location','branch_count','main_phone',
   'known_phone_numbers','primary_contact_name','primary_contact_email','other_known_emails',
-  'outreach_contact_email',
+  'outreach_contact_email','email_verification_status',
   'owner_md','independent_franchise_corporate','sales_led_lettings_only','years_trading',
   'incorporation_date','live_listing_count','crm_name','crm_evidence','qualification_segment',
   'current_pipeline_status','suppression_status','suppression_reason','notes','created_at','updated_at',
@@ -86,6 +86,7 @@ function agencyRow(overrides = {}) {
     rightmove_sales_branch_url: ANDREW_GRANGER_RM,
     rightmove_status: 'CONFIRMED',
     outreach_contact_email: 'bradley@andrewgranger.co.uk',
+    email_verification_status: 'VALID',
     ...overrides,
   };
   return AGENCIES_HEADER.map((k) => obj[k] ?? '');
@@ -230,6 +231,17 @@ async function run() {
     assert.strictEqual(store.PROBES.length, before, 'rehydration created no new probe row');
     ok('?probe_id= rehydrates the existing probe (agency link intact, no new row)');
 
+    // 8) A RISKY outreach email cannot create a probe at all.
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_risky_create', agency_name: 'Risky Create', email_verification_status: 'RISKY' }));
+    const riskyCreate = mockRes();
+    await createHandler(mockReq({ body: {
+      action: 'create', url: 'https://www.rightmove.co.uk/properties/3', agency_id: 'ag_risky_create',
+    }}), riskyCreate);
+    assert.strictEqual(riskyCreate.statusCode, 409);
+    assert.match(riskyCreate.body.error, /verified VALID/);
+    assert.strictEqual(store.PROBES.length, before, 'RISKY email creates no PROBES row');
+    ok('RISKY email is blocked server-side before a probe can be created');
+
     __setRepoForTests(null);
   }
 
@@ -245,17 +257,18 @@ async function run() {
       rightmove_sales_branch_url: '', rightmove_status: 'DELETE - NON-SALES/LETTINGS' }));
     store.AGENCIES.push(agencyRow({ agency_id: 'ag_suppressed', agency_name: 'Suppressed',
       suppression_status: 'suppressed' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_risky', agency_name: 'Risky', email_verification_status: 'RISKY' }));
     store.AGENCIES.push(agencyRow({ agency_id: 'ag_two', agency_name: 'Two' }));
     __setRepoForTests(createRepo(valuesApi));
 
     const { default: getHandler } = await import('../api/novus/probe.js');
 
-    // Skips the blank-URL, DELETE and suppressed rows, lands on the next real one.
+    // Skips blank-URL, DELETE, suppressed and non-VALID rows, lands on next VALID one.
     const nRes = mockRes();
     await getHandler(mockReq({ method: 'GET', query: { next_after: 'ag_one' } }), nRes);
     assert.strictEqual(nRes.statusCode, 200);
     assert.strictEqual(nRes.body.agency.agency_id, 'ag_two');
-    ok('next_after skips blank-URL, DELETE and suppressed rows → "ag_two"');
+    ok('next_after skips blank-URL, DELETE, suppressed and RISKY rows → "ag_two"');
 
     // Ordering is the sheet's, not alphabetical/id order.
     const idx = (id) => store.AGENCIES.findIndex((r) => r[0] === id);
@@ -351,6 +364,7 @@ async function run() {
     store.AGENCIES.push(headerWithout.map((k) => ({
       agency_id: ANDREW_GRANGER_ID, agency_name: ANDREW_GRANGER_NAME,
       rightmove_sales_branch_url: ANDREW_GRANGER_RM,
+      outreach_contact_email: 'bradley@andrewgranger.co.uk', email_verification_status: 'VALID',
     }[k] ?? '')));
     __setRepoForTests(createRepo(valuesApi));
 
@@ -416,63 +430,60 @@ async function run() {
     __setRepoForTests(null);
   }
 
-  // ── Part G: the canonical Prober queue rule is the physical probe_sent cell ──
-  console.log('\nPart G — Prober queue is gated on a genuinely blank AGENCIES.probe_sent');
+  // ── Part G: canonical Prober queue = blank probe_sent + VALID outreach email ──
+  console.log('\nPart G — Prober queue requires blank probe_sent AND a verified VALID outreach email');
   {
-    // Pure predicate first: the rule itself, independent of any transport.
     const EMAIL = 'bradley@andrewgranger.co.uk';
-    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '', outreach_contact_email: EMAIL }), true);
-    ok('blank probe_sent is eligible');
-    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '   ', outreach_contact_email: EMAIL }), true);
+    const base = { rightmove_sales_branch_url: ANDREW_GRANGER_RM, outreach_contact_email: EMAIL, email_verification_status: 'VALID' };
+    assert.equal(isProbeQueueEligible({ ...base, probe_sent: '' }), true);
+    ok('blank probe_sent + VALID email is eligible');
+    assert.equal(isProbeQueueEligible({ ...base, probe_sent: '   ' }), true);
     ok('whitespace-only probe_sent counts as blank and stays eligible');
-    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: 'YES', outreach_contact_email: EMAIL }), false);
+    assert.equal(isProbeQueueEligible({ ...base, probe_sent: 'YES' }), false);
     ok('probe_sent = "YES" is not eligible');
     for (const value of ['NO', 'yes', '2026-09-01T10:00:00.000Z', 'sent by hand', '0']) {
-      assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: value, outreach_contact_email: EMAIL }), false, value);
+      assert.equal(isProbeQueueEligible({ ...base, probe_sent: value }), false, value);
     }
     ok('ANY non-empty probe_sent value is not eligible (including "NO", "0" and free text)');
-    // PROBES history must not influence the queue in either direction.
-    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '', current_pipeline_status: 'PROBE_COMPLETE', outreach_contact_email: EMAIL }), true);
+    assert.equal(isProbeQueueEligible({ ...base, probe_sent: '', current_pipeline_status: 'PROBE_COMPLETE' }), true);
     ok('downstream lifecycle state does not override a blank probe_sent');
-    // Normal exclusions still apply on top of the blank gate.
-    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: '', probe_sent: '', outreach_contact_email: EMAIL }), false);
-    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '', suppression_status: 'suppressed', outreach_contact_email: EMAIL }), false);
+    assert.equal(isProbeQueueEligible({ ...base, rightmove_sales_branch_url: '', probe_sent: '' }), false);
+    assert.equal(isProbeQueueEligible({ ...base, probe_sent: '', suppression_status: 'suppressed' }), false);
     for (const status of ['CLOSED', 'EXCLUDED', 'MEETING_BOOKED', 'NOT_INTERESTED']) {
-      assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '', current_pipeline_status: status, outreach_contact_email: EMAIL }), false, status);
+      assert.equal(isProbeQueueEligible({ ...base, probe_sent: '', current_pipeline_status: status }), false, status);
     }
     ok('blank probe_sent still respects suppressed / closed / excluded / meeting / not-interested exclusions');
 
-    // ── Email eligibility gate (outreach_contact_email canonical field) ──────
-    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '', outreach_contact_email: '' }), false);
-    ok('blank probe_sent + blank outreach_contact_email is skipped over');
-    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '', outreach_contact_email: '   ' }), false);
-    ok('whitespace-only outreach_contact_email is treated as blank and skipped over');
-    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: 'YES', outreach_contact_email: EMAIL }), false);
-    ok('populated probe_sent + email is still skipped over');
-    // primary_contact_email / other_known_emails must NOT substitute for outreach_contact_email.
-    assert.equal(isProbeQueueEligible({ rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '', outreach_contact_email: '', primary_contact_email: EMAIL, other_known_emails: EMAIL }), false);
+    // Email is a hard pre-probe gate: only VALID can enter.
+    assert.equal(isProbeQueueEligible({ ...base, probe_sent: '', outreach_contact_email: '' }), false);
+    ok('blank outreach_contact_email is skipped over');
+    assert.equal(isProbeQueueEligible({ ...base, probe_sent: '', outreach_contact_email: '   ' }), false);
+    ok('whitespace-only outreach_contact_email is skipped over');
+    for (const status of ['RISKY', 'UNKNOWN', 'INVALID', 'DISPOSABLE', '']) {
+      assert.equal(isProbeQueueEligible({ ...base, probe_sent: '', email_verification_status: status }), false, status);
+    }
+    ok('RISKY, UNKNOWN, INVALID, DISPOSABLE and blank verification statuses are all skipped');
+    assert.equal(isProbeQueueEligible({ ...base, probe_sent: '', outreach_contact_email: '', primary_contact_email: EMAIL, other_known_emails: EMAIL }), false);
     ok('primary_contact_email / other_known_emails do not substitute for outreach_contact_email');
     {
-      // An email-less row later receives an email and becomes selectable again.
-      const row = { rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '', outreach_contact_email: '' };
+      const row = { rightmove_sales_branch_url: ANDREW_GRANGER_RM, probe_sent: '', outreach_contact_email: '', email_verification_status: '' };
       assert.equal(isProbeQueueEligible(row), false);
       row.outreach_contact_email = EMAIL;
+      assert.equal(isProbeQueueEligible(row), false);
+      row.email_verification_status = 'VALID';
       assert.equal(isProbeQueueEligible(row), true);
-      ok('a row that later resolves an outreach_contact_email becomes eligible');
+      ok('a row becomes eligible only after both outreach email and VALID verification are present');
     }
 
-    // Now the same rule end-to-end through the live queue routes.
+    // End-to-end: RISKY/no-email rows are invisible to next/advance/telemetry.
     const { store, valuesApi } = makeFakeSheet();
     store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_sent', agency_name: 'Probed YES', probe_sent: 'YES' }));
     store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_stray', agency_name: 'Probed out of band', probe_sent: '2026-08-30T09:00:00.000Z' }));
-    // Blank probe_sent but no resolved outreach_contact_email yet: not worth
-    // probing, must be silently skipped — never marked, never selected.
-    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_noemail', agency_name: 'No Email Yet', outreach_contact_email: '' }));
-    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_first', agency_name: 'First Blank' }));
-    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_second', agency_name: 'Second Blank', updated_at: '2026-09-03T10:00:00Z' }));
-    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_third', agency_name: 'Third Blank' }));
-    // ag_q_first has probe history but a blank cell: the sheet is the gate, so
-    // it must STILL be served. This is the inverted half of the same bug.
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_noemail', agency_name: 'No Email Yet', outreach_contact_email: '', email_verification_status: '' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_risky', agency_name: 'Risky Email', email_verification_status: 'RISKY' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_first', agency_name: 'First Valid' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_second', agency_name: 'Second Valid', updated_at: '2026-09-03T10:00:00Z' }));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_q_third', agency_name: 'Third Valid' }));
     store.PROBES.push(PROBES_HEADER.map((key) => ({ probe_id: 'prb_q1', agency_id: 'ag_q_first', probe_status: 'closed', probe_timestamp: new Date().toISOString() }[key] ?? '')));
     __setRepoForTests(createRepo(valuesApi));
     const { default: handler } = await import('../api/novus/probe.js');
@@ -481,24 +492,23 @@ async function run() {
     await handler(mockReq({ method: 'GET', query: { next: '1' } }), first);
     assert.equal(first.statusCode, 200);
     assert.equal(first.body.agency.agency_id, 'ag_q_first');
-    ok('next=1 returns the FIRST sheet row with a blank probe_sent AND an email, skipping "YES", timestamped and email-less rows');
+    ok('next=1 skips probed, email-less and RISKY rows and returns the first VALID row');
 
     assert.equal(first.body.queue.remaining, 3);
-    ok('queue telemetry counts only blank-probe_sent + has-email eligible rows (3 remaining, ag_q_noemail excluded)');
+    ok('queue telemetry counts only blank-probe_sent + VALID-email eligible rows');
 
-    // The email-less row was never touched: still blank probe_sent, still there.
-    const noEmailIdx = AGENCIES_HEADER.indexOf('probe_sent');
-    const noEmailRow = store.AGENCIES.find((r) => r[0] === 'ag_q_noemail');
-    assert.equal(noEmailRow[noEmailIdx], '');
-    ok('ag_q_noemail was ignored, not skipped/marked — its probe_sent cell is untouched, and it still exists in AGENCIES');
+    const probeSentIdx = AGENCIES_HEADER.indexOf('probe_sent');
+    for (const id of ['ag_q_noemail', 'ag_q_risky']) {
+      const untouched = store.AGENCIES.find((r) => r[0] === id);
+      assert.equal(untouched[probeSentIdx], '');
+    }
+    ok('email-less and RISKY rows are ignored without touching probe_sent');
 
-    // Auto-advance after a send uses the identical rule.
     const advanced = mockRes();
     await handler(mockReq({ method: 'GET', query: { next_after: 'ag_q_first' } }), advanced);
     assert.equal(advanced.body.agency.agency_id, 'ag_q_second');
-    ok('auto-advance (next_after) applies the same blank-probe_sent rule');
+    ok('auto-advance uses the same VALID-email rule');
 
-    // Skip then advance uses the identical rule too.
     const skipped = mockRes();
     await handler(mockReq({ body: { action: 'skip-agency', agency_id: 'ag_q_second',
       expected_updated_at: '2026-09-03T10:00:00Z', reason: 'Lettings only', confirm: 'DELETE_UNWORKED_AGENCY' } }), skipped);
@@ -506,12 +516,13 @@ async function run() {
     assert.equal(skipped.body.next_agency_id, 'ag_q_third');
     assert.equal(skipped.body.reason, 'Lettings only');
     assert.equal(skipped.body.reason_persisted, false);
-    ok('Skip Agency advances by the same rule and reports the (unpersisted) reason');
+    ok('Skip Agency advances by the same VALID-email rule');
 
-    // A sheet with no probe_sent column cannot silently re-serve probed rows.
     const { store: bare, valuesApi: bareApi } = makeFakeSheet({ agenciesHeader: AGENCIES_HEADER.filter((h) => h !== 'probe_sent') });
     bare.AGENCIES.push(AGENCIES_HEADER.filter((h) => h !== 'probe_sent').map((k) => ({
-      agency_id: 'ag_bare', agency_name: 'No Column', rightmove_sales_branch_url: ANDREW_GRANGER_RM }[k] ?? '')));
+      agency_id: 'ag_bare', agency_name: 'No Column', rightmove_sales_branch_url: ANDREW_GRANGER_RM,
+      outreach_contact_email: EMAIL, email_verification_status: 'VALID',
+    }[k] ?? '')));
     __setRepoForTests(createRepo(bareApi));
     const bareRes = mockRes();
     await handler(mockReq({ method: 'GET', query: { next: '1' } }), bareRes);
