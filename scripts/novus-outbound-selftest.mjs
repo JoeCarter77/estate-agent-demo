@@ -158,18 +158,18 @@ for (const [label, overrides, reason] of [
   ok(`${label} is skipped`);
 }
 
-for (const status of ['VALID', 'RISKY']) {
-  const { result } = await dryRun({ agency: { email_verification_status: status } });
+{
+  const { result } = await dryRun({ agency: { email_verification_status: 'VALID' } });
   assert.equal(result.eligible_count, 1);
-  ok(`verification ${status} is accepted`);
+  ok('verification VALID is accepted');
 }
 
-for (const status of ['UNKNOWN', 'INVALID', '']) {
+for (const status of ['RISKY', 'UNKNOWN', 'INVALID', 'DISPOSABLE', '']) {
   const { result } = await dryRun({ agency: { email_verification_status: status } });
   assert.equal(result.eligible_count, 0);
-  assert(result.skipped[0].reasons.some((reason) => reason.startsWith('email_verification_status ')));
+  assert(result.skipped[0].reasons.some((reason) => reason.startsWith('email_verification_status_not_VALID:')));
 }
-ok('UNKNOWN, blank and other verification statuses are skipped');
+ok('RISKY, UNKNOWN, INVALID, DISPOSABLE and blank verification statuses are skipped');
 
 for (const [label, overrides, reason] of [
   ['missing clean agency name', { agency: { clean_agency_name: '  ' } }, 'missing clean_agency_name'],
