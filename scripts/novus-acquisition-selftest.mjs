@@ -11,7 +11,7 @@ import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 const NOW = '2026-09-03T12:00:00.000Z';
 const hoursAgo = (hours) => new Date(Date.parse(NOW) - hours * 3600000).toISOString();
 const base = (overrides = {}) => ({
-  agency: { agency_id: 'ag_1', agency_name: 'One', rightmove_sales_branch_url: 'https://rightmove.test/one' },
+  agency: { agency_id: 'ag_1', agency_name: 'One', rightmove_sales_branch_url: 'https://rightmove.test/one', outreach_contact_email: 'one@example.test', email_verification_status: 'VALID' },
   probe: null, outbound: null, replyEvents: [], salesMessages: [], demo: null,
   intelligence: null, personalisation: null, actions: [], outreachReady: false,
   preparationReason: '', now: NOW, nowMs: Date.parse(NOW), ...overrides,
@@ -149,8 +149,8 @@ check('zero denominator produces null, never a misleading percentage', () => {
 check('agency-wide dashboard never drops a pre-OUTBOUND lead and enforces the next-action invariant', () => {
   const table = (header, objects = []) => ({ header, rows: objects.map((obj) => header.map((key) => obj[key] ?? '')) });
   const tables = {
-    AGENCIES: table(['agency_id', 'agency_name', 'rightmove_sales_branch_url', 'current_pipeline_status'], [
-      { agency_id: 'ag_ready', agency_name: 'Ready', rightmove_sales_branch_url: 'https://rightmove.test/ready' },
+    AGENCIES: table(['agency_id', 'agency_name', 'rightmove_sales_branch_url', 'current_pipeline_status', 'outreach_contact_email', 'email_verification_status'], [
+      { agency_id: 'ag_ready', agency_name: 'Ready', rightmove_sales_branch_url: 'https://rightmove.test/ready', outreach_contact_email: 'ready@example.test', email_verification_status: 'VALID' },
       { agency_id: 'ag_closed', agency_name: 'Closed', current_pipeline_status: 'CLOSED' },
     ]),
     PROBES: table(['probe_id', 'agency_id']), INTELLIGENCE: table(['intelligence_id', 'probe_id']),
@@ -247,12 +247,12 @@ console.log('\nManual action queue semantics (Needs your attention)');
 }
 {
   // End-to-end through the dashboard: probing must not reach needs_attention.
-  const agenciesHeader = ['agency_id', 'agency_name', 'rightmove_sales_branch_url', 'probe_sent', 'outreach_contact_email'];
+  const agenciesHeader = ['agency_id', 'agency_name', 'rightmove_sales_branch_url', 'probe_sent', 'outreach_contact_email', 'email_verification_status'];
   const tables = {
     AGENCIES: { header: agenciesHeader, rows: [
-      ['ag_probe', 'Unprobed Agency', 'https://rightmove.test/probe', '', 'probe@example.test'],
-      ['ag_reply', 'Replied Agency', 'https://rightmove.test/reply', 'YES', 'reply@example.test'],
-      ['ag_done', 'Probed Agency', 'https://rightmove.test/done', 'YES', 'done@example.test'],
+      ['ag_probe', 'Unprobed Agency', 'https://rightmove.test/probe', '', 'probe@example.test', 'VALID'],
+      ['ag_reply', 'Replied Agency', 'https://rightmove.test/reply', 'YES', 'reply@example.test', 'VALID'],
+      ['ag_done', 'Probed Agency', 'https://rightmove.test/done', 'YES', 'done@example.test', 'VALID'],
     ] },
     PROBES: { header: ['probe_id', 'agency_id', 'probe_status', 'observation_deadline'], rows: [
       ['prb_done', 'ag_done', 'observing', hoursAgo(-48)],
@@ -334,12 +334,52 @@ console.log('\nManual action queue semantics (Needs your attention)');
     assert.equal(board.counts.probe_queue, 0);
     assert.equal(board.leads.find((e) => e.agency_id === 'ag_probe').probe_queue_eligible, false);
   });
+  check('probe queue also requires email_verification_status = VALID', () => {
+    const riskyTables = {
+      ...tables,
+      AGENCIES: { header: agenciesHeader, rows: [
+        ['ag_probe', 'Unprobed Agency', 'https://rightmove.test/probe', '', 'probe@example.test', 'RISKY'],
+        ['ag_reply', 'Replied Agency', 'https://rightmove.test/reply', 'YES', 'reply@example.test', 'VALID'],
+        ['ag_done', 'Probed Agency', 'https://rightmove.test/done', 'YES', 'done@example.test', 'VALID'],
+      ] },
+    };
+    const board = buildAcquisitionDashboard(riskyTables, { now: NOW, actionsAvailable: false });
+    assert.equal(board.counts.probe_queue, 0);
+    assert.equal(board.leads.find((e) => e.agency_id === 'ag_probe').probe_queue_eligible, false);
+  });
+  // The legacy hole: an agency probed before the VALID-only probe rule existed
+  // can still carry a RISKY outreach_contact_email today, with everything else
+  // (demo, personalisation) already prepared. It must stay stuck waiting on
+  // "contact resolution" rather than reaching READY_FOR_OUTREACH/Instantly.
+  check('a legacy already-probed RISKY agency stays blocked on contact resolution, never READY_FOR_OUTREACH', () => {
+    const riskyReadyTables = {
+      AGENCIES: { header: agenciesHeader, rows: [
+        ['ag_risky_ready', 'Legacy Risky Agency', 'https://rightmove.test/legacy', 'YES', 'legacy@example.test', 'RISKY'],
+      ] },
+      PROBES: { header: ['probe_id', 'agency_id', 'probe_status', 'observation_deadline'], rows: [
+        ['prb_risky', 'ag_risky_ready', 'closed', hoursAgo(48)],
+      ] },
+      INTELLIGENCE: { header: ['intelligence_id', 'probe_id'], rows: [['int_risky', 'prb_risky']] },
+      PERSONALISATION: { header: ['probe_id', 'agency_id'], rows: [['prb_risky', 'ag_risky_ready']] },
+      DEMOS: { header: ['demo_id', 'agency_id', 'probe_id', 'demo_status', 'demo_slug'], rows: [
+        ['dm_risky', 'ag_risky_ready', 'prb_risky', 'READY', 'legacy-agency'],
+      ] },
+      OUTBOUND: { header: ['outbound_id', 'agency_id', 'probe_id'], rows: [] },
+      REPLY_EVENTS: { header: ['reply_event_id', 'agency_id', 'classification', 'received_at'], rows: [] },
+      SALES_MESSAGES: { header: [], rows: [] },
+      ACTIONS: { header: [], rows: [] },
+    };
+    const board = buildAcquisitionDashboard(riskyReadyTables, { now: NOW, actionsAvailable: false });
+    const lead = board.leads.find((e) => e.agency_id === 'ag_risky_ready');
+    assert.equal(lead.current_stage, 'PREPARING_OUTREACH');
+    assert.match(lead.current_stage_reason, /contact resolution/);
+  });
 }
 
 console.log('\nAPI security and read shape');
 {
   const store = {
-    AGENCIES: [['agency_id', 'agency_name', 'rightmove_sales_branch_url'], ['ag_api', 'API Agency', 'https://rightmove.test/api']],
+    AGENCIES: [['agency_id', 'agency_name', 'rightmove_sales_branch_url', 'outreach_contact_email', 'email_verification_status'], ['ag_api', 'API Agency', 'https://rightmove.test/api', 'api@example.test', 'VALID']],
     PROBES: [['probe_id', 'agency_id']], INTELLIGENCE: [['intelligence_id', 'probe_id']],
     PERSONALISATION: [['probe_id', 'agency_id']], DEMOS: [['demo_id', 'agency_id', 'probe_id']],
     OUTBOUND: [['outbound_id', 'agency_id', 'probe_id']], REPLY_EVENTS: [['reply_event_id', 'agency_id']],

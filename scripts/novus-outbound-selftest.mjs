@@ -164,12 +164,25 @@ for (const [label, overrides, reason] of [
   ok('verification VALID is accepted');
 }
 
+// RISKY bounces too often to risk Instantly deliverability, so it no longer
+// clears outbound eligibility — same hard requirement as probing.
 for (const status of ['RISKY', 'UNKNOWN', 'INVALID', 'DISPOSABLE', '']) {
   const { result } = await dryRun({ agency: { email_verification_status: status } });
   assert.equal(result.eligible_count, 0);
   assert(result.skipped[0].reasons.some((reason) => reason.startsWith('email_verification_status_not_VALID:')));
 }
 ok('RISKY, UNKNOWN, INVALID, DISPOSABLE and blank verification statuses are skipped');
+
+{
+  // The legacy hole this closes: an agency probed before the VALID-only probe
+  // rule existed can still carry a RISKY outreach_contact_email today. It must
+  // not be waved through into Instantly just because it already has a probe,
+  // demo and personalisation ready to compile.
+  const { result } = await dryRun({ agency: { email_verification_status: 'RISKY' } });
+  assert.equal(result.eligible_count, 0);
+  assert(result.skipped[0].reasons.includes('email_verification_status_not_VALID:RISKY'));
+  ok('a legacy already-probed RISKY agency still cannot enter outbound');
+}
 
 for (const [label, overrides, reason] of [
   ['missing clean agency name', { agency: { clean_agency_name: '  ' } }, 'missing clean_agency_name'],
