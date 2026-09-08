@@ -1,1295 +1,236 @@
 <!DOCTYPE html>
-<html lang="en-GB">
+<html lang="en-GB" class="demo-page">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="robots" content="noindex, nofollow" />
-<meta name="description" content="NOVUS - one real enquiry, read the way NOVUS reads everything happening inside your agency." />
-<meta name="theme-color" content="#0A0B0E" />
-<title>NOVUS</title>
-
-<link rel="icon" href="/assets/img/novus-mark-32.png" sizes="32x32" type="image/png" />
-<link rel="apple-touch-icon" href="/assets/img/novus-mark-180.png" />
-
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Inter:wght@300..800&display=swap" />
-
-<!-- ═══════════════════════════════════════════════════════════════════════
-     THE DEMO AND THE WEBSITE ARE TWO SURFACES OF ONE BRAND.
-     These three files ARE the site's design system - the same tokens, the
-     same base surface, the same component vocabulary, served from the same
-     origin (/assets/* is rewritten to /site/assets/* in vercel.json). They
-     are linked rather than copied so the demo cannot drift away from
-     getnovus.co.uk the next time a token moves.
-     ═══════════════════════════════════════════════════════════════════════ -->
-<link rel="stylesheet" href="/assets/css/tokens.css" />
-<link rel="stylesheet" href="/assets/css/base.css" />
-<link rel="stylesheet" href="/assets/css/components.css" />
-
-<link rel="stylesheet" href="https://assets.calendly.com/assets/external/widget.css" />
-<script src="https://assets.calendly.com/assets/external/widget.js" async></script>
-
-<style>
-  /* ═══════════════════════════════════════════════════════════════════════
-     NOVUS PERSONALISED DEMO — /{demo_slug}
-
-     ONE JOB: answer what we noticed, show why it matters, and earn twenty minutes.
-
-     SEVEN BEATS, and the single thought each one has to land:
-
-       1  the problem, their agency, their listing       "that's genuinely us"
-       2  what the team did                               "that is factual"
-       3  what was never established                     "that was still open"
-       4  the commercial meaning                         "now I see why it matters"
-       5  the zoom-out                                    "this isn't one enquiry"
-       6  individual execution, agency-wide intelligence "now I understand NOVUS"
-       7  the ask                                         "worth twenty minutes"
-
-     One rhythm: premise, evidence, consequence, cinematic expansion, plain
-     explanation, ask.
-     Every section arriving as two equal columns is the same as none of them
-     doing it - the reader stops being told what to look at first. The field
-     in beat 5 is the loudest thing on the page and everything after it is
-     deliberately quieter than the thing it is explaining.
-
-     WHAT THIS PAGE IS NOT. Not an audit, not a grade, not a missed-seller
-     detector. It reports what the enquiry contained, what the conversation
-     settled, what it left open and what would usefully happen next - and
-     where the evidence credits the team it says so first. The copy for all
-     of that is SELECTED from the row's own ordinals in
-     lib/demo-journeys.mjs; nothing on this page is authored per agency.
-
-     EVERY CLASS BELOW IS PREFIXED d- so it cannot collide with the site
-     components this page reuses (.frame .section .head .eyebrow .btn .chip
-     .sys .wordmark .mark .reveal).
-     ═══════════════════════════════════════════════════════════════════════ */
-
-  /* ── SCROLL PROGRESS ──
-     One hairline. It reports where the reader is; it is not a set of steps
-     to complete, which is what a row of dots turns into. */
-  .d-progress{ position:fixed; inset:0 0 auto; z-index:130; height:1px; background:transparent; }
-  .d-progress i{ display:block; height:100%; width:0; background:var(--blue); opacity:.85; transition:width .12s linear; }
-
-  .hdr__right{ margin-left:auto; display:flex; align-items:center; gap:14px; min-width:0; }
-  .d-agency{
-    font-size:var(--t-xs); font-weight:500; color:var(--ink-4);
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:38vw;
-  }
-
-  /* A class-level display rule outranks the UA's [hidden], and several
-     below set display on elements the renderer hides when the row has
-     nothing to put in them. One rule, once. */
-  [hidden]{ display:none !important; }
-
-  /* ── SHARED TYPE ──────────────────────────────────────────────────────
-     A statement set alone in the frame, used at the two moments the page
-     stops explaining and simply says one thing. */
-  .d-statement{
-    font-family:var(--serif); font-weight:400;
-    letter-spacing:-.018em; line-height:1.14; text-wrap:balance;
-  }
-  .d-statement .soft{ display:block; color:rgba(241,237,230,.44); }
-
-  /* ═══ 01 · THE REAL ENQUIRY ════════════════════════════════════════════
-     Their agency, their property, their enquiry, and the factual record of
-     what happened. No analysis: this section has about four seconds to
-     prove the page is genuinely about them, and then it is finished. */
-  .d-open{ padding-top:clamp(96px,12vh,138px); }
-  .d-open__grid{
-    display:grid; grid-template-columns:minmax(0,1.06fr) minmax(0,.94fr);
-    gap:clamp(32px,5vw,74px); align-items:start;
-  }
-  /* THREE WEIGHTS, IN ORDER: the big idea, the commercial turn, the thing
-     that is actually theirs. Everything the eye does on this screen is
-     decided by that ranking, which is why the second line - the one that
-     costs them something - is the only one carrying the accent. */
-  .d-open h1{
-    font-size:clamp(1.9rem,1.2rem + 2.4vw,3.2rem);
-    margin:clamp(18px,2vw,26px) 0 0;
-    max-width:13em;
-  }
-  .d-open__turn{ display:block; color:var(--blue-hi); }
-  /* Smaller and quieter than the headline it explains. It is the sentence an
-     owner recognises, not the sentence that wins the argument. */
-  .d-open__sub{
-    margin-top:clamp(16px,1.9vw,24px);
-    font-size:var(--t-body); line-height:1.62; color:var(--ink-3);
-    max-width:var(--measure);
-  }
-  /* The turn from an idea to their agency. Set apart by a rule rather than
-     by size, so the hero keeps three weights instead of four. */
-  .d-open__probe{
-    margin-top:clamp(24px,2.8vw,34px);
-    padding-top:clamp(18px,2.1vw,24px);
-    border-top:1px solid var(--hair);
-    font-size:var(--t-lede); line-height:1.55; color:var(--ink-2);
-    max-width:var(--measure);
-  }
-  /* The agency's own name is the proof. Lifted out of the sentence just
-     enough to be the thing the eye lands on. */
-  .d-name{ color:var(--blue-hi); font-weight:600; }
-
-  /* THE ENQUIRY, IN TWO COLUMNS. The record on the left, everything the
-     enquiry actually contained on the right - so the reader sees the event
-     and its contents in one glance rather than as two chapters. Both
-     columns start on the same hairline. */
-  .d-enq{
-    display:grid;
-    grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);
-    gap:clamp(30px,4.4vw,72px);
-    margin-top:clamp(26px,3vw,40px);
-    align-items:start;
-  }
-  /* A row with no signals at all must not leave half the frame empty. */
-  .d-enq.is-solo{ grid-template-columns:minmax(0,1fr); max-width:var(--measure-wide); }
-  .d-enq__aside{ border-top:1px solid var(--hair); padding-top:clamp(13px,1.5vw,17px); }
-  .d-enq .d-log{ margin-top:0; }
-
-  /* THE RECORD. Times and events only - what happened, in the order it
-     happened. Everything the page concludes from it waits for section two,
-     so nothing here is coloured good or bad. */
-  .d-log{ margin-top:clamp(28px,3.4vw,44px); border-top:1px solid var(--hair); }
-  .d-log__row{
-    display:grid; grid-template-columns:minmax(84px,auto) minmax(0,1fr);
-    gap:4px clamp(16px,2.4vw,32px); align-items:baseline;
-    padding-block:clamp(11px,1.3vw,15px);
-    border-bottom:1px solid var(--hair);
-  }
-  .d-log__t{
-    font-family:var(--mono); font-size:var(--t-xs); font-variant-numeric:tabular-nums;
-    color:var(--ink-2); white-space:nowrap;
-  }
-  .d-log__e{ font-size:var(--t-sm); color:var(--ink-3); }
-
-  /* The one line of methodology the page owes the reader, set small enough
-     that it informs without becoming the subject. */
-  .d-note{
-    margin-top:clamp(16px,2vw,22px);
-    font-size:var(--t-xs); line-height:1.6; color:var(--ink-4);
-    max-width:var(--measure);
-  }
-
-  /* The listing, drawn as the artefact it is rather than as a hero image. */
-  .d-prop{ border:1px solid var(--hair-2); border-radius:var(--r-lg); overflow:hidden; background:var(--bg-2); }
-  .d-prop__visual{ position:relative; aspect-ratio:16/10; background:var(--bg-3); overflow:hidden; }
-  .d-prop__visual img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .6s var(--ease); }
-  .d-prop__visual img.is-loaded{ opacity:1; }
-  .d-prop__ph{ position:absolute; inset:0; width:100%; height:100%; }
-  .d-prop__tag{
-    position:absolute; left:12px; top:12px; z-index:2;
-    font-size:var(--t-micro); font-weight:700; letter-spacing:.13em; text-transform:uppercase;
-    color:var(--ink-2); background:rgba(7,8,10,.62); border:1px solid var(--hair-2);
-    border-radius:var(--r-full); padding:5px 11px; backdrop-filter:blur(8px);
-  }
-  .d-prop__price{
-    position:absolute; right:12px; bottom:12px; z-index:2;
-    font-family:var(--sans); font-size:var(--t-sm); font-weight:700; letter-spacing:.01em;
-    color:var(--ink); background:rgba(7,8,10,.66); border:1px solid var(--hair-2);
-    border-radius:var(--r-sm); padding:6px 11px; backdrop-filter:blur(8px);
-    font-variant-numeric:tabular-nums;
-  }
-  .d-prop__body{ padding:clamp(15px,1.6vw,20px) clamp(16px,1.8vw,22px) clamp(16px,1.8vw,20px); }
-  .d-prop__addr{ font-size:var(--t-h4); font-weight:600; letter-spacing:-.006em; line-height:1.32; }
-  .d-prop__meta{
-    display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px;
-    margin-top:9px; padding-top:11px; border-top:1px solid var(--hair);
-    font-size:var(--t-xs); color:var(--ink-3);
-  }
-  /* A row with neither a portal nor a listing link must not leave its rule
-     behind - :has() is supported everywhere this page runs. */
-  .d-prop__meta:not(:has(> :not([hidden]))){ display:none; }
-  .d-prop__link{ margin-left:auto; color:var(--ink-4); white-space:nowrap; transition:color .2s var(--ease); }
-  .d-prop__link:hover{ color:var(--blue); }
-
-  /* ═══ 02 · WHAT NOVUS UNDERSTOOD ═══════════════════════════════════════
-     ONE intelligence section, not five. What the enquiry contained, what
-     the team did with it, and - the half that proves this is reading
-     rather than pattern-matching - what it left open. */
-
-  /* The credit, where the evidence genuinely supports one. Stated BEFORE
-     anything is described as unresolved: a strong operator told what they
-     missed first starts arguing with the methodology instead of reading. */
-  .d-credit{
-    margin-top:clamp(22px,2.6vw,30px);
-    font-size:var(--t-lede); font-weight:500; line-height:1.5; color:var(--blue-hi);
-    max-width:var(--measure);
-  }
-  /* Only where the credit is actually rendered - a hidden one must not
-     leave its spacing behind and push the column out of alignment with the
-     one beside it. */
-  .d-credit:not([hidden]) + *{ margin-top:clamp(22px,2.6vw,30px); }
-
-  /* The quiet label that names a block inside a section. Small enough that
-     it orders the page without competing with the heading above it. */
-  .d-key{
-    margin-top:clamp(40px,4.6vw,64px);
-    padding-top:clamp(20px,2.4vw,28px);
-    border-top:1px solid var(--hair);
-    font-size:var(--t-micro); font-weight:700; letter-spacing:.18em; text-transform:uppercase;
-    color:var(--ink-4);
-  }
-  /* At the head of a column that already carries the rule. */
-  .d-key--flush{ margin-top:0; padding-top:0; border-top:none; }
-
-  /* WHAT IS STILL OPEN. Each item names the unresolved thing and, under it,
-     what the record actually shows - which is where an agency that DID ask
-     gets the credit for asking.
-
-     IT IS THE TAIL OF THE SAME READING, NOT A CHAPTER. One quiet block under
-     the two columns above it: a small label, a tight list, no second column
-     invented to balance it and no dot repeating a colour the label already
-     carries. The evidence is the whole point, so nothing competes with it. */
-  .d-open-q{
-    margin-top:clamp(26px,3vw,38px);
-    padding-top:clamp(19px,2.2vw,25px);
-    border-top:1px solid var(--hair);
-    max-width:var(--measure-wide);
-  }
-  .d-enq .d-open-q{ margin-top:0; max-width:none; }
-  .d-open-q__k{
-    font-size:var(--t-micro); font-weight:700; letter-spacing:.18em; text-transform:uppercase;
-    color:var(--amber); margin-bottom:clamp(4px,.6vw,7px);
-  }
-  .d-open-q__item{ padding-block:clamp(11px,1.3vw,15px); border-bottom:1px solid var(--hair); }
-  .d-open-q__t{
-    font-size:var(--t-body); font-weight:600; letter-spacing:-.002em; color:var(--ink);
-  }
-  .d-open-q__n{ margin-top:4px; font-size:var(--t-sm); line-height:1.55; color:var(--ink-3); }
-
-  /* THE COMMERCIAL MEANING. One conclusion from the evidence, with no
-     invented fee, conversion rate or outcome. */
-  .d-impact{ margin-top:clamp(22px,2.8vw,36px); max-width:var(--measure-wide); }
-  .d-impact__lead{
-    font-family:var(--serif); font-size:clamp(1.5rem,1.1rem + 1.55vw,2.55rem);
-    font-weight:400; letter-spacing:-.018em; line-height:1.18; text-wrap:balance;
-  }
-  .d-impact__body{
-    margin-top:clamp(16px,2vw,24px); max-width:var(--measure);
-    font-size:var(--t-lede); line-height:1.62; color:var(--ink-2);
-  }
-
-  /* FACTS, NOT SCORECARDS. Each line names the evidence and then gets out of
-     the way. No cards, tags or feature UI. */
-  .d-facts{ margin-top:clamp(18px,2.2vw,26px); border-top:1px solid var(--hair); }
-  .d-fact{
-    display:grid; grid-template-columns:minmax(112px,168px) minmax(0,1fr);
-    gap:6px clamp(20px,3vw,44px); align-items:baseline;
-    padding-block:clamp(13px,1.5vw,18px); border-bottom:1px solid var(--hair);
-  }
-  .d-fact__k{
-    font-size:var(--t-micro); font-weight:700; letter-spacing:.16em;
-    text-transform:uppercase; color:var(--ink-4);
-  }
-  .d-fact__v{ font-size:var(--t-body); line-height:1.55; color:var(--ink); }
-
-  /* TWO LAYERS, IN PLAIN ENGLISH: what happens for one enquiry, then what
-     becomes knowable across all of them. */
-  .d-novus{ margin-top:clamp(26px,3vw,42px); max-width:960px; }
-  .d-novus__layer{ padding-block:clamp(22px,2.8vw,36px); }
-  .d-novus__layer + .d-novus__layer{ border-top:1px solid var(--hair); }
-  .d-novus__k{
-    margin-bottom:10px; font-size:var(--t-micro); font-weight:700;
-    letter-spacing:.18em; text-transform:uppercase; color:var(--blue);
-  }
-  .d-novus__p{
-    max-width:44em; font-size:clamp(1.08rem,1rem + .56vw,1.45rem);
-    line-height:1.55; color:var(--ink); text-wrap:balance;
-  }
-
-  /* ═══ 04 · THE ZOOM-OUT ════════════════════════════════════════════════
-     THE ONE MOMENT THE PAGE STOPS BEING ABOUT AN ENQUIRY.
-
-     A scroll track holds a sticky stage. Everything inside it is driven by
-     one number - how far through the track the reader is - which pulls the
-     camera back from the single interaction they have just read about until
-     the whole agency is in frame: activity, then connections, then clusters,
-     then the few patterns that only exist once the signals are joined up.
-
-     THE FIELD IS DRAWN, NOT DECORATED. It is one canvas of hairline dots in
-     the ink already on the page, with the accent spent only on the clusters
-     that carry an insight. No glow, no gradient mesh, no network graphic.
-     ═══════════════════════════════════════════════════════════════════════ */
-  .d-zoom{ padding-block:0; }
-  /* The track's height IS the length of the sequence. Long enough to feel
-     like a pull-back, short enough that nobody is scrolling through an
-     animation waiting for the page to continue. */
-  .d-zoom__track{ position:relative; height:250vh; }
-  .d-zoom__stage{
-    position:sticky; top:0; height:100vh; min-height:560px;
-    display:grid; place-items:center; overflow:hidden;
-  }
-  .d-zoom__canvas{ position:absolute; inset:0; width:100%; height:100%; }
-  /* The type sits IN the field, so the field is quietened where the type is.
-     A radial wash of the page's own background - not a panel, not a blur. */
-  .d-zoom__veil{
-    position:absolute; inset:0; pointer-events:none; opacity:0;
-    background:radial-gradient(60% 48% at 50% 48%,
-      var(--bg) 0%, rgba(10,11,14,.94) 30%, rgba(10,11,14,.72) 52%,
-      rgba(10,11,14,.34) 68%, rgba(10,11,14,0) 84%);
-  }
-  .d-zoom__copy{ position:relative; z-index:2; width:100%; text-align:center; }
-
-  /* "But this is only one enquiry." - present at the start, gone as soon as
-     the camera starts moving. */
-  .d-zoom__pre{
-    font-size:var(--t-lede); color:var(--ink-3);
-    margin-bottom:clamp(16px,2vw,24px);
-    will-change:opacity;
-  }
-  .d-zoom__title{
-    font-size:var(--t-h1); margin-inline:auto; max-width:min(100%,960px);
-    will-change:opacity,transform;
-  }
-
-  /* THE PATTERNS, EMERGING. Four short observations, placed out in the field
-     rather than listed under it, so they read as things the picture surfaced
-     rather than as a feature list. */
-  .d-zoom__insights{ position:absolute; inset:0; z-index:2; pointer-events:none; }
-  .d-zoom__i{
-    position:absolute; max-width:19ch; text-align:left;
-    display:flex; gap:9px;
-    font-size:var(--t-xs); line-height:1.5; color:var(--ink-2);
-    opacity:0; transform:translate3d(0,6px,0);
-    transition:opacity .6s var(--ease), transform .6s var(--ease);
-  }
-  .d-zoom__i::before{
-    content:''; flex:none; width:5px; height:5px; border-radius:50%;
-    background:var(--blue); transform:translateY(.5em);
-  }
-  .d-zoom__i.is-on{ opacity:1; transform:none; }
-  .d-zoom__i--a{ left:clamp(20px,7vw,120px);  top:22%; }
-  .d-zoom__i--b{ right:clamp(20px,7vw,120px); top:28%; text-align:right; }
-  .d-zoom__i--c{ left:clamp(20px,9vw,164px);  bottom:24%; }
-  .d-zoom__i--d{ right:clamp(20px,9vw,164px); bottom:19%; }
-  .d-zoom__i--b{ flex-direction:row-reverse; }
-
-  .d-zoom__after{
-    text-align:center; max-width:38em;
-    margin:clamp(28px,3.6vw,52px) auto 0;
-    font-size:var(--t-lede); line-height:1.6; color:var(--ink-2);
-  }
-  .d-zoom__close{ padding-block:0 var(--sec-y-lg); }
-
-  /* NO SEQUENCE, NO STICKY. Reduced motion, or a browser with no canvas,
-     gets the finished composition at a readable height - which is the whole
-     idea, simply not travelled through. */
-  .d-zoom.is-static .d-zoom__track{ height:auto; }
-  .d-zoom.is-static .d-zoom__stage{ position:relative; height:auto; min-height:min(74vh,620px); padding-block:var(--sec-y-lg); }
-  .d-zoom.is-static .d-zoom__pre{ display:none; }
-  .d-zoom.is-static .d-zoom__stage{ align-content:center; }
-  .d-zoom.is-static .d-zoom__copy{ order:1; }
-  .d-zoom.is-static .d-zoom__insights{ order:2; position:static; display:grid; gap:14px 32px; grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:clamp(28px,3.4vw,44px); }
-  .d-zoom.is-static .d-zoom__i{ position:static; opacity:1; transform:none; max-width:none; text-align:left; flex-direction:row; }
-
-  /* ═══ 07 · THE PAYOFF ══════════════════════════════════════════════════
-     No new concept. Three outcomes that synthesise what has just been read,
-     and then the ask.
-
-     ONE IDEA, THEN THE BUTTON. Three ranked statements and a second column
-     of persuasion made the reader choose what the page was asking for. It
-     asks for one thing, so it says one thing. */
-  .d-final{ max-width:var(--measure-wide); }
-  .d-final__h{
-    font-family:var(--serif); font-weight:400;
-    font-size:clamp(1.5rem,1.16rem + 1.5vw,2.6rem);
-    letter-spacing:-.018em; line-height:1.16; color:var(--ink);
-    max-width:15em; text-wrap:balance;
-  }
-  .d-final__s{
-    margin-top:clamp(16px,1.9vw,22px);
-    font-size:var(--t-lede); line-height:1.58; color:var(--ink-2);
-    max-width:var(--measure);
-  }
-  .d-cta .btn{ font-size:var(--t-body); padding:15px 28px; margin-top:clamp(26px,3.2vw,40px); }
-  .d-cta__support{ margin-top:clamp(12px,1.5vw,17px); font-size:var(--t-sm); color:var(--ink-3); }
-  .d-cal{
-    max-height:0; overflow:hidden; opacity:0;
-    transition:max-height .7s var(--ease), opacity .5s var(--ease), margin-top .7s var(--ease);
-  }
-  .d-cal.is-open{ max-height:1200px; opacity:1; margin-top:clamp(26px,3.4vw,42px); }
-  .calendly-inline-widget{
-    min-width:280px; height:680px;
-    border:1px solid var(--hair-2); border-radius:var(--r-lg); overflow:hidden;
-  }
-
-  /* ── BOOT / FAILURE ────────────────────────────────────────────────────
-     Nothing above renders until one DEMOS row resolves. */
-  .d-boot{
-    position:fixed; inset:0; z-index:140;
-    display:grid; place-content:center; justify-items:center; gap:20px;
-    padding:var(--gutter); text-align:center; background:var(--bg);
-    transition:opacity .5s var(--ease), visibility .5s;
-  }
-  .d-boot.is-gone{ opacity:0; visibility:hidden; }
-  .d-boot__ring{
-    width:26px; height:26px; border-radius:50%;
-    border:1px solid var(--hair-2); border-top-color:var(--blue);
-    animation:spin 1s linear infinite;
-  }
-  @keyframes spin{ to{ transform:rotate(360deg); } }
-  .d-boot__msg{ font-size:var(--t-sm); color:var(--ink-3); max-width:34em; }
-  .d-boot__title{ display:block; font-family:var(--serif); font-size:var(--t-h3); color:var(--ink); margin-bottom:.6em; }
-  .d-boot__msg a{ color:var(--blue); font-weight:600; }
-
-  /* ═══════════════════════════════════════════════════════════════════════
-     RESPONSIVE — a designed composition at every width, never a squeeze.
-     ═══════════════════════════════════════════════════════════════════════ */
-  @media (max-width:1080px){
-    .d-open__grid{ grid-template-columns:minmax(0,1fr); gap:clamp(28px,4vw,40px); }
-    .d-open__art{ max-width:560px; }
-    /* Below this the second column is too narrow to be a column. Every
-       pairing on the page becomes the same single reading order it has
-       always had, in the order the argument runs. */
-    .d-enq{ grid-template-columns:minmax(0,1fr); gap:clamp(30px,4vw,44px); }
-    .d-enq__aside{ max-width:var(--measure-wide); }
-  }
-
-  @media (max-width:900px){
-    /* The four observations cannot sit out in the field at this width
-       without landing on the type, so they gather under it as a list. Same
-       four patterns, drawn for the shape available. */
-    /* Stacked, and in reading order: the statement, then what the picture
-       surfaced. The grid's own ordering is what puts the copy first, since
-       the field's labels are painted before it in the markup. */
-    .d-zoom__stage{ align-content:center; }
-    .d-zoom__copy{ order:1; }
-    /* A tall column of type on a narrow screen would take the whole field
-       with it. The wash is pulled back to the band the type actually
-       occupies. */
-    .d-zoom__veil{
-      background:radial-gradient(84% 34% at 50% 50%,
-        rgba(10,11,14,.94) 0%, rgba(10,11,14,.74) 48%, rgba(10,11,14,0) 88%);
-    }
-    .d-zoom__insights{
-      order:2; position:static; display:grid; gap:12px 26px;
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      margin-top:clamp(26px,4vw,40px); text-align:left;
-    }
-    .d-zoom__i{ position:static; max-width:none; text-align:left; flex-direction:row; }
-  }
-
-  @media (max-width:640px){
-    .d-open{ padding-top:clamp(88px,12vh,110px); }
-    .d-open h1{ font-size:clamp(1.8rem,1rem + 4.2vw,2.35rem); letter-spacing:-.024em; }
-    .d-log__row{ grid-template-columns:minmax(0,1fr); gap:3px; }
-    .d-log__t{ font-size:var(--t-micro); letter-spacing:.06em; }
-    .d-fact{ grid-template-columns:minmax(0,1fr); gap:5px; }
-    .d-zoom__track{ height:220vh; }
-    .d-zoom__stage{ min-height:0; height:100svh; }
-    .d-zoom__title{ font-size:clamp(1.75rem,1rem + 4.6vw,2.5rem); }
-    .d-zoom__insights{ grid-template-columns:minmax(0,1fr); }
-    /* The page names the agency in its first sentence; a truncated copy of
-       it beside the button is only crowding. */
-    .d-agency{ display:none; }
-    .d-cta .btn{ width:100%; justify-content:center; }
-    .calendly-inline-widget{ height:960px; }
-  }
-
-  @media (prefers-reduced-motion:reduce){
-    .d-zoom__i{ transition:none; }
-    .d-cal{ transition:none; }
-  }
-</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="A real enquiry to your agency. A wider question about the value in your existing demand.">
+<meta name="theme-color" content="#0a0b0e">
+<title>NOVUS · Your personalised demo</title>
+<link rel="icon" href="/assets/img/novus-mark-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/demo.css">
+<script src="/assets/js/demo.js" type="module"></script>
 </head>
-
 <body>
-
-<div class="d-progress" aria-hidden="true"><i id="progress"></i></div>
-
-<header class="hdr" id="hdr">
-  <div class="frame">
-    <span class="wordmark">
-      <img class="mark" src="/assets/img/novus-mark.png" alt="" width="384" height="360" />
-      <b>NOVUS</b>
-    </span>
-    <div class="hdr__right">
-      <span class="d-agency" id="hdr-agency"></span>
-      <span class="chip chip--amber" id="review-flag" hidden
-            title="This demo is flagged for review - see review_reasons on its DEMOS row">Needs review</span>
-      <button class="btn btn--ghost btn--sm" id="hdr-cta" hidden onclick="revealCalendly()">Book 20 minutes</button>
-    </div>
+<a class="skip" href="#main">Skip to demo</a>
+<div class="progress" aria-hidden="true"><i id="progress"></i></div>
+<header class="header">
+  <div class="frame header-inner">
+    <a class="wordmark" href="https://getnovus.co.uk" aria-label="NOVUS website"><img src="/assets/img/novus-mark.png" width="32" height="30" alt=""><span>NOVUS</span></a>
+    <span class="header-agency" id="header-agency"></span>
+    <a class="button button-small" href="#booking" data-book hidden>Book 20 minutes <span aria-hidden="true">↗</span></a>
   </div>
 </header>
+<main id="main" hidden>
 
-<main class="d-stage" id="stage" hidden>
-
-  <!-- ═══ 01 · THE REAL ENQUIRY ════════════════════════════════════════ -->
-  <section class="section d-open" data-reveal data-stagger="110">
-    <div class="frame">
-      <div class="d-open__grid">
-        <div>
-          <p class="eyebrow reveal-child" id="s1-eyebrow">Prepared for your agency</p>
-          <h1 class="reveal-child">
-            Your agency creates thousands of signals.
-            <span class="d-open__turn">Most are never used to their full value.</span>
-          </h1>
-
-          <p class="d-open__probe reveal-child">
-            We tested one real enquiry with <span class="d-name" id="s1-agency">your agency</span>
-            to show you what we noticed.
-          </p>
+  <!-- ── 01 · THE REAL ENQUIRY ───────────────────────────────────────────── -->
+  <section class="opening" aria-labelledby="enquiry-title">
+    <div class="opening-grid">
+      <div class="opening-copy">
+        <p class="eyebrow" id="enquiry-eyebrow"></p>
+        <h1 id="enquiry-title"></h1>
+      </div>
+      <figure class="property">
+        <div class="property-visual">
+          <img id="property-photo" width="1400" height="1000" fetchpriority="high" alt="" hidden>
+          <span class="photo-unavailable" id="photo-unavailable">Listing photograph unavailable</span>
         </div>
+        <figcaption>
+          <p class="property-address" id="property-address"></p>
+          <p class="property-facts">
+            <span class="property-price" id="property-price" hidden></span>
+            <span class="property-meta" id="property-meta" hidden></span>
+          </p>
+          <a class="text-link property-link" id="property-link" target="_blank" rel="noopener noreferrer" hidden>View listing <span aria-hidden="true">↗</span></a>
+        </figcaption>
+      </figure>
+    </div>
 
-        <figure class="d-prop d-open__art reveal-child">
-          <div class="d-prop__visual">
-            <svg class="d-prop__ph" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-              <g stroke="rgba(241,237,230,.055)" stroke-width="1">
-                <path d="M0 196h400M62 196V54M338 196V54M62 54h276M62 125h276M154 54v142M246 54v142"/>
-              </g>
-              <g fill="rgba(78,155,255,.045)">
-                <rect x="74" y="68" width="68" height="34" rx="1"/><rect x="166" y="68" width="68" height="34" rx="1"/>
-                <rect x="258" y="68" width="68" height="34" rx="1"/><rect x="74" y="139" width="68" height="34" rx="1"/>
-                <rect x="166" y="139" width="68" height="34" rx="1"/><rect x="258" y="139" width="68" height="34" rx="1"/>
-              </g>
-            </svg>
-            <img id="prop-photo" alt="" />
-            <span class="d-prop__tag">The listing we enquired about</span>
-            <span class="d-prop__price" id="prop-price" hidden></span>
+    <div class="frame enquiry-record" id="enquiry">
+      <p class="section-label"><i aria-hidden="true"></i>The enquiry</p>
+
+      <!-- Two primary facts. The contact address is supporting metadata under
+           the declaration — never a claim about the property being sold. -->
+      <ul class="fact-row" data-reveal>
+        <li><p class="eyebrow">Buyer enquiry</p><p class="fact-value" id="fact-buyer"></p></li>
+        <li id="fact-seller" hidden>
+          <p class="eyebrow seller-cue">Seller declared</p>
+          <p class="fact-value">Property to sell</p>
+          <p class="fact-note" id="fact-locality"></p>
+        </li>
+      </ul>
+
+      <div class="comms-block">
+        <p class="eyebrow">The communication record</p>
+        <ol class="timeline" id="timeline"></ol>
+        <details id="more-events" hidden><summary>More recorded communications</summary><ol class="timeline" id="timeline-more"></ol></details>
+        <p class="note">We only show what we can reliably observe from the enquiry and the communications around it.</p>
+        <!-- The raw record carries no more screen space than a click asks for.
+             Hidden entirely when there is nothing to show. -->
+        <details class="original-enquiry" id="original-enquiry" hidden>
+          <summary>View original enquiry</summary>
+          <div class="original-enquiry-body">
+            <p class="eyebrow" id="message-label"></p>
+            <blockquote id="probe-message" hidden></blockquote>
+            <p class="record-copy" id="enquiry-record" hidden></p>
           </div>
-          <figcaption class="d-prop__body">
-            <p class="d-prop__addr" id="prop-address">The property in your enquiry</p>
-            <!-- The card says what the LISTING is. Who the enquiry went to is
-                 in the sentence beside it, and when it went is the first line
-                 of the record - neither is repeated here. -->
-            <p class="d-prop__meta">
-              <span id="prop-source" hidden></span>
-              <a class="d-prop__link" id="prop-link" href="#" target="_blank" rel="noopener" hidden>View the listing &#8599;</a>
-            </p>
-          </figcaption>
-        </figure>
+        </details>
+        <p class="note" id="message-unavailable" hidden>The original enquiry text isn’t available in this record.</p>
       </div>
     </div>
   </section>
 
-  <!-- ═══ 02 · WHAT WE NOTICED ═════════════════════════════════════════ -->
-  <section class="section section--lg section--ruled" data-reveal data-stagger="90">
+  <!-- ── 02 · THE STATIC TRANSITION ────────────────────────────────────────
+       Hard-coded narrative copy. It does not fade, animate or disappear —
+       it reads exactly like the rest of the page, once, in order. -->
+  <section class="transition" aria-labelledby="transition-title">
+    <div class="frame transition-inner" data-reveal>
+      <h2 class="transition-title" id="transition-title">This enquiry may have been dealt with perfectly.</h2>
+      <p class="transition-examples"><span>Fast response</span><span>Consistent follow-up</span><span>Seller position identified and questioned</span><span>Buyer progressed</span></p>
+      <p class="transition-hint note">These are examples of what strong handling may include.</p>
+      <p class="transition-but">But one well-handled enquiry doesn’t tell you how much more value could exist across the rest of your enquiries and database.</p>
+      <p class="transition-main" id="transition-main">So what’s happening across your entire agency?</p>
+    </div>
+  </section>
+
+  <!-- ── 03 · THE ZOOM-OUT ────────────────────────────────────────────────────
+       The small enquiry card is the visual starting point: it sits at rest,
+       then recedes as the wider pool of demand and the commercial question
+       arrive. Every fragment is ILLUSTRATIVE, never a finding. -->
+  <section class="zoom" aria-labelledby="commercial-question">
+    <div class="zoom-track" id="zoom">
+      <div class="zoom-stage">
+        <div class="demand-field" id="demand-field" aria-hidden="true">
+          <div class="field-orbit orbit-one"></div><div class="field-orbit orbit-two"></div><div class="field-orbit orbit-three"></div>
+          <div class="fragment f1"  style="--s:.02"><i></i><span>New buyer enquiry</span></div>
+          <div class="fragment f2"  style="--s:.16"><i></i><span>Buyer with a property to sell</span></div>
+          <div class="fragment f3"  style="--s:.34"><i></i><span>Past buyer</span></div>
+          <div class="fragment f4"  style="--s:.10"><i></i><span>Previous seller</span></div>
+          <div class="fragment f5"  style="--s:.24"><i></i><span>Previous valuation</span></div>
+          <div class="fragment f6"  style="--s:.40"><i></i><span>Old database contact</span></div>
+          <div class="fragment f7"  style="--s:.06"><i></i><span>Viewing activity</span></div>
+          <div class="fragment f8"  style="--s:.28"><i></i><span>Offer activity</span></div>
+          <div class="fragment f9"  style="--s:.13"><i></i><span>Contact re-engaging</span></div>
+          <div class="fragment f10" style="--s:.37"><i></i><span>Seller interest</span></div>
+          <div class="fragment f11" style="--s:.20"><i></i><span>Buyer progression</span></div>
+          <div class="fragment f12" style="--s:.44"><i></i><span>Historic relationship</span></div>
+          <div class="fragment f13" style="--s:.31"><i></i><span>Follow-up activity</span></div>
+          <div class="fragment f14" style="--s:.47"><i></i><span>Human involvement</span></div>
+          <div class="fragment f15" style="--s:.26"><i></i><span>Automated action</span></div>
+          <div class="fragment f16" style="--s:.42"><i></i><span>Opportunity resurfacing</span></div>
+        </div>
+
+        <div class="enquiry-seed" id="enquiry-seed" aria-hidden="true">
+          <img id="seed-photo" alt="" hidden>
+          <div><span class="seed-label">One real enquiry</span><p id="seed-street"></p><span class="seed-agency" id="seed-agency"></span></div>
+        </div>
+
+        <div class="question-wrap frame" id="question-wrap">
+          <h2 id="commercial-question">How confident are you that you’re getting <em>all the commercial value you could</em> from the enquiries and database you already have?</h2>
+          <p class="question-follow">Where does that extra value sit — and what stops more of it turning into business?</p>
+        </div>
+        <p class="field-note">Illustrative examples of what can exist across an agency. Not findings about your agency.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 04 · WHAT NOVUS DOES ────────────────────────────────────────────────
+       Four named stages, all readable from the first frame. One explanation
+       area swaps beneath them. Motion is emphasis, never discovery. -->
+  <section class="method" aria-labelledby="method-title">
+    <div class="method-track" id="method-track">
+      <div class="method-pin">
+        <div class="frame">
+          <p class="eyebrow method-eyebrow">What NOVUS does</p>
+          <h2 id="method-title">Get more business from the demand your agency already has.</h2>
+
+          <ol class="steps" id="steps" aria-hidden="true">
+            <li class="step"><b>01</b><span>Understand</span></li>
+            <li class="step"><b>02</b><span>Identify</span></li>
+            <li class="step"><b>03</b><span>Act</span></li>
+            <li class="step"><b>04</b><span>Learn</span></li>
+          </ol>
+
+          <div class="panels" id="panels">
+            <article class="panel">
+              <p class="panel-step"><b>01</b> Understand</p>
+              <h3>Understand the full picture</h3>
+              <p>NOVUS brings together enquiries, previous conversations, current activity and past outcomes — so each opportunity is understood with the context around it.</p>
+            </article>
+            <article class="panel">
+              <p class="panel-step"><b>02</b> Identify</p>
+              <h3>Identify where the value is</h3>
+              <p>It uses that wider picture to identify the opportunities with the strongest commercial potential and where a better decision could create more value.</p>
+            </article>
+            <article class="panel">
+              <p class="panel-step"><b>03</b> Act</p>
+              <h3>Take the best next action</h3>
+              <p>NOVUS decides what should happen next and when — acting automatically where appropriate, or bringing your team in when their judgement adds more value.</p>
+              <ul class="branch">
+                <li class="branch-novus"><i></i>NOVUS acts</li>
+                <li class="branch-team"><i></i>Your team</li>
+              </ul>
+            </article>
+            <article class="panel">
+              <p class="panel-step"><b>04</b> Learn</p>
+              <h3>Learn what works</h3>
+              <p>Every outcome feeds back into NOVUS, improving how similar opportunities are understood and handled next time.</p>
+              <p class="loop-note"><span class="loop-mark" aria-hidden="true"></span>Every outcome feeds back into the next decision.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 05 · THE RESULT ─────────────────────────────────────────────────────
+       A value chain that intensifies into blue. A direction, not a promise. -->
+  <section class="result" aria-labelledby="result-title">
     <div class="frame">
-      <div class="head">
-        <p class="eyebrow reveal-child" id="s2-eyebrow">The enquiry</p>
-        <h2 class="reveal-child">What we noticed in your enquiry.</h2>
-      </div>
-
-      <div class="d-enq" id="s2-grid">
-        <div class="d-enq__main">
-          <p class="d-key d-key--flush reveal-child">What your team did</p>
-          <p class="d-credit reveal-child" id="s2-credit" hidden></p>
-          <div class="d-log reveal-child" id="s2-log"></div>
-          <div class="d-facts reveal-child" id="s2-handling"></div>
-          <p class="d-note reveal-child">
-            We sent this enquiry ourselves, and stopped once we had enough to read it.
-          </p>
-        </div>
-
-        <aside class="d-enq__aside d-open-q reveal-child" id="s2-open">
-          <p class="d-open-q__k">What was still never established</p>
-          <div class="d-open-q__list" id="s2-open-list"></div>
-        </aside>
-      </div>
+      <h2 class="result-title" id="result-title" data-reveal>The result</h2>
+      <ol class="ladder" id="ladder">
+        <li class="rung" style="--s:.00"><span class="rung-num" aria-hidden="true">01</span><div class="rung-body"><h3>Existing demand</h3><p>Enquiries + database</p></div></li>
+        <li class="rung" style="--s:.16"><span class="rung-num" aria-hidden="true">02</span><div class="rung-body"><h3>Better commercial decisions</h3><p>More context · better timing · more precise action</p></div></li>
+        <li class="rung" style="--s:.32"><span class="rung-num" aria-hidden="true">03</span><div class="rung-body"><h3>More opportunities turned into business</h3><p>Buyer · seller · valuation opportunities</p></div></li>
+        <li class="rung" style="--s:.48"><span class="rung-num" aria-hidden="true">04</span><div class="rung-body"><h3>More valuations, instructions &amp; transactions</h3></div></li>
+        <li class="rung rung-payoff" style="--s:.64"><span class="rung-num" aria-hidden="true">05</span><div class="rung-body"><h3>More fee income</h3></div></li>
+      </ol>
+      <p class="note ladder-note">The direction commercial value moves in — not a guaranteed outcome.</p>
     </div>
   </section>
 
-  <!-- ═══ 03 · WHY IT MATTERS ══════════════════════════════════════════ -->
-  <section class="section section--lg section--dark section--ruled" data-reveal data-stagger="80">
-    <div class="frame">
-      <div class="head">
-        <p class="eyebrow reveal-child">Why that matters</p>
-      </div>
-      <div class="d-impact">
-        <p class="d-impact__lead reveal-child" id="s3-impact-lead"></p>
-        <p class="d-impact__body reveal-child" id="s3-impact-body"></p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ 04 · THE ZOOM-OUT ════════════════════════════════════════════
-       The moment NOVUS stops looking like an enquiry tool. The scale change
-       is FELT - the camera pulls back from the one interaction they have
-       just read about until the whole agency is in frame - so the copy here
-       is three lines and the field is given the screen. -->
-  <section class="section section--ruled d-zoom" id="zoom">
-    <div class="d-zoom__track">
-      <div class="d-zoom__stage">
-        <canvas class="d-zoom__canvas" id="zoom-canvas" aria-hidden="true"></canvas>
-        <div class="d-zoom__veil" aria-hidden="true"></div>
-
-        <div class="d-zoom__insights" id="zoom-insights">
-          <p class="d-zoom__i d-zoom__i--a">Enquiries repeatedly stalling after first contact</p>
-          <p class="d-zoom__i d-zoom__i--b">Seller positions frequently left unresolved</p>
-          <p class="d-zoom__i d-zoom__i--c">Faster follow-up linked to stronger progression</p>
-          <p class="d-zoom__i d-zoom__i--d">Past contacts showing renewed intent</p>
+  <!-- ── 06 · QUALIFICATION + CTA ────────────────────────────────────────────
+       Two decision states: one deliberately quiet, one primary. -->
+  <section class="qualification" aria-labelledby="qualification-title">
+    <div class="frame qualification-inner" data-reveal>
+      <p class="eyebrow">Is NOVUS relevant to your agency?</p>
+      <h2 id="qualification-title">If you think there may be <em>more value</em> in the enquiries and database you already have, it’s worth a conversation.</h2>
+      <div class="states">
+        <div class="state state-out">
+          <p class="state-q">Already confident you’re getting everything possible?</p>
+          <p class="state-a">NOVUS probably isn’t for you.</p>
         </div>
-
-        <div class="frame frame--wide d-zoom__copy">
-          <p class="d-zoom__pre" id="zoom-pre">But this is only one enquiry.</p>
-          <h2 class="d-statement d-zoom__title" id="zoom-title">
-            <span class="soft">One enquiry creates signals.</span>
-            Thousands reveal how your agency is actually operating.
-          </h2>
+        <div class="state state-in">
+          <p class="state-q">Not completely sure?</p>
+          <p class="state-a give-us">Give us 20 minutes.</p>
+          <p class="state-detail">We’ll look at how your existing demand is being worked, where more commercial value might exist, and whether NOVUS could fit into your agency.</p>
+          <a class="button button-primary" href="#booking" data-book>Book 20 minutes <span aria-hidden="true">↗</span></a>
         </div>
       </div>
     </div>
-
-    <div class="frame d-zoom__close">
-      <p class="d-zoom__after reveal" >
-        This is visibility over how the whole agency operates.
-      </p>
+    <div class="frame booking" id="booking" hidden>
+      <div class="booking-heading"><h3>Book your 20 minutes</h3><a class="text-link" href="https://calendly.com/joe-getnovus/10min" target="_blank" rel="noopener noreferrer">Open calendar in a new tab ↗</a></div>
+      <iframe id="calendar" title="Book a 20-minute conversation with NOVUS" referrerpolicy="strict-origin-when-cross-origin"></iframe>
     </div>
   </section>
 
-  <!-- ═══ 06 · THIS IS WHERE NOVUS COMES IN ════════════════════════════ -->
-  <section class="section section--lg section--dark section--ruled" data-reveal data-stagger="90">
-    <div class="frame">
-      <div class="head">
-        <p class="eyebrow reveal-child">This is where NOVUS comes in</p>
-        <h2 class="reveal-child">Each opportunity moves. The whole agency becomes visible.</h2>
-      </div>
-
-      <div class="d-novus">
-        <div class="d-novus__layer reveal-child">
-          <p class="d-novus__k">For each enquiry</p>
-          <p class="d-novus__p">NOVUS understands the context, remembers what has already happened, works out what still needs to be known, and takes the next action automatically - bringing your team back in when human attention is the more valuable next step.</p>
-        </div>
-
-        <div class="d-novus__layer reveal-child">
-          <p class="d-novus__k">Across the agency</p>
-          <p class="d-novus__p">Every enquiry, conversation, follow-up and outcome feeds into one picture. NOVUS connects those signals to reveal where opportunities are being missed, where things repeatedly stall, what is working best - and what should happen next.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ 07 · THE PAYOFF ══════════════════════════════════════════════ -->
-  <section class="section section--lg section--ruled d-cta" data-reveal data-stagger="110">
-    <div class="frame">
-      <div class="d-final">
-        <p class="d-final__h reveal-child">Curious what this would look like across your agency?</p>
-        <p class="d-final__s reveal-child">Give me 20 minutes and I'll show you.</p>
-        <button class="btn btn--primary reveal-child" onclick="revealCalendly()">
-          Book a 20-minute conversation <span class="arw" aria-hidden="true">&rarr;</span>
-        </button>
-      </div>
-
-      <div class="d-cal" id="calendly-wrap">
-        <div class="calendly-inline-widget" data-url="https://calendly.com/joe-getnovus/10min?hide_gdpr_banner=1&background_color=0a0b0e&text_color=f1ede6&primary_color=4e9bff"></div>
-      </div>
-    </div>
-  </section>
-
+  <footer class="frame footer"><span>NOVUS</span><span id="footer-agency"></span><a href="https://getnovus.co.uk/privacy">Privacy</a></footer>
 </main>
-
-<div class="d-boot" id="boot">
-  <div class="d-boot__ring" id="boot-ring"></div>
-  <p class="d-boot__msg" id="boot-msg">Loading&#8230;</p>
-</div>
-
-<script>
-/* ═══════════════════════════════════════════════════════════════════════
-   THE RENDERER IS JOURNEY-BLIND, AND IT ALWAYS WAS.
-   It resolves ONE slug, reads ONE DEMOS row through /api/demo, and writes
-   whatever that row carries into a fixed structure. There is no
-   hero_journey branch in this file. What VARIES between two agencies is
-   the reading /api/demo derives from their own ordinals - the record, the
-   signals, what was left unresolved and why it matters - never
-   the shape of the page.
-
-   Every field is optional. An element with no data is removed, so a thin
-   row degrades to a shorter demo rather than to a broken one.
-   ═══════════════════════════════════════════════════════════════════════ */
-
-  let demoSlug = '';
-
-  /* /{demo_slug} is the public route; /demo/{demo_slug} remains supported,
-     and ?slug= is accepted so the page can be opened directly while testing.
-     UNCHANGED from the previous shell - these URLs are already in inboxes. */
-  function resolveSlug() {
-    const params = new URLSearchParams(location.search);
-    const fromQuery = (params.get('slug') || '').trim();
-    if (fromQuery) return fromQuery;
-    const segments = location.pathname.split('/').filter(Boolean);
-    if (segments.length === 1 && segments[0] !== 'demo.html') return decodeURIComponent(segments[0]);
-    if (segments.length >= 2 && segments[0] === 'demo') return decodeURIComponent(segments[1]);
-    return '';
-  }
-
-  function txt(value) { return String(value == null ? '' : value).trim(); }
-
-  /* HOUSE STYLE: no em or en dashes in prospect-facing copy. lib/demos.mjs
-     applies the same rule when the row is compiled; this is the second half
-     of it, so a row compiled by an earlier build still reads correctly.
-     Deliberately NOT applied to txt(), which also carries the listing URL. */
-  function copy(value) { return txt(value).replace(/\s*[—–]\s*/g, ' - ').trim(); }
-
-  /* Sets text, and HIDES the element when there is nothing to say. Blank
-     upstream data must never render as an empty heading or a stray rule. */
-  function setField(id, value, { keepEmpty = false } = {}) {
-    const el = document.getElementById(id);
-    if (!el) return false;
-    const v = copy(value);
-    if (!v && !keepEmpty) { el.hidden = true; return false; }
-    el.textContent = v;
-    el.hidden = false;
-    return true;
-  }
-
-  /* One element, one class, one string - the whole page is built from lists
-     of these, so the renderer never concatenates HTML. */
-  function el(tag, className, text) {
-    const node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text != null) node.textContent = copy(text);
-    return node;
-  }
-
-  /* ── REVEAL ──
-     The site's own engine (site/assets/js/reveal.js), inlined rather than
-     imported so the demo costs one request instead of five ES modules that
-     also boot the homepage's hero field and sequences. Same contract:
-     [data-reveal] gains .is-in, its .reveal-child descendants get a stagger. */
-  function startReveal() {
-    const groups = document.querySelectorAll('[data-reveal]');
-    if (!('IntersectionObserver' in window)) {
-      groups.forEach((g) => g.classList.add('is-in'));
-      document.querySelectorAll('.reveal').forEach((node) => node.classList.add('is-in'));
-      return;
-    }
-    const io = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        entry.target.classList.add('is-in');
-        io.unobserve(entry.target);
-      }
-    }, { rootMargin: '0px 0px -12% 0px', threshold: 0.08 });
-
-    for (const group of groups) {
-      const step = Number(group.dataset.stagger || 70);
-      Array.from(group.querySelectorAll('.reveal-child'))
-        .filter((node) => node.closest('[data-reveal]') === group)
-        .forEach((node, i) => { node.style.setProperty('--d', Math.min(i, 10) * step + 'ms'); });
-      io.observe(group);
-    }
-    document.querySelectorAll('.reveal').forEach((node) => io.observe(node));
-  }
-
-  /* The header condenses, and the hairline reports the scroll. Both are
-     presentational; neither is load-bearing. */
-  function startChrome() {
-    const hdr = document.getElementById('hdr');
-    const bar = document.getElementById('progress');
-    let ticking = false;
-    const update = () => {
-      ticking = false;
-      const y = window.scrollY || 0;
-      hdr.classList.toggle('is-stuck', y > 24);
-      const max = document.documentElement.scrollHeight - window.innerHeight;
-      bar.style.width = (max > 0 ? Math.min(100, (y / max) * 100) : 0) + '%';
-    };
-    window.addEventListener('scroll', () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(update);
-    }, { passive: true });
-    update();
-  }
-
-  /* ── THE ZOOM-OUT ──
-     ONE NUMBER DRIVES THE WHOLE SECTION: how far the reader has travelled
-     through the sticky track, 0 to 1. It moves a camera backwards away from
-     the single interaction they have just read about, and the agency is
-     simply already there to be found - nothing is spawned, nothing is
-     staged. What changes is how much of it fits in the frame.
-
-       0.00  one interaction, alone
-       0.15  activity, arriving continuously as the frame widens
-       0.38  connections between things that belong together
-       0.66  two clusters carry an accent: repeated shapes, not noise
-       0.70+ the patterns that only exist once the signals are joined up
-
-     The field is GENERATED ONCE from a fixed seed, so every prospect sees
-     the same composition and a reload is not a different picture. It is an
-     illustration of scale, never a chart of their data. */
-  function startZoom() {
-    const section = document.getElementById('zoom');
-    const canvas = document.getElementById('zoom-canvas');
-    if (!section || !canvas) return;
-
-    const ctx = canvas.getContext ? canvas.getContext('2d') : null;
-    const reduced = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-    const track = section.querySelector('.d-zoom__track');
-    const pre = document.getElementById('zoom-pre');
-    const title = document.getElementById('zoom-title');
-    const insights = Array.from(section.querySelectorAll('.d-zoom__i'));
-    const veil = section.querySelector('.d-zoom__veil');
-
-    /* No canvas, or a reader who has asked for no motion: the section
-       becomes the finished composition at a readable height. */
-    const isStatic = !ctx || reduced;
-    if (isStatic) {
-      section.classList.add('is-static');
-      if (pre) pre.style.opacity = '0';
-      if (veil) veil.style.opacity = '1';
-      insights.forEach((node) => node.classList.add('is-on'));
-      if (!ctx) { canvas.remove(); return; }
-    }
-
-    /* Same seed, same field, every time. */
-    function mulberry32(a) {
-      return function () {
-        a = a + 0x6D2B79F5 | 0;
-        let t = Math.imul(a ^ a >>> 15, 1 | a);
-        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-        return ((t ^ t >>> 14) >>> 0) / 4294967296;
-      };
-    }
-    const rand = mulberry32(20260904);
-
-    const TAU = Math.PI * 2;
-    const narrow = window.innerWidth < 760;
-
-    /* A LOGARITHMIC FIELD OF CLUSTERS. Cluster centres are spread evenly in
-       LOG space and everything about a cluster is measured relative to its
-       own distance from the middle, so the field looks equally dense at
-       every zoom level: pulling back always finds more, and what it finds is
-       always grouped. Straight uniform scatter reads as stars; this reads as
-       an agency. */
-    const R_IN = 0.0042;
-    const R_OUT = 1.08;
-    const SEEDS = narrow ? 54 : 88;
-    const PER = narrow ? 11 : 14;
-    const SPREAD = 0.27;
-
-    const seeds = [];
-    for (let i = 0; i < SEEDS; i += 1) {
-      const u = (i + rand() * 0.9) / SEEDS;
-      const r = R_IN * Math.pow(R_OUT / R_IN, u);
-      const a = rand() * TAU;
-      seeds.push({
-        x: Math.cos(a) * r,
-        y: Math.sin(a) * r * 0.92,
-        r,
-        /* Three clusters carry the accent. Everything else stays in ink -
-           an accent on all of it would mark nothing. */
-        hot: i % 11 === 4,
-      });
-    }
-
-    const pts = [];
-    for (let i = 0; i < seeds.length; i += 1) {
-      const seed = seeds[i];
-      const count = Math.max(4, Math.round(PER * (0.6 + rand() * 0.8)));
-      for (let j = 0; j < count; j += 1) {
-        const a = rand() * TAU;
-        const d = seed.r * SPREAD * Math.sqrt(rand());
-        pts.push({
-          x: seed.x + Math.cos(a) * d,
-          y: seed.y + Math.sin(a) * d * 0.94,
-          seed: i,
-          hot: seed.hot,
-          ph: rand() * TAU,
-          sz: 0.85 + rand() * 0.75,
-          live: j % 5 === 0,
-        });
-      }
-    }
-
-    /* Two kinds of join, and the difference is the whole argument:
-       inside a cluster, the interactions that belong to the same shape;
-       between clusters, the repetition that only exists agency-wide. */
-    const links = [];
-    for (let i = 0; i < pts.length; i += 1) {
-      const a = pts[i];
-      let best = -1;
-      let bestD = Infinity;
-      for (let j = i + 1; j < Math.min(i + 16, pts.length); j += 1) {
-        const b = pts[j];
-        if (b.seed !== a.seed) continue;
-        const d = Math.hypot(b.x - a.x, b.y - a.y);
-        if (d < bestD) { bestD = d; best = j; }
-      }
-      if (best >= 0 && bestD < seeds[a.seed].r * SPREAD * 1.15) {
-        links.push({ a: i, b: best, hot: a.hot, far: false });
-      }
-    }
-    /* One join per cluster to its nearest neighbour, held back until the
-       clusters themselves have formed. */
-    const seedFirst = [];
-    for (let i = 0; i < pts.length; i += 1) if (seedFirst[pts[i].seed] === undefined) seedFirst[pts[i].seed] = i;
-    for (let i = 0; i < seeds.length; i += 1) {
-      let best = -1;
-      let bestD = Infinity;
-      for (let j = 0; j < seeds.length; j += 1) {
-        if (j === i) continue;
-        const d = Math.hypot(seeds[j].x - seeds[i].x, seeds[j].y - seeds[i].y);
-        if (d < bestD) { bestD = d; best = j; }
-      }
-      if (best >= 0 && bestD < seeds[i].r * 1.5 && seedFirst[i] !== undefined && seedFirst[best] !== undefined) {
-        links.push({ a: seedFirst[i], b: seedFirst[best], hot: seeds[i].hot && seeds[best].hot, far: true });
-      }
-    }
-
-    function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
-    function smooth(a, b, v) { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); }
-
-    let w = 0;
-    let h = 0;
-    function size() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const rect = canvas.getBoundingClientRect();
-      w = Math.max(1, Math.round(rect.width));
-      h = Math.max(1, Math.round(rect.height));
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-
-    /* How far through the track we are. In the static section there is no
-       track to travel, so the sequence is simply already finished. */
-    function progress() {
-      if (isStatic) return 1;
-      const rect = track.getBoundingClientRect();
-      const travel = rect.height - window.innerHeight;
-      return travel > 0 ? clamp01(-rect.top / travel) : 0;
-    }
-
-    /* THE CAMERA. Geometric, not linear: equal scroll buys equal
-       magnification, which is what a real pull-back does. */
-    const ZOOM_IN = 420;
-
-    function draw(p, t) {
-      const e = smooth(0, 1, p);
-      const zoom = ZOOM_IN * Math.pow(1 / ZOOM_IN, e);
-      /* A tall, narrow frame cannot be filled by a field measured on its
-         short side, so the phone measures on its long one. */
-      const k = (narrow ? Math.max(w, h) * 0.52 : Math.min(w, h) * 0.54) * zoom;
-      const cx = w / 2;
-      const cy = h / 2;
-      const edge = Math.max(w, h) * 0.62;
-
-      ctx.clearRect(0, 0, w, h);
-
-      const linkAlpha = smooth(0.34, 0.58, p);
-      const farAlpha = smooth(0.56, 0.78, p);
-      const accent = smooth(0.60, 0.80, p);
-
-      if (linkAlpha > 0.01) {
-        for (const link of links) {
-          const a = pts[link.a];
-          const b = pts[link.b];
-          const ax = cx + a.x * k;
-          const ay = cy + a.y * k;
-          const bx = cx + b.x * k;
-          const by = cy + b.y * k;
-          if (ax < -60 && bx < -60) continue;
-          if (ax > w + 60 && bx > w + 60) continue;
-          if (ay < -60 && by < -60) continue;
-          if (ay > h + 60 && by > h + 60) continue;
-          const len = Math.hypot(bx - ax, by - ay);
-          if (len > 260 || len < 1) continue;
-          const near = 1 - smooth(0.74, 1, Math.hypot(ax - cx, ay - cy) / edge);
-          const hot = link.hot ? accent : 0;
-          const base = (link.far ? farAlpha * 0.5 : linkAlpha) * near * (1 - smooth(150, 260, len));
-          if (base <= 0.004) continue;
-          ctx.strokeStyle = hot > 0
-            ? 'rgba(78,155,255,' + (base * (0.2 + hot * 0.45)).toFixed(3) + ')'
-            : 'rgba(241,237,230,' + (base * 0.16).toFixed(3) + ')';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(ax, ay);
-          ctx.lineTo(bx, by);
-          ctx.stroke();
-        }
-      }
-
-      for (let i = 0; i < pts.length; i += 1) {
-        const pt = pts[i];
-        const px = cx + pt.x * k;
-        const py = cy + pt.y * k;
-        if (px < -40 || px > w + 40 || py < -40 || py > h + 40) continue;
-        /* Arriving points fade in at the edge of the frame rather than
-           appearing, so the field grows instead of flickering. */
-        const near = 1 - smooth(0.72, 1, Math.hypot(px - cx, py - cy) / edge);
-        if (near <= 0.01) continue;
-        const pulse = pt.live ? 0.6 + 0.4 * Math.abs(Math.sin(t * 0.0007 + pt.ph)) : 1;
-        const hot = pt.hot ? accent : 0;
-        const alpha = near * pulse * (0.5 + hot * 0.34);
-        ctx.fillStyle = hot > 0.02
-          ? 'rgba(78,155,255,' + Math.min(0.9, alpha).toFixed(3) + ')'
-          : 'rgba(241,237,230,' + Math.min(0.58, alpha * 0.7).toFixed(3) + ')';
-        ctx.beginPath();
-        ctx.arc(px, py, pt.sz, 0, TAU);
-        ctx.fill();
-      }
-
-      /* The interaction they have just read about. It holds the middle of
-         the frame alone, and gives it up to the headline as the agency
-         opens out around it. */
-      const core = 1 - smooth(0.03, 0.17, p);
-      if (core > 0.01) {
-        ctx.strokeStyle = 'rgba(78,155,255,' + (0.34 * core).toFixed(3) + ')';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(cx, cy, 30, 0, TAU);
-        ctx.stroke();
-        ctx.fillStyle = 'rgba(78,155,255,' + core.toFixed(3) + ')';
-        ctx.beginPath();
-        ctx.arc(cx, cy, 3.4, 0, TAU);
-        ctx.fill();
-      }
-    }
-
-    const STEPS = [0.70, 0.77, 0.84, 0.90];
-    function copyAt(p) {
-      if (isStatic) return;
-      if (pre) pre.style.opacity = String(1 - smooth(0.02, 0.12, p));
-      /* The wash arrives with the type it exists for, so the opening frame
-         is the single interaction and nothing else. */
-      if (veil) veil.style.opacity = String(smooth(0.12, 0.30, p));
-      if (title) {
-        const on = smooth(0.16, 0.30, p);
-        title.style.opacity = String(on);
-        title.style.transform = 'translate3d(0,' + ((1 - on) * 16).toFixed(1) + 'px,0)';
-      }
-      insights.forEach((node, i) => { node.classList.toggle('is-on', p >= STEPS[i]); });
-    }
-
-    let raf = 0;
-    let running = false;
-    function frame(t) {
-      const p = progress();
-      draw(p, t);
-      copyAt(p);
-      raf = running ? requestAnimationFrame(frame) : 0;
-    }
-    function start() { if (!running) { running = true; raf = requestAnimationFrame(frame); } }
-    function stop() { running = false; if (raf) cancelAnimationFrame(raf); raf = 0; }
-
-    size();
-    copyAt(progress());
-    draw(progress(), 0);
-
-    window.addEventListener('resize', () => { size(); draw(progress(), 0); }, { passive: true });
-
-    /* Static, or off-screen: nothing runs. One frame is the whole picture. */
-    if (isStatic || !('IntersectionObserver' in window)) return;
-    new IntersectionObserver(([entry]) => { entry.isIntersecting ? start() : stop(); }, { threshold: 0 })
-      .observe(section);
-    document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });
-  }
-
-  /* ── CTA ──
-     BOTH BUTTONS LAND HERE - the closing one and the compact one in the
-     header. One booking flow, one telemetry signal, and the calendar's
-     data-url is set in the markup so Calendly's own auto-init mounts it
-     whenever its script lands. */
-  function revealCalendly() {
-    const wrap = document.getElementById('calendly-wrap');
-    wrap.classList.add('is-open');
-    setTimeout(() => { wrap.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 80);
-    track('cta_click');
-  }
-  window.revealCalendly = revealCalendly;
-
-  /* Fire-and-forget: telemetry must never delay or block the CTA. The route
-     records the FIRST click only, so a reload is not a second signal. */
-  function track(action) {
-    if (!demoSlug) return;
-    try {
-      fetch('/api/demo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: action, slug: demoSlug }),
-        keepalive: true,
-      }).catch(() => {});
-    } catch (_) { /* telemetry is never load-bearing */ }
-  }
-
-  /* Calendly posts a message when a meeting is actually booked - the outcome
-     this whole page exists to produce, recorded separately from the click
-     that opened the calendar. */
-  window.addEventListener('message', (e) => {
-    if (!e.data || typeof e.data !== 'object') return;
-    if (e.data.event === 'calendly.event_scheduled') track('meeting_booked');
-  });
-
-  /* ── RENDER ── */
-
-  function renderProperty(demo) {
-    setField('prop-address', demo.property_address || 'The property in your enquiry', { keepEmpty: true });
-    /* PROBES stores some prices with pence and some without. A house is not
-       priced to the penny, so a trailing ".00" is dropped for display only -
-       the row itself is never rewritten. */
-    setField('prop-price', txt(demo.property_price).replace(/\.00\b/, ''));
-
-    const PORTALS = { rightmove: 'Rightmove', zoopla: 'Zoopla', onthemarket: 'OnTheMarket' };
-    setField('prop-source', PORTALS[txt(demo.portal).toLowerCase()] ? 'Listed on ' + PORTALS[txt(demo.portal).toLowerCase()] : '');
-
-    const link = document.getElementById('prop-link');
-    if (txt(demo.property_url)) {
-      link.href = demo.property_url;
-      link.hidden = false;
-    }
-
-    /* The stored image is used as-is and NEVER re-derived here - the browser
-       makes no request to Rightmove. A load error simply leaves the drawn
-       placeholder in place. */
-    const photo = document.getElementById('prop-photo');
-    const src = txt(demo.property_image_url);
-    if (!src) { photo.remove(); return; }
-    photo.addEventListener('load', () => { photo.classList.add('is-loaded'); });
-    photo.addEventListener('error', () => { photo.remove(); });
-    photo.src = src;
-    photo.alt = txt(demo.property_address) ? 'Photograph of ' + demo.property_address : '';
-  }
-
-  /* SECTION 2 — the factual record. Times and events, in order. */
-  function renderLog(items) {
-    const wrap = document.getElementById('s2-log');
-    wrap.innerHTML = '';
-    let written = 0;
-    for (const item of (Array.isArray(items) ? items : [])) {
-      const mark = copy(item && item.mark);
-      const text = copy(item && item.text);
-      if (!mark || !text) continue;
-      const row = el('div', 'd-log__row');
-      row.append(el('span', 'd-log__t', mark), el('span', 'd-log__e', text));
-      wrap.appendChild(row);
-      written += 1;
-    }
-    wrap.hidden = written === 0;
-  }
-
-  /* SECTION 2 — the evidence-grounded handling facts. Newer demo rows carry
-     structured diagnosis signals; older rows receive the deterministic
-     ordinal-based fallback from /api/demo. Both arrive in this one shape. */
-  function renderHandling(items) {
-    const wrap = document.getElementById('s2-handling');
-    wrap.innerHTML = '';
-    let written = 0;
-    for (const item of (Array.isArray(items) ? items : [])) {
-      const label = copy(item && item.label);
-      const value = copy(item && (item.detail || item.value));
-      if (!label || !value) continue;
-      const row = el('div', 'd-fact');
-      row.append(el('p', 'd-fact__k', label), el('p', 'd-fact__v', value));
-      wrap.appendChild(row);
-      written += 1;
-    }
-    wrap.hidden = written === 0;
-  }
-
-  /* SECTION 2 — what the conversation left open, and what the record shows.
-     The note is where an agency that DID ask gets the credit for asking. */
-  function renderUnresolved(items) {
-    const block = document.getElementById('s2-open');
-    const list = document.getElementById('s2-open-list');
-    list.innerHTML = '';
-    let written = 0;
-    for (const item of (Array.isArray(items) ? items : [])) {
-      const text = copy(item && (item.question || item.text));
-      if (!text) continue;
-      const row = el('div', 'd-open-q__item');
-      row.appendChild(el('p', 'd-open-q__t', text));
-      const note = copy(item && item.note);
-      if (note) row.appendChild(el('p', 'd-open-q__n', note));
-      list.appendChild(row);
-      written += 1;
-    }
-    block.hidden = written === 0;
-    const grid = document.getElementById('s2-grid');
-    if (grid) grid.classList.toggle('is-solo', written === 0);
-  }
-
-  function render(demo, needsReview) {
-    demoSlug = txt(demo.demo_slug) || demoSlug;
-    const agency = txt(demo.agency_name);
-
-    document.title = agency ? 'NOVUS - ' + agency : 'NOVUS';
-    setField('hdr-agency', agency);
-    document.getElementById('review-flag').hidden = !needsReview;
-
-    /* ── 01 ── The framing, and the proof it is genuinely about them: their
-       agency named at the top of the page, their listing beside it. */
-    setField('s1-eyebrow', 'Prepared for ' + (agency || 'your agency'), { keepEmpty: true });
-    setField('s1-agency', agency || 'your agency', { keepEmpty: true });
-    /* Section two's eyebrow carries the DATE - the piece of evidence the
-       reader has not been given yet, and the one the record needs. */
-    setField('s2-eyebrow', ['The enquiry', txt(demo.enquiry_date)].filter(Boolean).join(' · '), { keepEmpty: true });
-    renderProperty(demo);
-
-    /* ── 01 / 02 / 03 ── The reading /api/demo derived from this row's own
-       ordinals: the record, the signals, what is unresolved, what is next. */
-    const r = (demo && demo.reading) || {};
-    renderLog(r.timeline);
-    setField('s2-credit', r.credit);
-    const structuredSignals = Array.isArray(demo.enquiry_signals) ? demo.enquiry_signals : [];
-    const structuredFacts = structuredSignals.map((item) => ({
-      label: item && item.label,
-      detail: [item && item.value, item && item.context].map(copy).filter(Boolean).join(' - '),
-    }));
-    const handling = Array.isArray(r.handling) ? r.handling.slice() : [];
-    for (const item of structuredFacts) {
-      if (handling.length >= 6) break;
-      if (!item.label || !item.detail) continue;
-      if (handling.some((existing) => txt(existing.label).toLowerCase() === txt(item.label).toLowerCase())) continue;
-      handling.push(item);
-    }
-    renderHandling(handling);
-    /* A non-empty handling summary marks the newer, evidence-constrained
-       diagnosis contract. Its empty unresolved array is meaningful for a
-       strong enquiry and must not be replaced by legacy fallback criticism. */
-    const hasStructuredReading = !!txt(demo.handling_summary) || structuredSignals.length > 0;
-    renderUnresolved(hasStructuredReading ? demo.unresolved_context : r.unresolved);
-
-    const impact = txt(demo.handling_quality).toLowerCase() === 'strong'
-      ? {
-          lead: 'Your team handled this well.',
-          body: 'The opportunity is making that standard consistent across every enquiry - not only the ones that happen to be handled this way.',
-        }
-      : (r.commercialMeaning || {});
-    setField('s3-impact-lead', impact.lead, { keepEmpty: true });
-    setField('s3-impact-body', impact.body, { keepEmpty: true });
-
-    document.getElementById('stage').hidden = false;
-    document.getElementById('hdr-cta').hidden = false;
-    document.getElementById('boot').classList.add('is-gone');
-    startReveal();
-    startChrome();
-    startZoom();
-  }
-
-  function fail(message) {
-    document.getElementById('boot-ring').hidden = true;
-    const msg = document.getElementById('boot-msg');
-    msg.innerHTML = '';
-    const title = document.createElement('span');
-    title.className = 'd-boot__title';
-    title.textContent = "This demo link isn't available.";
-    const body = document.createElement('span');
-    body.textContent = message;
-    const link = document.createElement('a');
-    link.href = 'https://getnovus.co.uk';
-    link.textContent = 'getnovus.co.uk ↗';
-    msg.append(title, body, document.createElement('br'), document.createElement('br'), link);
-  }
-
-  (async function boot() {
-    demoSlug = resolveSlug();
-    if (!demoSlug) { fail('No demo was named in the link.'); return; }
-    const preview = new URLSearchParams(location.search).get('preview') === '1' ? '&preview=1' : '';
-    try {
-      const res = await fetch('/api/demo?slug=' + encodeURIComponent(demoSlug) + preview, {
-        headers: { Accept: 'application/json' },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data || !data.demo) {
-        fail((data && data.error) || 'We could not load this demo.');
-        return;
-      }
-      render(data.demo, !!data.needs_review);
-    } catch (err) {
-      fail('We could not reach the demo service. Please try again in a moment.');
-    }
-  })();
-</script>
+<div class="boot frame" id="boot" role="status"><span class="boot-line" id="boot-line"></span><h1 id="boot-title">Preparing your demo.</h1><p id="boot-message">One real enquiry. A wider question.</p><a class="text-link" href="" id="retry" hidden>Try again ↗</a></div>
+<noscript><p class="frame">Please enable JavaScript to view your personalised demo.</p></noscript>
 </body>
 </html>

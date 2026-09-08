@@ -5,7 +5,9 @@
 //   POST /api/demo {action:'build'|'archive'|'restore'}     AUTHED — recovery
 //   POST /api/demo {action:'audit'}                         AUTHED — every link
 //
-// THE GET PATH READS ONE ROW AND NOTHING ELSE. It resolves the slug in DEMOS,
+// The legacy GET path reads the stored snapshot. The facts=1 renderer also
+// reads PROBES and COMMUNICATIONS through a factual allowlist; no AI or writes.
+// THE LEGACY GET PATH READS ONE ROW AND NOTHING ELSE. It resolves the slug in DEMOS,
 // loads that row, and returns it. No AI call, no join against PROBES /
 // INTELLIGENCE / DIAGNOSIS_FINDINGS / PERSONALISATION, no Rightmove request,
 // no compilation of any kind. The row was compiled when PERSONALISATION
@@ -36,6 +38,7 @@
 // This route is the twelfth; anything further must merge into an existing one.
 
 import { getRepo } from '../lib/sheets.mjs';
+import { loadDemoFacts } from '../lib/demo-facts.mjs';
 import { requireAuth } from './novus/_auth.mjs';
 import { compileDemoForProbe, compileDemos, isPersonalised } from '../lib/demo-compile.mjs';
 import {
@@ -103,7 +106,9 @@ async function handleGet(req, res) {
 
   res.setHeader('Cache-Control', 'no-store');
   return res.status(200).json({
-    demo: toRenderReady(record.obj),
+    demo: text(req.query?.facts) === '1'
+      ? await loadDemoFacts(repo, record.obj)
+      : toRenderReady(record.obj),
     needs_review: status === 'needs_review',
   });
 }

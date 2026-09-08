@@ -1,0 +1,467 @@
+/* GENERATED — do not edit. Source: demo.src.css
+   Built by scripts/novus-demo-scope-css.mjs; every selector is scoped to
+   .demo-page so this stylesheet can never restyle the public site. */
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOVUS — PERSONALISED DEMO
+
+   ⚠ EVERY selector in this file is scoped to .demo-page (set on <html> in
+   demo.html) by scripts/novus-demo-scope-css.mjs. Author rules normally here;
+   the build step prefixes them. This file must never be able to restyle the
+   public site: it redefines tokens tokens.css owns (--ink, --blue, --hair…)
+   and generic classes the homepage also uses (.frame, .eyebrow, .wordmark).
+
+   SEMANTIC COLOUR — applied by meaning, never decoration:
+     --ink   off-white  human-facing narrative
+     --blue  NOVUS blue commercial value, active NOVUS state, forward movement
+     --mute  grey       supporting context, metadata, inactive information
+
+   TYPE — Fraunces for major thoughts, questions, transitions and payoffs only.
+   MOTION — 200-500ms. Emphasis, never discovery. Nothing assembles slowly.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html.demo-page{
+  --ink:#F2EFE9;--mid:#c6c9cf;--mute:#9297a0;--faint:#767b85;--dim:#565b64;
+  --blue:#8FC2FF;--blue-2:#4E9BFF;--blue-deep:#2E7BE0;
+  --blue-line:rgba(143,194,255,.34);--blue-soft:rgba(143,194,255,.14);--blue-glow:rgba(78,155,255,.11);
+  --hair:rgba(242,239,233,.085);--hair-2:rgba(242,239,233,.15);
+  --e:cubic-bezier(.22,.61,.36,1);
+  --head:80px;
+}
+.demo-page *{box-sizing:border-box}
+html.demo-page{scroll-behavior:smooth;scroll-padding-top:100px}
+.demo-page body{margin:0;background:#0A0B0E;color:var(--ink);font:400 16px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+.demo-page a{color:inherit;text-decoration:none}
+.demo-page button,.demo-page a,.demo-page summary{-webkit-tap-highlight-color:transparent}
+.demo-page a:focus-visible,.demo-page summary:focus-visible{outline:1px solid var(--blue);outline-offset:6px;border-radius:2px}
+.demo-page p,.demo-page h1,.demo-page h2,.demo-page h3,.demo-page figure,.demo-page blockquote,.demo-page ol,.demo-page ul{margin:0}
+.demo-page ol,.demo-page ul{padding:0;list-style:none}
+.demo-page h1,.demo-page h2,.demo-page h3{font-weight:400}
+.demo-page h1,.demo-page h2{font-family:var(--serif);letter-spacing:-.035em;line-height:1.11;text-wrap:balance}
+.demo-page p{color:var(--mute)}
+.demo-page img{display:block;max-width:100%}
+.demo-page [hidden]{display:none!important}
+.demo-page em{font-style:normal;font-weight:inherit;color:var(--blue)}
+.demo-page .frame{width:min(1240px,calc(100% - 112px));margin-inline:auto}
+
+
+/* ── shared apparatus ─────────────────────────────────────────────────────── */
+.demo-page .eyebrow{font-size:10.5px;line-height:1.5;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);font-weight:500}
+.demo-page .note{font-size:12px;line-height:1.7;color:var(--faint)}
+.demo-page .text-link{font-size:12.5px;display:inline-flex;align-items:center;gap:12px;color:var(--mid);transition:color .25s var(--e),gap .25s var(--e)}
+.demo-page .text-link:hover{color:var(--blue);gap:16px}
+.demo-page .button{display:inline-flex;align-items:center;justify-content:center;gap:20px;min-height:46px;padding:12px 22px;border:1px solid var(--dim);border-radius:2px;font-size:13.5px;line-height:1.4;white-space:nowrap;transition:background .3s var(--e),border-color .3s var(--e),color .3s var(--e),gap .3s var(--e)}
+.demo-page .button:hover{background:rgba(143,194,255,.06);border-color:var(--blue-line);color:var(--blue);gap:26px}
+.demo-page .button-primary{color:#06111f;background:var(--blue);border-color:var(--blue);font-weight:500;padding:19px 32px;font-size:15px;box-shadow:0 0 0 0 var(--blue-glow);transition:background .3s var(--e),box-shadow .3s var(--e),transform .3s var(--e),gap .3s var(--e)}
+.demo-page .button-primary:hover{background:#b9daff;border-color:#b9daff;color:#06111f;transform:translateY(-1px);box-shadow:0 10px 34px -12px rgba(78,155,255,.55)}
+.demo-page .button-small{font-size:12px;min-height:40px;padding:10px 16px;gap:14px}
+.demo-page .skip{position:fixed;left:20px;top:-80px;padding:12px;background:var(--ink);color:#0A0B0E;z-index:100}
+.demo-page .skip:focus{top:10px}
+
+
+/* ── chrome ───────────────────────────────────────────────────────────────── */
+.demo-page .header{height:var(--head);position:fixed;inset:0 0 auto;z-index:50;background:rgba(10,11,14,.82);backdrop-filter:blur(18px) saturate(120%);border-bottom:1px solid var(--hair)}
+.demo-page .header-inner{display:flex;align-items:center;height:100%;gap:26px}
+.demo-page .wordmark{display:flex;align-items:center;gap:10px;letter-spacing:.16em;font-size:15px;font-weight:600}
+.demo-page .wordmark img{object-fit:contain}
+.demo-page .header-agency{margin-left:auto;font-size:11px;letter-spacing:.05em;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.demo-page .progress{position:fixed;inset:0 0 auto;height:1.5px;z-index:60}
+.demo-page .progress i{display:block;background:linear-gradient(90deg,var(--blue-deep),var(--blue));height:100%;transform:scaleX(0);transform-origin:left}
+.demo-page .footer{display:flex;align-items:center;gap:24px;border-top:1px solid var(--hair);padding-block:30px;font-size:11px;color:var(--faint)}
+.demo-page .footer>span:first-child{letter-spacing:.2em;color:var(--mute)}
+.demo-page .footer>a{margin-left:auto;transition:color .25s var(--e)}
+.demo-page .footer>a:hover{color:var(--blue)}
+
+
+/* ═══ 01 · THE REAL ENQUIRY ════════════════════════════════════════════════
+   A personalised editorial introduction — NOT a property hero. The listing is
+   evidence that this demo is genuinely about their agency, so it is a capped
+   editorial plate beside the headline, never a full-bleed image. The headline
+   carries at least equal weight and the whole composition sits in one fold. */
+.demo-page .opening{padding-top:calc(var(--head) + 60px);padding-bottom:clamp(56px,5.4vw,80px);background:#0A0B0E}
+
+/* The image is recognition evidence, not the subject: capped well under the
+   headline column so the two carry co-equal weight. Percentages resolve
+   against .opening-grid's own width (itself capped at 1240px by .frame's own
+   rule), so past ~1350px viewport the split — and the image — simply stop
+   growing. No vw/vh drives the split; the only vh use left is a defensive
+   backstop so the image can never approach full viewport height. */
+.demo-page .opening-grid{width:min(1240px,calc(100% - 112px));margin-inline:auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,min(46%,600px));gap:clamp(48px,6%,80px);align-items:center}
+.demo-page .opening-copy .eyebrow{color:var(--blue);opacity:.9}
+.demo-page .opening h1{font-size:clamp(36px,3.6vw,58px);margin-top:22px}
+
+/* Explicit px caps stand guard even if the grid math above ever changes:
+   the property must never exceed ~650x460 or read as a full-bleed hero. */
+.demo-page .property{position:relative;width:100%;max-width:600px}
+.demo-page .property-visual{position:relative;aspect-ratio:1.38;max-height:min(48vh,420px);background:#111419;overflow:hidden;border-radius:2px}
+.demo-page .property-visual img{width:100%;height:100%;object-fit:cover}
+.demo-page .photo-unavailable{position:absolute;inset:0;display:grid;place-items:center;font-size:13px;color:var(--faint)}
+
+/* the caption sits UNDER the photograph — no scrim, no hero treatment */
+.demo-page .property figcaption{padding-top:20px;margin-top:18px;border-top:1px solid var(--hair)}
+.demo-page .property-address{font-family:var(--serif);font-size:clamp(19px,1.45vw,23px);line-height:1.2;letter-spacing:-.028em;color:var(--ink)}
+.demo-page .property-facts{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 12px;margin-top:9px}
+.demo-page .property-price{font-size:14px;color:var(--mid);white-space:nowrap;letter-spacing:.01em}
+.demo-page .property-price:not([hidden])+.property-meta:not([hidden]):before{content:'';display:inline-block;width:3px;height:3px;border-radius:50%;background:var(--dim);margin-right:12px;vertical-align:middle}
+.demo-page .property-meta{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+.demo-page .property-link{font-size:12px;margin-top:16px;color:var(--mute)}
+
+
+/* facts — two primary, one supporting */
+.demo-page .enquiry-record{padding-top:52px;margin-top:56px;border-top:1px solid var(--hair);scroll-margin-top:100px}
+.demo-page .section-label{display:flex;align-items:center;gap:11px;font-size:13.5px;letter-spacing:.15em;text-transform:uppercase;font-weight:600;color:var(--ink);margin-bottom:30px}
+.demo-page .section-label i{width:5px;height:5px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 4px var(--blue-glow);flex-shrink:0}
+.demo-page .fact-row{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:64px}
+.demo-page .seller-cue{color:var(--blue);display:flex;align-items:center;gap:9px}
+.demo-page .seller-cue:before{content:'';width:5px;height:5px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 4px var(--blue-glow)}
+.demo-page .fact-value{font-size:19px;line-height:1.4;color:var(--ink);margin-top:15px;letter-spacing:-.014em}
+
+/* The address supplied with the enquiry is NEVER the property being sold. */
+.demo-page .fact-note{font-size:12px;line-height:1.65;color:var(--faint);margin-top:11px;max-width:44ch}
+.demo-page .comms-block{padding-top:48px;margin-top:48px;border-top:1px solid var(--hair)}
+.demo-page .original-enquiry{margin-top:22px}
+.demo-page .original-enquiry summary{display:inline-flex;align-items:center;gap:8px}
+.demo-page .original-enquiry-body{margin-top:18px}
+.demo-page .original-enquiry-body blockquote,.demo-page .original-enquiry-body .record-copy{font-size:14px;line-height:1.85;color:var(--mute);white-space:pre-wrap;overflow-wrap:anywhere;padding-left:20px;border-left:1px solid var(--hair-2)}
+.demo-page .original-enquiry-body .eyebrow{margin-bottom:14px}
+.demo-page .timeline{margin:22px 0 16px;position:relative}
+.demo-page .timeline:before{content:'';position:absolute;left:2.5px;top:16px;bottom:16px;width:1px;background:var(--hair-2)}
+.demo-page .timeline li{display:grid;grid-template-columns:118px 1fr;gap:22px;position:relative;padding:10px 0 10px 24px;font-size:13.5px}
+.demo-page .timeline li:before{content:'';position:absolute;top:18px;left:0;width:6px;height:6px;border-radius:50%;background:#0A0B0E;border:1px solid var(--dim)}
+.demo-page .timeline li:first-child:before{background:var(--blue);border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-glow)}
+.demo-page .timeline time{font:400 11.5px/1.5 var(--mono);color:var(--mute);white-space:nowrap;letter-spacing:.01em}
+.demo-page .timeline span{color:var(--mid)}
+.demo-page .comms-block>.note{max-width:52ch}
+.demo-page .comms-block>.note+.note{margin-top:10px}
+.demo-page summary{font-size:12px;cursor:pointer;color:var(--mute);transition:color .25s var(--e)}
+.demo-page summary:hover{color:var(--blue)}
+.demo-page #more-events{margin-bottom:16px}
+.demo-page details .timeline{margin-top:6px}
+.demo-page details .timeline:before{display:none}
+
+
+/* ═══ 02 · THE STATIC TRANSITION ═══════════════════════════════════════════
+   Hard-coded, always-on narrative copy — a single quiet lift in tone, never a
+   scroll-scrubbed reveal. It fades in once (the shared [data-reveal] motion,
+   same as every other static block on the page) and then simply stays. */
+.demo-page .transition{background:#0C0E13;border-top:1px solid var(--hair)}
+.demo-page .transition-inner{max-width:640px;margin-inline:auto;padding:clamp(56px,6.4vw,92px) 0;text-align:center}
+.demo-page .transition-title{font-family:var(--serif);font-size:clamp(26px,2.6vw,38px);line-height:1.22;letter-spacing:-.03em;color:var(--ink)}
+.demo-page .transition-examples{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px 0;margin-top:28px;padding-top:24px;border-top:1px solid var(--hair)}
+.demo-page .transition-examples span{font-size:12.5px;letter-spacing:.05em;color:var(--mute);padding:0 18px;position:relative}
+.demo-page .transition-examples span+span:before{content:'';position:absolute;left:0;top:50%;width:3px;height:3px;border-radius:50%;background:var(--dim);transform:translate(-1.5px,-50%)}
+.demo-page .transition-hint{margin-top:14px}
+.demo-page .transition-but{font-size:15px;line-height:1.75;color:var(--mute);max-width:46ch;margin:34px auto 0}
+.demo-page .transition-main{font-family:var(--serif);font-size:clamp(28px,3vw,42px);line-height:1.18;letter-spacing:-.032em;color:var(--ink);max-width:19ch;margin:38px auto 0;padding-top:32px;border-top:1px solid var(--hair)}
+
+
+/* ═══ 03 · THE ZOOM-OUT ═════════════════════════════════════════════════════
+   The card is present at rest from the first frame, then recedes as the
+   pool and the question take its place. */
+.demo-page .zoom{background:#0A0B0E}
+.demo-page .zoom-track{height:230vh}
+.demo-page .zoom-stage{position:sticky;top:var(--head);height:calc(100svh - var(--head));min-height:580px;max-height:1000px;overflow:hidden;isolation:isolate;
+  background:radial-gradient(130% 95% at 50% 46%,#11151d 0%,#0a0c11 42%,#06070A 100%)}
+
+
+/* the enquiry sits at rest, then recedes into the pool */
+.demo-page .enquiry-seed{position:absolute;left:50%;top:50%;width:min(430px,calc(100% - 48px));padding:16px;display:flex;align-items:center;gap:18px;z-index:3;
+  background:rgba(18,22,29,.94);border-radius:3px;box-shadow:0 0 0 1px var(--blue-soft),0 40px 100px -24px #000;
+  transform:translate(-50%,-50%) scale(var(--seed-scale,1));opacity:var(--seed,0);will-change:transform,opacity}
+.demo-page .enquiry-seed img{width:82px;height:88px;object-fit:cover;border-radius:2px;flex-shrink:0}
+.demo-page .enquiry-seed>div{min-width:0}
+.demo-page .seed-label{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--blue);font-weight:500}
+.demo-page .enquiry-seed p{color:var(--ink);font-family:var(--serif);font-size:23px;line-height:1.15;letter-spacing:-.035em;margin:9px 0 7px}
+.demo-page .seed-agency{font-size:11px;color:var(--mute)}
+
+
+/* the wider pool of demand */
+.demo-page .demand-field{position:absolute;inset:0;opacity:var(--field,0);transform:scale(var(--field-scale,1.35));transform-origin:50% 50%;will-change:transform,opacity}
+.demo-page .field-orbit{position:absolute;left:50%;top:50%;border:1px solid rgba(143,194,255,.07);border-radius:50%;transform:translate(-50%,-50%);width:50%;height:44%}
+.demo-page .orbit-two{width:86%;height:80%;border-color:rgba(143,194,255,.05)}
+.demo-page .orbit-three{width:124%;height:122%;border-color:rgba(143,194,255,.035)}
+.demo-page .fragment{position:absolute;font-size:11.5px;letter-spacing:.005em;color:#98a3b3;display:flex;align-items:center;gap:9px;white-space:nowrap;
+  opacity:clamp(0,calc((var(--field,0) - var(--s,0)) * 4),1);
+  transform:translate3d(0,calc((1 - var(--field,0)) * 10px),0)}
+.demo-page .fragment i{width:5px;height:5px;border-radius:50%;background:#67717f;box-shadow:0 0 0 5px rgba(143,194,255,.03)}
+.demo-page .f2 i,.demo-page .f5 i,.demo-page .f10 i,.demo-page .f16 i{background:var(--blue);box-shadow:0 0 0 5px rgba(143,194,255,.1)}
+.demo-page .f2 span,.demo-page .f5 span,.demo-page .f10 span,.demo-page .f16 span{color:#b2c9e6}
+.demo-page .f1{left:5%;top:12%}.demo-page .f2{left:27%;top:7%}.demo-page .f3{left:52%;top:11%}.demo-page .f4{right:22%;top:6%}.demo-page .f5{right:4%;top:15%}
+.demo-page .f6{left:2%;top:31%}.demo-page .f7{right:2%;top:28%}.demo-page .f8{left:4%;top:45%}.demo-page .f9{right:3%;top:48%}
+.demo-page .f10{left:2%;top:64%}.demo-page .f11{right:2%;top:67%}
+.demo-page .f12{left:5%;top:83%}.demo-page .f13{left:28%;top:90%}.demo-page .f14{left:53%;top:86%}.demo-page .f15{right:21%;top:91%}.demo-page .f16{right:4%;top:82%}
+
+.demo-page .zoom-stage:after{content:'';position:absolute;inset:-12%;background:radial-gradient(52% 40% at 50% 47%,rgba(6,7,10,.98) 34%,rgba(6,7,10,.86) 60%,transparent 82%);opacity:var(--question,0);z-index:2;pointer-events:none}
+.demo-page .question-wrap{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:5;opacity:var(--question,0);transform:translateY(calc((1 - var(--question,0)) * 18px));pointer-events:none}
+
+/* Sized for a comfortable three-line composition on a standard desktop. */
+.demo-page .question-wrap h2{max-width:min(880px,34ch);text-align:center;font-size:clamp(29px,3.05vw,46px);line-height:1.16;letter-spacing:-.035em}
+.demo-page .question-follow{max-width:52ch;text-align:center;font-size:14.5px;line-height:1.7;color:var(--mute);margin-top:30px;padding-top:26px;border-top:1px solid var(--hair);opacity:clamp(0,calc((var(--question,0) - .4) * 2.6),1)}
+.demo-page .field-note{position:absolute;inset:auto 24px 22px;font-size:10px;letter-spacing:.05em;color:var(--dim);text-align:center;z-index:6;opacity:var(--field,0)}
+
+
+/* ═══ 03 · WHAT NOVUS DOES ═════════════════════════════════════════════════
+   Four named stages readable from the first frame; one explanation beneath. */
+.demo-page .method{background:linear-gradient(180deg,#06070A 0%,#080B12 22%,#090C14 100%);border-top:1px solid var(--hair)}
+.demo-page .method-track{height:300vh}
+.demo-page .method-pin{position:sticky;top:var(--head);min-height:calc(100svh - var(--head));display:flex;flex-direction:column;justify-content:center;padding-block:44px}
+.demo-page .method-eyebrow{color:var(--blue);opacity:.9}
+.demo-page .method h2{font-size:clamp(27px,2.7vw,42px);margin-top:18px;max-width:19ch}
+
+.demo-page .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:clamp(38px,4vw,60px);position:relative}
+.demo-page .steps:before{content:'';position:absolute;left:0;right:0;top:19px;height:1px;background:var(--hair-2)}
+.demo-page .steps i{display:none}
+.demo-page .step{position:relative;display:flex;align-items:center;gap:12px;padding-right:24px;background:linear-gradient(180deg,#070910,#070910);
+  color:var(--mute);transition:color .25s var(--e)}
+.demo-page .step b{font:400 10px var(--mono);letter-spacing:.14em;color:var(--dim);transition:color .25s var(--e)}
+.demo-page .step span{font-size:13.5px;letter-spacing:.19em;text-transform:uppercase;font-weight:500;white-space:nowrap;
+  padding-right:14px;background:inherit;transition:color .25s var(--e)}
+.demo-page .step:after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;background:transparent;transition:background .25s var(--e)}
+
+/* every label stays readable; the active one takes NOVUS blue */
+.demo-page .steps .step.on{color:var(--blue)}
+.demo-page .steps .step.on b{color:var(--blue)}
+.demo-page .steps .step.on span{color:var(--blue)}
+.demo-page .step-rail{position:absolute;left:0;top:19px;height:1px;width:25%;background:linear-gradient(90deg,var(--blue-deep),var(--blue));
+  transform:translateX(calc(var(--active,0) * 100%));transition:transform .4s var(--e)}
+
+.demo-page .panels{position:relative;margin-top:clamp(34px,3.6vw,52px);min-height:196px}
+.demo-page .panel{position:absolute;inset:0;max-width:62ch;opacity:0;transform:translateY(8px);transition:opacity .28s var(--e),transform .28s var(--e);pointer-events:none}
+.demo-page .panel.on{opacity:1;transform:none;pointer-events:auto}
+.demo-page .panel-step{display:none}
+.demo-page .panel h3{font-family:var(--serif);font-size:clamp(24px,2.15vw,33px);line-height:1.16;letter-spacing:-.032em;color:var(--ink)}
+.demo-page .panel>p{font-size:15px;line-height:1.8;color:var(--mid);margin-top:18px;max-width:56ch}
+.demo-page .branch{display:flex;gap:14px;margin-top:26px}
+.demo-page .branch li{display:flex;align-items:center;gap:10px;font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;
+  padding:11px 20px;border:1px solid var(--hair-2);border-radius:2px}
+.demo-page .branch i{width:6px;height:6px;border-radius:50%}
+.demo-page .branch-novus{color:var(--blue);border-color:var(--blue-line)!important;background:rgba(78,155,255,.06)}
+.demo-page .branch-novus i{background:var(--blue);box-shadow:0 0 0 4px var(--blue-glow)}
+.demo-page .branch-team{color:var(--mid)}
+.demo-page .branch-team i{background:var(--mid)}
+.demo-page .loop-note{display:flex;align-items:center;gap:14px;margin-top:26px;font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--blue)}
+.demo-page .loop-mark{width:34px;height:16px;flex-shrink:0;border:1px solid var(--blue-line);border-bottom:0;border-radius:17px 17px 0 0;position:relative}
+.demo-page .loop-mark:after{content:'';position:absolute;left:-1px;top:6px;width:5px;height:5px;border-left:1px solid var(--blue);border-top:1px solid var(--blue);transform:rotate(45deg)}
+
+
+/* ═══ 04 · THE RESULT ══════════════════════════════════════════════════════ */
+.demo-page .result{background:linear-gradient(180deg,#090C14 0%,#0A0C12 55%,#0B1018 100%);border-top:1px solid var(--hair);padding:clamp(74px,7.6vw,116px) 0 clamp(60px,6.4vw,92px)}
+.demo-page .result-title{font-size:clamp(25px,2.2vw,34px);color:var(--mute)}
+.demo-page .ladder{margin-top:clamp(40px,4.6vw,66px);position:relative;--flow:1}
+.demo-page .ladder:before{content:'';position:absolute;left:0;top:16px;bottom:30px;width:1px;background:var(--hair-2)}
+.demo-page .ladder:after{content:'';position:absolute;left:0;top:16px;width:1px;height:calc((100% - 46px) * clamp(0,var(--flow),1));
+  background:linear-gradient(180deg,rgba(143,194,255,.14),var(--blue-2) 62%,var(--blue))}
+.demo-page .rung{--on:clamp(0,calc((var(--flow) - var(--s)) * 7),1);position:relative;display:grid;grid-template-columns:auto 1fr;gap:30px;align-items:baseline;
+  padding:24px 0 24px 42px;border-bottom:1px solid var(--hair);
+  opacity:calc(.6 + var(--on) * .4);transform:translate3d(calc((1 - var(--on)) * -6px),0,0)}
+.demo-page .rung:before{content:'';position:absolute;left:-3px;top:34px;width:7px;height:7px;border-radius:50%;background:#0A0C12;border:1px solid var(--dim)}
+.demo-page .rung-num{font:400 10px var(--mono);letter-spacing:.16em;color:var(--dim)}
+.demo-page .rung h3{font-size:clamp(17px,1.2vw,19px);line-height:1.3;letter-spacing:-.018em;color:var(--mute);font-weight:400}
+.demo-page .rung p{font-size:12.5px;letter-spacing:.03em;margin-top:9px;color:var(--faint)}
+.demo-page .rung:nth-child(2) h3{font-size:clamp(19px,1.45vw,22px);color:var(--ink)}
+.demo-page .rung:nth-child(3) h3{font-size:clamp(21px,1.75vw,26px);color:#c3d8f4}
+.demo-page .rung:nth-child(3):before{border-color:rgba(143,194,255,.4)}
+.demo-page .rung:nth-child(4) h3{font-size:clamp(23px,2.1vw,31px);color:var(--blue)}
+.demo-page .rung:nth-child(4):before{border-color:var(--blue-line)}
+.demo-page .rung-payoff{border-bottom:0;padding-top:40px}
+.demo-page .rung-payoff:before{background:var(--blue);border-color:var(--blue);width:10px;height:10px;left:-4.5px;top:54px;box-shadow:0 0 0 7px var(--blue-glow)}
+.demo-page .rung-payoff .rung-num{color:var(--blue);opacity:.75}
+.demo-page .rung-payoff h3{font-family:var(--serif);font-size:clamp(32px,3.5vw,52px);line-height:1.02;letter-spacing:-.045em;color:var(--blue);text-shadow:0 0 60px rgba(78,155,255,.22)}
+.demo-page .ladder-note{margin-top:22px;padding-left:42px}
+
+
+/* ═══ 05 · QUALIFICATION + CTA ═════════════════════════════════════════════
+   Two decision states: one deliberately quiet, one primary. */
+.demo-page .qualification{background:#0A0B0E;border-top:1px solid var(--hair);padding:clamp(80px,8vw,122px) 0 clamp(56px,5.6vw,84px)}
+.demo-page .qualification h2{font-size:clamp(26px,2.7vw,40px);margin:24px 0 clamp(44px,4.4vw,64px);max-width:22ch}
+.demo-page .states{display:grid;grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr);gap:clamp(40px,5vw,84px);align-items:start}
+.demo-page .state-q{font-size:13.5px;letter-spacing:.02em;color:var(--faint)}
+.demo-page .state-out{padding-top:6px;border-top:1px solid var(--hair)}
+.demo-page .state-out .state-q{padding-top:22px}
+.demo-page .state-out .state-a{font-size:15px;line-height:1.6;color:var(--mute);margin-top:10px;max-width:26ch}
+.demo-page .state-in{padding-top:6px;border-top:1px solid var(--blue-line)}
+.demo-page .state-in .state-q{padding-top:22px;color:var(--blue);opacity:.85}
+.demo-page .give-us{font-family:var(--serif);font-size:clamp(30px,3.2vw,50px);line-height:1.06;letter-spacing:-.04em;color:var(--ink);margin-top:14px}
+.demo-page .state-detail{font-size:14px;line-height:1.75;max-width:52ch;margin-top:22px;color:var(--mute)}
+.demo-page .state-in .button-primary{margin-top:36px}
+.demo-page .booking{margin-top:64px;scroll-margin-top:105px}
+.demo-page .booking-heading{display:flex;justify-content:space-between;gap:20px;align-items:center;padding-bottom:20px}
+.demo-page .booking-heading h3{font-family:var(--serif);font-size:23px}
+.demo-page .booking iframe{width:100%;height:780px;border:0;background:#0A0B0E}
+
+
+/* ── boot / error ─────────────────────────────────────────────────────────── */
+.demo-page .boot{min-height:88vh;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:18px}
+.demo-page .boot h1{font-size:clamp(28px,3vw,36px)}
+.demo-page .boot-line{width:44px;height:1px;background:var(--blue);animation:breathe 1.5s ease-in-out infinite}
+.demo-page .boot p{font-size:15px}
+@keyframes breathe{50%{opacity:.28;transform:scaleX(.5);transform-origin:left}}
+
+
+/* ── motion ───────────────────────────────────────────────────────────────── */
+.demo-page .motion-ready [data-reveal]{opacity:0;transform:translateY(14px);transition:opacity .45s var(--e),transform .5s var(--e)}
+.demo-page .motion-ready [data-reveal].is-in{opacity:1;transform:none}
+
+/* static mode: reduced motion and short viewports get the whole narrative in
+   document order, with nothing depending on scroll. */
+.demo-page .static-zoom .zoom-track{height:auto}
+.demo-page .static-zoom .zoom-stage{height:auto;min-height:0;max-height:none;padding:70px 0 88px;position:relative;top:0;overflow-x:clip;overflow-y:visible;
+  display:flex;flex-direction:column;--field:1;--field-scale:1;--question:1;--seed:0}
+.demo-page .static-zoom .enquiry-seed{display:none}
+.demo-page .static-zoom .demand-field{order:1;position:relative;inset:auto;height:520px;transform:none}
+.demo-page .static-zoom .question-wrap{order:2;position:relative;inset:auto;opacity:1;transform:none;margin-top:-460px;padding-bottom:36px}
+.demo-page .static-zoom .question-follow{opacity:1}
+.demo-page .static-zoom .field-note{order:3;position:relative;inset:auto;margin-top:20px;opacity:1}
+.demo-page .static-zoom .f13,.demo-page .static-zoom .f14,.demo-page .static-zoom .f15{display:none}
+.demo-page .static-zoom .method-track{height:auto}
+.demo-page .static-zoom .method-pin{position:relative;top:0;min-height:0;padding-block:0}
+
+@media(min-width:1600px){.demo-page .opening{padding-top:calc(var(--head) + 96px)}.demo-page .opening-grid{gap:88px}}
+
+
+/* ── ≤1050px ──────────────────────────────────────────────────────────────── */
+@media(max-width:1050px){
+.demo-page .frame,.demo-page .opening-grid{width:calc(100% - 64px)}
+.demo-page .opening-grid{gap:44px}
+.demo-page .fact-row{gap:40px}
+.demo-page .property{max-width:520px}
+.demo-page .states{grid-template-columns:1fr;gap:44px}
+.demo-page .f6,.demo-page .f7,.demo-page .f14,.demo-page .f15{display:none}
+
+/* the process goes vertical: no pin, no swapping, all four readable at once */
+.demo-page .method-track{height:auto}
+.demo-page .method-pin{position:relative;top:0;min-height:0;padding-block:clamp(62px,7vw,88px)}
+.demo-page .steps{display:none}
+.demo-page .panels{position:static;min-height:0;margin-top:38px;padding-left:26px;border-left:1px solid var(--hair-2)}
+.demo-page .panel{position:static;inset:auto;opacity:1;transform:none;pointer-events:auto;max-width:none;padding:26px 0 30px;border-top:1px solid var(--hair)}
+.demo-page .panel:first-child{border-top:0;padding-top:0}
+.demo-page .panel-step{display:flex;align-items:center;gap:10px;font-size:11.5px;letter-spacing:.19em;text-transform:uppercase;color:var(--blue);position:relative}
+.demo-page .panel-step b{font:400 10px var(--mono);letter-spacing:.14em;color:var(--faint)}
+.demo-page .panel-step:before{content:'';position:absolute;left:-30px;width:7px;height:7px;border-radius:50%;background:#080B12;border:1px solid var(--blue)}
+.demo-page .panel h3{margin-top:12px;font-size:clamp(21px,3.4vw,26px)}
+.demo-page .panel>p{font-size:14.5px;margin-top:12px}
+}
+
+
+/* ── ≤700px ───────────────────────────────────────────────────────────────── */
+@media(max-width:700px){
+html.demo-page{--head:86px}
+html.demo-page{scroll-padding-top:96px}
+.demo-page .frame,.demo-page .opening-grid{width:calc(100% - 36px)}
+.demo-page .header-inner{gap:12px;flex-wrap:wrap;align-content:center}
+.demo-page .wordmark{font-size:14px}.demo-page .wordmark img{width:24px;height:24px}
+.demo-page .header .button{margin-left:auto;min-height:38px;gap:12px;font-size:11.5px}
+.demo-page .header-agency{order:3;width:100%;max-width:100%;font-size:10px;line-height:1.1;margin-top:-2px}
+
+.demo-page .opening{padding-top:calc(var(--head) + 30px);padding-bottom:52px}
+.demo-page .opening-grid{display:flex;flex-direction:column;gap:30px}
+.demo-page .opening h1{font-size:clamp(27px,7.6vw,35px);margin-top:14px;text-wrap:pretty}
+.demo-page .opening .lede{font-size:13.5px;max-width:none;margin-top:20px;padding-top:20px}
+.demo-page .property{width:100%;margin-inline:0}
+.demo-page .property-visual{aspect-ratio:1.5;max-height:34vh}
+.demo-page .property figcaption{padding-top:16px;margin-top:14px}
+.demo-page .property-address{font-size:19px}
+.demo-page .property-facts{margin-top:8px;gap:6px 12px}
+.demo-page .property-price{font-size:13.5px}
+.demo-page .property-meta{font-size:9.5px}
+.demo-page .property-link{margin-top:14px}
+.demo-page .enquiry-record{padding-top:36px;margin-top:38px}
+.demo-page .fact-row{grid-auto-flow:row;gap:26px}
+.demo-page .fact-value{font-size:17px;margin-top:11px}
+.demo-page .fact-note{font-size:11.5px;max-width:none}
+.demo-page .comms-block{padding-top:30px;margin-top:32px}
+.demo-page .original-enquiry-body blockquote,.demo-page .original-enquiry-body .record-copy{font-size:13.5px;padding-left:15px}
+.demo-page .timeline li{grid-template-columns:100px 1fr;gap:14px;padding-block:9px;font-size:13px}
+.demo-page .comms-block>.note{max-width:none}
+
+.demo-page .zoom-track{height:280svh}
+.demo-page .zoom-stage{min-height:500px}
+.demo-page .transition-inner{padding:44px 0 52px}
+.demo-page .transition-title{font-size:clamp(22px,6.6vw,27px)}
+.demo-page .transition-examples{margin-top:20px;padding-top:18px;gap:8px 0}
+.demo-page .transition-examples span{font-size:11px;padding:0 12px}
+.demo-page .transition-but{font-size:14px;max-width:none;margin-top:24px}
+.demo-page .transition-main{font-size:clamp(23px,7.2vw,29px);max-width:none;margin-top:28px;padding-top:24px}
+.demo-page .enquiry-seed{width:min(300px,calc(100% - 32px));padding:13px;gap:12px}
+.demo-page .enquiry-seed img{width:62px;height:70px}
+.demo-page .enquiry-seed p{font-size:19px}
+.demo-page .question-wrap{width:calc(100% - 32px)}
+.demo-page .question-wrap h2{font-size:clamp(23px,6.4vw,31px);max-width:none;line-height:1.2}
+.demo-page .question-follow{font-size:13px;margin-top:20px;padding-top:18px;max-width:none}
+.demo-page .fragment{font-size:9.5px;gap:6px}
+.demo-page .fragment i{width:4px;height:4px;box-shadow:0 0 0 4px rgba(143,194,255,.025)}
+.demo-page .f3,.demo-page .f4,.demo-page .f8,.demo-page .f9,.demo-page .f13,.demo-page .f14{display:none}
+.demo-page .f1{left:3%;top:9%}.demo-page .f2{right:3%;top:6%;left:auto}.demo-page .f5{right:3%;top:19%}
+.demo-page .f6{left:3%;top:22%}.demo-page .f10{left:3%;top:76%}.demo-page .f11{right:3%;top:73%}
+.demo-page .f12{left:3%;top:88%}.demo-page .f15{right:3%;top:85%}.demo-page .f16{right:3%;top:91%}
+.demo-page .field-note{font-size:9px;bottom:14px;inset-inline:18px;line-height:1.5}
+.demo-page .zoom-stage:after{background:radial-gradient(74% 36% at 50% 47%,rgba(6,7,10,.99) 44%,rgba(6,7,10,.9) 70%,transparent 90%)}
+
+.demo-page .method-pin{padding-block:58px}
+.demo-page .method h2{font-size:clamp(24px,6.8vw,31px);max-width:none;text-wrap:pretty}
+.demo-page .panels{margin-top:32px}
+.demo-page .branch{flex-wrap:wrap;gap:10px;margin-top:20px}
+.demo-page .branch li{font-size:10.5px;padding:10px 16px}
+.demo-page .loop-note{font-size:10.5px;gap:11px;margin-top:20px}
+
+.demo-page .result{padding:58px 0 46px}
+.demo-page .result-title{font-size:23px}
+.demo-page .ladder{margin-top:30px}
+.demo-page .rung{grid-template-columns:1fr;gap:0;padding:20px 0 20px 26px}
+.demo-page .rung:before{top:28px}
+.demo-page .rung-num{display:none}
+.demo-page .rung h3,.demo-page .rung:nth-child(2) h3{font-size:16px}
+.demo-page .rung:nth-child(3) h3{font-size:18px}
+.demo-page .rung:nth-child(4) h3{font-size:21px}
+.demo-page .rung p{font-size:12px;margin-top:7px}
+.demo-page .rung-payoff{padding-top:32px}
+.demo-page .rung-payoff:before{top:46px}
+.demo-page .rung-payoff h3{font-size:clamp(27px,8vw,36px)}
+.demo-page .ladder-note{padding-left:26px;margin-top:18px}
+
+.demo-page .qualification{padding:60px 0 42px}
+.demo-page .qualification h2{font-size:clamp(23px,6.6vw,30px);margin:16px 0 34px;max-width:none;text-wrap:pretty}
+.demo-page .states{gap:34px}
+.demo-page .state-out .state-a{font-size:14px;max-width:none}
+.demo-page .give-us{font-size:clamp(26px,7.4vw,34px)}
+.demo-page .state-detail{font-size:13.5px;max-width:none}
+.demo-page .state-in .button-primary{margin-top:28px;width:100%;padding-inline:22px}
+.demo-page .booking{margin-top:44px}
+.demo-page .booking-heading{display:block}
+.demo-page .booking-heading .text-link{margin-top:14px;font-size:12px}
+.demo-page .booking iframe{height:1000px}
+.demo-page .footer{gap:16px;font-size:10px;align-items:flex-start}
+.demo-page .footer #footer-agency{max-width:46%}
+.demo-page .static-zoom .zoom-stage{padding:50px 0 60px}
+.demo-page .static-zoom .demand-field{height:420px}
+.demo-page .static-zoom .question-wrap{margin-top:-372px}
+}
+
+
+/* ── ≤360px ───────────────────────────────────────────────────────────────── */
+@media(max-width:360px){
+.demo-page .frame,.demo-page .opening-grid{width:calc(100% - 28px)}
+.demo-page .fragment{font-size:9px}
+.demo-page .f5,.demo-page .f6,.demo-page .f16{display:none}
+.demo-page .timeline li{grid-template-columns:92px 1fr;gap:10px}
+.demo-page .transition-examples span{font-size:10px;padding:0 9px}
+}
+
+
+/* Short desktop viewports: keep the pinned stages inside the fold. */
+@media(max-height:800px) and (min-width:1051px){
+.demo-page .method h2{font-size:clamp(24px,2.2vw,32px)}
+.demo-page .steps{margin-top:34px}
+.demo-page .panels{margin-top:32px;min-height:176px}
+.demo-page .panel h3{font-size:clamp(21px,1.8vw,27px)}
+.demo-page .question-wrap h2{font-size:clamp(26px,2.6vw,40px)}
+.demo-page .question-follow{margin-top:22px;padding-top:18px}
+}
+
+@media(prefers-reduced-motion:reduce){
+html.demo-page{scroll-behavior:auto}
+.demo-page *,.demo-page *:before,.demo-page *:after{animation:none!important;transition:none!important}
+.demo-page .motion-ready [data-reveal]{opacity:1;transform:none}
+}
+
+
+/* Long source addresses stay readable without widening the page. */
+.demo-page #enquiry-title,.demo-page .property-address,.demo-page #seed-street{overflow-wrap:anywhere}
