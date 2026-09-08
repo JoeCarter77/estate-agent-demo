@@ -14,7 +14,7 @@ import { newProbeId, newProbeReference } from '../../lib/ids.mjs';
 import { fetchListingMeta } from '../../lib/rightmove-meta.mjs';
 import { requireAuth } from './_auth.mjs';
 import { reconcileAgencyActionsBestEffort } from '../../lib/action-engine.mjs';
-import { isProbeQueueEligible } from '../../lib/acquisition-stage.mjs';
+import { hasValidOutreachContactEmail, isProbeQueueEligible } from '../../lib/acquisition-stage.mjs';
 
 export const maxDuration = 20;
 
@@ -29,7 +29,8 @@ export const maxDuration = 20;
 // whenever a PROBES row was missing, deleted or logged out of band.
 //
 // The normal exclusions (no Rightmove sales branch URL, suppressed, closed,
-// excluded, meeting booked, not interested) still apply on top.
+// excluded, meeting booked, not interested) still apply on top. The agency
+// must also have a canonical outreach_contact_email verified VALID.
 export function isProbeEligible(agency) {
   return isProbeQueueEligible(agency);
 }
@@ -85,7 +86,8 @@ async function handleGet(req, res) {
       }
       const from = nextAfter ? agencies.findIndex((r) => String(r.obj.agency_id || '').trim() === nextAfter) : -1;
       if (nextAfter && from === -1) return res.status(404).json({ error: 'Agency not found' });
-      // Sheet order, first row whose probe_sent is genuinely blank.
+      // Sheet order, first row whose probe_sent is genuinely blank and whose
+      // outreach email is verifier-backed VALID.
       const found = agencies.slice(from + 1).find((r) => isProbeEligible(r.obj));
       if (!found) return res.status(404).json({ error: nextAfter ? 'No further eligible agency in the list' : 'No eligible agency is ready to probe' });
       return res.status(200).json({ agency: found.obj, queue: queueStats(agencies) });
@@ -136,6 +138,11 @@ async function handleCreate(body, res) {
     // PROBES row and never guess an agency from listing metadata.
     const agencyRecord = await repo.findById('AGENCIES', 'agency_id', agencyId);
     if (!agencyRecord) return res.status(400).json({ error: 'Unknown agency_id' });
+    if (!hasValidOutreachContactEmail(agencyRecord.obj)) {
+      return res.status(409).json({
+        error: 'Probe creation blocked — the agency outreach email must be verified VALID before probing.',
+      });
+    }
 
     const meta = await fetchListingMeta(url).catch(() => ({ address: '', price: '', status: '', title: '' }));
     const sequence = await repo.count('PROBES', 'probe_id').catch(() => 0);
@@ -203,6 +210,11 @@ async function handleMarkSent(body, res) {
         error: 'Probe agency_id does not resolve to AGENCIES — Mark as Sent blocked to protect probe identity.',
       });
     }
+    if (!hasValidOutreachContactEmail(agencyRecord.obj)) {
+      return res.status(409).json({
+        error: 'Mark as Sent blocked — the agency outreach email is not verified VALID.',
+      });
+    }
 
     if (record.obj.probe_status && record.obj.probe_status !== 'draft' && record.obj.probe_timestamp) {
       return res.status(200).json({ probe: record.obj, already_sent: true });
@@ -259,7 +271,7 @@ async function handleSkipAgency(body, res) {
     }
     const agencyRows = await repo.getRecords('AGENCIES', 'agency_id');
     const agencyIndex = agencyRows.findIndex((record) => String(record.obj.agency_id || '').trim() === agencyId);
-    // Skip advances through the identical blank-probe_sent rule as Send & Next.
+    // Skip advances through the identical eligibility rule as Send & Next.
     const nextAgency = agencyRows.slice(agencyIndex + 1).find((record) => isProbeEligible(record.obj));
     const dependencies = [];
     for (const [tab, idColumn] of DOWNSTREAM_TABS) {
