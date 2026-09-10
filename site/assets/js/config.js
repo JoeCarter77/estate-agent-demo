@@ -18,8 +18,8 @@ export const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').mat
 
 /* Timings, in milliseconds. */
 export const TIMING = {
-  ledger: 2600,   // how long each opportunity in the hero ledger stays lit
-  loop: 2000,     // how long each stage of the optimise loop stays lit
+  ledger: 2600,   // how long each line of the hero's output ledger stays lit
+  act: 3200,      // how long one opportunity's next step stays selected
   pip: 3400,      // one signal's journey into the intelligence layer
 };
 
