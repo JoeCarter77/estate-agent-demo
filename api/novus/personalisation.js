@@ -1034,6 +1034,7 @@ async function handleOperatorCallStart(req, res) {
       prospectPhone,
       actionId: String(req.body?.action_id || '').trim(),
       probeId: String(req.body?.probe_id || '').trim(),
+      contactName: String(req.body?.contact_name || '').trim(),
       baseUrl: process.env.NOVUS_PUBLIC_BASE_URL,
     });
     invalidateOperatorCaches();
