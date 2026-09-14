@@ -62,7 +62,10 @@ export default async function handler(req, res) {
   const isRecording = Boolean(body.RecordingSid) && !isTranscription;
   const isStatus = !isRecording && !isTranscription && Boolean(body.CallStatus);
   const callSid = text(body.CallSid);
-  const targetCallSid = isStatus ? text(body.ParentCallSid || body.CallSid) : callSid;
+  // Child-leg progress events carry ParentCallSid; recordings normally use
+  // the parent CallSid directly. Preferring ParentCallSid when present makes
+  // the correlation robust to either Twilio callback shape.
+  const targetCallSid = text(body.ParentCallSid || body.CallSid);
   const providerEventId = isTranscription
     ? text(body.TranscriptionSid)
     : isRecording
