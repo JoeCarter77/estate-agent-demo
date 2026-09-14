@@ -18,5 +18,7 @@ jobs:
           node --check lib/call-intelligence.mjs
           node --check api/novus/personalisation.js
           node --check api/novus/webhooks/voice-recording.js
+          node -e "const fs=require('fs');const h=fs.readFileSync('novus/operator.html','utf8');const m=h.match(/<script>([\\s\\S]*)<\\/script>/);if(!m)throw new Error('operator script missing');fs.writeFileSync('/tmp/operator-script.js',m[1]);"
+          node --check /tmp/operator-script.js
       - name: Run dialler self-test
         run: node scripts/novus-call-dialler-selftest.mjs
