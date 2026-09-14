@@ -19,8 +19,9 @@ import { requireTwilioSignature, parseTwilioBody } from '../../../lib/twilio-web
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 import { isDeletedCommunication } from '../../../lib/communication-status.mjs';
 import {
-  processSalesCallIntelligence,
+  analyseSalesTranscript,
   shouldAnalyseCall,
+  transcribeSalesCall,
 } from '../../../lib/call-intelligence.mjs';
 
 export const maxDuration = 60;
@@ -214,6 +215,23 @@ export default async function handler(req, res) {
         });
       }
 
+      // If a previous callback attempt already completed both stages, the retry
+      // only needs to close its RAW_EVENT. This also prevents duplicate model
+      // spend if Twilio redelivers after a response-edge failure.
+      if (text(comm.transcript) && text(comm.ai_summary)) {
+        await repo.updateById('RAW_EVENTS', 'raw_event_id', rawEventId, {
+          processing_status: 'processed',
+          processed_communication_id: comm.communication_id,
+          error_message: '',
+        });
+        return res.status(200).json({
+          matched: true,
+          communication_id: comm.communication_id,
+          ai_processed: true,
+          reused_existing_intelligence: true,
+        });
+      }
+
       // The telephony path must remain usable before the optional OpenAI secret
       // is configured. The recording stays persisted and clearly flags that
       // intelligence has not run.
@@ -243,18 +261,32 @@ export default async function handler(req, res) {
           || agencyRecord?.obj?.name
           || ''
         );
-        const intelligence = await processSalesCallIntelligence({
-          recordingReference,
-          durationSeconds,
+
+        // Persist transcription before analysis. If the second model call
+        // fails, a Twilio retry reuses this transcript instead of paying to
+        // transcribe the same audio again.
+        let transcript = text(comm.transcript);
+        const transcribeModel = text(process.env.NOVUS_CALL_TRANSCRIBE_MODEL) || 'gpt-transcribe';
+        if (!transcript) {
+          transcript = await transcribeSalesCall({ recordingReference });
+          await repo.updateById('COMMUNICATIONS', 'communication_id', comm.communication_id, {
+            transcript,
+            ai_model: `${transcribeModel}+PENDING`,
+            updated_at: new Date().toISOString(),
+          });
+        }
+
+        const analysed = await analyseSalesTranscript({
+          transcript,
           agencyName,
           contactName: text(comm.display_name),
         });
-        const analysis = intelligence.analysis || {};
+        const analysis = analysed.analysis || {};
         const aiPatch = {
-          transcript: intelligence.transcript,
+          transcript,
           ai_summary: safeStringify(analysis).slice(0, 45000),
           ai_confidence: analysis.confidence ?? '',
-          ai_model: intelligence.model,
+          ai_model: `${transcribeModel}+${analysed.model}`,
           intent: text(analysis.main_constraint || analysis.agency_priority || ''),
           contact_quality: analysis.decision_maker_reached === true
             ? 'DECISION_MAKER'
