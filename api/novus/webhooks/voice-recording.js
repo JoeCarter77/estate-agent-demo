@@ -1,27 +1,15 @@
-// api/novus/webhooks/voice-recording.js — POST /api/novus/webhooks/voice-recording
+// api/novus/webhooks/voice-recording.js
 //
-// Twilio posts here TWICE per voicemail, from the same <Record> verb in
-// voice-inbound.js's TwiML: once as recordingStatusCallback (RecordingSid,
-// RecordingUrl, RecordingDuration) when the recording finishes, and once as
-// transcribeCallback (TranscriptionSid, TranscriptionText) when the legacy
-// Record-level transcription completes. This single handler distinguishes
-// the two by which fields are present and patches the matching COMMUNICATIONS
-// row (found by interaction_id === CallSid) rather than creating a new one —
-// the "Communication" is the call, already written by voice-inbound.js.
+// Shared Twilio callback for two deliberately small voice paths:
 //
-// V1 uses Twilio's built-in <Record transcribe="true"> rather than a
-// separate transcription service — the simplest option that needs no extra
-// provider (Source Master §28: "V1 should be simple and reliable rather than
-// over-engineered"). Swapping to Twilio Voice Intelligence or another STT
-// provider later only touches this file.
+// 1) Existing inbound NOVUS voicemail:
+//    recording callback + Twilio transcription callback.
+// 2) Operator outbound sales calls:
+//    <Number> call-progress callbacks + <Dial> recording callback. Meaningful
+//    completed recordings are transcribed and analysed once.
 //
-// AUTH: Twilio request signature, same as voice-inbound.js.
-// Not wired up in the Twilio console by this change.
-//
-// After patching the COMMUNICATIONS row, triggers an automatic observation/
-// intelligence recompute for the call's probe_id (if any) — the recording/
-// transcript can change voicemail_present, recording_reference, transcript,
-// and (on the transcription callback) classification.
+// Both paths persist the raw provider event first, then patch the one canonical
+// COMMUNICATIONS row for the call. Twilio signatures protect this public route.
 
 import { getRepo } from '../../../lib/sheets.mjs';
 import { newRawEventId } from '../../../lib/ids.mjs';
@@ -30,14 +18,37 @@ import { matchInboundCommunication } from '../../../lib/inbound-matching.mjs';
 import { requireTwilioSignature, parseTwilioBody } from '../../../lib/twilio-webhook.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
 import { isDeletedCommunication } from '../../../lib/communication-status.mjs';
+import {
+  processSalesCallIntelligence,
+  shouldAnalyseCall,
+} from '../../../lib/call-intelligence.mjs';
 
-export const maxDuration = 20;
+export const maxDuration = 60;
 
 const WEBHOOK_PATH = '/api/novus/webhooks/voice-recording';
 
+function text(value) { return String(value ?? '').trim(); }
 function isOverridden(comm) {
   return comm.manual_override === 'TRUE' || comm.manual_override === true;
 }
+function isOutboundSalesCall(comm) {
+  return text(comm.direction).toLowerCase() === 'outbound'
+    && text(comm.communication_type).toLowerCase() === 'sales_call';
+}
+function statusEventId(body) {
+  return [
+    'call-status',
+    text(body.CallSid),
+    text(body.CallStatus || 'unknown'),
+    text(body.SequenceNumber || ''),
+  ].join(':');
+}
+function meaningfulOutcome(analysis) {
+  return analysis?.decision_maker_reached === true
+    || ['OWNER_CONVERSATION','MEETING_BOOKED','NOT_INTERESTED','CALL_LATER']
+      .includes(text(analysis?.call_outcome).toUpperCase());
+}
+function safeStringify(o) { try { return JSON.stringify(o); } catch { return ''; } }
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -47,95 +58,262 @@ export default async function handler(req, res) {
   if (!requireTwilioSignature(req, res, WEBHOOK_PATH, body)) return;
 
   const provider = 'twilio';
-  const callSid = String(body.CallSid || '').trim();
   const isTranscription = Boolean(body.TranscriptionSid);
-  const providerEventId = isTranscription ? String(body.TranscriptionSid).trim() : String(body.RecordingSid || '').trim();
+  const isRecording = Boolean(body.RecordingSid) && !isTranscription;
+  const isStatus = !isRecording && !isTranscription && Boolean(body.CallStatus);
+  const callSid = text(body.CallSid);
+  const targetCallSid = isStatus ? text(body.ParentCallSid || body.CallSid) : callSid;
+  const providerEventId = isTranscription
+    ? text(body.TranscriptionSid)
+    : isRecording
+      ? text(body.RecordingSid)
+      : statusEventId(body);
 
   if (!callSid) return res.status(400).json({ error: 'Missing CallSid' });
-  if (!providerEventId) return res.status(400).json({ error: 'Missing RecordingSid/TranscriptionSid' });
+  if (!providerEventId) return res.status(400).json({ error: 'Missing callback event id' });
 
   try {
     const repo = getRepo();
-
-    // Idempotency: a redelivered callback for the same recording/transcription
-    // must not double-write.
     const existingEvents = await repo.getRecords('RAW_EVENTS', 'raw_event_id');
-    const dup = existingEvents.find((r) => r.obj.provider === provider && r.obj.provider_event_id === providerEventId);
-    if (dup) return res.status(200).json({ duplicate: true });
+    const duplicate = existingEvents.find(
+      (r) => r.obj.provider === provider && r.obj.provider_event_id === providerEventId
+    );
+
+    // A fully processed Twilio retry is a no-op. An ERROR/RECEIVED row is
+    // intentionally retried using the same RAW_EVENT id so a transient OpenAI
+    // failure cannot permanently strand an otherwise valid recording.
+    if (duplicate && text(duplicate.obj.processing_status).toLowerCase() === 'processed') {
+      return res.status(200).json({ duplicate: true });
+    }
 
     const nowIso = new Date().toISOString();
+    const eventType = isTranscription
+      ? 'call.transcription'
+      : isRecording
+        ? 'call.recording'
+        : `call.${text(body.CallStatus || 'status')}`;
 
-    // 1) Immutable raw evidence.
-    const rawEventId = newRawEventId();
-    await repo.appendRecord('RAW_EVENTS', {
-      raw_event_id: rawEventId,
-      provider,
-      provider_event_id: providerEventId,
-      channel: 'voice',
-      event_type: isTranscription ? 'call.transcription' : 'call.recording',
-      received_at: nowIso,
-      occurred_at: nowIso,
-      source_identifier: callSid,
-      destination_identifier: '',
-      payload_reference: safeStringify(body).slice(0, 45000),
-      processing_status: 'received',
-      processed_communication_id: '',
-      error_message: '',
-      created_at: nowIso,
-    });
+    let rawEventId = duplicate?.obj?.raw_event_id || '';
+    if (!rawEventId) {
+      rawEventId = newRawEventId();
+      await repo.appendRecord('RAW_EVENTS', {
+        raw_event_id: rawEventId,
+        provider,
+        provider_event_id: providerEventId,
+        channel: 'voice',
+        event_type: eventType,
+        received_at: nowIso,
+        occurred_at: nowIso,
+        source_identifier: targetCallSid || callSid,
+        destination_identifier: '',
+        payload_reference: safeStringify(body).slice(0, 45000),
+        processing_status: 'received',
+        processed_communication_id: '',
+        error_message: '',
+        created_at: nowIso,
+      });
+    } else {
+      await repo.updateById('RAW_EVENTS', 'raw_event_id', rawEventId, {
+        received_at: nowIso,
+        payload_reference: safeStringify(body).slice(0, 45000),
+        processing_status: 'received',
+        error_message: '',
+      });
+    }
 
-    // 2) Find the Communication this recording/transcription belongs to.
     const communications = await repo.getRecords('COMMUNICATIONS', 'communication_id');
-    const target = communications.find((r) => r.obj.interaction_id === callSid);
+    const target = communications.find((r) => r.obj.interaction_id === targetCallSid);
 
     if (!target) {
       await repo.updateById('RAW_EVENTS', 'raw_event_id', rawEventId, {
         processing_status: 'error',
-        error_message: `No COMMUNICATIONS row found for CallSid ${callSid}`,
+        error_message: `No COMMUNICATIONS row found for CallSid ${targetCallSid}`,
       });
-      // Still 200 — Twilio does not need a retry for evidence that cannot be
-      // matched, and RAW_EVENTS already preserves the raw payload for review.
       return res.status(200).json({ matched: false, raw_event_id: rawEventId });
     }
 
     const comm = target.obj;
-
-    // The Communication this recording/transcript belongs to was deliberately
-    // deleted (no useful evidence). A late-arriving recording/transcript must
-    // never resurrect it — record the raw evidence and stop.
     if (isDeletedCommunication(comm)) {
       await repo.updateById('RAW_EVENTS', 'raw_event_id', rawEventId, {
         processing_status: 'processed',
         processed_communication_id: '',
-        error_message: `Communication ${comm.communication_id} was deleted; recording/transcript discarded`,
+        error_message: `Communication ${comm.communication_id} was deleted; callback discarded`,
       });
       return res.status(200).json({ matched: false, deleted: true, raw_event_id: rawEventId });
     }
 
+    // ── OUTBOUND OPERATOR CALL PROGRESS ────────────────────────────────
+    if (isStatus && isOutboundSalesCall(comm)) {
+      const status = text(body.CallStatus).toLowerCase();
+      const answered = ['in-progress', 'completed'].includes(status);
+      const terminalNoContact = ['busy', 'failed', 'no-answer', 'canceled'].includes(status);
+      const patch = {
+        call_status: status || comm.call_status,
+        updated_at: nowIso,
+      };
+      if (body.CallDuration !== undefined && body.CallDuration !== '') {
+        patch.duration_seconds = text(body.CallDuration);
+      }
+      if (answered) patch.human_contact = 'TRUE';
+      if (terminalNoContact) {
+        patch.human_contact = 'FALSE';
+        patch.successful_conversation = 'FALSE';
+      }
+      await repo.updateById('COMMUNICATIONS', 'communication_id', comm.communication_id, patch);
+      await repo.updateById('RAW_EVENTS', 'raw_event_id', rawEventId, {
+        processing_status: 'processed',
+        processed_communication_id: comm.communication_id,
+      });
+      return res.status(200).json({
+        matched: true,
+        communication_id: comm.communication_id,
+        call_status: patch.call_status,
+      });
+    }
+
+    // A status callback on the old inbound path is not part of its contract.
+    if (isStatus) {
+      await repo.updateById('RAW_EVENTS', 'raw_event_id', rawEventId, {
+        processing_status: 'processed',
+        processed_communication_id: comm.communication_id,
+      });
+      return res.status(200).json({ matched: true, ignored_status: true });
+    }
+
+    // ── OUTBOUND OPERATOR CALL RECORDING + AI ──────────────────────────
+    if (isRecording && isOutboundSalesCall(comm)) {
+      const durationSeconds = text(body.RecordingDuration || comm.duration_seconds || '');
+      const recordingReference = text(body.RecordingUrl || body.RecordingSid);
+      const meaningful = shouldAnalyseCall(durationSeconds);
+      const recordingPatch = {
+        recording_reference: recordingReference,
+        duration_seconds: durationSeconds,
+        voicemail_present: 'FALSE',
+        call_status: 'completed',
+        human_contact: 'TRUE',
+        successful_conversation: meaningful ? 'TRUE' : 'FALSE',
+        updated_at: nowIso,
+      };
+      await repo.updateById('COMMUNICATIONS', 'communication_id', comm.communication_id, recordingPatch);
+
+      // Short calls are still logged and playable; they simply do not incur
+      // transcription/model cost.
+      if (!meaningful) {
+        await repo.updateById('RAW_EVENTS', 'raw_event_id', rawEventId, {
+          processing_status: 'processed',
+          processed_communication_id: comm.communication_id,
+        });
+        return res.status(200).json({
+          matched: true,
+          communication_id: comm.communication_id,
+          ai_processed: false,
+          reason: 'short_call',
+        });
+      }
+
+      // The telephony path must remain usable before the optional OpenAI secret
+      // is configured. The recording stays persisted and clearly flags that
+      // intelligence has not run.
+      if (!text(process.env.OPENAI_API_KEY)) {
+        await repo.updateById('COMMUNICATIONS', 'communication_id', comm.communication_id, {
+          ai_model: 'OPENAI_NOT_CONFIGURED',
+          updated_at: nowIso,
+        });
+        await repo.updateById('RAW_EVENTS', 'raw_event_id', rawEventId, {
+          processing_status: 'processed',
+          processed_communication_id: comm.communication_id,
+        });
+        return res.status(200).json({
+          matched: true,
+          communication_id: comm.communication_id,
+          ai_processed: false,
+          reason: 'openai_not_configured',
+        });
+      }
+
+      try {
+        const agencyRecord = comm.agency_id
+          ? await repo.findById('AGENCIES', 'agency_id', comm.agency_id)
+          : null;
+        const agencyName = text(
+          agencyRecord?.obj?.agency_name
+          || agencyRecord?.obj?.name
+          || ''
+        );
+        const intelligence = await processSalesCallIntelligence({
+          recordingReference,
+          durationSeconds,
+          agencyName,
+          contactName: text(comm.display_name),
+        });
+        const analysis = intelligence.analysis || {};
+        const aiPatch = {
+          transcript: intelligence.transcript,
+          ai_summary: safeStringify(analysis).slice(0, 45000),
+          ai_confidence: analysis.confidence ?? '',
+          ai_model: intelligence.model,
+          intent: text(analysis.main_constraint || analysis.agency_priority || ''),
+          contact_quality: analysis.decision_maker_reached === true
+            ? 'DECISION_MAKER'
+            : text(analysis.call_outcome).toUpperCase() === 'GATEKEEPER'
+              ? 'GATEKEEPER'
+              : '',
+          booking_attempt: analysis.meeting_booked ? 'TRUE' : 'FALSE',
+          communication_classification: text(analysis.call_outcome || 'OUTBOUND_SALES_CALL'),
+          successful_conversation: meaningfulOutcome(analysis) ? 'TRUE' : 'FALSE',
+          updated_at: new Date().toISOString(),
+        };
+        await repo.updateById('COMMUNICATIONS', 'communication_id', comm.communication_id, aiPatch);
+        await repo.updateById('RAW_EVENTS', 'raw_event_id', rawEventId, {
+          processing_status: 'processed',
+          processed_communication_id: comm.communication_id,
+          error_message: '',
+        });
+        return res.status(200).json({
+          matched: true,
+          communication_id: comm.communication_id,
+          ai_processed: true,
+          call_outcome: analysis.call_outcome || '',
+        });
+      } catch (err) {
+        console.error('outbound call intelligence failed:', err);
+        await repo.updateById('RAW_EVENTS', 'raw_event_id', rawEventId, {
+          processing_status: 'error',
+          processed_communication_id: comm.communication_id,
+          error_message: text(err?.message || 'Call intelligence failed').slice(0, 1000),
+        });
+        // 500 asks Twilio to retry a transient processing failure. The
+        // recording itself is already safely attached above, and the retry
+        // path reuses this RAW_EVENT instead of duplicating it.
+        return res.status(500).json({
+          matched: true,
+          communication_id: comm.communication_id,
+          error: err?.message || 'Call intelligence failed',
+        });
+      }
+    }
+
+    // ── EXISTING INBOUND VOICEMAIL PATH ────────────────────────────────
     const patch = {};
 
-    if (!isTranscription) {
-      patch.recording_reference = String(body.RecordingUrl || providerEventId);
-      patch.duration_seconds = String(body.RecordingDuration || '');
+    if (isRecording) {
+      patch.recording_reference = text(body.RecordingUrl || providerEventId);
+      patch.duration_seconds = text(body.RecordingDuration || '');
       patch.voicemail_present = 'TRUE';
       patch.call_status = 'voicemail';
-    } else {
-      patch.transcript = String(body.TranscriptionText || '');
+    } else if (isTranscription) {
+      patch.transcript = text(body.TranscriptionText || '');
 
       if (!isOverridden(comm)) {
-        // Reconcile the original caller number with numbers/property/address
-        // evidence found in the transcript. Use the call time so a delayed
-        // transcription callback still sees the observation window that was
-        // active when the communication occurred.
         const occurredAt = new Date(comm.occurred_at || nowIso);
         const matchAt = Number.isNaN(occurredAt.getTime()) ? new Date() : occurredAt;
         const match = await matchInboundCommunication(repo, {
-          channel: 'voice', sender_phone: comm.source_identifier_raw,
-          display_name: comm.display_name, transcript: patch.transcript,
+          channel: 'voice',
+          sender_phone: comm.source_identifier_raw,
+          display_name: comm.display_name,
+          transcript: patch.transcript,
         }, matchAt);
-        // Never erase a safe match merely because the asynchronous transcript
-        // arrived after the probe window closed. New matched or conflicting
-        // evidence is still applied; an evidence-free downgrade is ignored.
+
         const preserveExistingMatch = comm.match_status === 'matched'
           && match.match_status !== 'matched'
           && match.matching_method !== 'conflict';
@@ -155,9 +333,6 @@ export default async function handler(req, res) {
           probeTimestamp = probeRecord?.obj?.probe_timestamp;
         }
 
-        // Re-classify now that transcript text (and possibly a newly
-        // resolved agency/probe) is available, unless a human already
-        // corrected this row.
         const tags = classifyCommunication(
           { ...comm, ...patch, channel: 'voice', body_text: patch.transcript },
           { probeTimestamp }
@@ -168,20 +343,15 @@ export default async function handler(req, res) {
         patch.booking_attempt = tags.booking_attempt ? 'TRUE' : 'FALSE';
       }
     }
-    patch.updated_at = nowIso;
 
+    patch.updated_at = nowIso;
     await repo.updateById('COMMUNICATIONS', 'communication_id', comm.communication_id, patch);
     await repo.updateById('RAW_EVENTS', 'raw_event_id', rawEventId, {
       processing_status: 'processed',
       processed_communication_id: comm.communication_id,
+      error_message: '',
     });
 
-    // Automatic recompute: only when the call this recording/transcription
-    // belongs to was matched to an active probe — including a probe newly
-    // resolved above via the transcript's content-based agency fallback.
-    // Covers both callbacks — the recording landing (voicemail_present/
-    // recording_reference) and the transcript landing (which can also
-    // change matching and classification above).
     const recomputeProbeId = patch.probe_id || comm.probe_id;
     if (recomputeProbeId) {
       try {
@@ -191,11 +361,13 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ matched: true, communication_id: comm.communication_id, raw_event_id: rawEventId });
+    return res.status(200).json({
+      matched: true,
+      communication_id: comm.communication_id,
+      raw_event_id: rawEventId,
+    });
   } catch (err) {
     console.error('voice-recording error:', err);
     return res.status(500).json({ error: err.message || 'Failed to process recording/transcription callback' });
   }
 }
-
-function safeStringify(o) { try { return JSON.stringify(o); } catch { return ''; } }
