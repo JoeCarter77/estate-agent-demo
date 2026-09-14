@@ -390,6 +390,7 @@ const ACTION_CREATE_URL   = '/api/novus/personalisation?novus_operation=operator
 const ACTION_COMPLETE_URL = '/api/novus/personalisation?novus_operation=operator-action-complete';
 const ACTION_SNOOZE_URL   = '/api/novus/personalisation?novus_operation=operator-action-snooze';
 const CONVERSATION_URL = '/api/novus/personalisation?novus_operation=operator-conversation';
+const CALLS_URL        = '/api/novus/personalisation?novus_operation=operator-calls';
 const MANUAL_REPLY_URL = '/api/novus/personalisation?novus_operation=operator-manual-reply';
 /* READ-ONLY dry run. classify=0 keeps it zero-cost: no AI call, no write. */
 const UNROUTED_URL     = '/api/novus/personalisation?novus_operation=instantly-reply-poll-dry-run&classify=0&limit=50';
@@ -1208,8 +1209,9 @@ function paneSummary(lead){
       ])}</details>`;
 }
 
-function paneCalls(lead){
-  const calls = lead.call_history || [];
+let CALLS_TOKEN = 0;
+
+function callsHtml(calls){
   if(!calls.length) return blk('Calls', '<div class="note">No NOVUS sales calls are attached to this agency yet.</div>');
   const duration = (seconds) => {
     const n = Number(seconds) || 0;
@@ -1241,6 +1243,25 @@ function paneCalls(lead){
       : (call.recording_available ? '<div class="note">Recording saved. Transcript is pending or this call was below the AI threshold.</div>' : '');
     return blk(index === 0 ? 'Latest call' : 'Earlier call', kv(rows) + summary + objections + transcript);
   }).join('');
+}
+
+async function loadCalls(agencyId){
+  const body = $('calls-body');
+  if(!body) return;
+  const token = ++CALLS_TOKEN;
+  body.innerHTML = '<div class="note"><span class="spin"></span>Loading calls&hellip;</div>';
+  try{
+    const res = await fetch(`${CALLS_URL}&agency_id=${encodeURIComponent(agencyId)}`, { headers:{ Accept:'application/json' } });
+    const data = await res.json();
+    if(!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+    if(token !== CALLS_TOKEN) return;
+    const target = $('calls-body');
+    if(target) target.innerHTML = callsHtml(data.calls || []);
+  }catch(err){
+    if(token !== CALLS_TOKEN) return;
+    const target = $('calls-body');
+    if(target) target.innerHTML = `<div class="note">Calls could not be loaded: ${esc(err.message || 'Unknown error')}</div>`;
+  }
 }
 
 function paneProbe(lead){
@@ -1318,7 +1339,11 @@ function renderDrawerPane(){
     }
     return;
   }
-  if(DRAWER_PANE === 'calls')   { $('d-body').innerHTML = paneCalls(lead); return; }
+  if(DRAWER_PANE === 'calls'){
+    $('d-body').innerHTML = '<div id="calls-body"></div>';
+    loadCalls(lead.agency_id);
+    return;
+  }
   if(DRAWER_PANE === 'probe')   { $('d-body').innerHTML = paneProbe(lead); return; }
   if(DRAWER_PANE === 'demo')    { $('d-body').innerHTML = paneDemo(lead); return; }
   if(DRAWER_PANE === 'actions') { $('d-body').innerHTML = paneActions(lead); return; }
@@ -1353,6 +1378,7 @@ function closeDrawer(){
   $('scrim').classList.remove('on');
   /* Invalidate any conversation fetch still in flight for the closed lead. */
   CONV_TOKEN += 1;
+  CALLS_TOKEN += 1;
   OPEN_LEAD = null; CONV_LEAD = null; CONV_DATA = null;
 }
 
