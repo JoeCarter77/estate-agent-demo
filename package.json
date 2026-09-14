@@ -20,6 +20,7 @@
     "novus:diagnosis-preview": "node scripts/novus-diagnosis-preview.mjs",
     "novus:strong-handling-preview": "node scripts/novus-strong-handling-preview.mjs",
     "novus:phone-selftest": "node scripts/novus-phone-selftest.mjs",
+    "novus:call-dialler-selftest": "node scripts/novus-call-dialler-selftest.mjs",
     "novus:communication-quality-selftest": "node scripts/novus-communication-quality-selftest.mjs",
     "novus:neverbounce-selftest": "node scripts/novus-neverbounce-selftest.mjs",
     "novus:contact-resolution-selftest": "node scripts/novus-contact-resolution-selftest.mjs",
