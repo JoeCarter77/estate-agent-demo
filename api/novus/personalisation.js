@@ -807,7 +807,7 @@ async function handleOperatorDashboard(req, res) {
     const repo = getRepo();
     const entries = await Promise.all(ACQUISITION_REQUIRED_TABS.map(async (tab) => [tab, await repo.getTable(tab)]));
     let actionsAvailable = false;
-    for (const tab of ['SALES_MESSAGES', 'ACTIONS']) {
+    for (const tab of ['SALES_MESSAGES', 'ACTIONS', 'COMMUNICATIONS']) {
       try {
         const table = await repo.getTable(tab);
         entries.push([tab, table]);
