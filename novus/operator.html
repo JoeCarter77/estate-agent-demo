@@ -1758,6 +1758,7 @@ async function startCallFromNovus(agencyId, button){
       to: phone,
       action_id: lead.current_action?.action_id || lead.next_action?.id || '',
       probe_id: lead.probe_id || '',
+      contact_name: lead.contact?.name || '',
       confirm: 'START_OPERATOR_CALL',
     });
     if(button){
