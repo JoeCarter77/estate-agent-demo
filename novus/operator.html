@@ -348,6 +348,7 @@
   <div class="dr-tabs" id="d-tabs">
     <button class="dr-tab on" data-pane="summary" type="button">Summary</button>
     <button class="dr-tab" data-pane="conversation" type="button">Conversation</button>
+    <button class="dr-tab" data-pane="calls" type="button">Calls</button>
     <button class="dr-tab" data-pane="probe" type="button">Probe</button>
     <button class="dr-tab" data-pane="demo" type="button">Demo</button>
     <button class="dr-tab" data-pane="actions" type="button">Actions</button>
@@ -384,10 +385,12 @@ const LEADS_URL        = '/api/novus/personalisation?novus_operation=operator-da
 const RECONCILE_URL    = '/api/novus/personalisation?novus_operation=operator-actions-reconcile';
 const MEETING_URL      = '/api/novus/personalisation?novus_operation=operator-mark-meeting-booked';
 const CALL_URL         = '/api/novus/personalisation?novus_operation=operator-call-outcome';
+const CALL_START_URL   = '/api/novus/personalisation?novus_operation=operator-call-start';
 const ACTION_CREATE_URL   = '/api/novus/personalisation?novus_operation=operator-action-create';
 const ACTION_COMPLETE_URL = '/api/novus/personalisation?novus_operation=operator-action-complete';
 const ACTION_SNOOZE_URL   = '/api/novus/personalisation?novus_operation=operator-action-snooze';
 const CONVERSATION_URL = '/api/novus/personalisation?novus_operation=operator-conversation';
+const CALLS_URL        = '/api/novus/personalisation?novus_operation=operator-calls';
 const MANUAL_REPLY_URL = '/api/novus/personalisation?novus_operation=operator-manual-reply';
 /* READ-ONLY dry run. classify=0 keeps it zero-cost: no AI call, no write. */
 const UNROUTED_URL     = '/api/novus/personalisation?novus_operation=instantly-reply-poll-dry-run&classify=0&limit=50';
@@ -774,9 +777,14 @@ function taskHtml(lead){
     <div class="task-side">
       <div class="task-when ${due.cls}">${esc(due.text)}</div>
       ${lead.reply.received_at ? `<div class="task-when" style="font-weight:500">Replied ${esc(ago(lead.reply.received_at))}</div>` : ''}
-      ${a.id ? `<div class="btnrow"><button class="btn btn-secondary btn-sm action-complete" data-action="${esc(a.id)}" type="button">Complete</button>
-        <button class="btn btn-quiet btn-sm action-complete-next" data-action="${esc(a.id)}" type="button">Complete + next</button>
-        <button class="btn btn-quiet btn-sm action-snooze" data-action="${esc(a.id)}" type="button">Snooze</button></div>` : ''}
+      <div class="btnrow">
+        ${['CALL_PROSPECT','RETRY_CALL'].includes(a.type) && lead.contact.phone
+          ? `<button class="btn btn-primary btn-sm call-now" data-agency="${esc(lead.agency_id)}" type="button">Call now</button>`
+          : ''}
+        ${a.id ? `<button class="btn btn-secondary btn-sm action-complete" data-action="${esc(a.id)}" type="button">Complete</button>
+          <button class="btn btn-quiet btn-sm action-complete-next" data-action="${esc(a.id)}" type="button">Complete + next</button>
+          <button class="btn btn-quiet btn-sm action-snooze" data-action="${esc(a.id)}" type="button">Snooze</button>` : ''}
+      </div>
     </div></div>`;
 }
 
@@ -1163,6 +1171,10 @@ function paneSummary(lead){
   const meetingControl = !['MEETING_BOOKED','OPTED_OUT','NOT_INTERESTED','CLOSED'].includes(lead.current_stage)
     ? `<div class="btnrow"><button class="btn btn-secondary btn-sm" id="mark-meeting" data-agency="${esc(lead.agency_id)}" type="button">Mark meeting booked</button></div>`
     : '';
+  const dialControl = lead.contact.phone
+    ? blk('Call from NOVUS', `<div class="btnrow"><button class="btn btn-primary btn-sm call-now" data-agency="${esc(lead.agency_id)}" type="button">Call ${esc(lead.contact.phone)}</button></div>
+        <div class="note">NOVUS rings your mobile first. Answer it and the agency is dialled automatically; completed calls are recorded and meaningful conversations are analysed.</div>`)
+    : '';
   return nextActionBox(lead)
     + blk('Agency & contact', kv([
         ['Contact', dash(lead.contact.name)],
@@ -1180,7 +1192,7 @@ function paneSummary(lead){
         ...outreachRows(lead),
         ['Replies on file', String(lead.reply.reply_count || 0)],
       ]))
-    + callControls + meetingControl
+    + dialControl + callControls + meetingControl
     + (lead.other_journeys.length
         ? blk('Other journeys', kv(lead.other_journeys.map((j) => [j.outbound_id,
             `${dash(j.property_street)} &middot; ${dash(j.outbound_status)}${j.instantly_lead_id ? ' &middot; in sequence' : ''}`]))
@@ -1195,6 +1207,61 @@ function paneSummary(lead){
         ['Action status', `<span class="mono">${dash(lead.next_action.status)}</span>`],
         ['Last outreach error', lead.outreach.last_error ? `<span class="mono">${esc(lead.outreach.last_error)}</span>` : '&mdash;'],
       ])}</details>`;
+}
+
+let CALLS_TOKEN = 0;
+
+function callsHtml(calls){
+  if(!calls.length) return blk('Calls', '<div class="note">No NOVUS sales calls are attached to this agency yet.</div>');
+  const duration = (seconds) => {
+    const n = Number(seconds) || 0;
+    const mins = Math.floor(n / 60);
+    const secs = String(n % 60).padStart(2, '0');
+    return mins ? `${mins}:${secs}` : `0:${secs}`;
+  };
+  return calls.map((call, index) => {
+    const a = call.analysis || {};
+    const outcome = a.call_outcome || call.call_status || 'call';
+    const rows = [
+      ['When', dash(when(call.occurred_at))],
+      ['Duration', duration(call.duration_seconds)],
+      ['Outcome', dash(String(outcome).replace(/_/g,' ').toLowerCase())],
+      ['Decision maker', a.decision_maker_reached === true ? 'Yes' : a.decision_maker_reached === false ? 'No' : '&mdash;'],
+      ['Priority', dash(a.agency_priority)],
+      ['Main constraint', dash(a.main_constraint)],
+      ['CRM', dash(a.crm_used)],
+      ['Interest', dash(a.interest_level)],
+      ['Next action', dash(a.next_action)],
+      ['Recording', call.recording_available ? 'Saved' : '&mdash;'],
+      ['AI', call.ai_model ? `<span class="mono">${esc(call.ai_model)}</span>` : '&mdash;'],
+    ];
+    const summary = a.summary ? `<div class="quote">${esc(a.summary)}</div>` : '';
+    const objections = Array.isArray(a.objections) && a.objections.length
+      ? `<div class="note"><b>Objections:</b> ${esc(a.objections.join(' · '))}</div>` : '';
+    const transcript = call.transcript
+      ? `<details class="tech"><summary>Transcript</summary><div class="quote" style="white-space:pre-wrap">${esc(call.transcript)}</div></details>`
+      : (call.recording_available ? '<div class="note">Recording saved. Transcript is pending or this call was below the AI threshold.</div>' : '');
+    return blk(index === 0 ? 'Latest call' : 'Earlier call', kv(rows) + summary + objections + transcript);
+  }).join('');
+}
+
+async function loadCalls(agencyId){
+  const body = $('calls-body');
+  if(!body) return;
+  const token = ++CALLS_TOKEN;
+  body.innerHTML = '<div class="note"><span class="spin"></span>Loading calls&hellip;</div>';
+  try{
+    const res = await fetch(`${CALLS_URL}&agency_id=${encodeURIComponent(agencyId)}`, { headers:{ Accept:'application/json' } });
+    const data = await res.json();
+    if(!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+    if(token !== CALLS_TOKEN) return;
+    const target = $('calls-body');
+    if(target) target.innerHTML = callsHtml(data.calls || []);
+  }catch(err){
+    if(token !== CALLS_TOKEN) return;
+    const target = $('calls-body');
+    if(target) target.innerHTML = `<div class="note">Calls could not be loaded: ${esc(err.message || 'Unknown error')}</div>`;
+  }
 }
 
 function paneProbe(lead){
@@ -1272,6 +1339,11 @@ function renderDrawerPane(){
     }
     return;
   }
+  if(DRAWER_PANE === 'calls'){
+    $('d-body').innerHTML = '<div id="calls-body"></div>';
+    loadCalls(lead.agency_id);
+    return;
+  }
   if(DRAWER_PANE === 'probe')   { $('d-body').innerHTML = paneProbe(lead); return; }
   if(DRAWER_PANE === 'demo')    { $('d-body').innerHTML = paneDemo(lead); return; }
   if(DRAWER_PANE === 'actions') { $('d-body').innerHTML = paneActions(lead); return; }
@@ -1306,6 +1378,7 @@ function closeDrawer(){
   $('scrim').classList.remove('on');
   /* Invalidate any conversation fetch still in flight for the closed lead. */
   CONV_TOKEN += 1;
+  CALLS_TOKEN += 1;
   OPEN_LEAD = null; CONV_LEAD = null; CONV_DATA = null;
 }
 
@@ -1671,6 +1744,39 @@ async function markMeetingBooked(agencyId){
   closeDrawer(); await load(true);
 }
 
+async function startCallFromNovus(agencyId, button){
+  const lead = LEADS.find((row) => row.agency_id === agencyId);
+  if(!lead) throw new Error('Lead not found');
+  const phone = String(lead.contact?.phone || '').trim();
+  if(!phone) throw new Error('This lead has no phone number');
+
+  const original = button?.textContent || 'Call now';
+  if(button){ button.disabled = true; button.textContent = 'Starting call…'; }
+  try{
+    const data = await postWorkflow(CALL_START_URL, {
+      agency_id: lead.agency_id,
+      to: phone,
+      action_id: lead.current_action?.action_id || lead.next_action?.id || '',
+      probe_id: lead.probe_id || '',
+      contact_name: lead.contact?.name || '',
+      confirm: 'START_OPERATOR_CALL',
+    });
+    if(button){
+      button.textContent = 'Your phone is ringing…';
+      setTimeout(() => {
+        if(document.body.contains(button)){
+          button.disabled = false;
+          button.textContent = original;
+        }
+      }, 8000);
+    }
+    return data;
+  }catch(err){
+    if(button){ button.disabled = false; button.textContent = original; }
+    throw err;
+  }
+}
+
 async function recordCallOutcome(actionId, outcome){
   let dueAt = '';
   let nextActionType = '';
@@ -1773,6 +1879,11 @@ document.addEventListener('click', (e) => {
   if(e.target.id === 'send-reply'){ sendManualReply(); return; }
   if(e.target.id === 'mark-meeting'){
     markMeetingBooked(e.target.dataset.agency).catch((err) => window.alert(err.message));
+    return;
+  }
+  const callNow = e.target.closest('.call-now');
+  if(callNow){
+    startCallFromNovus(callNow.dataset.agency, callNow).catch((err) => window.alert(err.message));
     return;
   }
   if(e.target.classList.contains('call-outcome')){
