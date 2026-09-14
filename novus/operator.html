@@ -348,6 +348,7 @@
   <div class="dr-tabs" id="d-tabs">
     <button class="dr-tab on" data-pane="summary" type="button">Summary</button>
     <button class="dr-tab" data-pane="conversation" type="button">Conversation</button>
+    <button class="dr-tab" data-pane="calls" type="button">Calls</button>
     <button class="dr-tab" data-pane="probe" type="button">Probe</button>
     <button class="dr-tab" data-pane="demo" type="button">Demo</button>
     <button class="dr-tab" data-pane="actions" type="button">Actions</button>
@@ -1207,6 +1208,41 @@ function paneSummary(lead){
       ])}</details>`;
 }
 
+function paneCalls(lead){
+  const calls = lead.call_history || [];
+  if(!calls.length) return blk('Calls', '<div class="note">No NOVUS sales calls are attached to this agency yet.</div>');
+  const duration = (seconds) => {
+    const n = Number(seconds) || 0;
+    const mins = Math.floor(n / 60);
+    const secs = String(n % 60).padStart(2, '0');
+    return mins ? `${mins}:${secs}` : `0:${secs}`;
+  };
+  return calls.map((call, index) => {
+    const a = call.analysis || {};
+    const outcome = a.call_outcome || call.call_status || 'call';
+    const rows = [
+      ['When', dash(when(call.occurred_at))],
+      ['Duration', duration(call.duration_seconds)],
+      ['Outcome', dash(String(outcome).replace(/_/g,' ').toLowerCase())],
+      ['Decision maker', a.decision_maker_reached === true ? 'Yes' : a.decision_maker_reached === false ? 'No' : '&mdash;'],
+      ['Priority', dash(a.agency_priority)],
+      ['Main constraint', dash(a.main_constraint)],
+      ['CRM', dash(a.crm_used)],
+      ['Interest', dash(a.interest_level)],
+      ['Next action', dash(a.next_action)],
+      ['Recording', call.recording_available ? 'Saved' : '&mdash;'],
+      ['AI', call.ai_model ? `<span class="mono">${esc(call.ai_model)}</span>` : '&mdash;'],
+    ];
+    const summary = a.summary ? `<div class="quote">${esc(a.summary)}</div>` : '';
+    const objections = Array.isArray(a.objections) && a.objections.length
+      ? `<div class="note"><b>Objections:</b> ${esc(a.objections.join(' · '))}</div>` : '';
+    const transcript = call.transcript
+      ? `<details class="tech"><summary>Transcript</summary><div class="quote" style="white-space:pre-wrap">${esc(call.transcript)}</div></details>`
+      : (call.recording_available ? '<div class="note">Recording saved. Transcript is pending or this call was below the AI threshold.</div>' : '');
+    return blk(index === 0 ? 'Latest call' : 'Earlier call', kv(rows) + summary + objections + transcript);
+  }).join('');
+}
+
 function paneProbe(lead){
   return blk('Probe finding', kv([
       ['Probe reference', `<span class="mono">${dash(lead.probe_summary.probe_reference)}</span>`],
@@ -1282,6 +1318,7 @@ function renderDrawerPane(){
     }
     return;
   }
+  if(DRAWER_PANE === 'calls')   { $('d-body').innerHTML = paneCalls(lead); return; }
   if(DRAWER_PANE === 'probe')   { $('d-body').innerHTML = paneProbe(lead); return; }
   if(DRAWER_PANE === 'demo')    { $('d-body').innerHTML = paneDemo(lead); return; }
   if(DRAWER_PANE === 'actions') { $('d-body').innerHTML = paneActions(lead); return; }
