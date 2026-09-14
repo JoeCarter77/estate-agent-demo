@@ -54,6 +54,7 @@ import { handedOutreachEmails, reconcileActionEngine } from '../../lib/action-en
 // the browser, and never a write endpoint.
 import { loadOutreachExecutionState } from '../../lib/instantly-execution-state.mjs';
 import { ACTIONS_HEADER, appendAction, patchAction, readActions } from '../../lib/actions-store.mjs';
+import { startOperatorCall } from '../../lib/operator-calls.mjs';
 import { ACQUISITION_POLICY, addMs } from '../../lib/acquisition-policy.mjs';
 import {
   buildConversation,
@@ -1016,6 +1017,35 @@ async function handleOperatorMarkMeetingBooked(req, res) {
   }
 }
 
+async function handleOperatorCallStart(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  if (String(req.body?.confirm || '').trim() !== 'START_OPERATOR_CALL') {
+    return res.status(400).json({ success: false, error: 'Missing confirm=START_OPERATOR_CALL' });
+  }
+  const agencyId = String(req.body?.agency_id || '').trim();
+  const prospectPhone = String(req.body?.to || '').trim();
+  if (!agencyId || !prospectPhone) {
+    return res.status(400).json({ success: false, error: 'agency_id and to are required' });
+  }
+  try {
+    const result = await startOperatorCall({
+      repo: getRepo(),
+      agencyId,
+      prospectPhone,
+      actionId: String(req.body?.action_id || '').trim(),
+      probeId: String(req.body?.probe_id || '').trim(),
+      baseUrl: process.env.NOVUS_PUBLIC_BASE_URL,
+    });
+    invalidateOperatorCaches();
+    return res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    console.error('operator-call-start error:', err);
+    const message = err?.message || 'Could not start call';
+    const status = /not configured|required|valid E\.164|Agency not found|https URL/i.test(message) ? 400 : 502;
+    return res.status(status).json({ success: false, error: message });
+  }
+}
+
 const CALL_OUTCOMES = new Set(['NO_ANSWER', 'SPOKE_CONTINUE', 'MEETING_BOOKED', 'NOT_INTERESTED', 'CALL_LATER']);
 async function handleOperatorCallOutcome(req, res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -1725,6 +1755,10 @@ export default async function handler(req, res) {
   if (req.method === 'POST' && req.query?.novus_operation === 'operator-mark-meeting-booked') {
     if (!requireAuth(req, res)) return;
     return handleOperatorMarkMeetingBooked(req, res);
+  }
+  if (req.method === 'POST' && req.query?.novus_operation === 'operator-call-start') {
+    if (!requireAuth(req, res)) return;
+    return handleOperatorCallStart(req, res);
   }
   if (req.method === 'POST' && req.query?.novus_operation === 'operator-call-outcome') {
     if (!requireAuth(req, res)) return;
