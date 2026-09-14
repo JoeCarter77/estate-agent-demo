@@ -807,7 +807,7 @@ async function handleOperatorDashboard(req, res) {
     const repo = getRepo();
     const entries = await Promise.all(ACQUISITION_REQUIRED_TABS.map(async (tab) => [tab, await repo.getTable(tab)]));
     let actionsAvailable = false;
-    for (const tab of ['SALES_MESSAGES', 'ACTIONS', 'COMMUNICATIONS']) {
+    for (const tab of ['SALES_MESSAGES', 'ACTIONS']) {
       try {
         const table = await repo.getTable(tab);
         entries.push([tab, table]);
@@ -1097,6 +1097,43 @@ async function handleOperatorCallOutcome(req, res) {
     return res.status(200).json({ success: true, action_id: actionId, outcome });
   } catch (err) {
     return res.status(500).json({ success: false, error: err?.message || 'Could not record call outcome' });
+  }
+}
+
+async function handleOperatorCalls(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  const agencyId = String(req.query?.agency_id || '').trim();
+  if (!agencyId) return res.status(400).json({ success: false, error: 'Missing agency_id' });
+
+  try {
+    const rows = await getRepo().getRecords('COMMUNICATIONS', 'communication_id');
+    const calls = rows
+      .map((record) => record.obj)
+      .filter((row) =>
+        String(row.agency_id || '').trim() === agencyId
+        && String(row.direction || '').trim().toLowerCase() === 'outbound'
+        && String(row.communication_type || '').trim().toLowerCase() === 'sales_call'
+      )
+      .sort((a, b) => Date.parse(b.occurred_at || '') - Date.parse(a.occurred_at || ''))
+      .slice(0, 20)
+      .map((row) => {
+        let analysis = null;
+        try { analysis = row.ai_summary ? JSON.parse(String(row.ai_summary)) : null; } catch { analysis = null; }
+        return {
+          communication_id: String(row.communication_id || ''),
+          occurred_at: String(row.occurred_at || ''),
+          call_status: String(row.call_status || ''),
+          duration_seconds: Number(row.duration_seconds) || 0,
+          recording_available: Boolean(String(row.recording_reference || '').trim()),
+          transcript: String(row.transcript || ''),
+          ai_model: String(row.ai_model || ''),
+          analysis,
+        };
+      });
+    return res.status(200).json({ success: true, agency_id: agencyId, calls });
+  } catch (err) {
+    console.error('operator-calls error:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Could not load calls' });
   }
 }
 
@@ -1706,6 +1743,10 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && req.query?.novus_operation === 'operator-dashboard') {
     if (!requireAuth(req, res)) return;
     return handleOperatorDashboard(req, res);
+  }
+  if (req.method === 'GET' && req.query?.novus_operation === 'operator-calls') {
+    if (!requireAuth(req, res)) return;
+    return handleOperatorCalls(req, res);
   }
   if (req.method === 'GET' && req.query?.novus_operation === 'operator-conversation') {
     // GET-only by construction, exactly like operator-leads: this branch is
