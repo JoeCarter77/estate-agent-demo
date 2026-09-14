@@ -1,0 +1,22 @@
+name: Temporary NOVUS call dialler self-test
+on:
+  push:
+    branches:
+      - feature/novus-call-dialler-v0
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Syntax check changed server files
+        run: |
+          node --check lib/operator-calls.mjs
+          node --check lib/call-intelligence.mjs
+          node --check api/novus/personalisation.js
+          node --check api/novus/webhooks/voice-recording.js
+      - name: Run dialler self-test
+        run: node scripts/novus-call-dialler-selftest.mjs
