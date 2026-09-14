@@ -41,6 +41,7 @@ const result = await startOperatorCall({
   prospectPhone: '020 7123 4567',
   actionId: 'act_test',
   probeId: 'prb_test',
+  contactName: 'Ian Owner',
   baseUrl: 'https://novus.example',
   fetchImpl: fakeFetch,
   env,
@@ -55,6 +56,7 @@ assert.equal(appended.COMMUNICATIONS[0].agency_id, 'agy_test');
 assert.equal(appended.COMMUNICATIONS[0].direction, 'outbound');
 assert.equal(appended.COMMUNICATIONS[0].communication_type, 'sales_call');
 assert.equal(appended.COMMUNICATIONS[0].interaction_id, result.call_sid);
+assert.equal(appended.COMMUNICATIONS[0].display_name, 'Ian Owner');
 assert.equal(appended.COMMUNICATIONS[0].recording_reference, '');
 
 assert.match(twilioRequest.url, /\/Calls\.json$/);
@@ -100,8 +102,10 @@ const personalisation = fs.readFileSync(new URL('../api/novus/personalisation.js
 const voiceRecording = fs.readFileSync(new URL('../api/novus/webhooks/voice-recording.js', import.meta.url), 'utf8');
 
 assert.match(operatorHtml, /novus_operation=operator-call-start/);
+assert.match(operatorHtml, /novus_operation=operator-calls/);
 assert.match(operatorHtml, /class="btn btn-primary btn-sm call-now"/);
 assert.match(personalisation, /handleOperatorCallStart/);
+assert.match(personalisation, /handleOperatorCalls/);
 assert.match(voiceRecording, /processSalesCallIntelligence/);
 assert.match(voiceRecording, /communication_type\)\.toLowerCase\(\) === 'sales_call'/);
 
