@@ -106,7 +106,8 @@ assert.match(operatorHtml, /novus_operation=operator-calls/);
 assert.match(operatorHtml, /class="btn btn-primary btn-sm call-now"/);
 assert.match(personalisation, /handleOperatorCallStart/);
 assert.match(personalisation, /handleOperatorCalls/);
-assert.match(voiceRecording, /processSalesCallIntelligence/);
+assert.match(voiceRecording, /transcribeSalesCall/);
+assert.match(voiceRecording, /analyseSalesTranscript/);
 assert.match(voiceRecording, /communication_type\)\.toLowerCase\(\) === 'sales_call'/);
 
 console.log('NOVUS call dialler self-test passed');
