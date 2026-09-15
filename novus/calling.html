@@ -943,21 +943,40 @@ function doneHtml(){
    patched onto the row by webhooks; nothing here waits for them.           */
 let KEYPAD = false;
 const DIALER = { enabled:false, reason:'', device:null, call:null, expires:0, ready:null };
+function logDeviceError(label, e){
+  // Never log e.g. the access token or any field carrying it — only the
+  // error's own identifying fields, which Twilio documents as safe to log.
+  console.warn(`[twilio] ${label}`, {
+    code: e?.code, name: e?.name, message: e?.message,
+    twilioErrorCode: e?.twilioError?.code, twilioErrorMessage: e?.twilioError?.message,
+  });
+}
 async function fetchToken(){
-  const res = await fetch(TOKEN_URL, { headers:{ Accept:'application/json' } });
-  const data = await res.json();
-  if(!res.ok || data.success===false) throw new Error(data.error || `Token request failed (${res.status})`);
-  return data;
+  try{
+    const res = await fetch(TOKEN_URL, { headers:{ Accept:'application/json' } });
+    const data = await res.json();
+    if(!res.ok || data.success===false) throw new Error(data.error || `Token request failed (${res.status})`);
+    console.debug('[twilio] token fetch succeeded', { enabled: data.enabled, expires_at: data.expires_at });
+    return data;
+  }catch(err){ console.warn('[twilio] token fetch failed', err?.message || err); throw err; }
 }
 async function initDialer(){
   try{
     const data = await fetchToken();
     if(!data.enabled){ DIALER.enabled=false; DIALER.reason = `Browser calling not configured — missing ${(data.missing||[]).join(', ')}`; return; }
     if(!window.Twilio || !window.Twilio.Device){ DIALER.enabled=false; DIALER.reason='Twilio Voice SDK failed to load'; return; }
-    DIALER.device = new Twilio.Device(data.token, { codecPreferences:['opus','pcmu'], closeProtection:true, logLevel:'error' });
+    DIALER.device = new Twilio.Device(data.token, {
+      codecPreferences:['opus','pcmu'], closeProtection:true, logLevel:'error',
+      // Without this, most signalling/connection failures (declined,
+      // invalid/expired JWT, etc.) collapse into the generic 31005 —
+      // this asks the SDK to surface the specific underlying error code instead.
+      enableImprovedSignalingErrorPrecision: true,
+    });
     DIALER.expires = Date.parse(data.expires_at||'') || (Date.now()+3600000);
+    DIALER.device.on('registered', () => console.debug('[twilio] device registered/ready'));
+    DIALER.device.on('unregistered', () => console.debug('[twilio] device unregistered'));
     DIALER.device.on('tokenWillExpire', async () => { try{ const t = await fetchToken(); if(t.enabled) DIALER.device.updateToken(t.token); }catch(e){ console.warn('token refresh failed', e); } });
-    DIALER.device.on('error', (e) => { console.warn('Twilio device error', e); if(CALL && (CALL.state==='connecting'||CALL.state==='ringing')){ CALL.state='failed'; CALL.error = e?.message || 'device error'; saveDraft(); renderMode(); } });
+    DIALER.device.on('error', (e) => { logDeviceError('device error', e); if(CALL && (CALL.state==='connecting'||CALL.state==='ringing')){ CALL.state='failed'; CALL.error = e?.message || 'device error'; saveDraft(); renderMode(); } });
     DIALER.enabled = true; DIALER.reason = '';
   }catch(err){ DIALER.enabled=false; DIALER.reason = `Browser calling unavailable: ${err.message}`; }
   finally{ if(CALL) renderCallControls(); }
@@ -975,16 +994,18 @@ async function dial(){
     const opened = await post(START_URL, { confirm:'START_CALL', client_key: CALL.client_key, agency_id: l.agency_id, script_id: CALL.script_id, source_action_id: CALL.source_action_id||'',
       contact_name: l.contact_name||'', contact_role: l.contact_role||'', phone: l.phone||'', call_mode:'TWILIO', started_at: CALL.started_at });
     CALL.call_id = opened.call.call_id; saveDraft();
+    console.debug('[twilio] call connecting', { call_id: CALL.call_id });
     const call = await DIALER.device.connect({ params: { call_id: CALL.call_id, To: l.phone_e164 } });
     DIALER.call = call;
-    call.on('ringing', () => { if(CALL && CALL.state!=='connected'){ CALL.state='ringing'; saveDraft(); renderCallControls(); } });
-    call.on('accept', () => { CALL.twilio_call_sid = call.parameters?.CallSid || CALL.twilio_call_sid || ''; CALL.state='connected'; CALL.connected_at = CALL.connected_at || new Date().toISOString(); saveDraft(); renderMode(); });
-    call.on('disconnect', () => { finishTwilioCall(false); });
-    call.on('cancel', () => { finishTwilioCall(false); });
-    call.on('error', (e) => { CALL.error = e?.message || 'call error'; finishTwilioCall(true); });
+    call.on('ringing', () => { console.debug('[twilio] call ringing'); if(CALL && CALL.state!=='connected'){ CALL.state='ringing'; saveDraft(); renderCallControls(); } });
+    call.on('accept', () => { console.debug('[twilio] call accepted', { CallSid: call.parameters?.CallSid }); CALL.twilio_call_sid = call.parameters?.CallSid || CALL.twilio_call_sid || ''; CALL.state='connected'; CALL.connected_at = CALL.connected_at || new Date().toISOString(); saveDraft(); renderMode(); });
+    call.on('disconnect', () => { console.debug('[twilio] call disconnect'); finishTwilioCall(false); });
+    call.on('cancel', () => { console.debug('[twilio] call cancel'); finishTwilioCall(false); });
+    call.on('error', (e) => { logDeviceError('call error', e); CALL.error = e?.message || 'call error'; finishTwilioCall(true); });
     call.on('mute', (muted) => { CALL.muted = muted; renderCallControls(); });
     CALL.twilio_call_sid = call.parameters?.CallSid || '';
   }catch(err){
+    logDeviceError('connect() rejected', err);
     CALL.state='failed'; CALL.error = err.message || 'could not connect'; saveDraft(); renderMode();
   }
 }
