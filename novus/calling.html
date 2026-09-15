@@ -366,7 +366,7 @@ function renderCalling(){
     <td class="col-md nowrap">${l.next_call_due ? esc(when(l.next_call_due)) : '<span class="muted">&mdash;</span>'}</td>
     <td class="num">${l.attempts||0}</td>
     <td class="col-lg">${l.script ? `${esc(l.script.name)} <span class="mono muted">v${l.script.version}</span>` : '<span class="muted">no script</span>'}</td>
-    <td class="reason-cell"><b class="bucket-${l.bucket}">${esc(BUCKET_LABEL[l.bucket]||'')}</b><div>${esc(l.due_reason||'')}</div></td>
+    <td class="reason-cell"><b class="bucket-${l.bucket}">${esc(BUCKET_LABEL[l.bucket]||'')}</b><div>${esc(l.due_reason||'')}</div>${l.bucket===5&&l.probe_sent_at?`<div class="t-sub">Probe ${esc(when(l.probe_sent_at))}</div>`:''}</td>
     <td class="nowrap"><button class="btn btn-secondary btn-sm call-one" data-id="${esc(l.agency_id)}" type="button">Call</button></td>
   </tr>`).join('');
   $('q-empty').innerHTML = q.length ? (q.length>300 ? `<div class="empty"><div class="empty-s">Showing the first 300 of ${q.length}.</div></div>` : '')

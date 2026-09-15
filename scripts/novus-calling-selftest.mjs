@@ -138,6 +138,7 @@ const table = (header, objs) => ({ header: [...header], rows: objs.map((o) => he
     { agency_id: 'ag_referral', clean_agency_name: 'Referred', main_phone: '01234 567800' },
     { agency_id: 'ag_optout', clean_agency_name: 'Email Opt Out', main_phone: '01234 567801' },
     { agency_id: 'ag_allsupp', clean_agency_name: 'All-contact Suppressed', main_phone: '01234 567802', suppression_status: 'SUPPRESSED' },
+    { agency_id: 'ag_no_probe', clean_agency_name: 'Never Probed', main_phone: '01234 567803' },
   ];
   const callMeta = (extra) => JSON.stringify({ manual: true, call_action: true, ...extra });
   const actions = [
@@ -164,15 +165,27 @@ const table = (header, objs) => ({ header: [...header], rows: objs.map((o) => he
     REPLY_EVENTS: table(['reply_event_id', 'agency_id', 'classification', 'suppression_type', 'received_at'], [
       { reply_event_id: 'r1', agency_id: 'ag_optout', classification: 'OPT_OUT', suppression_type: 'PERMANENT', received_at: iso(T0 - DAY) },
     ]), CONTACTS: { header: [], rows: [] }, INTELLIGENCE: { header: [], rows: [] },
+    // Every bucket-5 candidate needs a genuine sent/completed probe: without
+    // one (ag_no_probe) an otherwise-eligible lead never enters the cold pool.
+    PROBES: table(['probe_id', 'agency_id', 'probe_status', 'probe_timestamp'], [
+      { probe_id: 'p_new', agency_id: 'ag_new', probe_status: 'CLOSED', probe_timestamp: iso(T0 - 30 * DAY) },
+      { probe_id: 'p_new2', agency_id: 'ag_new2', probe_status: 'CLOSED', probe_timestamp: iso(T0 - 20 * DAY) },
+      { probe_id: 'p_optout', agency_id: 'ag_optout', probe_status: 'CLOSED', probe_timestamp: iso(T0 - 10 * DAY) },
+    ]), DEMOS: { header: [], rows: [] },
   }, { now: iso(T0) });
 
   assert.deepEqual(ws.queue.map((l) => l.agency_id), ['ag_overdue', 'ag_today', 'ag_referral', 'ag_retry', 'ag_engine', 'ag_new', 'ag_new2', 'ag_optout']);
   assert.deepEqual(ws.queue.map((l) => l.bucket), [1, 2, 2, 3, 4, 5, 5, 5]);
+  assert.deepEqual(ws.queue.filter((l) => l.bucket === 5).map((l) => l.due_reason), ['No interaction', 'No interaction', 'Email opt-out']);
   assert.equal(ws.leads.ag_optout.suppression, '', 'an email opt-out is not phone suppression');
   assert.equal(ws.leads.ag_optout.context.email_signal, 'OPTED_OUT_EMAIL', 'but it is shown as context');
   assert.equal(ws.leads.ag_allsupp.suppression, 'agency suppressed', 'the agency-level all-contact flag still suppresses');
   ok('email opt-outs stay visible as context; only all-contact, terminal, DO_NOT_CALL and wrong-number suppress calling');
-  ok('queue order: overdue callback → today callback → no-answer retry → other due call actions → untouched (named contact first)');
+  ok('queue order: overdue callback → today callback → no-answer retry → other due call actions → untouched cold pool (oldest probe first, no engagement)');
+  assert.ok(!ws.queue.some((l) => l.agency_id === 'ag_no_probe'), 'an agency with no genuine PROBES sent/completed evidence never enters the queue');
+  assert.equal(ws.leads.ag_no_probe.bucket, null, 'it still appears in the lookup map, just outside the queue');
+  assert.equal(ws.counts.no_probe, 1);
+  ok('agencies never probed (or only holding a DRAFT probe) are excluded from the general cold-calling pool');
   // COHORT INTEGRITY: a lead already called with scr_v1 stays on scr_v1
   // even though it is now ARCHIVED — testing cohorts must never be silently
   // reassigned to CURRENT just because their version got archived. A
@@ -205,6 +218,109 @@ const table = (header, objs) => ({ header: [...header], rows: objs.map((o) => he
   ok('script funnel counts derive purely from immutable CALLS rows');
 }
 
+// ── 2a. cold-call eligibility and engagement-tier ranking ──────────────────
+// Only a genuinely probed agency reaches the general cold-calling pool, and
+// within that pool engagement (a real reply, or a genuinely re-viewed/CTA
+// -clicked demo) beats a fresher probe date every time; ties within a tier
+// go to the oldest probe. Explicit call actions still sit above all of it.
+{
+  const AG = ['agency_id', 'clean_agency_name', 'main_phone'];
+  const agencies = [
+    { agency_id: 'ag_never_probed', clean_agency_name: 'Never Probed', main_phone: '01234 700001' },
+    { agency_id: 'ag_draft_probe', clean_agency_name: 'Draft Probe Only', main_phone: '01234 700002' },
+    { agency_id: 'ag_no_interaction_old', clean_agency_name: 'No Interaction Old', main_phone: '01234 700003' },
+    { agency_id: 'ag_no_interaction_new', clean_agency_name: 'No Interaction New', main_phone: '01234 700004' },
+    { agency_id: 'ag_weak_reply', clean_agency_name: 'Weak Reply', main_phone: '01234 700005' },
+    { agency_id: 'ag_demo_engaged', clean_agency_name: 'Demo Engaged', main_phone: '01234 700006' },
+    { agency_id: 'ag_strong_reply_new', clean_agency_name: 'Strong Reply New Probe', main_phone: '01234 700007' },
+    { agency_id: 'ag_callback_due', clean_agency_name: 'Explicit Callback', main_phone: '01234 700008' },
+    { agency_id: 'ag_not_interested', clean_agency_name: 'Not Interested By Email', main_phone: '01234 700009' },
+    { agency_id: 'ag_opt_out', clean_agency_name: 'Opted Out By Email', main_phone: '01234 700010' },
+    { agency_id: 'ag_draft_with_timestamp', clean_agency_name: 'Legacy Draft With Timestamp', main_phone: '01234 700011' },
+  ];
+  const probes = [
+    { probe_id: 'pr_draft', agency_id: 'ag_draft_probe', probe_status: 'DRAFT', probe_timestamp: '' },
+    { probe_id: 'pr_old', agency_id: 'ag_no_interaction_old', probe_status: 'CLOSED', probe_timestamp: iso(T0 - 60 * DAY) },
+    { probe_id: 'pr_new', agency_id: 'ag_no_interaction_new', probe_status: 'CLOSED', probe_timestamp: iso(T0 - 5 * DAY) },
+    { probe_id: 'pr_weak', agency_id: 'ag_weak_reply', probe_status: 'CLOSED', probe_timestamp: iso(T0 - 40 * DAY) },
+    { probe_id: 'pr_demo', agency_id: 'ag_demo_engaged', probe_status: 'CLOSED', probe_timestamp: iso(T0 - 30 * DAY) },
+    { probe_id: 'pr_strong', agency_id: 'ag_strong_reply_new', probe_status: 'OBSERVING', probe_timestamp: iso(T0 - 2 * DAY) },
+    { probe_id: 'pr_callback', agency_id: 'ag_callback_due', probe_status: 'CLOSED', probe_timestamp: iso(T0 - 1 * DAY) },
+    { probe_id: 'pr_not_interested', agency_id: 'ag_not_interested', probe_status: 'CLOSED', probe_timestamp: iso(T0 - 45 * DAY) },
+    { probe_id: 'pr_opt_out', agency_id: 'ag_opt_out', probe_status: 'CLOSED', probe_timestamp: iso(T0 - 45 * DAY) },
+    // A hand-edited/legacy row: still 'draft' but carrying a timestamp. This
+    // must never count as sent — only probe_status does (see
+    // isProbeSentOrComplete in lib/calling-queue.mjs).
+    { probe_id: 'pr_draft_ts', agency_id: 'ag_draft_with_timestamp', probe_status: 'DRAFT', probe_timestamp: iso(T0 - 1 * DAY) },
+  ];
+  const replies = [
+    { reply_event_id: 'rw1', agency_id: 'ag_weak_reply', classification: 'NOT_NOW', received_at: iso(T0 - 10 * DAY) },
+    { reply_event_id: 'rs1', agency_id: 'ag_strong_reply_new', classification: 'POSITIVE_MEETING', received_at: iso(T0 - 1 * DAY) },
+    { reply_event_id: 'rn1', agency_id: 'ag_not_interested', classification: 'NOT_INTERESTED', received_at: iso(T0 - 20 * DAY) },
+    { reply_event_id: 'ro1', agency_id: 'ag_opt_out', classification: 'OPT_OUT', received_at: iso(T0 - 20 * DAY) },
+  ];
+  const demos = [
+    { demo_id: 'd1', agency_id: 'ag_demo_engaged', view_count: 3, cta_clicked_at: '', created_at: iso(T0 - 20 * DAY), updated_at: iso(T0 - 20 * DAY) },
+  ];
+  const actions = [
+    actionRow({ action_id: 'a_cb', agency_id: 'ag_callback_due', action_type: 'CALL_PROSPECT', due_at: iso(T0 - 2 * DAY), metadata_json: JSON.stringify({ call_action: true, callback_reason: 'Callback requested' }) }),
+  ];
+  const ws = buildCallingWorkspace({
+    AGENCIES: table(AG, agencies), ACTIONS: table(ACTIONS_HEADER, actions), CALLS: table(CALLS_HEADER, []),
+    SCRIPTS: table(SCRIPTS_HEADER, []), OBJECTIONS: table(OBJECTIONS_HEADER, []), CALL_OBJECTION_EVENTS: table(CALL_OBJECTION_EVENTS_HEADER, []),
+    REPLY_EVENTS: table(['reply_event_id', 'agency_id', 'classification', 'received_at'], replies),
+    PROBES: table(['probe_id', 'agency_id', 'probe_status', 'probe_timestamp'], probes),
+    DEMOS: table(['demo_id', 'agency_id', 'view_count', 'cta_clicked_at', 'created_at', 'updated_at'], demos),
+    CONTACTS: { header: [], rows: [] }, INTELLIGENCE: { header: [], rows: [] },
+  }, { now: iso(T0) });
+
+  assert.ok(!ws.queue.some((l) => l.agency_id === 'ag_never_probed'), 'an agency with no PROBES row at all is excluded');
+  assert.ok(!ws.queue.some((l) => l.agency_id === 'ag_draft_probe'), 'a DRAFT-only probe was never sent, so it is excluded too');
+  assert.ok(!ws.queue.some((l) => l.agency_id === 'ag_draft_with_timestamp'), 'a DRAFT probe can never become eligible solely because probe_timestamp happens to be populated');
+  assert.equal(ws.counts.no_probe, 3);
+  ok('cold-call eligibility: no probe, a DRAFT probe, or a DRAFT probe with a stray timestamp, all keep an agency out of the queue — only probe_status counts');
+
+  assert.deepEqual(ws.queue.map((l) => l.agency_id), [
+    'ag_callback_due', 'ag_demo_engaged', 'ag_strong_reply_new', 'ag_weak_reply', 'ag_no_interaction_old', 'ag_no_interaction_new',
+    'ag_not_interested', 'ag_opt_out',
+  ]);
+  ok('a sent probe with no reply or demo activity is still included, just ranked behind engagement');
+  assert.equal(ws.queue[0].bucket, 1, 'explicit overdue callback still outranks every cold-call candidate');
+
+  const byId = Object.fromEntries(ws.queue.map((l) => [l.agency_id, l]));
+  assert.equal(byId.ag_strong_reply_new.engagement_tier, 1);
+  assert.equal(byId.ag_strong_reply_new.due_reason, 'Replied');
+  assert.equal(byId.ag_demo_engaged.engagement_tier, 1);
+  assert.equal(byId.ag_demo_engaged.due_reason, 'Demo viewed');
+  assert.equal(byId.ag_weak_reply.engagement_tier, 2);
+  assert.equal(byId.ag_weak_reply.due_reason, 'Email activity');
+  assert.equal(byId.ag_no_interaction_old.engagement_tier, 3);
+  assert.equal(byId.ag_no_interaction_old.due_reason, 'No interaction');
+  ok('engagement tiers and their operator-facing labels come from REPLY_EVENTS classification and DEMOS view/CTA analytics only');
+
+  // ag_strong_reply_new's probe (2 days ago) is far newer than
+  // ag_no_interaction_old's (60 days ago), yet strong engagement still wins.
+  assert.ok(ws.queue.indexOf(byId.ag_strong_reply_new) < ws.queue.indexOf(byId.ag_no_interaction_old));
+  ok('strong engagement outranks no engagement even with a much newer probe date');
+
+  // Within tier 3, oldest probe first.
+  assert.ok(ws.queue.indexOf(byId.ag_no_interaction_old) < ws.queue.indexOf(byId.ag_no_interaction_new));
+  ok('within the same engagement tier, the oldest probe sent/completed date wins');
+
+  // Tier 4 — negative email signal. Still callable (REPLY_EVENTS is
+  // channel-specific and never suppresses the phone), but ranked below every
+  // ordinary tier-3 "No interaction" lead, even one with a much older probe.
+  assert.equal(byId.ag_not_interested.engagement_tier, 4);
+  assert.equal(byId.ag_not_interested.due_reason, 'Email declined');
+  assert.equal(byId.ag_not_interested.suppression, '', 'NOT_INTERESTED by email is not phone suppression');
+  assert.equal(byId.ag_opt_out.engagement_tier, 4);
+  assert.equal(byId.ag_opt_out.due_reason, 'Email opt-out');
+  assert.equal(byId.ag_opt_out.suppression, '', 'an email OPT_OUT remains callable unless a phone-specific rule also suppresses it');
+  assert.ok(ws.queue.indexOf(byId.ag_no_interaction_new) < ws.queue.indexOf(byId.ag_not_interested), 'NOT_INTERESTED by email ranks below an untouched probe');
+  assert.ok(ws.queue.indexOf(byId.ag_no_interaction_new) < ws.queue.indexOf(byId.ag_opt_out), 'OPT_OUT by email ranks below an untouched probe');
+  ok('a negative email signal (NOT_INTERESTED / OPT_OUT) drops a lead to the lowest cold-call tier without suppressing the phone');
+}
+
 // ── 2b. deliberate script override becomes the new "last heard" version ────
 {
   const AG = ['agency_id', 'clean_agency_name', 'main_phone'];
@@ -235,6 +351,11 @@ const table = (header, objs) => ({ header: [...header], rows: objs.map((o) => he
     AGENCIES: [AG, ['ag_1', 'Tinsley & Co', '01277 781030', 'Ian Tinsley', '', ''], ['ag_2', 'Second Agency', '01234 000000', '', '', '']],
     ACTIONS: [ACTIONS_HEADER.slice(), ACTIONS_HEADER.map((_, i) => (i === 0 ? 'SCHEMA NOTE' : ''))],
     REPLY_EVENTS: [['reply_event_id', 'agency_id', 'classification', 'received_at', 'suppression_type']],
+    PROBES: [
+      ['probe_id', 'agency_id', 'probe_status', 'probe_timestamp'],
+      ['pr_1', 'ag_1', 'CLOSED', iso(T0 - 10 * DAY)],
+      ['pr_2', 'ag_2', 'CLOSED', iso(T0 - 5 * DAY)],
+    ],
   });
   __setRepoForTests(repo);
   process.env.NOVUS_BASIC_AUTH_USER = 'novus'; process.env.NOVUS_BASIC_AUTH_PASS = 'testpass';
