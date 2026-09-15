@@ -57,6 +57,16 @@
     </div>
 
     <div class="nav-group">
+      <div class="nav-label">Calling</div>
+      <a class="nav-item" href="/novus/calling#calling">
+        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span></a>
+      <a class="nav-item" href="/novus/calling#call-actions">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/></svg><span>Call Actions</span></a>
+      <a class="nav-item" href="/novus/calling#scripts">
+        <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg><span>Scripts</span></a>
+    </div>
+
+    <div class="nav-group">
       <div class="nav-label">System</div>
       <button class="nav-item" data-view="exceptions" type="button">
         <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
@@ -256,7 +266,7 @@
           </div>
           <select class="input" id="f-stage"><option value="">All stages</option></select>
           <select class="input" id="f-owner"><option value="">All queues</option>
-            <option value="JOE">Needs you</option><option value="PROBER">Prober</option><option value="SYSTEM">NOVUS / system</option></select>
+            <option value="JOE">Needs you</option><option value="PROBER">Prober</option><option value="CALLING">Calling</option><option value="SYSTEM">NOVUS / system</option></select>
           <select class="input" id="f-priority"><option value="">All priorities</option></select>
           <select class="input" id="f-contact"><option value="">All contact types</option></select>
           <select class="input" id="f-demo"><option value="">All demo states</option>
@@ -440,14 +450,15 @@ const ACTION_LABEL = {
   FOLLOW_UP_CONVERSATION:'Follow up conversation', SET_NEXT_STEP:'Set the next step',
   RESOLVE_EXCEPTION:'Resolve exception', REPLY:'Reply', FOLLOW_UP:'Follow up', CALL:'Call',
   EMAIL:'Email', REVIEW:'Review', BOOK_MEETING:'Book meeting', OTHER:'Other',
+  SEND_INFORMATION:'Send requested information', PREPARE_MEETING:'Prepare for meeting', MEETING_FOLLOW_UP:'Meeting follow-up',
 };
 /* QUEUE = who executes. NOVUS may only own a queue it can actually execute,
    so everything without an enabled automated executor is Manual (Joe's), even
    when NOVUS is the one that recommended it. See the execution authority
    registry in lib/acquisition-actions.mjs. */
-const QUEUE_LABEL = { JOE:'Manual', PROBER:'Prober', SYSTEM:'NOVUS' };
+const QUEUE_LABEL = { JOE:'Manual', PROBER:'Prober', SYSTEM:'NOVUS', CALLING:'Calling' };
 const OWNER_LABEL = { JOE:'Joe', NOVUS:'NOVUS', SYSTEM:'NOVUS' };
-const QUEUE_TONE  = { JOE:'t-amber', PROBER:'t-blue', SYSTEM:'t-grey' };
+const QUEUE_TONE  = { JOE:'t-amber', PROBER:'t-blue', SYSTEM:'t-grey', CALLING:'t-blue' };
 const PRIORITY_TONE = { CRITICAL:'t-red', HIGH:'t-amber', NORMAL:'t-blue', LOW:'t-grey' };
 const CONTACT_TONE  = { OWNER_DIRECT:'t-violet', NAMED_HUMAN:'t-blue', GENERIC:'t-grey', UNKNOWN:'t-grey' };
 
@@ -457,7 +468,7 @@ const ACTION_TABS = [
   { key:'replies',   label:'Replies',    types:['HUMAN_REPLY','REPLY','EMAIL'] },
   { key:'calls',     label:'Calls',      types:['CALL_PROSPECT','RETRY_CALL','CALL'] },
   { key:'reviews',   label:'Reviews',    types:['MANUAL_REVIEW','RESOLVE_EXCEPTION','REVIEW'] },
-  { key:'followups', label:'Follow-ups', types:['FOLLOW_UP_CONVERSATION','SET_NEXT_STEP','DEMO_UNOPENED_FOLLOWUP','DEMO_OPENED_FOLLOWUP','FOLLOW_UP'] },
+  { key:'followups', label:'Follow-ups', types:['FOLLOW_UP_CONVERSATION','SET_NEXT_STEP','DEMO_UNOPENED_FOLLOWUP','DEMO_OPENED_FOLLOWUP','FOLLOW_UP','SEND_INFORMATION','PREPARE_MEETING','MEETING_FOLLOW_UP'] },
 ];
 
 /* Pipeline bands. Mutually exclusive: a lead has exactly one canonical stage,

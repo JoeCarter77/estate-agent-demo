@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NOVUS — Calling</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/novus/assets/novus-mark-32.png" />
+  <link rel="apple-touch-icon" href="/novus/assets/novus-mark-128.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <meta name="theme-color" content="#0A0B0E" />
+  <meta name="color-scheme" content="dark" />
+  <!-- THEME, BEFORE FIRST PAINT — see the same snippet in operator.html. -->
+  <script data-theme-boot>
+    (function(){var t='dark';try{var v=localStorage.getItem('novus.theme');if(v==='light'||v==='dark')t=v;}catch(e){}
+    document.documentElement.setAttribute('data-theme',t);})();
+  </script>
+  <!-- Same product, same stylesheet as the Command Centre and the Prober. -->
+  <link rel="stylesheet" href="/novus/novus-ui.css" />
+  <script src="/novus/novus-ui.js" defer></script>
+  <!-- Twilio Voice JS SDK, vendored (novus/vendor). It only ever receives a
+       short-lived access token minted server-side; no Twilio secret is here. -->
+  <script src="/novus/vendor/twilio-voice-sdk-2.18.5.min.js" defer></script>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── SIDEBAR — the Command Centre rail, with the calling workspace's own
+       three tabs live and everything else a link back to operator.html. ── -->
+  <nav class="nav">
+    <div class="nav-brand">
+      <img class="nav-mark" src="/novus/assets/novus-mark-512.png" width="34" height="34" alt="NOVUS" />
+      <div><div class="nav-name">NOVUS</div><div class="nav-sub">Calling</div></div>
+    </div>
+    <div class="nav-group">
+      <a class="nav-item" href="/novus/operator#overview">
+        <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Overview</span></a>
+      <a class="nav-item" href="/novus/operator#actions">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>Actions</span></a>
+      <button class="nav-item" data-view="calling" type="button">
+        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg>
+        <span>Calling</span><span class="nav-badge zero" id="b-calling">0</span></button>
+      <button class="nav-item" data-view="call-actions" type="button">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/></svg>
+        <span>Call Actions</span><span class="nav-badge zero" id="b-call-actions">0</span></button>
+      <button class="nav-item" data-view="scripts" type="button">
+        <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg><span>Scripts</span></button>
+      <a class="nav-item" href="/novus/operator#pipeline">
+        <svg viewBox="0 0 24 24"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg><span>Pipeline</span></a>
+      <a class="nav-item" href="/novus/operator#leads">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg><span>Leads</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">System</div>
+      <a class="nav-item" href="/novus/operator#prober">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Prober</span></a>
+      <a class="nav-item" href="/novus/communications.html">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 4l8 8 8-8"/></svg><span>Communications</span></a>
+    </div>
+    <div class="nav-foot"><div class="nav-stamp" id="stamp"><span class="spin"></span>Loading</div></div>
+  </nav>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="crumb">NOVUS <span class="muted">/</span> <b id="crumb">Calling</b></div>
+      <div class="topbar-right">
+        <button class="btn btn-secondary btn-sm" id="refresh" type="button">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 019-9 9 9 0 016.7 3M21 12a9 9 0 01-9 9 9 9 0 01-6.7-3"/><path d="M21 3v6h-6M3 21v-6h6"/></svg>Refresh</button>
+        <button class="btn btn-quiet btn-sm themebtn" data-theme-toggle type="button" title="Switch to light theme" aria-label="Switch to light theme" aria-pressed="false">
+          <svg class="ic-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+          <svg class="ic-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1111.2 3a6.6 6.6 0 009.8 9.8z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="page">
+      <div id="load-err" class="banner err hidden"></div>
+      <div id="setup-box" class="banner warn hidden"></div>
+      <div id="resume-box" class="resume-box hidden"></div>
+
+      <!-- ══ CALLING ═══════════════════════════════════════════════════ -->
+      <section class="view" id="v-calling">
+        <div class="page-head">
+          <h1 class="page-title">Calling</h1>
+          <p class="page-sub">Every lead that is due a call, in the order it should be called: overdue callbacks first, then
+            today's callbacks, no-answer retries, other due call actions, and finally leads never called. <b>Start calling</b>
+            opens the first one and keeps going until you exit.</p>
+        </div>
+        <div class="probe-hero">
+          <div class="probe-panel brandy">
+            <div class="probe-eyebrow">Calling queue</div>
+            <div class="probe-n" id="q-count">&mdash;</div>
+            <div class="probe-cap" id="q-cap">leads due to call</div>
+            <div class="btnrow" style="margin-top:20px;">
+              <button class="btn btn-primary" id="start-all" type="button">
+                <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 5l7 7-7 7"/></svg>Start calling</button>
+            </div>
+          </div>
+          <div class="probe-panel">
+            <div class="probe-stats">
+              <div class="probe-stat"><div class="n" id="s-today">&mdash;</div><div class="l">Calls today</div></div>
+              <div class="probe-stat"><div class="n" id="s-due">&mdash;</div><div class="l">Callbacks due now</div></div>
+              <div class="probe-stat"><div class="n" id="s-overdue">&mdash;</div><div class="l">Overdue callbacks</div></div>
+              <div class="probe-stat"><div class="n" id="s-new">&mdash;</div><div class="l">Never called</div></div>
+            </div>
+            <div class="steps" style="margin-top:20px;">
+              <div class="step"><div class="step-t"><b>Call</b> — the script is in front of you, objections one click away.</div></div>
+              <div class="step"><div class="step-t"><b>Classify</b> — one outcome, a couple of questions, no typing unless you want to.</div></div>
+              <div class="step"><div class="step-t"><b>Next</b> — actions update themselves and the next lead loads.</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head">
+            <div class="section-title">Calling funnel</div>
+            <div class="section-note">Every call ever logged, counted from immutable call records. Per-script figures are on the Scripts page.</div>
+          </div>
+          <div class="card"><div class="card-body"><div class="funnel" id="q-funnel"></div></div></div>
+        </div>
+        <div class="section">
+          <div class="section-head">
+            <div class="section-title">Due to call</div>
+            <div class="section-note" id="q-note"></div>
+          </div>
+          <div class="card"><div class="tablewrap"><table>
+            <thead><tr><th>Agency</th><th>Contact</th><th>Phone</th><th class="col-md">Last call</th><th class="col-md">Next due</th>
+              <th class="num">Attempts</th><th class="col-lg">Script</th><th>Why now</th><th></th></tr></thead>
+            <tbody id="q-rows"></tbody></table></div>
+            <div id="q-empty"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ CALL ACTIONS ══════════════════════════════════════════════ -->
+      <section class="view" id="v-call-actions">
+        <div class="page-head">
+          <h1 class="page-title">Call actions</h1>
+          <p class="page-sub">Phone work only — callbacks you promised, no-answer retries and gatekept retries. The generic
+            <a href="/novus/operator#actions" style="color:var(--blue)">Actions</a> list is deliberately not this: information to
+            send and meetings to prepare live there.</p>
+        </div>
+        <div class="filters">
+          <button class="btn btn-primary btn-sm" id="start-actions" type="button">
+            <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 5l7 7-7 7"/></svg>Start calling due actions</button>
+          <span class="card-note" id="ca-note"></span>
+        </div>
+        <div id="ca-sections"></div>
+      </section>
+
+      <!-- ══ SCRIPTS ═══════════════════════════════════════════════════ -->
+      <section class="view" id="v-scripts">
+        <div class="page-head">
+          <h1 class="page-title">Scripts</h1>
+          <p class="page-sub">One script is <b>Current</b>; a <b>Testing</b> version can be picked in Calling Mode. Every call
+            records the exact version it was made with, so a version that has calls is frozen — editing it creates the next
+            version instead.</p>
+        </div>
+        <div class="scr-grid">
+          <div>
+            <div class="section-head"><div class="section-title">Versions</div>
+              <button class="section-link" id="scr-new" type="button">+ New script</button></div>
+            <div class="scr-list" id="scr-list"></div>
+          </div>
+          <div class="card scr-ed"><div class="card-body" id="scr-editor"></div></div>
+        </div>
+        <div class="section" style="margin-top:var(--s-6)">
+          <div class="section-head"><div class="section-title">Objection library</div>
+            <div class="section-note">Titles show in the Calling Mode sidebar; the response opens as one passage on click.</div>
+            <button class="section-link" id="obj-new" type="button">+ New objection</button></div>
+          <div class="scr-grid">
+            <div class="card"><div class="card-body" id="obj-list"></div></div>
+            <div class="card"><div class="card-body" id="obj-editor"></div></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- ── CALLING MODE — full screen, nothing else on it ────────────────── -->
+<div class="cm" id="cm" aria-hidden="true">
+  <div class="cm-head">
+    <button class="btn btn-quiet btn-sm" id="cm-exit" type="button">
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>Exit</button>
+    <div class="cm-who">
+      <div class="cm-name" id="cm-name">&mdash;</div>
+      <div class="cm-meta" id="cm-meta"></div>
+    </div>
+    <div class="cm-call" id="cm-call"></div>
+  </div>
+  <div id="cm-stage" style="flex:1;min-height:0;display:flex;flex-direction:column;"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   NOVUS Calling workspace
+   ---------------------------------------------------------------------
+   DATA RULE. The queue, its order, each lead's reason for being due, the
+   assigned script and the Call Actions grouping are all computed on the
+   server (lib/calling-queue.mjs). This page presents them and collects one
+   thing: what happened on the call. Outcome semantics (pitched, owner
+   reached, follow-up actions) are derived server-side (lib/calling-outcomes)
+   — the copy of the pitched rule below exists only to preview it on the
+   review screen.
+
+   LOSSLESS. A call in progress is mirrored to localStorage on every change
+   and cleared only when the server confirms the save. Saving is idempotent
+   on client_key, so a retry after a dropped connection cannot double-write.
+   ═══════════════════════════════════════════════════════════════════════ */
+const $ = (id) => document.getElementById(id);
+const OP = (name) => `/api/novus/personalisation?novus_operation=${name}`;
+const WORKSPACE_URL     = OP('calling-workspace');
+const SETUP_URL         = OP('calling-setup');
+const SAVE_URL          = OP('calling-save');
+const START_URL         = OP('calling-start');
+const SCRIPT_SAVE_URL   = OP('script-save');
+const SCRIPT_DUP_URL    = OP('script-duplicate');
+const SCRIPT_STATUS_URL = OP('script-status');
+const OBJECTION_SAVE_URL = OP('objection-save');
+const REPAIR_URL        = OP('calling-repair');
+const TOKEN_URL         = OP('twilio-token');
+const RECORDING_URL     = OP('calling-recording');
+const DRAFT_KEY = 'novus.calling.draft';
+
+let WS = null;          // the workspace payload
+let LOADED = false;
+let VIEW = 'calling';
+let SESSION = null;     // { mode:'all'|'actions', done:Set, count:0 }
+let CALL = null;        // the call in progress (see newCall)
+let TIMER = null;
+
+const OUTCOMES = [
+  ['NO_ANSWER', 'No answer', 'Retry tomorrow, automatically'],
+  ['GATEKEPT', 'Gatekept', 'Retry in 14 days, automatically'],
+  ['OWNER_UNAVAILABLE', 'Owner unavailable / not in', 'Pick a callback time'],
+  ['CALLBACK_REQUESTED', 'Callback requested / not right now', 'Pick a callback time'],
+  ['MORE_INFO_REQUESTED', 'More information requested', 'What they asked for + follow-up'],
+  ['NOT_INTERESTED', 'Not interested', 'Why? (required)'],
+  ['BOOKED_MEETING', 'Booked meeting', 'Date and time'],
+  ['WRONG_NUMBER', 'Wrong number', 'Number is never dialled again'],
+  ['NOT_THE_DECISION_MAKER', 'Not the decision-maker', 'Who should we speak to?'],
+  ['DO_NOT_CALL', 'Do not call again', 'Hard suppression from calling'],
+];
+const OUTCOME_LABEL = Object.fromEntries(OUTCOMES.map(([k, l]) => [k, l]));
+const NI_REASONS = [
+  ['HAPPY_WITH_CURRENT_PROCESS', 'Happy with current process'], ['DOESNT_BELIEVE_PROBLEM_EXISTS', "Doesn't believe the problem exists"],
+  ['DOESNT_NEED_MORE_VALUATIONS', "Doesn't need more valuations"], ['TOO_BUSY_CAPACITY', 'Too busy / capacity'],
+  ['DOESNT_WANT_ANOTHER_SYSTEM', "Doesn't want another system"], ['AI_AUTOMATION_CONCERN', 'AI / automation concern'],
+  ['BUDGET_PRICE', 'Budget / price'], ['TIMING', 'Timing'], ['DOESNT_UNDERSTAND_VALUE', "Doesn't understand value"],
+  ['BAD_FIT', 'Bad fit'], ['WOULDNT_SAY', "Wouldn't say"], ['OTHER', 'Other'],
+];
+const INFO_TYPES = [['EMAIL_OVERVIEW', 'Email overview'], ['DEMO', 'Demo'], ['WEBSITE', 'Website'], ['CASE_STUDY', 'Case study'], ['PRICING', 'Pricing'], ['OTHER', 'Other']];
+const PRIORITIES = [['VALUATIONS', 'Valuations'], ['INSTRUCTIONS', 'Instructions'], ['STOCK', 'Stock'], ['BUYER_BUSINESS', 'Buyer business'], ['LEAD_GENERATION', 'Lead generation'], ['DATABASE_UTILISATION', 'Database utilisation'], ['OTHER', 'Other']];
+const CONSTRAINTS = [['INSUFFICIENT_DEMAND', 'Insufficient demand'], ['POOR_INCONSISTENT_FOLLOW_UP', 'Poor / inconsistent follow-up'], ['TEAM_CAPACITY', 'Team capacity'], ['DATABASE_NOT_WORKED', 'Database not worked'], ['SELLER_OPPORTUNITIES_NOT_IDENTIFIED', 'Seller opportunities not identified'], ['LOW_VALUATION_CONVERSION', 'Low valuation conversion'], ['UNCLEAR', 'Unclear'], ['OTHER', 'Other']];
+const NEEDS_DETAILS = new Set(['OWNER_UNAVAILABLE', 'CALLBACK_REQUESTED', 'MORE_INFO_REQUESTED', 'NOT_INTERESTED', 'BOOKED_MEETING', 'NOT_THE_DECISION_MAKER', 'DO_NOT_CALL']);
+const BUCKET_LABEL = { 1: 'Callback overdue', 2: 'Callback due today', 3: 'No-answer retry', 4: 'Call action due', 5: 'Never called' };
+
+/* ── helpers ────────────────────────────────────────────────────────── */
+function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function dash(v){ return (v==null||v==='')?'&mdash;':esc(v); }
+function pill(text, tone, bare){ return `<span class="pill ${tone||'t-grey'}${bare?' bare':''}">${esc(text)}</span>`; }
+function when(iso){ if(!iso) return ''; const d=new Date(iso); if(Number.isNaN(d.getTime())) return String(iso);
+  return d.toLocaleString('en-GB',{ weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }); }
+function ago(iso){ const ms=Date.now()-Date.parse(iso||''); if(!Number.isFinite(ms)) return ''; const m=Math.round(ms/60000);
+  if(m<1) return 'just now'; if(m<60) return `${m} min ago`; const h=Math.round(m/60); if(h<48) return `${h}h ago`; return `${Math.round(h/24)}d ago`; }
+function outcomeLabel(v){ return OUTCOME_LABEL[v] || String(v||'').replace(/_/g,' ').toLowerCase(); }
+function labelOf(list, v){ return (list.find(([k])=>k===v)||[])[1] || String(v||'').replace(/_/g,' ').toLowerCase(); }
+function mmss(s){ s=Math.max(0,Math.round(s||0)); return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+function emptyState(title, sub){ return `<div class="empty"><div class="empty-ic"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div><div class="empty-t">${esc(title)}</div><div class="empty-s">${esc(sub||'')}</div></div>`; }
+function firstName(name){ return String(name||'').trim().split(/\s+/)[0] || ''; }
+function uid(){ return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`; }
+function toLocalInput(iso){ if(!iso) return ''; const d=new Date(iso); if(Number.isNaN(d.getTime())) return '';
+  const p=(n)=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }
+function fromLocalInput(v){ const d=new Date(v); return Number.isNaN(d.getTime()) ? '' : d.toISOString(); }
+/* Date shortcuts: local time, 9:00 unless a time is part of the shortcut. */
+function shortcut(key){
+  const d=new Date(); d.setSeconds(0,0);
+  if(key==='later'){ d.setHours(d.getHours()+2); return d.toISOString(); }
+  if(key==='tomorrow'){ d.setDate(d.getDate()+1); d.setHours(9,0,0,0); return d.toISOString(); }
+  if(key==='tomorrow_pm'){ d.setDate(d.getDate()+1); d.setHours(14,0,0,0); return d.toISOString(); }
+  if(key==='2d'){ d.setDate(d.getDate()+2); d.setHours(9,0,0,0); return d.toISOString(); }
+  if(key==='monday'){ d.setDate(d.getDate()+((8-d.getDay())%7||7)); d.setHours(9,0,0,0); return d.toISOString(); }
+  if(key==='1w'){ d.setDate(d.getDate()+7); d.setHours(9,0,0,0); return d.toISOString(); }
+  if(key==='2w'){ d.setDate(d.getDate()+14); d.setHours(9,0,0,0); return d.toISOString(); }
+  return '';
+}
+async function post(url, body){
+  const res = await fetch(url, { method:'POST', headers:{ Accept:'application/json', 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if(!res.ok || data.success === false){ const err = new Error(data.error || `Request failed (${res.status})`); err.data = data; err.status = res.status; throw err; }
+  return data;
+}
+function showErr(msg){ $('load-err').innerHTML = `<div>${esc(msg)}</div>`; $('load-err').classList.remove('hidden'); }
+
+/* ═══ ROUTING ═══════════════════════════════════════════════════════════ */
+const VIEWS = ['calling','call-actions','scripts'];
+const VIEW_TITLE = { 'calling':'Calling', 'call-actions':'Call actions', 'scripts':'Scripts' };
+function routeFromHash(){ const raw=String(location.hash||'').replace(/^#\/?/,'').split('?')[0].trim().toLowerCase(); return VIEWS.includes(raw)?raw:'calling'; }
+function showView(name, { push = true } = {}){
+  VIEW = VIEWS.includes(name) ? name : 'calling';
+  VIEWS.forEach((v) => $('v-'+v).classList.toggle('on', v===VIEW));
+  document.querySelectorAll('.nav-item[data-view]').forEach((el) => el.classList.toggle('on', el.dataset.view===VIEW));
+  $('crumb').textContent = VIEW_TITLE[VIEW]; document.title = `NOVUS — ${VIEW_TITLE[VIEW]}`;
+  if(push && routeFromHash()!==VIEW) location.hash = '#'+VIEW;
+  renderView();
+}
+function renderView(){ if(!LOADED) return; if(VIEW==='calling') renderCalling(); if(VIEW==='call-actions') renderCallActions(); if(VIEW==='scripts') renderScripts(); }
+
+/* ═══ LOAD ══════════════════════════════════════════════════════════════ */
+async function load(force){
+  $('refresh').disabled = true;
+  $('stamp').innerHTML = '<span class="spin"></span>Loading';
+  $('load-err').classList.add('hidden');
+  try{
+    const res = await fetch(WORKSPACE_URL + (force ? '&refresh=1' : ''), { headers:{ Accept:'application/json' } });
+    const data = await res.json();
+    if(!res.ok || data.success===false) throw new Error(data.error || `Request failed (${res.status})`);
+    WS = data; LOADED = true;
+    renderSetup(); renderBadges(); renderResume(); renderView();
+    $('stamp').innerHTML = `<span class="nav-dot${data.cached?' stale':''}"></span>${esc(when(data.generated_at))}${data.cached?` · cached ${Math.round((data.cache_age_ms||0)/1000)}s`:''}`;
+  }catch(err){
+    showErr(`The calling workspace could not load. ${err.message||''}`);
+    $('stamp').innerHTML = '<span class="nav-dot bad"></span>Load failed';
+  }finally{ $('refresh').disabled = false; }
+}
+function renderSetup(){
+  const box = $('setup-box');
+  const pending = WS.followups_pending||[]; const conflicts = WS.current_script_conflicts||[];
+  if(WS.setup?.available && !pending.length && !conflicts.length){ box.classList.add('hidden'); return; }
+  if(WS.setup?.available){
+    box.innerHTML = (pending.length ? `<div><strong>${pending.length} saved call${pending.length===1?'':'s'} still ${pending.length===1?'has':'have'} follow-up actions to write</strong> — a Sheets write failed after the call landed. Nothing is lost; repairing re-runs the same idempotent step.
+      <div class="btnrow" style="margin-top:10px"><button class="btn btn-primary btn-sm" id="repair-btn" type="button">Repair follow-ups</button></div></div>` : '')
+      + (conflicts.length ? `<div style="margin-top:${pending.length?'10px':'0'}"><strong>More than one script is marked Current</strong> (${esc(conflicts.length+1)} rows). The most recently updated one is being used; set the intended version to Current on the Scripts page to demote the rest.</div>` : '');
+    box.classList.remove('hidden'); return;
+  }
+  const missing = (WS.setup?.missing||[]).concat((WS.setup?.header_mismatch||[]).map((t)=>`${t} (wrong header)`));
+  box.innerHTML = `<div><strong>Calling tabs are not set up yet.</strong> Missing in the workbook: <span class="mono">${esc(missing.join(', '))}</span>.
+    <div class="btnrow" style="margin-top:10px"><button class="btn btn-primary btn-sm" id="setup-btn" type="button">Set up calling tabs</button>
+    <span class="card-note">Creates the tabs with their headers and seeds a starter script and objection titles. Nothing existing is touched.</span></div></div>`;
+  box.classList.remove('hidden');
+}
+function renderBadges(){
+  const set=(id,n,hot)=>{ const el=$(id); el.textContent=String(n); el.classList.toggle('zero',!n); el.classList.toggle('hot',Boolean(hot)&&n>0); };
+  set('b-calling', WS.counts?.callable||0, false);
+  set('b-call-actions', WS.counts?.call_actions_due||0, true);
+}
+
+/* ═══ CALLING VIEW ══════════════════════════════════════════════════════ */
+function renderCalling(){
+  const c = WS.counts||{}; const q = WS.queue||[];
+  $('q-count').textContent = c.callable ?? q.length;
+  $('q-cap').textContent = (c.callable===1) ? 'lead due to call' : 'leads due to call';
+  $('s-today').textContent = c.calls_today ?? 0;
+  $('s-due').textContent = (c.by_bucket?.[2]||0)+(c.by_bucket?.[3]||0)+(c.by_bucket?.[4]||0);
+  $('s-overdue').textContent = c.by_bucket?.[1]||0;
+  $('s-new').textContent = c.by_bucket?.[5]||0;
+  $('start-all').disabled = !q.length;
+  $('q-note').textContent = `${q.length} in order · ${c.scheduled_later||0} scheduled for later · ${c.suppressed||0} suppressed · ${c.no_phone||0} without a usable number`;
+  $('q-funnel').innerHTML = funnelHtml(WS.funnel||{});
+  $('q-rows').innerHTML = q.slice(0, 300).map((l) => `<tr data-id="${esc(l.agency_id)}">
+    <td><div class="t-name">${dash(l.agency_name)}</div><div class="t-sub">${dash(l.location)}</div></td>
+    <td><div>${dash(l.contact_name)}</div><div class="t-sub">${dash(l.contact_role)}</div></td>
+    <td class="mono nowrap">${dash(l.phone)}</td>
+    <td class="col-md">${l.last_call ? `${esc(outcomeLabel(l.last_call.outcome))}<div class="t-sub">${esc(ago(l.last_call.at))}</div>` : '<span class="muted">&mdash;</span>'}</td>
+    <td class="col-md nowrap">${l.next_call_due ? esc(when(l.next_call_due)) : '<span class="muted">&mdash;</span>'}</td>
+    <td class="num">${l.attempts||0}</td>
+    <td class="col-lg">${l.script ? `${esc(l.script.name)} <span class="mono muted">v${l.script.version}</span>` : '<span class="muted">no script</span>'}</td>
+    <td class="reason-cell"><b class="bucket-${l.bucket}">${esc(BUCKET_LABEL[l.bucket]||'')}</b><div>${esc(l.due_reason||'')}</div></td>
+    <td class="nowrap"><button class="btn btn-secondary btn-sm call-one" data-id="${esc(l.agency_id)}" type="button">Call</button></td>
+  </tr>`).join('');
+  $('q-empty').innerHTML = q.length ? (q.length>300 ? `<div class="empty"><div class="empty-s">Showing the first 300 of ${q.length}.</div></div>` : '')
+    : emptyState('Nothing is due to call', 'Scheduled callbacks appear here when their time arrives.');
+}
+
+/* Dials → Connected → Owner → Pitched → Interested → Meeting. Pure counts
+   from the server's scriptFunnel(); a rate is blank when its base is zero. */
+function funnelHtml(f){
+  const steps = [['Dials',f.dials],['Connected',f.connected],['Owner reached',f.owner_conversations],['Pitched',f.pitched],['Interested',f.interested],['Meeting',f.booked_meetings]];
+  const top = Math.max(1, ...steps.map(([,n])=>n||0)); const first = steps[0][1]||0;
+  return steps.map(([label,n]) => `<div class="fstep"><div class="fstep-l">${esc(label)}</div><div class="fstep-n">${n??0}</div>
+    <div class="fstep-b" style="width:${Math.max(3, Math.round(((n||0)/top)*100))}%"></div>
+    <div class="fstep-r">${first>0 ? Math.round(((n||0)/first)*1000)/10 + '% of dials' : '&mdash;'}</div></div>`).join('')
+    + `<div class="fstep"><div class="fstep-l">Pitched → meeting</div><div class="fstep-n">${f.pitched_to_meeting_pct==null?'&mdash;':f.pitched_to_meeting_pct+'%'}</div><div class="fstep-b" style="width:${Math.min(100,f.pitched_to_meeting_pct||0)}%"></div><div class="fstep-r">owner → meeting ${f.owner_to_meeting_pct==null?'&mdash;':f.owner_to_meeting_pct+'%'}</div></div>`;
+}
+
+/* ═══ CALL ACTIONS VIEW ═════════════════════════════════════════════════ */
+function renderCallActions(){
+  const rows = WS.call_actions||[];
+  const groups = [['overdue','Overdue'],['today','Today'],['tomorrow','Tomorrow'],['upcoming','Upcoming']];
+  const due = (WS.counts?.call_actions_due)||0;
+  $('start-actions').disabled = !(WS.queue||[]).some((l)=>l.bucket<=4);
+  $('ca-note').textContent = rows.length ? `${rows.length} scheduled · ${due} due now` : 'No phone actions scheduled.';
+  $('ca-sections').innerHTML = groups.map(([key,label]) => {
+    const items = rows.filter((r)=>r.group===key);
+    return `<div class="section"><div class="section-head"><div class="section-title">${label}</div><div class="section-note">${items.length}</div></div>
+      <div class="card"><div class="tasks${key==='upcoming'||key==='tomorrow'?' future':''}">${items.length ? items.map(callActionHtml).join('') : `<div class="empty"><div class="empty-s">None.</div></div>`}</div></div></div>`;
+  }).join('');
+}
+function callActionHtml(a){
+  const t = Date.parse(a.due_at||''); const over = Number.isFinite(t) && t < Date.now();
+  const time = Number.isFinite(t) ? new Date(t).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
+  return `<div class="task" data-id="${esc(a.agency_id)}">
+    <div class="task-rail ${over?(a.group==='overdue'?'over':'due'):''}"></div>
+    <div class="task-main">
+      <div class="task-top"><div class="task-what">${esc(a.reason||'Call back')}</div>
+        ${pill(a.kind==='RETRY'?'retry':a.kind==='CALLBACK'?'callback':'call', a.kind==='CALLBACK'?'t-amber':'t-blue', true)}
+        ${a.suppressed?pill('suppressed','t-red',true):''}${a.no_phone?pill('no number','t-red',true):''}</div>
+      <div class="task-who"><b>${dash(a.agency_name)}</b> &middot; ${dash(a.contact_name)}${a.contact_role?` <span class="muted">(${esc(a.contact_role)})</span>`:''} &middot; <span class="mono">${dash(a.phone)}</span></div>
+      <div class="task-why">${a.previous_outcome?`Last time: ${esc(outcomeLabel(a.previous_outcome))} &middot; `:''}${a.attempts||0} previous attempt${a.attempts===1?'':'s'}${a.note?` &middot; ${esc(a.note)}`:''}</div>
+    </div>
+    <div class="task-side"><div class="task-when ${over?'due':''}">${esc(a.group==='overdue'?when(a.due_at):time)}</div>
+      ${!a.suppressed&&!a.no_phone&&over?`<div class="btnrow"><button class="btn btn-secondary btn-sm call-one" data-id="${esc(a.agency_id)}" type="button">Call now</button></div>`:''}</div></div>`;
+}
+
+/* ═══ SCRIPTS VIEW ══════════════════════════════════════════════════════ */
+let SCR_SEL = null; let SCR_NEW = false; let OBJ_SEL = null; let OBJ_NEW = false;
+const STATUS_TONE = { CURRENT:'t-green', TESTING:'t-amber', ARCHIVED:'t-grey' };
+function renderScripts(){
+  const scripts = WS.scripts||[];
+  if(!SCR_SEL && !SCR_NEW && scripts.length) SCR_SEL = (scripts.find((s)=>s.status==='CURRENT')||scripts[0]).script_id;
+  $('scr-list').innerHTML = scripts.length ? scripts.map((s) => `<div class="scr ${SCR_SEL===s.script_id?'on':''}" data-script="${esc(s.script_id)}">
+      <div class="scr-top"><span class="scr-name">${esc(s.name)}</span><span class="scr-v">v${s.version}</span>${pill(s.status.toLowerCase(), STATUS_TONE[s.status])}
+        <span class="scr-v" style="margin-left:auto">${s.call_count} call${s.call_count===1?'':'s'}</span></div>
+      <div class="scr-stats">
+        ${[['Dials',s.funnel.dials],['Connected',s.funnel.connected],['Owner',s.funnel.owner_conversations],['Pitched',s.funnel.pitched],['Meetings',s.funnel.booked_meetings]]
+          .map(([l,n])=>`<div class="scr-stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('')}
+      </div>
+      <div class="t-sub" style="margin-top:8px">Pitched → meeting ${s.funnel.pitched_to_meeting_pct==null?'&mdash;':s.funnel.pitched_to_meeting_pct+'%'} &middot;
+        Owner → meeting ${s.funnel.owner_to_meeting_pct==null?'&mdash;':s.funnel.owner_to_meeting_pct+'%'} &middot;
+        More info ${s.funnel.more_info} &middot; Callbacks ${s.funnel.callbacks} &middot; Not interested ${s.funnel.not_interested}</div>
+    </div>`).join('') : emptyState('No scripts yet', 'Create one, or run setup to seed a starter.');
+  renderScriptEditor(); renderObjections();
+}
+function renderScriptEditor(){
+  const s = SCR_NEW ? { script_id:'', name:'', version:1, status: (WS.scripts||[]).some((x)=>x.status==='CURRENT')?'TESTING':'CURRENT', content:'', notes:'', call_count:0 } : (WS.scripts||[]).find((x)=>x.script_id===SCR_SEL);
+  if(!s){ $('scr-editor').innerHTML = '<div class="note">Select a script version to edit it.</div>'; return; }
+  const frozen = !SCR_NEW && s.call_count > 0;
+  $('scr-editor').innerHTML = `
+    <div class="field"><label class="field-l">Name</label><input class="input block" id="se-name" value="${esc(s.name)}" placeholder="Seller Opportunity" /></div>
+    <div class="field" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
+      <div><label class="field-l">Version</label><input class="input block" value="v${s.version}" readonly /></div>
+      <div><label class="field-l">Status</label><select class="input block" id="se-status">
+        ${['CURRENT','TESTING','ARCHIVED'].map((v)=>`<option value="${v}" ${s.status===v?'selected':''}>${v[0]+v.slice(1).toLowerCase()}</option>`).join('')}</select></div>
+    </div>
+    <div class="field"><label class="field-l">Script</label>
+      <textarea class="input" id="se-content" placeholder="Hi, is that {{first_name}}? ... Lines starting with # become headings; {{name}}, {{first_name}}, {{agency}} and {{location}} are filled in.">${esc(s.content)}</textarea>
+      <div class="field-note">Placeholders: <span class="mono">{{first_name}}</span> <span class="mono">{{name}}</span> <span class="mono">{{agency}}</span> <span class="mono">{{location}}</span>. A line starting with <span class="mono">#</span> is a heading.</div></div>
+    <div class="field"><label class="field-l">Notes</label><input class="input block" id="se-notes" value="${esc(s.notes||'')}" placeholder="What changed in this version" /></div>
+    ${frozen ? `<div class="hintbox"><b>${s.call_count} call${s.call_count===1?'':'s'} recorded with this version.</b> Its wording is frozen. Saving creates v${(Math.max(...(WS.scripts||[]).filter((x)=>x.script_key===s.script_key).map((x)=>x.version)))+1}; status changes still apply to this version.</div>` : ''}
+    <div class="btnrow" style="margin-top:18px">
+      <button class="btn btn-primary" id="se-save" type="button">${frozen?'Save as new version':'Save'}</button>
+      ${!SCR_NEW?`<button class="btn btn-secondary" id="se-dup" type="button">Duplicate as new version</button>`:''}
+      ${!SCR_NEW&&s.status!=='CURRENT'?`<button class="btn btn-quiet" id="se-current" type="button">Make current</button>`:''}
+      ${SCR_NEW?`<button class="btn btn-quiet" id="se-cancel" type="button">Cancel</button>`:''}
+    </div><div id="se-err" class="formerr"></div>`;
+}
+function renderObjections(){
+  const rows = WS.objections||[];
+  const shown = rows.filter((o)=>o.active || o.objection_id===OBJ_SEL);
+  $('obj-list').innerHTML = shown.length ? shown.sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)).map((o)=>`<div class="objrow ${o.active?'':'off'}" data-objection="${esc(o.objection_id)}">
+      <div><div class="t">${esc(o.title)}</div><div class="r">${esc(o.response)}</div></div>
+      <span class="scr-v">v${o.version}</span><span class="scr-v">${o.event_count} use${o.event_count===1?'':'s'}</span>
+      <button class="btn btn-quiet btn-sm obj-edit" data-objection="${esc(o.objection_id)}" type="button">Edit</button></div>`).join('')
+    : '<div class="note">No objections yet.</div>';
+  const o = OBJ_NEW ? { objection_id:'', title:'', response:'', active:true, event_count:0, version:1 } : rows.find((x)=>x.objection_id===OBJ_SEL);
+  if(!o){ $('obj-editor').innerHTML = '<div class="note">Select an objection to edit it, or add a new one.</div>'; return; }
+  const frozen = !OBJ_NEW && o.event_count > 0;
+  $('obj-editor').innerHTML = `
+    <div class="field"><label class="field-l">Title</label><input class="input block" id="oe-title" value="${esc(o.title)}" placeholder="We already do this" /></div>
+    <div class="field"><label class="field-l">Response — one continuous passage</label><textarea class="input" id="oe-response" style="min-height:180px">${esc(o.response)}</textarea></div>
+    <div class="field"><label class="pick ${o.active?'on':''}" id="oe-active-l" style="cursor:pointer"><input type="checkbox" id="oe-active" ${o.active?'checked':''} style="display:none" />${o.active?'Active — shown in Calling Mode':'Inactive — hidden in Calling Mode'}</label></div>
+    ${frozen?`<div class="hintbox"><b>Used on ${o.event_count} call${o.event_count===1?'':'s'}.</b> Rewording creates v${o.version+1} and retires this version, so those calls keep pointing at what was said.</div>`:''}
+    <div class="btnrow" style="margin-top:18px"><button class="btn btn-primary" id="oe-save" type="button">${frozen?'Save as new version':'Save'}</button>
+      ${OBJ_NEW?`<button class="btn btn-quiet" id="oe-cancel" type="button">Cancel</button>`:''}</div><div id="oe-err" class="formerr"></div>`;
+}
+async function saveScript(asNew){
+  const s = SCR_NEW ? null : (WS.scripts||[]).find((x)=>x.script_id===SCR_SEL);
+  const body = { confirm:'SAVE_SCRIPT', script_id: s?s.script_id:'', name: $('se-name').value, content: $('se-content').value, notes: $('se-notes').value, status: $('se-status').value, as_new_version: Boolean(asNew || (s && s.call_count>0)) };
+  const err = $('se-err'); err.classList.remove('show');
+  try{ const out = await post(SCRIPT_SAVE_URL, body); SCR_NEW = false; SCR_SEL = out.script.script_id; await load(true); }
+  catch(e){ err.textContent = e.message; err.classList.add('show'); }
+}
+async function saveObjection(){
+  const o = OBJ_NEW ? null : (WS.objections||[]).find((x)=>x.objection_id===OBJ_SEL);
+  const err = $('oe-err'); err.classList.remove('show');
+  try{ const out = await post(OBJECTION_SAVE_URL, { confirm:'SAVE_OBJECTION', objection_id:o?o.objection_id:'', title:$('oe-title').value, response:$('oe-response').value, active:$('oe-active').checked }); OBJ_NEW=false; OBJ_SEL=out.objection.objection_id; await load(true); }
+  catch(e){ err.textContent = e.message; err.classList.add('show'); }
+}
+
+/* ═══ CALLING MODE ══════════════════════════════════════════════════════ */
+function saveDraft(){ try{ if(CALL) localStorage.setItem(DRAFT_KEY, JSON.stringify(CALL)); else localStorage.removeItem(DRAFT_KEY); }catch{} }
+function readDraft(){ try{ const raw=localStorage.getItem(DRAFT_KEY); return raw?JSON.parse(raw):null; }catch{ return null; } }
+function renderResume(){
+  const d = readDraft(); const box = $('resume-box');
+  if(!d || !d.lead || SESSION){ box.classList.add('hidden'); return; }
+  box.innerHTML = `<div>Unsaved call with <b>${esc(d.lead.agency_name)}</b>${d.outcome?` — ${esc(outcomeLabel(d.outcome))}`:''}, started ${esc(when(d.started_at||d.opened_at))}.</div>
+    <button class="btn btn-primary btn-sm" id="resume-btn" type="button">Resume</button><button class="btn btn-quiet btn-sm" id="discard-btn" type="button">Discard</button>`;
+  box.classList.remove('hidden');
+}
+function nextLead(){
+  const q = WS?.queue||[];
+  return q.find((l) => !SESSION.done.has(l.agency_id) && (SESSION.mode==='all' || l.bucket<=4)) || null;
+}
+function startSession(mode, agencyId){
+  SESSION = { mode, done:new Set(), count:0 };
+  const lead = agencyId ? (WS.queue||[]).find((l)=>l.agency_id===agencyId) || WS.leads?.[agencyId] : nextLead();
+  if(!lead){ SESSION=null; return; }
+  openMode(); beginCall(lead);
+}
+function openMode(){ window.scrollTo(0,0); $('cm').classList.add('on'); $('cm').setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; }
+function closeMode(){ $('cm').classList.remove('on'); $('cm').setAttribute('aria-hidden','true'); document.body.style.overflow=''; stopTimer(); SESSION=null; CALL=null; saveDraft(); renderResume(); load(true); }
+function beginCall(lead){
+  /* The server already decided this: a lead with a previous call stays on
+     that exact version even if it is now archived (cohort integrity), and
+     a never-called lead gets whatever is CURRENT. Look the assignment up in
+     the FULL script list — filtering archived out here would silently
+     override the server's assignment back to CURRENT the moment a version
+     is archived, which is exactly what must not happen. */
+  const all = WS.scripts||[];
+  const script = (lead.script && all.find((s)=>s.script_id===lead.script.script_id))
+    || all.find((s)=>s.status==='CURRENT') || all.filter((s)=>s.status!=='ARCHIVED')[0] || null;
+  CALL = { client_key: uid(), lead, script_id: script?script.script_id:'', source_action_id: lead.action_id||'', opened_at: new Date().toISOString(),
+    call_mode:'MANUAL', state:'idle', started_at:'', connected_at:'', ended_at:'', duration_seconds:0, objections:[], outcome:'', details:{}, commercial:{ main_priority:'', main_constraint:'', useful_note:'' }, stage:'live' };
+  saveDraft(); renderMode();
+}
+function resumeDraft(){
+  const d = readDraft(); if(!d) return;
+  SESSION = { mode:'all', done:new Set(), count:0 }; CALL = d;
+  /* A live leg cannot survive a reload: whatever was in progress is over. */
+  if(['connecting','ringing','connected'].includes(CALL.state)){
+    if(!CALL.ended_at) CALL.ended_at = new Date().toISOString();
+    if(CALL.state==='connected' && !CALL.duration_seconds) CALL.duration_seconds = Math.max(0, Math.round((Date.parse(CALL.ended_at)-Date.parse(CALL.connected_at||CALL.started_at))/1000));
+    CALL.state='ended'; if(CALL.stage==='live') CALL.stage='outcome';
+  }
+  openMode(); renderMode();
+}
+function currentScript(){ return (WS.scripts||[]).find((s)=>s.script_id===CALL.script_id) || null; }
+function scriptHtml(content, lead){
+  const vars = { name: lead.contact_name||'there', first_name: firstName(lead.contact_name)||'there', agency: lead.agency_name||'your agency', location: lead.location||'your area' };
+  return esc(content||'(this script has no content yet — add it in Scripts)')
+    .replace(/\{\{\s*(name|first_name|agency|location)\s*\}\}/g, (_, k) => `<span class="var">${esc(vars[k])}</span>`)
+    .replace(/\n{0,2}^#+\s*(.+)$\n?/gm, '<h3>$1</h3>');
+}
+function stopTimer(){ if(TIMER){ clearInterval(TIMER); TIMER=null; } }
+function tick(){ const el=$('cm-timer'); if(!el||!CALL) return; const from=Date.parse(CALL.connected_at||CALL.started_at||''); if(Number.isFinite(from)) el.textContent = mmss((Date.now()-from)/1000); }
+
+function renderModeHead(){
+  const l = CALL.lead; const s = currentScript();
+  $('cm-name').innerHTML = `${esc(l.contact_name||'Unknown contact')}${l.contact_role?`<small>${esc(l.contact_role)}</small>`:''}<small>${esc(l.agency_name)}</small>`;
+  const ctx = l.context||{};
+  const bits = [
+    `<span class="cm-phone">${esc(l.phone||'no number')}</span>`,
+    l.location ? `<span>${esc(l.location)}</span>` : '',
+    l.email ? `<span class="mono">${esc(l.email)}</span>` : '',
+    `<span><b>${l.attempts||0}</b> previous attempt${l.attempts===1?'':'s'}${l.last_call?` · last ${esc(outcomeLabel(l.last_call.outcome))} ${esc(ago(l.last_call.at))}`:''}</span>`,
+    l.due_reason ? `<span>${esc(BUCKET_LABEL[l.bucket]||'')}${l.due_reason&&l.due_reason!==BUCKET_LABEL[l.bucket]?` · ${esc(l.due_reason)}`:''}</span>` : '',
+    ctx.probe_grade ? `<span>Probe grade <b>${esc(ctx.probe_grade)}</b></span>` : '',
+    ctx.email_signal==='OPTED_OUT_EMAIL' ? `<span style="color:var(--amber)"><b>Opted out of email</b> — phone not suppressed; use judgement</span>` : (ctx.email_signal==='NOT_INTERESTED_EMAIL' ? `<span style="color:var(--amber)"><b>Not interested by email</b> ${esc(ago(ctx.reply_received_at))}</span>` : ''),
+    ctx.reply_classification && !ctx.email_signal ? `<span>Replied <b>${esc(String(ctx.reply_classification).replace(/_/g,' ').toLowerCase())}</b> ${esc(ago(ctx.reply_received_at))}</span>` : '',
+    l.pipeline_status ? `<span class="muted">${esc(l.pipeline_status.toLowerCase())}</span>` : '',
+    s ? `<span>Script <b>${esc(s.name)} v${s.version}</b>${s.status==='TESTING'?' '+pill('testing','t-amber',true):''}${s.status==='ARCHIVED'?' '+pill('archived · in use','t-grey',true):''}</span>` : '<span class="muted">no script</span>',
+  ].filter(Boolean);
+  $('cm-meta').innerHTML = bits.join('');
+  renderCallControls();
+}
+function renderCallControls(){
+  const st = CALL.state; const box = $('cm-call');
+  const label = { idle:'Ready', connecting:'Connecting', ringing:'Ringing', connected:'Connected', ended:'Ended', failed:'Failed' }[st] || st;
+  const modeNote = DIALER.enabled ? '' : `<span class="cm-state" title="${esc(DIALER.reason||'')}" style="min-width:0;color:var(--amber)">Manual</span>`;
+  if(CALL.stage!=='live'){ box.innerHTML = `<span class="cm-state">${esc(label)}</span><span class="cm-timer">${mmss(CALL.duration_seconds)}</span>`; return; }
+  if(st==='idle') box.innerHTML = `${modeNote}<span class="cm-state">Ready</span>
+      <button class="btn btn-quiet btn-sm" id="cm-skip" type="button" title="Skip without logging a call">Skip</button>
+      <button class="btn btn-call" id="cm-dial" type="button"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg>${DIALER.enabled?'Call':'Start call'}</button>`;
+  else if(st==='connected'||st==='connecting'||st==='ringing') box.innerHTML = `<span class="cm-state ${st}">${esc(label)}</span><span class="cm-timer" id="cm-timer">${st==='connected'?'00:00':'&nbsp;'}</span>
+      ${DIALER.enabled&&st==='connected'?`<button class="btn btn-secondary btn-sm ${CALL.muted?'on':''}" id="cm-mute" type="button" aria-pressed="${CALL.muted?'true':'false'}">${CALL.muted?'Unmute':'Mute'}</button>
+      <button class="btn btn-secondary btn-sm" id="cm-keypad" type="button" aria-pressed="${KEYPAD?'true':'false'}">Keypad</button>`:''}
+      <button class="btn btn-hangup" id="cm-hangup" type="button">End call</button>`;
+  else box.innerHTML = `<span class="cm-state ${st}">${esc(label)}${st==='failed'&&CALL.error?` <span class="muted" style="font-weight:500;letter-spacing:0;text-transform:none">· ${esc(CALL.error)}</span>`:''}</span><span class="cm-timer">${mmss(CALL.duration_seconds)}</span>
+      ${st==='failed'?`<button class="btn btn-secondary btn-sm" id="cm-redial" type="button">Retry</button>`:''}
+      <button class="btn btn-primary" id="cm-classify" type="button">Log outcome</button>`;
+}
+function renderMode(){
+  if(!CALL) return;
+  renderModeHead();
+  const stage = $('cm-stage');
+  if(CALL.stage==='live') stage.innerHTML = liveHtml();
+  else if(CALL.stage==='outcome') stage.innerHTML = outcomeHtml();
+  else if(CALL.stage==='details') stage.innerHTML = detailsHtml();
+  else if(CALL.stage==='commercial') stage.innerHTML = commercialHtml();
+  else if(CALL.stage==='review') stage.innerHTML = reviewHtml();
+  else if(CALL.stage==='done') stage.innerHTML = doneHtml();
+  if(CALL.state==='connected' && !TIMER) TIMER = setInterval(tick, 500);
+  if(CALL.stage==='live') stage.querySelector('.cm-main')?.scrollTo(0,0);
+}
+function liveHtml(){
+  const s = currentScript(); const l = CALL.lead;
+  const testing = (WS.scripts||[]).filter((x)=>x.status==='TESTING');
+  /* Archived versions are not offered for a NEW assignment, but if this
+     lead's already-assigned version has since been archived it must still
+     appear here — selected, correctly labelled — or the dropdown would
+     silently misrepresent which script the call is actually using. Picking
+     a different entry is the only deliberate override. */
+  const switcherOptions = (WS.scripts||[]).filter((x)=>x.status!=='ARCHIVED' || x.script_id===CALL.script_id);
+  const switcher = testing.length ? `<select class="input" id="cm-script-sel" style="margin-left:auto;font-size:11.5px;padding:4px 26px 4px 8px">
+      ${switcherOptions.map((x)=>`<option value="${esc(x.script_id)}" ${x.script_id===CALL.script_id?'selected':''}>${esc(x.name)} v${x.version} · ${x.status==='ARCHIVED'?'archived · in use':x.status.toLowerCase()}</option>`).join('')}</select>` : '';
+  const clicked = new Set(CALL.objections.map((o)=>o.objection_id));
+  return `<div class="cm-body">
+    <div class="cm-main">
+      <div class="cm-label">Current script ${s?`<span class="mono muted">${esc(s.name)} v${s.version}</span>`:''}${switcher}</div>
+      <div class="script">${s?scriptHtml(s.content, l):'<span class="muted">No script. Add one in Scripts.</span>'}</div>
+      ${l.calls&&l.calls.length?`<div class="cm-label" style="margin-top:34px">Previous calls</div><ul class="cm-list">${l.calls.map((c)=>`<li><b>${esc(when(c.at))}</b><span>${esc(outcomeLabel(c.outcome))}${c.pitched?' · pitched':''}${c.callback_at?` · callback ${esc(when(c.callback_at))}`:''}${c.note?` — ${esc(c.note)}`:''}${c.recording?` · <a href="${RECORDING_URL}&call_id=${encodeURIComponent(c.call_id)}" target="_blank" rel="noopener" style="color:var(--blue)">recording</a>`:''}</span></li>`).join('')}</ul>`:''}
+      ${l.context?.reply_text?`<div class="cm-label" style="margin-top:34px">Latest email reply</div><div class="quote">${esc(l.context.reply_text)}</div>`:''}
+      ${l.context?.probe_grade_reason?`<div class="cm-label" style="margin-top:24px">Probe finding</div><div class="note">${esc(l.context.probe_grade_reason)}</div>`:''}
+    </div>
+    <div class="cm-side">
+      ${KEYPAD&&CALL.state==='connected'?`<div class="cm-label">Keypad</div><div class="keypad" id="cm-keys">${['1','2','3','4','5','6','7','8','9','*','0','#'].map((d)=>`<button class="key" data-digit="${d}" type="button">${d}</button>`).join('')}</div>`:''}
+      <div class="cm-label">Common objections ${CALL.state==='connected'?pill('logging','t-blue',true):''}</div>
+      <div id="cm-objs">${(WS.active_objections||[]).map((o)=>`<div class="obj" data-obj="${esc(o.objection_id)}">
+        <button class="obj-t" type="button">${esc(o.title)}${clicked.has(o.objection_id)?'<span class="obj-n">logged</span>':''}</button>
+        <div class="obj-r">${esc(o.response)}</div></div>`).join('') || '<div class="note">No active objections. Add them in Scripts.</div>'}</div>
+    </div></div>`;
+}
+function outcomeHtml(){
+  return `<div class="cm-main"><div class="cstage">
+    <div class="cstage-t">What happened?</div>
+    <div class="cstage-s">Press a number or click. Pitched is worked out from the outcome — you never select it.</div>
+    <div class="outcomes">${OUTCOMES.map(([k,l,sub],i)=>`<button class="outcome ${CALL.outcome===k?'on':''} ${k==='DO_NOT_CALL'?'warn':''}" data-outcome="${k}" type="button"><kbd>${(i+1)%10}</kbd><span>${esc(l)}<span class="sub">${esc(sub)}</span></span></button>`).join('')}</div>
+    <div class="cstage-actions"><button class="btn btn-quiet" data-back="live" type="button">&larr; Back</button><span class="spacer"></span></div>
+  </div></div>`;
+}
+function dtField(id, value, { shortcuts = ['later','tomorrow','tomorrow_pm','2d','monday','1w'], label = 'When' } = {}){
+  const names = { later:'In 2 hours', tomorrow:'Tomorrow 9am', tomorrow_pm:'Tomorrow 2pm', '2d':'In 2 days', monday:'Next Monday', '1w':'In a week', '2w':'In 2 weeks' };
+  return `<div class="field"><label class="field-l">${esc(label)}</label><div class="dt-row">
+    ${shortcuts.map((k)=>`<button class="pick" data-dt="${id}" data-key="${k}" type="button">${names[k]}</button>`).join('')}
+    <input class="input" type="datetime-local" id="${id}" value="${esc(toLocalInput(value))}" /></div></div>`;
+}
+function picks(name, list, value, { multi=false, keys=true } = {}){
+  const selected = multi ? new Set(value||[]) : new Set(value?[value]:[]);
+  return `<div class="picks" data-picks="${name}" ${multi?'data-multi="1"':''}>${list.map(([k,l],i)=>`<button class="pick ${selected.has(k)?'on':''}" data-value="${k}" type="button">${keys&&i<9?`<kbd>${i+1}</kbd>`:''}${esc(l)}</button>`).join('')}</div>`;
+}
+function detailsHtml(){
+  const o = CALL.outcome; const d = CALL.details;
+  let body = '';
+  if(o==='OWNER_UNAVAILABLE' || o==='CALLBACK_REQUESTED'){
+    body = (o==='CALLBACK_REQUESTED' ? `<div class="field"><label class="field-l">Who did you speak to?</label>${picks('owner_reached',[['TRUE','The decision-maker'],['FALSE','Someone else']], d.owner_reached===false?'FALSE':'TRUE',{keys:false})}</div>` : '')
+      + dtField('callback_at', d.callback_at, { label:'Call back' })
+      + `<div class="field"><label class="field-l">Note (optional)</label><input class="input block" id="d-note" value="${esc(d.callback_note||'')}" placeholder="Best time, who to ask for, context" /></div>`;
+  } else if(o==='MORE_INFO_REQUESTED'){
+    body = `<div class="field"><label class="field-l">What did they ask for?</label>${picks('more_info_type', INFO_TYPES, d.more_info_type)}</div>`
+      + dtField('followup_at', d.followup_at || shortcut('2d'), { shortcuts:['tomorrow','2d','monday','1w'], label:'Follow-up call' })
+      + `<div class="field"><label class="field-l">Note (optional)</label><input class="input block" id="d-note" value="${esc(d.more_info_note||'')}" placeholder="What exactly to send" /></div>`;
+  } else if(o==='NOT_INTERESTED'){
+    body = `<div class="field"><label class="field-l">Why? (required)</label>${picks('not_interested_reason', NI_REASONS, d.not_interested_reason)}</div>`
+      + `<div class="field"><label class="field-l">Detail (optional)</label><input class="input block" id="d-note" value="${esc(d.not_interested_detail||'')}" placeholder="In their words" /></div>`;
+  } else if(o==='BOOKED_MEETING'){
+    body = dtField('meeting_at', d.meeting_at, { shortcuts:['tomorrow','tomorrow_pm','2d','monday','1w'], label:'Meeting' })
+      + `<div class="field"><label class="field-l">Note (optional)</label><input class="input block" id="d-note" value="${esc(d.meeting_note||'')}" placeholder="Where, who, what to bring" /></div>`;
+  } else if(o==='NOT_THE_DECISION_MAKER'){
+    const r = d.referred_contact||{};
+    body = `<div class="field" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label class="field-l">Correct person</label><input class="input block" id="r-name" value="${esc(r.name||'')}" placeholder="Name" /></div>
+        <div><label class="field-l">Role</label><input class="input block" id="r-role" value="${esc(r.role||'')}" placeholder="Owner / Director" /></div>
+        <div><label class="field-l">Phone</label><input class="input block" id="r-phone" value="${esc(r.phone||'')}" placeholder="If known" /></div>
+        <div><label class="field-l">Email</label><input class="input block" id="r-email" value="${esc(r.email||'')}" placeholder="If known" /></div></div>
+      <div class="field"><label class="field-l">Notes</label><input class="input block" id="d-note" value="${esc(r.notes||'')}" placeholder="Best time, how to reach them" /></div>
+      <div class="field"><label class="field-l">Did a proper pitch take place anyway?</label>${picks('pitched_override',[['FALSE','No'],['TRUE','Yes, I pitched']], d.pitched_override?'TRUE':'FALSE',{keys:false})}</div>
+      ${dtField('callback_at', d.callback_at || shortcut('tomorrow'), { shortcuts:['tomorrow','2d','monday'], label:'Call them' })}`;
+  } else if(o==='DO_NOT_CALL'){
+    body = `<div class="field"><label class="field-l">Who said it?</label>${picks('owner_reached',[['TRUE','The decision-maker'],['FALSE','Someone else']], d.owner_reached===false?'FALSE':'TRUE',{keys:false})}</div>
+      <div class="hintbox">This lead is removed from every future calling queue. Email follow-ups are unaffected.</div>`;
+  }
+  return `<div class="cm-main"><div class="cstage">
+    <div class="cstage-t">${esc(outcomeLabel(o))}</div><div class="cstage-s">A couple of details, then next.</div>
+    ${body}<div id="d-err" class="formerr"></div>
+    <div class="cstage-actions"><button class="btn btn-quiet" data-back="outcome" type="button">&larr; Outcome</button><span class="spacer"></span>
+      <span class="hint">Enter to continue</span><button class="btn btn-primary" id="d-next" type="button">Continue &rarr;</button></div>
+  </div></div>`;
+}
+function ownerReached(){
+  const o = CALL.outcome; const d = CALL.details;
+  if(['MORE_INFO_REQUESTED','NOT_INTERESTED','BOOKED_MEETING'].includes(o)) return true;
+  if(o==='CALLBACK_REQUESTED'||o==='DO_NOT_CALL') return d.owner_reached!==false;
+  return false;
+}
+function pitchedPreview(){
+  const o = CALL.outcome; const d = CALL.details;
+  if(['MORE_INFO_REQUESTED','NOT_INTERESTED','BOOKED_MEETING'].includes(o)) return true;
+  if(o==='CALLBACK_REQUESTED') return d.owner_reached!==false;
+  if(o==='NOT_THE_DECISION_MAKER'||o==='DO_NOT_CALL') return d.pitched_override===true;
+  return false;
+}
+function commercialHtml(){
+  const c = CALL.commercial; const tags = CALL.objections;
+  const available = (WS.active_objections||[]).filter((o)=>!tags.some((t)=>t.objection_id===o.objection_id));
+  return `<div class="cm-main"><div class="cstage">
+    <div class="cstage-t">What did you learn?</div><div class="cstage-s">Optional, fast. Skip anything you don't know.</div>
+    <div class="field"><label class="field-l">Main priority</label>${picks('main_priority', PRIORITIES, c.main_priority)}</div>
+    <div class="field"><label class="field-l">Main constraint</label>${picks('main_constraint', CONSTRAINTS, c.main_constraint, {keys:false})}</div>
+    <div class="field"><label class="field-l">Objections raised</label>
+      <div class="picks" id="c-tags">${tags.map((t)=>`<button class="pick on x" data-untag="${esc(t.objection_id)}" type="button">${esc(t.title)}</button>`).join('')||'<span class="muted" style="font-size:12px">None logged during the call.</span>'}</div>
+      ${available.length?`<div class="picks" style="margin-top:8px">${available.map((o)=>`<button class="pick" data-tag="${esc(o.objection_id)}" type="button">+ ${esc(o.title)}</button>`).join('')}</div>`:''}</div>
+    <div class="field"><label class="field-l">Useful note (optional)</label><input class="input block" id="c-note" value="${esc(c.useful_note||'')}" placeholder="One line that matters next time" /></div>
+    <div class="cstage-actions"><button class="btn btn-quiet" data-back="${NEEDS_DETAILS.has(CALL.outcome)?'details':'outcome'}" type="button">&larr; Back</button><span class="spacer"></span>
+      <span class="hint">Enter to continue</span><button class="btn btn-primary" id="c-next" type="button">Review &rarr;</button></div>
+  </div></div>`;
+}
+function followupSummary(){
+  const o = CALL.outcome; const d = CALL.details;
+  if(o==='NO_ANSWER') return 'Retry tomorrow morning (Call Actions)';
+  if(o==='GATEKEPT') return 'Retry in 14 days (Call Actions)';
+  if(o==='OWNER_UNAVAILABLE'||o==='CALLBACK_REQUESTED') return `Callback ${when(d.callback_at)}${d.callback_note?` — ${d.callback_note}`:''}`;
+  if(o==='MORE_INFO_REQUESTED') return `Send ${labelOf(INFO_TYPES,d.more_info_type).toLowerCase()} (Actions) · follow-up call ${when(d.followup_at)}`;
+  if(o==='NOT_INTERESTED') return `Closed as not interested — ${labelOf(NI_REASONS,d.not_interested_reason)}${d.not_interested_detail?` — ${d.not_interested_detail}`:''}`;
+  if(o==='BOOKED_MEETING') return `Meeting ${when(d.meeting_at)}${d.meeting_note?` — ${d.meeting_note}`:''} · agency marked meeting booked · prepare-for-meeting action`;
+  if(o==='WRONG_NUMBER') return `${CALL.lead.phone} will not be dialled again`;
+  if(o==='NOT_THE_DECISION_MAKER'){ const r=d.referred_contact||{}; return r.name||r.phone ? `Call ${r.name||'the decision-maker'}${r.role?` (${r.role})`:''}${r.phone?` on ${r.phone}`:''} ${when(d.callback_at)}` : 'No contact captured — nothing scheduled'; }
+  if(o==='DO_NOT_CALL') return 'Removed from all future calling queues';
+  return '';
+}
+function reviewHtml(){
+  const c = CALL.commercial;
+  const row = (k, v, back) => `<div class="review-row"><div class="k">${esc(k)}</div><div class="v">${v}</div>${back?`<button class="edit" data-back="${back}" type="button">Edit</button>`:'<span></span>'}</div>`;
+  return `<div class="cm-main"><div class="cstage">
+    <div class="cstage-t">Review</div><div class="cstage-s">Both buttons save everything. Nothing is lost if you exit.</div>
+    <div class="review">
+      ${row('Call', `${esc(CALL.lead.agency_name)} · ${esc(CALL.lead.contact_name||'unknown contact')} · <span class="mono">${esc(CALL.lead.phone)}</span> · ${mmss(CALL.duration_seconds)}${CALL.started_at?'':' <span class="muted">(not dialled)</span>'}`)}
+      ${row('Outcome', esc(outcomeLabel(CALL.outcome)), 'outcome')}
+      ${row('Pitched', pitchedPreview() ? pill('pitched','t-green') : pill('not pitched','t-grey'), null)}
+      ${row('Follow-up', esc(followupSummary()), NEEDS_DETAILS.has(CALL.outcome)?'details':null)}
+      ${ownerReached()?row('Learned', [c.main_priority?`Priority: ${labelOf(PRIORITIES,c.main_priority)}`:'', c.main_constraint?`Constraint: ${labelOf(CONSTRAINTS,c.main_constraint)}`:''].filter(Boolean).map(esc).join(' · ')||'<span class="muted">nothing captured</span>', 'commercial'):''}
+      ${row('Objections', CALL.objections.length?CALL.objections.map((t)=>pill(t.title,'t-blue',true)).join(' '):'<span class="muted">none</span>', ownerReached()?'commercial':null)}
+      ${row('Note', c.useful_note?esc(c.useful_note):'<span class="muted">none</span>', 'commercial')}
+      ${row('Script', currentScript()?`${esc(currentScript().name)} v${currentScript().version}`:'<span class="muted">none</span>', null)}
+    </div>
+    <div id="r-err" class="formerr cm-err"></div>
+    <div class="cstage-actions"><button class="btn btn-secondary" id="r-exit" type="button">Save &amp; exit</button><span class="spacer"></span>
+      <span class="hint">Enter = next call</span><button class="btn btn-primary" id="r-next" type="button">Save &amp; next call &rarr;</button></div>
+  </div></div>`;
+}
+function doneHtml(){
+  const n = SESSION?.count||0;
+  const untouched = SESSION?.mode==='actions' && (WS.queue||[]).some((l)=>l.bucket===5 && !SESSION.done.has(l.agency_id));
+  return `<div class="cm-main"><div class="cstage" style="text-align:center;padding-top:80px">
+    <div class="cstage-t">Queue complete</div><div class="cstage-s">${n} call${n===1?'':'s'} logged this session. ${untouched?'Due call actions are done; leads never called are still waiting.':'Nothing else is due right now.'}</div>
+    <div class="btnrow" style="justify-content:center">${untouched?`<button class="btn btn-primary" id="done-continue" type="button">Continue with never-called leads</button>`:''}<button class="btn btn-secondary" id="done-exit" type="button">Exit</button></div>
+  </div></div>`;
+}
+
+/* ── DIALER ──────────────────────────────────────────────────────────────
+   Twilio Voice when the server says it is configured (twilio-token returns
+   enabled:true), otherwise the manual dialer: the operator dials on a phone
+   and the page only keeps time. Either way the outcome flow is identical.
+
+   Twilio flow: calling-start opens the CALLS row → Device.connect() with the
+   call_id as the only custom parameter → Twilio asks the server for TwiML,
+   which dials the number stored on that row and records from answer → the
+   Call object's events drive the state shown here. Recording and status are
+   patched onto the row by webhooks; nothing here waits for them.           */
+let KEYPAD = false;
+const DIALER = { enabled:false, reason:'', device:null, call:null, expires:0, ready:null };
+async function fetchToken(){
+  const res = await fetch(TOKEN_URL, { headers:{ Accept:'application/json' } });
+  const data = await res.json();
+  if(!res.ok || data.success===false) throw new Error(data.error || `Token request failed (${res.status})`);
+  return data;
+}
+async function initDialer(){
+  try{
+    const data = await fetchToken();
+    if(!data.enabled){ DIALER.enabled=false; DIALER.reason = `Browser calling not configured — missing ${(data.missing||[]).join(', ')}`; return; }
+    if(!window.Twilio || !window.Twilio.Device){ DIALER.enabled=false; DIALER.reason='Twilio Voice SDK failed to load'; return; }
+    DIALER.device = new Twilio.Device(data.token, { codecPreferences:['opus','pcmu'], closeProtection:true, logLevel:'error' });
+    DIALER.expires = Date.parse(data.expires_at||'') || (Date.now()+3600000);
+    DIALER.device.on('tokenWillExpire', async () => { try{ const t = await fetchToken(); if(t.enabled) DIALER.device.updateToken(t.token); }catch(e){ console.warn('token refresh failed', e); } });
+    DIALER.device.on('error', (e) => { console.warn('Twilio device error', e); if(CALL && (CALL.state==='connecting'||CALL.state==='ringing')){ CALL.state='failed'; CALL.error = e?.message || 'device error'; saveDraft(); renderMode(); } });
+    DIALER.enabled = true; DIALER.reason = '';
+  }catch(err){ DIALER.enabled=false; DIALER.reason = `Browser calling unavailable: ${err.message}`; }
+  finally{ if(CALL) renderCallControls(); }
+}
+async function dial(){
+  if(!CALL || CALL.state!=='idle') return;
+  if(!DIALER.enabled){
+    CALL.call_mode='MANUAL'; CALL.state='connected'; CALL.started_at = CALL.started_at || new Date().toISOString(); CALL.connected_at = new Date().toISOString();
+    saveDraft(); renderMode(); return;
+  }
+  const l = CALL.lead;
+  if(!l.phone_e164){ CALL.state='failed'; CALL.error='no dialable number'; saveDraft(); renderMode(); return; }
+  CALL.call_mode='TWILIO'; CALL.state='connecting'; CALL.started_at = new Date().toISOString(); CALL.error=''; saveDraft(); renderMode();
+  try{
+    const opened = await post(START_URL, { confirm:'START_CALL', client_key: CALL.client_key, agency_id: l.agency_id, script_id: CALL.script_id, source_action_id: CALL.source_action_id||'',
+      contact_name: l.contact_name||'', contact_role: l.contact_role||'', phone: l.phone||'', call_mode:'TWILIO', started_at: CALL.started_at });
+    CALL.call_id = opened.call.call_id; saveDraft();
+    const call = await DIALER.device.connect({ params: { call_id: CALL.call_id, To: l.phone_e164 } });
+    DIALER.call = call;
+    call.on('ringing', () => { if(CALL && CALL.state!=='connected'){ CALL.state='ringing'; saveDraft(); renderCallControls(); } });
+    call.on('accept', () => { CALL.twilio_call_sid = call.parameters?.CallSid || CALL.twilio_call_sid || ''; CALL.state='connected'; CALL.connected_at = CALL.connected_at || new Date().toISOString(); saveDraft(); renderMode(); });
+    call.on('disconnect', () => { finishTwilioCall(false); });
+    call.on('cancel', () => { finishTwilioCall(false); });
+    call.on('error', (e) => { CALL.error = e?.message || 'call error'; finishTwilioCall(true); });
+    call.on('mute', (muted) => { CALL.muted = muted; renderCallControls(); });
+    CALL.twilio_call_sid = call.parameters?.CallSid || '';
+  }catch(err){
+    CALL.state='failed'; CALL.error = err.message || 'could not connect'; saveDraft(); renderMode();
+  }
+}
+function finishTwilioCall(failed){
+  if(!CALL || CALL.state==='ended' || CALL.state==='failed') return;
+  stopTimer(); KEYPAD=false;
+  const connected = Boolean(CALL.connected_at);
+  CALL.ended_at = new Date().toISOString();
+  CALL.duration_seconds = connected ? Math.max(0, Math.round((Date.parse(CALL.ended_at) - Date.parse(CALL.connected_at))/1000)) : 0;
+  CALL.state = failed && !connected ? 'failed' : 'ended';
+  DIALER.call = null;
+  if(CALL.state==='ended') CALL.stage='outcome';
+  saveDraft(); renderMode();
+}
+function hangup(){
+  if(!CALL) return;
+  if(DIALER.enabled && DIALER.call){ try{ DIALER.call.disconnect(); }catch{} finishTwilioCall(false); return; }
+  stopTimer();
+  CALL.ended_at = new Date().toISOString();
+  CALL.duration_seconds = Math.max(0, Math.round((Date.parse(CALL.ended_at) - Date.parse(CALL.connected_at||CALL.started_at))/1000));
+  CALL.state='ended'; CALL.stage='outcome'; saveDraft(); renderMode();
+}
+function chooseOutcome(k){
+  CALL.outcome = k;
+  if(k==='MORE_INFO_REQUESTED' && !CALL.details.followup_at) CALL.details.followup_at = shortcut('2d');
+  if(k==='NOT_THE_DECISION_MAKER' && !CALL.details.callback_at) CALL.details.callback_at = shortcut('tomorrow');
+  CALL.stage = NEEDS_DETAILS.has(k) ? 'details' : 'review';
+  saveDraft(); renderMode();
+}
+function collectDetails(){
+  const o = CALL.outcome; const d = CALL.details; const errs = [];
+  const val = (id) => $(id) ? $(id).value : '';
+  if(o==='OWNER_UNAVAILABLE'||o==='CALLBACK_REQUESTED'){ d.callback_at = fromLocalInput(val('callback_at')); d.callback_note = val('d-note'); if(!d.callback_at) errs.push('Pick a callback time.'); else if(Date.parse(d.callback_at)<Date.now()-60000) errs.push('The callback time is in the past.'); }
+  if(o==='MORE_INFO_REQUESTED'){ d.more_info_note = val('d-note'); d.followup_at = fromLocalInput(val('followup_at')); if(!d.more_info_type) errs.push('Pick what they asked for.'); if(!d.followup_at) errs.push('Pick a follow-up date.'); }
+  if(o==='NOT_INTERESTED'){ d.not_interested_detail = val('d-note'); if(!d.not_interested_reason) errs.push('Pick a reason — it is required.'); }
+  if(o==='BOOKED_MEETING'){ d.meeting_at = fromLocalInput(val('meeting_at')); d.meeting_note = val('d-note'); if(!d.meeting_at) errs.push('Pick the meeting date and time.'); else if(Date.parse(d.meeting_at)<Date.now()-60000) errs.push('The meeting time is in the past.'); }
+  if(o==='NOT_THE_DECISION_MAKER'){ d.referred_contact = { name:val('r-name'), role:val('r-role'), phone:val('r-phone'), email:val('r-email'), notes:val('d-note') }; d.callback_at = fromLocalInput(val('callback_at')); }
+  return errs;
+}
+function collectCommercial(){ if($('c-note')) CALL.commercial.useful_note = $('c-note').value; }
+function goto(stage){
+  if(CALL.stage==='details') collectDetails();
+  if(CALL.stage==='commercial') collectCommercial();
+  CALL.stage = stage; saveDraft(); renderMode();
+}
+function nextFromDetails(){
+  const errs = collectDetails();
+  if(errs.length){ const e=$('d-err'); e.textContent=errs.join(' '); e.classList.add('show'); return; }
+  CALL.stage = ownerReached() ? 'commercial' : 'review'; saveDraft(); renderMode();
+}
+function payload(){
+  const l = CALL.lead; const d = CALL.details; const c = CALL.commercial;
+  return { confirm:'SAVE_CALL', client_key: CALL.client_key, call_id: CALL.call_id||'', agency_id: l.agency_id, script_id: CALL.script_id, source_action_id: CALL.source_action_id||'',
+    contact_name: l.contact_name||'', contact_role: l.contact_role||'', phone: l.phone||'', call_mode: CALL.call_mode, twilio_call_sid: CALL.twilio_call_sid||'',
+    started_at: CALL.started_at || CALL.opened_at, connected_at: CALL.connected_at||'', ended_at: CALL.ended_at||'', duration_seconds: CALL.duration_seconds||0,
+    outcome: CALL.outcome, callback_at: d.callback_at||'', callback_note: d.callback_note||'', owner_reached: d.owner_reached!==false, pitched_override: d.pitched_override===true,
+    more_info_type: d.more_info_type||'', more_info_note: d.more_info_note||'', followup_at: d.followup_at||'',
+    not_interested_reason: d.not_interested_reason||'', not_interested_detail: d.not_interested_detail||'', meeting_at: d.meeting_at||'', meeting_note: d.meeting_note||'',
+    referred_contact: d.referred_contact||null, objections: CALL.objections, main_priority: c.main_priority||'', main_constraint: c.main_constraint||'', useful_note: c.useful_note||'' };
+}
+let SAVING = false;
+async function saveCall(thenNext){
+  if(SAVING) return; SAVING = true;
+  const err = $('r-err'); if(err) err.classList.remove('show');
+  ['r-next','r-exit'].forEach((id)=>{ if($(id)) $(id).disabled = true; });
+  if($('r-next')) $('r-next').innerHTML = '<span class="spinner"></span>Saving';
+  try{
+    const out = await post(SAVE_URL, payload());
+    /* The call row landed but a follow-up write failed. Keep the draft: a
+       retry re-runs only the missing follow-ups (idempotent server-side). */
+    if(out.followups_complete === false) throw new Error(`the call is saved but its follow-up actions were not written (${(out.warnings||[]).join('; ')||'Sheets write failed'})`);
+    const agencyId = CALL.lead.agency_id;
+    SESSION.done.add(agencyId); SESSION.count += 1;
+    CALL = null; saveDraft();
+    /* Freshen the queue in the background: a callback that became due while
+       this call was on will be picked up on the call after next. */
+    load(true);
+    if(thenNext){ const lead = nextLead(); if(lead) beginCall(lead); else { CALL = { stage:'done', lead:{}, state:'idle', details:{}, commercial:{}, objections:[] }; renderMode(); } }
+    else closeMode();
+  }catch(e){
+    if(err){ err.textContent = `${/is saved but/.test(e.message)?'Partly saved':'Not saved'}: ${e.message}. Your call is kept locally — retry.`; err.classList.add('show'); }
+    ['r-next','r-exit'].forEach((id)=>{ if($(id)) $(id).disabled = false; });
+    if($('r-next')) $('r-next').innerHTML = 'Save &amp; next call &rarr;';
+  }finally{ SAVING = false; }
+}
+function logObjection(id){
+  const o = (WS.active_objections||[]).find((x)=>x.objection_id===id); if(!o) return;
+  if(CALL.objections.some((t)=>t.objection_id===id)) return;
+  const from = Date.parse(CALL.connected_at||CALL.started_at||'');
+  CALL.objections.push({ objection_id:id, title:o.title, clicked_at:new Date().toISOString(), offset_seconds: Number.isFinite(from)?Math.max(0,Math.round((Date.now()-from)/1000)):'', source: CALL.state==='connected'?'LIVE':'MANUAL' });
+  saveDraft();
+}
+
+/* ═══ WIRING ════════════════════════════════════════════════════════════ */
+window.addEventListener('hashchange', () => showView(routeFromHash(), { push:false }));
+$('refresh').addEventListener('click', () => load(true));
+$('start-all').addEventListener('click', () => startSession('all'));
+$('start-actions').addEventListener('click', () => startSession('actions'));
+$('cm-exit').addEventListener('click', () => {
+  if(CALL && CALL.outcome && CALL.stage!=='done'){ if(!confirm('This call has an outcome but is not saved yet. Exit anyway? It stays saved locally and can be resumed.')) return; }
+  closeMode();
+});
+$('scr-new').addEventListener('click', () => { SCR_NEW = true; SCR_SEL = null; renderScripts(); });
+$('obj-new').addEventListener('click', () => { OBJ_NEW = true; OBJ_SEL = null; renderObjections(); });
+
+document.addEventListener('click', async (e) => {
+  const t = e.target;
+  const nav = t.closest('.nav-item[data-view]'); if(nav){ showView(nav.dataset.view); return; }
+  if(t.id==='setup-btn'){ t.disabled = true; try{ await post(SETUP_URL, { confirm:'SETUP_CALLING_TABS' }); await load(true); }catch(err){ showErr(`Setup failed: ${err.message}`); t.disabled=false; } return; }
+  if(t.id==='repair-btn'){ t.disabled = true; try{ const out = await post(REPAIR_URL, { confirm:'REPAIR_CALL_FOLLOWUPS' }); if(out.still_pending) showErr(`${out.still_pending} call(s) could still not be repaired — check the ACTIONS tab header.`); await load(true); }catch(err){ showErr(`Repair failed: ${err.message}`); t.disabled=false; } return; }
+  if(t.id==='resume-btn'){ resumeDraft(); return; }
+  if(t.id==='discard-btn'){ localStorage.removeItem(DRAFT_KEY); renderResume(); return; }
+  const callOne = t.closest('.call-one'); if(callOne){ startSession('all', callOne.dataset.id); return; }
+
+  /* Scripts page */
+  const scr = t.closest('.scr'); if(scr && !t.closest('button')){ SCR_NEW=false; SCR_SEL = scr.dataset.script; renderScripts(); return; }
+  if(t.id==='se-save'){ saveScript(false); return; }
+  if(t.id==='se-cancel'){ SCR_NEW=false; renderScripts(); return; }
+  if(t.id==='se-dup'){ try{ const out = await post(SCRIPT_DUP_URL, { confirm:'DUPLICATE_SCRIPT', script_id: SCR_SEL }); SCR_SEL = out.script.script_id; await load(true); }catch(err){ showErr(err.message); } return; }
+  if(t.id==='se-current'){ try{ await post(SCRIPT_STATUS_URL, { confirm:'SET_SCRIPT_STATUS', script_id: SCR_SEL, status:'CURRENT' }); await load(true); }catch(err){ showErr(err.message); } return; }
+  const objEdit = t.closest('.obj-edit'); if(objEdit){ OBJ_NEW=false; OBJ_SEL = objEdit.dataset.objection; renderObjections(); return; }
+  if(t.id==='oe-save'){ saveObjection(); return; }
+  if(t.id==='oe-cancel'){ OBJ_NEW=false; renderObjections(); return; }
+  if(t.closest('#oe-active-l')){ e.preventDefault(); const cb=$('oe-active'); cb.checked=!cb.checked; $('oe-active-l').classList.toggle('on', cb.checked); $('oe-active-l').lastChild.textContent = cb.checked?'Active — shown in Calling Mode':'Inactive — hidden in Calling Mode'; return; }
+
+  /* Calling Mode */
+  if(!CALL) return;
+  if(t.id==='cm-dial'){ dial(); return; }
+  if(t.id==='cm-hangup'){ hangup(); return; }
+  if(t.id==='cm-redial'){ CALL.state='idle'; CALL.error=''; CALL.call_id=''; CALL.client_key=uid(); saveDraft(); renderMode(); return; }
+  if(t.id==='cm-mute'){ if(DIALER.call){ DIALER.call.mute(!DIALER.call.isMuted()); } return; }
+  if(t.id==='cm-keypad'){ KEYPAD=!KEYPAD; renderMode(); return; }
+  const key = t.closest('.key[data-digit]'); if(key){ if(DIALER.call) DIALER.call.sendDigits(key.dataset.digit); return; }
+  if(t.id==='cm-classify'){ CALL.stage='outcome'; saveDraft(); renderMode(); return; }
+  if(t.id==='cm-skip'){ SESSION.done.add(CALL.lead.agency_id); const lead = nextLead(); CALL=null; saveDraft(); if(lead) beginCall(lead); else { CALL={ stage:'done', lead:{}, state:'idle', details:{}, commercial:{}, objections:[] }; renderMode(); } return; }
+  if(t.id==='done-exit'){ closeMode(); return; }
+  if(t.id==='done-continue'){ SESSION.mode='all'; const lead=nextLead(); if(lead) beginCall(lead); return; }
+  const objT = t.closest('.obj-t'); if(objT){ const el=objT.closest('.obj'); const on=el.classList.toggle('on'); if(on && CALL.state==='connected'){ logObjection(el.dataset.obj); if(!objT.querySelector('.obj-n')) objT.insertAdjacentHTML('beforeend','<span class="obj-n">logged</span>'); } return; }
+  const oc = t.closest('.outcome'); if(oc){ chooseOutcome(oc.dataset.outcome); return; }
+  const back = t.closest('[data-back]'); if(back){ goto(back.dataset.back); return; }
+  if(t.id==='d-next'){ nextFromDetails(); return; }
+  if(t.id==='c-next'){ collectCommercial(); CALL.stage='review'; saveDraft(); renderMode(); return; }
+  if(t.id==='r-next'){ saveCall(true); return; }
+  if(t.id==='r-exit'){ saveCall(false); return; }
+  const dt = t.closest('[data-dt]'); if(dt){ $(dt.dataset.dt).value = toLocalInput(shortcut(dt.dataset.key)); dt.parentElement.querySelectorAll('.pick').forEach((p)=>p.classList.toggle('on', p===dt)); return; }
+  const pk = t.closest('.pick[data-value]'); if(pk){
+    const group = pk.closest('[data-picks]'); const name = group.dataset.picks; const value = pk.dataset.value;
+    group.querySelectorAll('.pick').forEach((p)=>p.classList.toggle('on', p===pk));
+    if(name==='owner_reached') CALL.details.owner_reached = value==='TRUE';
+    else if(name==='pitched_override') CALL.details.pitched_override = value==='TRUE';
+    else if(['main_priority','main_constraint'].includes(name)) CALL.commercial[name] = value;
+    else CALL.details[name] = value;
+    saveDraft(); return;
+  }
+  const tag = t.closest('[data-tag]'); if(tag){ logObjection(tag.dataset.tag); CALL.objections[CALL.objections.length-1].source='MANUAL'; renderMode(); return; }
+  const untag = t.closest('[data-untag]'); if(untag){ CALL.objections = CALL.objections.filter((x)=>x.objection_id!==untag.dataset.untag); saveDraft(); renderMode(); return; }
+});
+document.addEventListener('change', (e) => {
+  if(e.target.id==='cm-script-sel' && CALL){ CALL.script_id = e.target.value; saveDraft(); renderMode(); }
+});
+document.addEventListener('input', (e) => {
+  if(!CALL) return;
+  if(e.target.id==='d-note' || /^r-/.test(e.target.id) || e.target.type==='datetime-local'){ collectDetails(); saveDraft(); }
+  if(e.target.id==='c-note'){ collectCommercial(); saveDraft(); }
+});
+document.addEventListener('keydown', (e) => {
+  if(!CALL || !$('cm').classList.contains('on')) return;
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  if(e.key==='Escape' && CALL.stage!=='live'){ if(!typing) goto(CALL.stage==='outcome'?'live':CALL.stage==='details'?'outcome':CALL.stage==='commercial'?(NEEDS_DETAILS.has(CALL.outcome)?'details':'outcome'):CALL.stage==='review'?(ownerReached()?'commercial':NEEDS_DETAILS.has(CALL.outcome)?'details':'outcome'):'live'); return; }
+  if(CALL.stage==='outcome' && !typing && /^[0-9]$/.test(e.key)){ const i = e.key==='0'?9:Number(e.key)-1; if(OUTCOMES[i]){ e.preventDefault(); chooseOutcome(OUTCOMES[i][0]); } return; }
+  if((CALL.stage==='details'||CALL.stage==='commercial') && !typing && /^[1-9]$/.test(e.key)){
+    const group = $('cm-stage').querySelector('[data-picks]:not([data-picks="owner_reached"]):not([data-picks="pitched_override"])');
+    const btn = group && group.querySelectorAll('.pick')[Number(e.key)-1]; if(btn){ e.preventDefault(); btn.click(); } return;
+  }
+  if(e.key==='Enter' && e.target.tagName!=='BUTTON' && !(typing && e.target.tagName==='TEXTAREA')){
+    if(CALL.stage==='live' && CALL.state==='idle' && !typing){ e.preventDefault(); dial(); }
+    else if(CALL.stage==='live' && CALL.state==='connected' && !typing){ e.preventDefault(); hangup(); }
+    else if(CALL.stage==='details'){ e.preventDefault(); nextFromDetails(); }
+    else if(CALL.stage==='commercial'){ e.preventDefault(); collectCommercial(); CALL.stage='review'; saveDraft(); renderMode(); }
+    else if(CALL.stage==='review'){ e.preventDefault(); saveCall(true); }
+  }
+});
+
+showView(routeFromHash(), { push:false });
+load(false);
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initDialer); else initDialer();
+window.addEventListener('beforeunload', (e) => { if(DIALER.call || (CALL && CALL.state==='connected')){ e.preventDefault(); e.returnValue=''; } });
+</script>
+</body>
+</html>
