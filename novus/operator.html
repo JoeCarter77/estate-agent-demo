@@ -451,14 +451,15 @@ const ACTION_LABEL = {
   RESOLVE_EXCEPTION:'Resolve exception', REPLY:'Reply', FOLLOW_UP:'Follow up', CALL:'Call',
   EMAIL:'Email', REVIEW:'Review', BOOK_MEETING:'Book meeting', OTHER:'Other',
   SEND_INFORMATION:'Send requested information', PREPARE_MEETING:'Prepare for meeting', MEETING_FOLLOW_UP:'Meeting follow-up',
+  SORT_LEAD:'Sort lead',
 };
 /* QUEUE = who executes. NOVUS may only own a queue it can actually execute,
    so everything without an enabled automated executor is Manual (Joe's), even
    when NOVUS is the one that recommended it. See the execution authority
    registry in lib/acquisition-actions.mjs. */
-const QUEUE_LABEL = { JOE:'Manual', PROBER:'Prober', SYSTEM:'NOVUS', CALLING:'Calling' };
+const QUEUE_LABEL = { JOE:'Manual', PROBER:'Prober', SYSTEM:'NOVUS', CALLING:'Calling', SORT:'Sort' };
 const OWNER_LABEL = { JOE:'Joe', NOVUS:'NOVUS', SYSTEM:'NOVUS' };
-const QUEUE_TONE  = { JOE:'t-amber', PROBER:'t-blue', SYSTEM:'t-grey', CALLING:'t-blue' };
+const QUEUE_TONE  = { JOE:'t-amber', PROBER:'t-blue', SYSTEM:'t-grey', CALLING:'t-blue', SORT:'t-grey' };
 const PRIORITY_TONE = { CRITICAL:'t-red', HIGH:'t-amber', NORMAL:'t-blue', LOW:'t-grey' };
 const CONTACT_TONE  = { OWNER_DIRECT:'t-violet', NAMED_HUMAN:'t-blue', GENERIC:'t-grey', UNKNOWN:'t-grey' };
 
