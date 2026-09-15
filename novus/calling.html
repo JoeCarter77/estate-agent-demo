@@ -26,38 +26,58 @@
 <body>
 <div class="app">
 
-  <!-- ── SIDEBAR — the Command Centre rail, with the calling workspace's own
-       three tabs live and everything else a link back to operator.html. ── -->
+  <!-- ── SIDEBAR — the same operator.html rail (source of truth: novus/operator.html),
+       with this workspace's own three tabs live as buttons and everything else a
+       link back to /novus/operator.html. Keep this block's items, order, groups,
+       labels and badge ids in lockstep with operator.html's <nav> — the parity
+       self-test in scripts/novus-calling-selftest.mjs asserts they match. ── -->
   <nav class="nav">
     <div class="nav-brand">
       <img class="nav-mark" src="/novus/assets/novus-mark-512.png" width="34" height="34" alt="NOVUS" />
-      <div><div class="nav-name">NOVUS</div><div class="nav-sub">Calling</div></div>
+      <div><div class="nav-name">NOVUS</div><div class="nav-sub">Acquisition</div></div>
     </div>
+
     <div class="nav-group">
-      <a class="nav-item" href="/novus/operator#overview">
+      <a class="nav-item" href="/novus/operator.html#overview">
         <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Overview</span></a>
-      <a class="nav-item" href="/novus/operator#actions">
-        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>Actions</span></a>
-      <button class="nav-item" data-view="calling" type="button">
-        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg>
-        <span>Calling</span><span class="nav-badge zero" id="b-calling">0</span></button>
-      <button class="nav-item" data-view="call-actions" type="button">
+      <a class="nav-item" href="/novus/operator.html#actions">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg>
+        <span>Actions</span><span class="nav-badge zero" id="b-actions">0</span></a>
+      <a class="nav-item" href="/novus/operator.html#future">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/></svg>
-        <span>Call Actions</span><span class="nav-badge zero" id="b-call-actions">0</span></button>
+        <span>Future</span><span class="nav-badge zero" id="b-future">0</span></a>
+      <a class="nav-item" href="/novus/operator.html#pipeline">
+        <svg viewBox="0 0 24 24"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg><span>Pipeline</span></a>
+      <a class="nav-item" href="/novus/operator.html#prober">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <span>Prober</span><span class="nav-badge zero" id="b-prober">0</span></a>
+      <a class="nav-item" href="/novus/operator.html#leads">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg>
+        <span>Leads</span><span class="nav-badge zero" id="b-leads">0</span></a>
+      <a class="nav-item" href="/novus/operator.html#analytics">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Analytics</span></a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Calling</div>
+      <button class="nav-item" data-view="calling" type="button">
+        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span></button>
+      <button class="nav-item" data-view="call-actions" type="button">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/></svg><span>Call Actions</span></button>
       <button class="nav-item" data-view="scripts" type="button">
         <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg><span>Scripts</span></button>
-      <a class="nav-item" href="/novus/operator#pipeline">
-        <svg viewBox="0 0 24 24"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg><span>Pipeline</span></a>
-      <a class="nav-item" href="/novus/operator#leads">
-        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg><span>Leads</span></a>
     </div>
+
     <div class="nav-group">
       <div class="nav-label">System</div>
-      <a class="nav-item" href="/novus/operator#prober">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Prober</span></a>
+      <a class="nav-item" href="/novus/operator.html#exceptions">
+        <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+        <span>Exceptions</span><span class="nav-badge zero" id="b-exceptions">0</span></a>
       <a class="nav-item" href="/novus/communications.html">
-        <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 4l8 8 8-8"/></svg><span>Communications</span></a>
+        <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 4l8 8 8-8"/></svg>
+        <span>Communications</span></a>
     </div>
+
     <div class="nav-foot"><div class="nav-stamp" id="stamp"><span class="spin"></span>Loading</div></div>
   </nav>
 
@@ -137,7 +157,7 @@
         <div class="page-head">
           <h1 class="page-title">Call actions</h1>
           <p class="page-sub">Phone work only — callbacks you promised, no-answer retries and gatekept retries. The generic
-            <a href="/novus/operator#actions" style="color:var(--blue)">Actions</a> list is deliberately not this: information to
+            <a href="/novus/operator.html#actions" style="color:var(--blue)">Actions</a> list is deliberately not this: information to
             send and meetings to prepare live there.</p>
         </div>
         <div class="filters">
@@ -317,7 +337,7 @@ async function load(force){
     const data = await res.json();
     if(!res.ok || data.success===false) throw new Error(data.error || `Request failed (${res.status})`);
     WS = data; LOADED = true;
-    renderSetup(); renderBadges(); renderResume(); renderView();
+    renderSetup(); renderResume(); renderView();
     $('stamp').innerHTML = `<span class="nav-dot${data.cached?' stale':''}"></span>${esc(when(data.generated_at))}${data.cached?` · cached ${Math.round((data.cache_age_ms||0)/1000)}s`:''}`;
   }catch(err){
     showErr(`The calling workspace could not load. ${err.message||''}`);
@@ -340,12 +360,6 @@ function renderSetup(){
     <span class="card-note">Creates the tabs with their headers and seeds a starter script and objection titles. Nothing existing is touched.</span></div></div>`;
   box.classList.remove('hidden');
 }
-function renderBadges(){
-  const set=(id,n,hot)=>{ const el=$(id); el.textContent=String(n); el.classList.toggle('zero',!n); el.classList.toggle('hot',Boolean(hot)&&n>0); };
-  set('b-calling', WS.counts?.callable||0, false);
-  set('b-call-actions', WS.counts?.call_actions_due||0, true);
-}
-
 /* ═══ CALLING VIEW ══════════════════════════════════════════════════════ */
 function renderCalling(){
   const c = WS.counts||{}; const q = WS.queue||[];
@@ -444,8 +458,8 @@ function renderScriptEditor(){
         ${['CURRENT','TESTING','ARCHIVED'].map((v)=>`<option value="${v}" ${s.status===v?'selected':''}>${v[0]+v.slice(1).toLowerCase()}</option>`).join('')}</select></div>
     </div>
     <div class="field"><label class="field-l">Script</label>
-      <textarea class="input" id="se-content" placeholder="Hi, is that {{first_name}}? ... Lines starting with # become headings; {{name}}, {{first_name}}, {{agency}} and {{location}} are filled in.">${esc(s.content)}</textarea>
-      <div class="field-note">Placeholders: <span class="mono">{{first_name}}</span> <span class="mono">{{name}}</span> <span class="mono">{{agency}}</span> <span class="mono">{{location}}</span>. A line starting with <span class="mono">#</span> is a heading.</div></div>
+      <textarea class="input" id="se-content" placeholder="Hi, is that {{first_name}}? ... Lines starting with # become headings; {{name}}, {{first_name}}, {{agency}}, {{location}} and {{property}} are filled in.">${esc(s.content)}</textarea>
+      <div class="field-note">Placeholders: <span class="mono">{{first_name}}</span> <span class="mono">{{name}}</span> <span class="mono">{{agency}}</span> <span class="mono">{{location}}</span> <span class="mono">{{property}}</span>. A line starting with <span class="mono">#</span> is a heading.</div></div>
     <div class="field"><label class="field-l">Notes</label><input class="input block" id="se-notes" value="${esc(s.notes||'')}" placeholder="What changed in this version" /></div>
     ${frozen ? `<div class="hintbox"><b>${s.call_count} call${s.call_count===1?'':'s'} recorded with this version.</b> Its wording is frozen. Saving creates v${(Math.max(...(WS.scripts||[]).filter((x)=>x.script_key===s.script_key).map((x)=>x.version)))+1}; status changes still apply to this version.</div>` : ''}
     <div class="btnrow" style="margin-top:18px">
@@ -538,8 +552,11 @@ function resumeDraft(){
 function currentScript(){ return (WS.scripts||[]).find((s)=>s.script_id===CALL.script_id) || null; }
 function scriptHtml(content, lead){
   const vars = { name: lead.contact_name||'there', first_name: firstName(lead.contact_name)||'there', agency: lead.agency_name||'your agency', location: lead.location||'your area' };
+  const property = lead.context && lead.context.property || '';
   return esc(content||'(this script has no content yet — add it in Scripts)')
-    .replace(/\{\{\s*(name|first_name|agency|location)\s*\}\}/g, (_, k) => `<span class="var">${esc(vars[k])}</span>`)
+    .replace(/\{\{\s*(name|first_name|agency|location|property)\s*\}\}/g, (_, k) => k==='property'
+      ? (property ? `<span class="var">${esc(property)}</span>` : `<span class="var missing" title="No property on record for this lead's probe">[property unavailable]</span>`)
+      : `<span class="var">${esc(vars[k])}</span>`)
     .replace(/\n{0,2}^#+\s*(.+)$\n?/gm, '<h3>$1</h3>');
 }
 function stopTimer(){ if(TIMER){ clearInterval(TIMER); TIMER=null; } }

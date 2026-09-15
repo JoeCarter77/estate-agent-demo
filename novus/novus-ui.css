@@ -913,6 +913,7 @@ select.input.block{padding-right:30px;}
 .cm-label .pill{margin-left:auto;}
 .script{font-size:16.5px;line-height:1.72;color:var(--ink);white-space:pre-wrap;max-width:76ch;}
 .script .var{color:var(--blue-hi);font-weight:600;}
+.script .var.missing{color:var(--amber);}
 .script h3{font-family:var(--serif);font-size:19px;font-weight:400;margin:22px 0 8px;letter-spacing:-.01em;}
 .script h3:first-child{margin-top:0;}
 

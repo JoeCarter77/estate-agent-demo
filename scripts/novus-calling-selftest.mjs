@@ -344,6 +344,91 @@ const table = (header, objs) => ({ header: [...header], rows: objs.map((o) => he
   ok('a deliberate script override on a later call becomes the lead\'s new assigned version');
 }
 
+// ── 2c. {{property}} — lead.context.property resolves from PROBES ──────────
+// Reuses the one existing property_street/property_address rule
+// (lib/property-reference.mjs — the same field Instantly's {{property_street}}
+// already uses), scoped to whichever probe is genuinely sent/live, most
+// recent first — never a hand-invented new field.
+{
+  const AG = ['agency_id', 'clean_agency_name', 'main_phone'];
+  const PROBE_HEADER = ['probe_id', 'agency_id', 'probe_status', 'probe_timestamp', 'property_street', 'property_address'];
+  const agencies = [
+    { agency_id: 'ag_prop_stored', clean_agency_name: 'Stored Street', main_phone: '01234 800001' },
+    { agency_id: 'ag_prop_derived', clean_agency_name: 'Derived Street', main_phone: '01234 800002' },
+    { agency_id: 'ag_prop_multi', clean_agency_name: 'Multiple Probes', main_phone: '01234 800003' },
+    { agency_id: 'ag_prop_draft_only', clean_agency_name: 'Draft Probe Only', main_phone: '01234 800004' },
+    { agency_id: 'ag_prop_no_probe', clean_agency_name: 'No Probe At All', main_phone: '01234 800005' },
+    { agency_id: 'ag_prop_unresolvable', clean_agency_name: 'Unresolvable Address', main_phone: '01234 800006' },
+  ];
+  const probes = [
+    { probe_id: 'pp_stored', agency_id: 'ag_prop_stored', probe_status: 'CLOSED', probe_timestamp: iso(T0 - 5 * DAY), property_street: '14 Oak Road', property_address: '' },
+    { probe_id: 'pp_derived', agency_id: 'ag_prop_derived', probe_status: 'OBSERVING', probe_timestamp: iso(T0 - 3 * DAY), property_street: '', property_address: '10 High Street, Billericay, CM12 9AB' },
+    // Two genuine probes for the same agency: the OLDER one carries a
+    // different street. The most recent genuine probe must win.
+    { probe_id: 'pp_multi_old', agency_id: 'ag_prop_multi', probe_status: 'CLOSED', probe_timestamp: iso(T0 - 40 * DAY), property_street: 'Old Lane', property_address: '' },
+    { probe_id: 'pp_multi_new', agency_id: 'ag_prop_multi', probe_status: 'ACTIVE', probe_timestamp: iso(T0 - 2 * DAY), property_street: 'New Close', property_address: '' },
+    // Only a DRAFT probe — never genuinely sent, so it must not supply a property.
+    { probe_id: 'pp_draft', agency_id: 'ag_prop_draft_only', probe_status: 'DRAFT', probe_timestamp: '', property_street: 'Should Not Appear', property_address: '' },
+    // A genuine probe with neither a usable street nor a usable address.
+    { probe_id: 'pp_unresolvable', agency_id: 'ag_prop_unresolvable', probe_status: 'CLOSED', probe_timestamp: iso(T0 - 1 * DAY), property_street: '', property_address: 'Unknown address' },
+  ];
+  const ws = buildCallingWorkspace({
+    AGENCIES: table(AG, agencies), ACTIONS: table(ACTIONS_HEADER, []), CALLS: table(CALLS_HEADER, []),
+    SCRIPTS: table(SCRIPTS_HEADER, []), OBJECTIONS: table(OBJECTIONS_HEADER, []), CALL_OBJECTION_EVENTS: table(CALL_OBJECTION_EVENTS_HEADER, []),
+    REPLY_EVENTS: { header: [], rows: [] }, CONTACTS: { header: [], rows: [] }, INTELLIGENCE: { header: [], rows: [] },
+    PROBES: table(PROBE_HEADER, probes), DEMOS: { header: [], rows: [] },
+  }, { now: iso(T0) });
+
+  assert.equal(ws.leads.ag_prop_stored.context.property, '14 Oak Road', 'a stored property_street is used as-is');
+  assert.equal(ws.leads.ag_prop_derived.context.property, '10 High Street', 'a blank property_street derives from property_address');
+  ok('{{property}} resolves via the existing property_street/property_address rule (lib/property-reference.mjs), not a new field');
+
+  assert.equal(ws.leads.ag_prop_multi.context.property, 'New Close', 'the most recent genuine sent/live probe wins over an older one');
+  ok('multiple probes on one agency: the documented rule (genuine sent/live, most recent) decides which property is used');
+
+  assert.equal(ws.leads.ag_prop_draft_only.context.property, '', 'a DRAFT-only probe is never genuine, so it supplies no property');
+  assert.equal(ws.leads.ag_prop_no_probe.context.property, '', 'no PROBES row at all resolves to no property');
+  assert.equal(ws.leads.ag_prop_unresolvable.context.property, '', 'a genuine probe with no usable street or address still resolves to no property');
+  ok('a missing property resolves to an empty context field rather than throwing or inventing a value');
+}
+
+// ── 2d. {{property}} — Calling Mode script rendering (novus/calling.html) ──
+// Loads the real scriptHtml()/esc()/firstName() functions straight out of
+// novus/calling.html (not a hand copy, so this cannot silently drift from
+// the shipped code) and exercises the actual substitution + fallback.
+{
+  const fs = await import('node:fs');
+  const url = await import('node:url');
+  const callingHtml = fs.readFileSync(url.fileURLToPath(new URL('../novus/calling.html', import.meta.url)), 'utf8');
+  const extractFn = (name, { multiline = false } = {}) => {
+    const re = multiline
+      ? new RegExp(`function ${name}\\([^)]*\\)\\{[\\s\\S]*?\\n\\}`)
+      : new RegExp(`function ${name}\\([^)]*\\)\\{.*\\}`);
+    const m = callingHtml.match(re);
+    assert.ok(m, `could not find function ${name}() in novus/calling.html — has it been renamed?`);
+    return m[0];
+  };
+  const scriptHtml = new Function(
+    `${extractFn('esc')}\n${extractFn('firstName')}\n${extractFn('scriptHtml', { multiline: true })}\nreturn scriptHtml;`
+  )();
+
+  const leadWithProperty = { contact_name: 'Ian Smith', agency_name: 'Smith & Co', location: 'Billericay', context: { property: '14 Oak Road' } };
+  const content = 'Hi, is that {{first_name}}? It was actually on {{property}}. I\'d said in the enquiry that I had a property to sell as well.';
+  const rendered = scriptHtml(content, leadWithProperty);
+  assert.ok(rendered.includes('<span class="var">14 Oak Road</span>'), 'the resolved property renders as a filled-in variable');
+  assert.ok(rendered.includes('<span class="var">Ian</span>'), 'the existing placeholders keep working alongside {{property}}');
+  assert.ok(!rendered.includes('{{property}}'), 'the raw template syntax never reaches the screen');
+  assert.equal(content, 'Hi, is that {{first_name}}? It was actually on {{property}}. I\'d said in the enquiry that I had a property to sell as well.', 'the stored script content itself is never mutated — substitution happens only in the rendered output');
+  ok('{{property}} substitutes the resolved probe property at render time, leaving the stored script untouched');
+
+  const leadWithoutProperty = { contact_name: 'Ian Smith', agency_name: 'Smith & Co', location: 'Billericay', context: { property: '' } };
+  const missing = scriptHtml('On {{property}} you mentioned...', leadWithoutProperty);
+  assert.ok(missing.includes('[property unavailable]'), 'an unresolved property renders a clear neutral fallback');
+  assert.ok(!missing.includes('{{property}}'), 'the raw template syntax never reaches the screen even when unresolved');
+  assert.ok(!missing.includes('Smith &amp; Co') && !missing.includes('Smith & Co'), 'a missing property never silently falls back to the agency name or another field');
+  ok('a missing property fails gracefully — a labelled fallback, never raw template syntax and never a substituted wrong field');
+}
+
 // ── 3. handlers end to end against the in-memory workbook ──────────────────
 {
   const AG = ['agency_id', 'clean_agency_name', 'main_phone', 'outreach_contact_name', 'current_pipeline_status', 'updated_at'];
