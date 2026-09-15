@@ -74,7 +74,7 @@ import { buildInstantlyReplyPayload } from '../../lib/instantly-reply-send.mjs';
 // other operation on this function: a thirteenth file is not available, so the
 // calling workspace is a set of operations here, implemented in lib/.
 import {
-  handleCallingWorkspace, handleCallingSetup, handleCallingStart, handleCallingSave, handleCallingRepair,
+  handleCallingWorkspace, handleCallingAnalytics, handleCallingSetup, handleCallingStart, handleCallingSave, handleCallingRepair,
   handleScriptSave, handleScriptDuplicate, handleScriptStatus, handleObjectionSave,
 } from '../../lib/calling-handlers.mjs';
 import {
@@ -1782,6 +1782,12 @@ export default async function handler(req, res) {
     // READ-ONLY by construction: Sheets reads only, no writer reachable.
     if (!requireAuth(req, res)) return;
     return handleCallingWorkspace(req, res);
+  }
+  if (req.method === 'GET' && req.query?.novus_operation === 'calling-analytics') {
+    // READ-ONLY by construction, exactly like calling-workspace: Sheets reads
+    // only, a pure aggregation, no writer reachable (lib/calling-analytics.mjs).
+    if (!requireAuth(req, res)) return;
+    return handleCallingAnalytics(req, res);
   }
   if (req.method === 'GET' && req.query?.novus_operation === 'twilio-token') {
     // Mints a short-lived browser token; reads nothing from Sheets.

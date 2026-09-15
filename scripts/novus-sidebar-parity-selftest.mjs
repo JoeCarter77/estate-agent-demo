@@ -40,6 +40,7 @@ const CANONICAL = [
   { group: 'Calling', key: 'calling', label: 'Calling', badge: null },
   { group: 'Calling', key: 'call-actions', label: 'Call Actions', badge: null },
   { group: 'Calling', key: 'scripts', label: 'Scripts', badge: null },
+  { group: 'Calling', key: 'calling-analytics', label: 'Calling Analytics', badge: null },
   { group: 'System', key: 'exceptions', label: 'Exceptions', badge: 'b-exceptions' },
   { group: 'System', key: 'communications', label: 'Communications', badge: null },
 ];
@@ -47,7 +48,7 @@ const CANONICAL = [
 // the other workspace — the one legitimate structural difference between the
 // two pages.
 const OPERATOR_OWN = new Set(['overview', 'actions', 'future', 'pipeline', 'prober', 'leads', 'analytics', 'exceptions']);
-const CALLING_OWN = new Set(['calling', 'call-actions', 'scripts']);
+const CALLING_OWN = new Set(['calling', 'call-actions', 'scripts', 'calling-analytics']);
 
 function parseNav(html, file) {
   const navMatch = html.match(/<nav class="nav">([\s\S]*?)<\/nav>/);
@@ -118,7 +119,7 @@ function checkOwnership(name, parsed, ownKeys) {
 }
 checkOwnership('operator.html', operator, OPERATOR_OWN);
 checkOwnership('calling.html', calling, CALLING_OWN);
-ok('each page renders its own three-or-eight tabs as active buttons and everything else as a link elsewhere');
+ok('each page renders its own four-or-eight tabs as active buttons and everything else as a link elsewhere');
 
 console.log('\nEvery cross-page link resolves to a real file, never a bare route Vercel has no rewrite for');
 for (const [name, parsed] of [['operator.html', operator], ['calling.html', calling]]) {

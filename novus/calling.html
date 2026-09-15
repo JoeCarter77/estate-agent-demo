@@ -66,6 +66,8 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/></svg><span>Call Actions</span></button>
       <button class="nav-item" data-view="scripts" type="button">
         <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg><span>Scripts</span></button>
+      <button class="nav-item" data-view="calling-analytics" type="button">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Calling Analytics</span></button>
     </div>
 
     <div class="nav-group">
@@ -194,6 +196,112 @@
           </div>
         </div>
       </section>
+
+      <!-- ══ CALLING ANALYTICS ═════════════════════════════════════════
+           Read model: ?novus_operation=calling-analytics (lib/calling-analytics.mjs).
+           Summary first, detail on click; the call explorer at the bottom is
+           where every drill-down lands. ══════════════════════════════════ -->
+      <section class="view" id="v-calling-analytics">
+        <div class="page-head">
+          <h1 class="page-title">Calling analytics</h1>
+          <p class="page-sub">Where calls are lost, which objections come up, which scripts convert and when calling works —
+            counted from immutable call records. Rates are blank when there is nothing to divide by.</p>
+        </div>
+        <div class="an-filters" id="an-filters">
+          <div class="seg" id="an-range">
+            <button type="button" data-range="today">Today</button>
+            <button type="button" data-range="7d">7 days</button>
+            <button type="button" data-range="30d">30 days</button>
+            <button type="button" data-range="all" class="on">All time</button>
+            <button type="button" data-range="custom">Custom</button>
+          </div>
+          <span id="an-custom" class="hidden" style="display:inline-flex;gap:6px;align-items:center;">
+            <input class="input" type="date" id="an-from" /> <span class="muted">to</span> <input class="input" type="date" id="an-to" />
+            <button class="btn btn-secondary btn-sm" id="an-apply" type="button">Apply</button>
+          </span>
+          <select class="input" id="an-script"><option value="">All scripts</option></select>
+          <span class="an-range-note" id="an-note"></span>
+        </div>
+        <div id="an-empty" class="hidden"></div>
+        <div id="an-body">
+          <div class="kpis five" id="an-kpis"></div>
+
+          <div class="section">
+            <div class="section-head"><div class="section-title">Call funnel</div>
+              <div class="section-note">Calls → owner reached → pitched → meetings. Click a step to see those calls.</div></div>
+            <div class="card"><div class="card-body"><div class="funnel" id="an-funnel"></div><div class="reach" id="an-reach"></div></div></div>
+          </div>
+
+          <div class="section">
+            <div class="an-grid">
+              <div>
+                <div class="section-head"><div class="section-title">Top objections</div>
+                  <div class="section-note">Unique owner conversations</div>
+                  <button class="section-link" id="an-obj-all" type="button">View all</button></div>
+                <div class="card"><div class="card-body rank" id="an-objections"></div></div>
+              </div>
+              <div>
+                <div class="section-head"><div class="section-title">Top outcomes</div>
+                  <div class="section-note">Share of all calls</div>
+                  <button class="section-link" id="an-out-all" type="button">View all</button></div>
+                <div class="card"><div class="card-body rank" id="an-outcomes"></div></div>
+              </div>
+            </div>
+            <div id="an-drill"></div>
+          </div>
+
+          <div class="section">
+            <div class="section-head"><div class="section-title">Script performance</div>
+              <div class="section-note">Counted against the exact version each call was made with. Click a row for objections and duration.</div></div>
+            <div class="card an-scripts"><div class="tablewrap"><table>
+              <thead><tr><th>Script</th><th class="num">Calls</th><th class="num">Owner reached</th><th class="num">Pitched</th><th class="num">Meetings</th><th>Owner → meeting</th><th class="col-md">Pitch → meeting</th></tr></thead>
+              <tbody id="an-scripts"></tbody></table></div><div id="an-script-detail"></div></div>
+          </div>
+
+          <div class="section">
+            <div class="an-grid">
+              <div>
+                <div class="section-head"><div class="section-title">Gatekeepers</div>
+                  <div class="section-note">Is reception the bottleneck?</div></div>
+                <div class="gk-card" id="an-gk"></div>
+              </div>
+              <div>
+                <div class="section-head"><div class="section-title">Follow-ups</div>
+                  <div class="section-note">Only counted where the action is keyed to the call</div>
+                  <button class="section-link" id="an-fu-all" type="button">Details</button></div>
+                <div class="card"><div class="card-body" id="an-followups"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head"><div class="section-title">Best times to call</div>
+              <div class="section-note" id="an-time-note">Europe/London. Shade = calls, dot = a meeting was booked.</div></div>
+            <div class="card"><div class="card-body" id="an-timing"></div></div>
+          </div>
+
+          <div class="section an-explorer" id="an-explorer-section">
+            <div class="section-head"><div class="section-title">Call explorer</div>
+              <div class="section-note" id="an-ex-note"></div>
+              <button class="section-link" id="an-ex-clear" type="button">Clear filters</button></div>
+            <div class="filters" id="an-ex-filters">
+              <select class="input" id="ex-outcome"><option value="">Any outcome</option></select>
+              <select class="input" id="ex-objection"><option value="">Any objection</option></select>
+              <select class="input" id="ex-script"><option value="">Any script</option></select>
+              <select class="input" id="ex-gk"><option value="">Gatekeeper: any</option><option value="yes">Gatekeeper reached</option><option value="no">No gatekeeper</option></select>
+              <select class="input" id="ex-owner"><option value="">Owner: any</option><option value="yes">Owner reached</option><option value="no">Owner not reached</option><option value="direct">Owner · direct</option><option value="via">Owner · via gatekeeper</option></select>
+              <select class="input" id="ex-meeting"><option value="">Meeting: any</option><option value="yes">Meeting booked</option><option value="no">No meeting</option></select>
+              <select class="input" id="ex-pitched"><option value="">Pitched: any</option><option value="yes">Pitched</option><option value="no">Not pitched</option></select>
+              <input class="input" id="ex-q" type="search" placeholder="Agency, contact or phone" style="min-width:200px" />
+            </div>
+            <div class="card"><div class="tablewrap"><table>
+              <thead><tr><th>When</th><th>Agency</th><th class="col-md">Contact</th><th>Reach</th><th class="col-lg">Script</th><th>Objections</th><th>Outcome</th><th class="num">Dur.</th><th class="col-md">Follow-up</th></tr></thead>
+              <tbody id="ex-rows"></tbody></table></div>
+              <div class="an-pagefoot" id="ex-foot"></div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 </div>
@@ -241,6 +349,7 @@ const OBJECTION_SAVE_URL = OP('objection-save');
 const REPAIR_URL        = OP('calling-repair');
 const TOKEN_URL         = OP('twilio-token');
 const RECORDING_URL     = OP('calling-recording');
+const ANALYTICS_URL     = OP('calling-analytics');
 const DRAFT_KEY = 'novus.calling.draft';
 
 let WS = null;          // the workspace payload
@@ -336,8 +445,8 @@ async function post(url, body){
 function showErr(msg){ $('load-err').innerHTML = `<div>${esc(msg)}</div>`; $('load-err').classList.remove('hidden'); }
 
 /* ═══ ROUTING ═══════════════════════════════════════════════════════════ */
-const VIEWS = ['calling','call-actions','scripts'];
-const VIEW_TITLE = { 'calling':'Calling', 'call-actions':'Call actions', 'scripts':'Scripts' };
+const VIEWS = ['calling','call-actions','scripts','calling-analytics'];
+const VIEW_TITLE = { 'calling':'Calling', 'call-actions':'Call actions', 'scripts':'Scripts', 'calling-analytics':'Calling analytics' };
 function routeFromHash(){ const raw=String(location.hash||'').replace(/^#\/?/,'').split('?')[0].trim().toLowerCase(); return VIEWS.includes(raw)?raw:'calling'; }
 function showView(name, { push = true } = {}){
   VIEW = VIEWS.includes(name) ? name : 'calling';
@@ -347,7 +456,7 @@ function showView(name, { push = true } = {}){
   if(push && routeFromHash()!==VIEW) location.hash = '#'+VIEW;
   renderView();
 }
-function renderView(){ if(!LOADED) return; if(VIEW==='calling') renderCalling(); if(VIEW==='call-actions') renderCallActions(); if(VIEW==='scripts') renderScripts(); }
+function renderView(){ if(VIEW==='calling-analytics'){ loadAnalytics(false); return; } if(!LOADED) return; if(VIEW==='calling') renderCalling(); if(VIEW==='call-actions') renderCallActions(); if(VIEW==='scripts') renderScripts(); }
 
 /* ═══ LOAD ══════════════════════════════════════════════════════════════ */
 async function load(force){
@@ -970,9 +1079,316 @@ function logObjection(id){
   saveDraft();
 }
 
+
+/* ═══ CALLING ANALYTICS ═════════════════════════════════════════════════
+   Everything here is presentation. The read model — every count, rate and
+   denominator — comes from ?novus_operation=calling-analytics
+   (lib/calling-analytics.mjs). The server filters by date range and script;
+   outcome / objection / reach filters only narrow the explorer table below,
+   so the sections above always keep their true denominators. */
+let AN = null;                 // the analytics payload
+let AN_Q = { range:'all', from:'', to:'', script_id:'' };
+let AN_KEY = '';               // query string last loaded
+let AN_INFLIGHT = null;        // one fetch at a time
+let EX = { outcome:'', objection:'', script:'', gk:'', owner:'', meeting:'', pitched:'', q:'', step:'', page:0, open:null };
+const EX_PAGE = 50;
+let AN_DRILL = null;           // 'outcomes' | 'objections' | 'followups' | null
+let AN_SCRIPT_OPEN = null;
+const ANL = (n) => (n==null ? '&mdash;' : `${n}%`);
+const nfmt = (n) => Number(n||0).toLocaleString('en-GB');
+
+function analyticsQuery(){
+  const p = new URLSearchParams({ range: AN_Q.range });
+  if(AN_Q.range==='custom'){ p.set('from', AN_Q.from); p.set('to', AN_Q.to); }
+  if(AN_Q.script_id) p.set('script_id', AN_Q.script_id);
+  return p.toString();
+}
+async function loadAnalytics(force){
+  const key = analyticsQuery();
+  if(!force && AN && AN_KEY===key){ renderAnalytics(); return; }
+  if(AN_INFLIGHT===key && !force) return;
+  AN_INFLIGHT = key;
+  if(AN_Q.range==='custom' && !(AN_Q.from && AN_Q.to)){ $('an-note').textContent = 'Pick both dates, then Apply.'; return; }
+  $('refresh').disabled = true; $('an-note').innerHTML = '<span class="spin"></span> Loading';
+  try{
+    const res = await fetch(`${ANALYTICS_URL}&${key}${force?'&refresh=1':''}`, { headers:{ Accept:'application/json' } });
+    const data = await res.json();
+    if(!res.ok || data.success===false) throw new Error(data.error || `Request failed (${res.status})`);
+    AN = data; AN_KEY = key; EX.page = 0; EX.open = null;
+    renderAnalytics();
+    $('stamp').innerHTML = `<span class="nav-dot${data.cached?' stale':''}"></span>${esc(when(data.generated_at))}${data.cached?` · cached ${Math.round((data.cache_age_ms||0)/1000)}s`:''}`;
+  }catch(err){
+    showErr(`Calling analytics could not load. ${err.message||''}`);
+    $('an-note').textContent = 'Load failed';
+  }finally{ $('refresh').disabled = false; AN_INFLIGHT = null; }
+}
+function rangeLabel(){
+  const r = AN.range||{}; const d = (iso) => new Date(iso).toLocaleDateString('en-GB',{ day:'2-digit', month:'short', year:'numeric' });
+  if(r.key==='all') return 'All time';
+  if(r.key==='today') return `Today · ${d(r.from)}`;
+  const last = new Date(Date.parse(r.to) - 1).toISOString();
+  return `${d(r.from)} – ${d(last)}`;
+}
+function renderAnalytics(){
+  if(!AN) return;
+  const s = AN.summary||{};
+  document.querySelectorAll('#an-range button').forEach((b) => b.classList.toggle('on', b.dataset.range===AN_Q.range));
+  $('an-custom').classList.toggle('hidden', AN_Q.range!=='custom');
+  const scriptSel = $('an-script');
+  scriptSel.innerHTML = '<option value="">All scripts</option>' + (AN.enums?.scripts||[]).map((x) => `<option value="${esc(x.script_id)}">${esc(x.name)} v${x.version}${x.is_current?' · current':''}</option>`).join('');
+  scriptSel.value = AN_Q.script_id;
+  $('an-note').textContent = `${rangeLabel()} · ${nfmt(s.calls)} call${s.calls===1?'':'s'}${s.unclassified?` · ${s.unclassified} opened but never classified (not counted)`:''}`;
+
+  if(!AN.setup?.available){
+    $('an-empty').innerHTML = `<div class="banner warn">Calling tabs are not set up yet — there is nothing to analyse. Open the <a href="#calling" style="color:var(--blue)">Calling</a> page to set them up.</div>`;
+    $('an-empty').classList.remove('hidden'); $('an-body').classList.add('hidden'); return;
+  }
+  if(!s.calls){
+    $('an-empty').innerHTML = emptyState('No calls in this range', 'Widen the date range, or make some calls.');
+    $('an-empty').classList.remove('hidden'); $('an-body').classList.add('hidden'); return;
+  }
+  $('an-empty').classList.add('hidden'); $('an-body').classList.remove('hidden');
+
+  /* TOP LEVEL — five figures, no more. Each carries its denominator. */
+  $('an-kpis').innerHTML = [
+    ['Calls', nfmt(s.calls), `${nfmt(s.connected)} connected · ${s.connect_rate_pct==null?'—':s.connect_rate_pct+'%'}`, 'brand', ''],
+    ['Owners reached', nfmt(s.owner_reached), `${s.owner_rate_pct==null?'—':s.owner_rate_pct+'% of calls'}`, '', 'owner_reached'],
+    ['Gatekeeper → owner', ANL(s.gatekeeper_to_owner_pct), `${nfmt(s.gatekeeper_then_owner)} of ${nfmt(s.gatekeeper_reached)} gatekeeper calls`, '', 'gatekeeper'],
+    ['Meetings booked', nfmt(s.meetings), `${nfmt(s.pitched)} pitched · ${s.pitch_to_meeting_pct==null?'—':s.pitch_to_meeting_pct+'% of pitches'}`, s.meetings?'good':'', 'meetings'],
+    ['Owner → meeting', ANL(s.owner_to_meeting_pct), `${nfmt(s.meetings)} of ${nfmt(s.owner_reached)} owner conversations`, '', ''],
+  ].map(([l,n,f,tone,step]) => `<div class="kpi ${tone} ${step?'act':''}" ${step?`data-step="${step}"`:''}><div class="kpi-l">${l}</div><div class="kpi-n">${n}</div><div class="kpi-f">${esc(f)}</div></div>`).join('');
+
+  /* FUNNEL */
+  const steps = AN.funnel?.steps||[]; const top = Math.max(1, ...steps.map((x)=>x.count));
+  $('an-funnel').innerHTML = steps.filter((x)=>x.key!=='connected').map((x) => `<div class="fstep" data-step="${esc(x.key)}"><div class="fstep-l">${esc(x.label)}</div><div class="fstep-n">${nfmt(x.count)}</div>
+    <div class="fstep-b" style="width:${Math.max(3, Math.round((x.count/top)*100))}%"></div><div class="fstep-r">${x.pct_of_calls==null?'&mdash;':x.pct_of_calls+'% of calls'}</div></div>`).join('');
+  const r = AN.funnel?.reach||{};
+  $('an-reach').innerHTML = [
+    ['Owner reached directly', r.owner_direct, 'direct'], ['Gatekeeper reached', r.gatekeeper_reached, 'gatekeeper'],
+    ['Owner reached via gatekeeper', r.owner_via_gatekeeper, 'via'],
+    ['Gatekeeper → owner', r.gatekeeper_to_owner_pct==null?'&mdash;':r.gatekeeper_to_owner_pct+'%', ''],
+  ].map(([l,n,step]) => `<div ${step?`class="act" data-step="${step}" style="cursor:pointer"`:''}><div class="n">${typeof n==='number'?nfmt(n):n}</div><div class="l">${l}</div></div>`).join('')
+    + (r.owner_unclassified ? `<div style="grid-column:1/-1"><div class="small-note">${nfmt(r.owner_unclassified)} owner conversation${r.owner_unclassified===1?'':'s'} predate the gatekeeper/owner answer screen, so their route is unknown and not counted on either side.</div></div>` : '');
+
+  /* DIAGNOSTICS — top 5 each, the rest behind View all. */
+  const objs = AN.objections?.rows||[]; const ownerCalls = AN.objections?.owner_calls||0;
+  $('an-objections').innerHTML = objs.length ? objs.slice(0,5).map((o) => rankRow({ key:o.objection_key, kind:'objection', on: EX.objection===o.objection_key, label:o.title, n:o.call_count, unit:'call', pct:o.pct_of_owner_calls, width: ownerCalls?o.call_count/ownerCalls*100:0,
+      sub:`${o.meetings} meeting${o.meetings===1?'':'s'} after · ${o.meeting_pct==null?'—':o.meeting_pct+'%'}${o.event_count>o.call_count?` · ${o.event_count} clicks`:''}` })).join('')
+    : `<div class="empty"><div class="empty-s">No objections logged in this range.</div></div>`;
+  const outs = (AN.outcomes||[]).filter((o)=>o.count>0);
+  $('an-outcomes').innerHTML = outs.length ? outs.slice(0,5).map((o) => rankRow({ key:o.outcome, kind:'outcome', on: EX.outcome===o.outcome, label:o.label, n:o.count, unit:'call', pct:o.pct_of_calls, width:o.pct_of_calls||0, amber: o.outcome==='GATEKEPT'||o.outcome==='NO_ANSWER',
+      sub: o.pct_of_owner_calls!=null ? `${o.pct_of_owner_calls}% of owner conversations` : '' })).join('')
+    : '';
+  $('an-obj-all').classList.toggle('hidden', objs.length<=5 && AN_DRILL!=='objections');
+  $('an-out-all').classList.toggle('hidden', outs.length<=5 && AN_DRILL!=='outcomes');
+  $('an-obj-all').textContent = AN_DRILL==='objections' ? 'Hide' : `View all (${objs.length})`;
+  $('an-out-all').textContent = AN_DRILL==='outcomes' ? 'Hide' : `View all (${outs.length})`;
+  renderDrill();
+
+  /* SCRIPTS — compact table. */
+  const scripts = (AN.scripts||[]).filter((x) => x.calls>0 || x.status==='CURRENT' || x.status==='TESTING');
+  $('an-scripts').innerHTML = scripts.length ? scripts.map((x) => `<tr class="x" data-script="${esc(x.script_id)}">
+    <td class="${x.is_current?'cur':''}"><div class="t-name">${esc(x.name)}${x.version?` <span class="mono muted">v${x.version}</span>`:''} ${x.status?pill(x.status.toLowerCase(), STATUS_TONE[x.status]||'t-grey', true):''}${x.is_current?'':''}</div>
+      ${x.small_sample && x.calls ? `<div class="t-sub"><span class="sample">small sample</span> ${x.calls} call${x.calls===1?'':'s'}</div>` : ''}</td>
+    <td class="num">${nfmt(x.calls)}</td><td class="num">${nfmt(x.owner_reached)}</td><td class="num">${nfmt(x.pitched)}</td><td class="num">${nfmt(x.meetings)}</td>
+    <td><span class="conv">${x.owner_to_meeting_pct==null?'<span class="muted">&mdash;</span>':`${x.owner_to_meeting_pct}% <i><b style="width:${Math.min(100,x.owner_to_meeting_pct)}%"></b></i>`}</span></td>
+    <td class="col-md"><span class="conv">${x.pitch_to_meeting_pct==null?'<span class="muted">&mdash;</span>':`${x.pitch_to_meeting_pct}% <i><b style="width:${Math.min(100,x.pitch_to_meeting_pct)}%"></b></i>`}</span></td>
+  </tr>`).join('') : `<tr><td colspan="7"><div class="empty"><div class="empty-s">No scripts.</div></div></td></tr>`;
+  renderScriptDetail();
+
+  /* GATEKEEPER — one card. */
+  const g = AN.gatekeeper||{};
+  $('an-gk').innerHTML = `
+    <div><div class="n">${nfmt(g.encounters)}</div><div class="l">Gatekeepers hit</div><div class="s">${g.pct_of_connected==null?'':g.pct_of_connected+'% of connected calls'}</div></div>
+    <div><div class="n">${nfmt(g.owners_reached_after)}</div><div class="l">Owners reached via gatekeeper</div><div class="s">${nfmt(g.meetings_after_gatekeeper)} meeting${g.meetings_after_gatekeeper===1?'':'s'} booked on those calls</div></div>
+    <div><div class="n ${g.gatekeeper_to_owner_pct!=null&&g.gatekeeper_to_owner_pct>=50?'hi':''}">${ANL(g.gatekeeper_to_owner_pct)}</div><div class="l">Gatekeeper → owner</div><div class="s">${nfmt(g.gatekept_outcomes)} gatekept · ${nfmt(g.owner_unavailable_outcomes)} owner unavailable</div></div>`;
+
+  /* FOLLOW-UPS — one line per request type; the ladder lives in Details. */
+  const fu = AN.followups||{};
+  const fuLine = (f) => f ? `<div class="rank-row" style="cursor:default"><div class="rank-l">${esc(f.label)}</div><div class="rank-n">${nfmt(f.requests)} → <b>${nfmt(f.meetings_after)}</b> meeting${f.meetings_after===1?'':'s'} · ${f.meeting_pct==null?'&mdash;':f.meeting_pct+'%'}</div>
+    <div class="rank-sub">${nfmt(f.actions_created)} action${f.actions_created===1?'':'s'} created · ${nfmt(f.actions_completed)} completed · ${nfmt(f.followup_calls_linked)} follow-up call${f.followup_calls_linked===1?'':'s'} linked</div></div>` : '';
+  $('an-followups').innerHTML = (fu.callbacks?.requests||fu.more_info?.requests||fu.owner_unavailable?.requests)
+    ? `<div class="rank">${fuLine(fu.callbacks)}${fuLine(fu.more_info)}${fuLine(fu.owner_unavailable)}</div>`
+    : `<div class="empty"><div class="empty-s">No callback or information requests in this range.</div></div>`;
+  $('an-fu-all').textContent = AN_DRILL==='followups' ? 'Hide' : 'Details';
+
+  /* TIMING — heatmap 08:00–20:00 + a weekday strip. */
+  renderTiming();
+
+  /* EXPLORER */
+  renderExplorer();
+}
+function rankRow({ key, kind, on, label, n, unit, pct, width, sub, amber }){
+  return `<div class="rank-row ${on?'on':''}" data-${kind}="${esc(key)}"><div class="rank-l">${esc(label)}</div>
+    <div class="rank-n"><b>${nfmt(n)}</b> ${unit}${n===1?'':'s'}${pct==null?'':` · ${pct}%`}</div>
+    <div class="rank-b ${amber?'amber':''}"><i style="width:${Math.min(100, Math.max(0, width||0))}%"></i></div>${sub?`<div class="rank-sub">${esc(sub)}</div>`:''}</div>`;
+}
+function renderDrill(){
+  const el = $('an-drill');
+  if(!AN_DRILL){ el.innerHTML = ''; return; }
+  if(AN_DRILL==='outcomes'){
+    el.innerHTML = `<div class="drill"><div class="drill-head"><span class="t">All outcomes</span><span class="small-note">% of owner conversations is only shown for outcomes that need the decision-maker on the line.</span><button class="btn btn-quiet btn-sm" data-drill-close type="button">Close</button></div>
+      <div class="tablewrap"><table><thead><tr><th>Outcome</th><th class="num">Calls</th><th class="num">% of calls</th><th class="num">Owner conversations</th><th class="num">% of owner conv.</th></tr></thead><tbody>
+      ${(AN.outcomes||[]).map((o) => `<tr class="x" data-outcome="${esc(o.outcome)}"><td>${esc(o.label)}</td><td class="num">${nfmt(o.count)}</td><td class="num">${ANL(o.pct_of_calls)}</td><td class="num">${o.pct_of_owner_calls==null?'<span class="muted">&mdash;</span>':nfmt(o.owner_count)}</td><td class="num">${ANL(o.pct_of_owner_calls)}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+  } else if(AN_DRILL==='objections'){
+    el.innerHTML = `<div class="drill"><div class="drill-head"><span class="t">All objections</span><span class="small-note">${nfmt(AN.objections?.calls_with_objection)} of ${nfmt(AN.objections?.owner_calls)} owner conversations hit at least one objection · ${nfmt(AN.objections?.event_count)} clicks in total.</span><button class="btn btn-quiet btn-sm" data-drill-close type="button">Close</button></div>
+      <div class="tablewrap"><table><thead><tr><th>Objection</th><th class="num">Calls</th><th class="num">Clicks</th><th class="num">% of owner conv.</th><th class="num">Meetings after</th><th class="num">Meeting %</th><th>Most common outcome after</th><th class="col-lg">Scripts</th><th class="col-lg">Trend</th></tr></thead><tbody>
+      ${(AN.objections?.rows||[]).map((o) => `<tr class="x" data-objection="${esc(o.objection_key)}"><td><div class="t-name">${esc(o.title)}</div>${o.versions.length>1?`<div class="t-sub">${o.versions.length} wordings</div>`:''}</td>
+        <td class="num">${nfmt(o.call_count)}</td><td class="num">${nfmt(o.event_count)}</td><td class="num">${ANL(o.pct_of_owner_calls)}</td><td class="num">${nfmt(o.meetings)}</td><td class="num">${ANL(o.meeting_pct)}</td>
+        <td>${o.outcomes.slice(0,2).map((x)=>`${esc(x.label)} <span class="mono muted">${x.count}</span>`).join(' · ')||'<span class="muted">&mdash;</span>'}</td>
+        <td class="col-lg">${o.scripts.slice(0,3).map((x)=>`${esc(x.name)}${x.version?` v${x.version}`:''} <span class="mono muted">${x.calls}</span>`).join(' · ')}</td>
+        <td class="col-lg">${sparkline(o.by_day)}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+  } else if(AN_DRILL==='followups'){
+    const fu = AN.followups||{};
+    const ladder = (f, title) => f ? `<div style="margin-bottom:14px"><div class="t-name" style="margin-bottom:8px">${esc(title||f.label)} <span class="mono muted">${f.action_types.join(', ')}</span></div><div class="ladder">
+      <div><div class="n">${nfmt(f.requests)}</div><div class="l">Requests (calls)</div></div>
+      <div><div class="n">${nfmt(f.actions_created)}</div><div class="l">Actions created</div></div>
+      <div><div class="n">${nfmt(f.actions_completed)}</div><div class="l">Actions completed</div></div>
+      <div><div class="n">${nfmt(f.followup_calls_linked)}</div><div class="l">Follow-up calls linked</div></div>
+      <div><div class="n">${nfmt(f.meetings_after)}</div><div class="l">Meetings booked · ${f.meeting_pct==null?'&mdash;':f.meeting_pct+'%'} of requests</div></div></div></div>` : '';
+    el.innerHTML = `<div class="drill"><div class="drill-head"><span class="t">Follow-up performance</span><button class="btn btn-quiet btn-sm" data-drill-close type="button">Close</button></div><div class="card-body">
+      ${ladder(fu.callbacks)}${ladder(fu.more_info, 'More information requested — follow-up call')}${ladder(fu.more_info?.send_information, 'More information requested — send information')}${ladder(fu.owner_unavailable)}
+      <div class="small-note">${esc(fu.method||'')}</div></div></div>`;
+  }
+}
+function sparkline(days){
+  if(!days||!days.length) return '<span class="muted">&mdash;</span>';
+  const top = Math.max(1, ...days.map((d)=>d.calls));
+  return `<span title="${esc(days.map((d)=>`${d.day}: ${d.calls}`).join('\n'))}" style="display:inline-flex;align-items:flex-end;gap:2px;height:16px">${days.slice(-30).map((d)=>`<i style="display:inline-block;width:4px;height:${Math.max(2,Math.round(d.calls/top*16))}px;background:var(--blue);border-radius:1px"></i>`).join('')}</span>`;
+}
+function renderScriptDetail(){
+  const el = $('an-script-detail'); const x = (AN.scripts||[]).find((s)=>s.script_id===AN_SCRIPT_OPEN);
+  if(!x){ el.innerHTML=''; return; }
+  el.innerHTML = `<div class="drill-head" style="border-top:1px solid var(--hair)"><span class="t">${esc(x.name)}${x.version?` v${x.version}`:''}</span>
+    <span class="small-note">${x.small_sample?`Only ${x.calls} call${x.calls===1?'':'s'} — treat every rate here as indicative, not proven.`:`${x.calls} calls`}</span>
+    <button class="btn btn-quiet btn-sm" id="an-script-close" type="button">Close</button></div>
+    <div class="card-body"><div class="reach" style="margin-top:0">
+      <div><div class="n">${nfmt(x.connected)}</div><div class="l">Connected</div></div>
+      <div><div class="n">${ANL(x.objection_rate_pct)}</div><div class="l">Objection rate · ${nfmt(x.objection_calls)} of ${nfmt(x.owner_reached)} owner conv.</div></div>
+      <div><div class="n">${x.avg_duration_seconds==null?'&mdash;':mmss(x.avg_duration_seconds)}</div><div class="l">Avg duration · ${x.duration_sample} timed</div></div>
+      <div><div class="n">${x.top_objections.length?esc(x.top_objections.map((o)=>`${o.title} (${o.calls})`).join(', ')):'&mdash;'}</div><div class="l">Most common objections</div></div>
+    </div><div class="btnrow" style="margin-top:12px"><button class="btn btn-secondary btn-sm" data-ex-script="${esc(x.script_id)}" type="button">Show these calls</button></div></div>`;
+}
+function renderTiming(){
+  const t = AN.timing||{};
+  if(!t.reliable){ $('an-timing').innerHTML = `<div class="empty"><div class="empty-s">No call has a usable start time in this range.</div></div>`; return; }
+  const hours = Array.from({length:13},(_,i)=>i+8); // 08:00 … 20:00 London
+  const order = [1,2,3,4,5,6,0];
+  const grid = t.grid||[]; const max = Math.max(1, ...order.flatMap((d)=>hours.map((h)=>(grid[d]?.[h]?.[0])||0)));
+  const outside = (t.by_hour||[]).filter((h)=>h.hour<8||h.hour>20).reduce((n,h)=>n+h.calls,0);
+  $('an-timing').innerHTML = `<div class="heat"><div></div>${hours.map((h)=>`<div class="hl">${String(h).padStart(2,'0')}</div>`).join('')}
+    ${order.map((d)=>`<div class="wl">${t.by_weekday[d].label}</div>${hours.map((h)=>{ const c=grid[d]?.[h]||[0,0,0]; return `<div class="c ${c[2]?'mt':''}" data-n="${c[0]}" style="--a:${(c[0]/max).toFixed(2)}" title="${t.by_weekday[d].label} ${String(h).padStart(2,'0')}:00 — ${c[0]} call${c[0]===1?'':'s'}, ${c[1]} owner reached, ${c[2]} meeting${c[2]===1?'':'s'}">${c[0]?`<span>${c[0]}</span>`:''}</div>`; }).join('')}`).join('')}</div>
+    <div class="heat-legend"><span><i></i>calls (darker = more)</span><span><b></b>meeting booked in that hour</span>${outside?`<span>${outside} call${outside===1?'':'s'} outside 08:00–20:00</span>`:''}${t.untimed?`<span>${t.untimed} without a start time</span>`:''}</div>
+    <div class="heat-days">${order.map((d)=>{ const w=t.by_weekday[d]; return `<div><div class="d">${w.label}</div><div class="n">${nfmt(w.calls)}</div><div class="r">owner ${w.owner_pct==null?'—':w.owner_pct+'%'} · meeting ${w.meeting_pct==null?'—':w.meeting_pct+'%'}</div></div>`; }).join('')}</div>`;
+  $('an-time-note').textContent = `Europe/London · ${nfmt(t.sample)} timed call${t.sample===1?'':'s'}. Shade = calls, dot = a meeting was booked.`;
+}
+/* ── explorer ── */
+function exFilterRows(){
+  const rows = AN.explorer?.rows||[]; const q = EX.q.trim().toLowerCase();
+  return rows.filter((r) => {
+    if(EX.outcome && r.outcome!==EX.outcome) return false;
+    if(EX.objection && !r.objections.some((o)=>o.objection_key===EX.objection)) return false;
+    if(EX.script && r.script_id!==EX.script) return false;
+    if(EX.gk==='yes' && !r.gatekeeper_reached) return false; if(EX.gk==='no' && r.gatekeeper_reached) return false;
+    if(EX.owner==='yes' && !r.owner_reached) return false; if(EX.owner==='no' && r.owner_reached) return false;
+    if(EX.owner==='direct' && r.reach_source!=='DIRECT') return false; if(EX.owner==='via' && r.reach_source!=='VIA_GATEKEEPER') return false;
+    if(EX.meeting==='yes' && r.outcome!=='BOOKED_MEETING') return false; if(EX.meeting==='no' && r.outcome==='BOOKED_MEETING') return false;
+    if(EX.pitched==='yes' && !r.pitched) return false; if(EX.pitched==='no' && r.pitched) return false;
+    if(q && !`${r.agency_name} ${r.contact_name} ${r.phone}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function reachHtml(r){
+  if(r.owner_reached) return `<span class="yes">Owner</span> <span class="t-sub">${r.reach_source==='VIA_GATEKEEPER'?'via gatekeeper':r.reach_source==='DIRECT'?'direct':'route unknown'}</span>`;
+  if(r.gatekeeper_reached) return `<span style="color:var(--amber)">Gatekeeper</span> <span class="t-sub">owner not reached</span>`;
+  return r.outcome==='NO_ANSWER' ? '<span class="no">No answer</span>' : '<span class="no">No owner</span>';
+}
+function renderExplorer(){
+  const sel = (id, list, value, label) => { const el=$(id); el.innerHTML = `<option value="">${label}</option>` + list.map(([k,l])=>`<option value="${esc(k)}">${esc(l)}</option>`).join(''); el.value = value; };
+  sel('ex-outcome', (AN.enums?.outcomes||[]).map((o)=>[o.outcome,o.label]), EX.outcome, 'Any outcome');
+  sel('ex-objection', (AN.enums?.objections||[]).map((o)=>[o.objection_key,o.title]), EX.objection, 'Any objection');
+  sel('ex-script', (AN.enums?.scripts||[]).map((x)=>[x.script_id,`${x.name} v${x.version}`]), EX.script, 'Any script');
+  $('ex-gk').value = EX.gk; $('ex-owner').value = EX.owner; $('ex-meeting').value = EX.meeting; $('ex-pitched').value = EX.pitched;
+  if($('ex-q').value!==EX.q) $('ex-q').value = EX.q;
+  const rows = exFilterRows(); const total = AN.explorer?.total||0;
+  const pages = Math.max(1, Math.ceil(rows.length/EX_PAGE)); EX.page = Math.min(EX.page, pages-1);
+  const slice = rows.slice(EX.page*EX_PAGE, (EX.page+1)*EX_PAGE);
+  const active = Object.entries(EX).filter(([k,v])=>['outcome','objection','script','gk','owner','meeting','pitched','q'].includes(k) && v).length;
+  $('an-ex-note').textContent = `${nfmt(rows.length)} of ${nfmt(total)} call${total===1?'':'s'}${active?` · ${active} filter${active===1?'':'s'}`:''}${AN.explorer?.truncated?` · showing the newest ${nfmt(AN.explorer.cap)}`:''}`;
+  $('an-ex-clear').classList.toggle('hidden', !active);
+  document.querySelectorAll('#an-objections .rank-row').forEach((el)=>el.classList.toggle('on', el.dataset.objection===EX.objection && !!EX.objection));
+  document.querySelectorAll('#an-outcomes .rank-row').forEach((el)=>el.classList.toggle('on', el.dataset.outcome===EX.outcome && !!EX.outcome));
+  $('ex-rows').innerHTML = slice.length ? slice.map((r) => `<tr class="x" data-call="${esc(r.call_id)}">
+      <td class="nowrap"><div>${esc(when(r.started_at))}</div><div class="t-sub">${r.call_mode==='TWILIO'?'browser':'manual'}${r.attempt_number?` · attempt ${r.attempt_number}`:''}</div></td>
+      <td><div class="t-name">${dash(r.agency_name||r.agency_id)}</div><div class="t-sub mono">${dash(r.phone)}</div></td>
+      <td class="col-md">${dash(r.contact_name)}${r.contact_role?`<div class="t-sub">${esc(r.contact_role)}</div>`:''}</td>
+      <td class="nowrap">${reachHtml(r)}</td>
+      <td class="col-lg">${r.script_name?`${esc(r.script_name)} <span class="mono muted">v${r.script_version}</span>`:'<span class="muted">&mdash;</span>'}</td>
+      <td><div class="objs">${r.objections.map((o)=>`<span>${esc(o.title)}</span>`).join('')||'<span class="muted">&mdash;</span>'}</div></td>
+      <td><div>${esc(r.outcome_label)}</div><div class="t-sub">${r.pitched?'pitched':'not pitched'}</div></td>
+      <td class="num mono">${r.duration_seconds==null?'<span class="muted">&mdash;</span>':mmss(r.duration_seconds)}</td>
+      <td class="col-md">${r.followups.length?r.followups.map((f)=>`<div class="t-sub">${esc(f.action_type.replace(/_/g,' ').toLowerCase())} · ${esc(f.action_status.toLowerCase())}</div>`).join(''):(r.followups_state==='PENDING'?'<span class="t-sub" style="color:var(--amber)">pending write</span>':'<span class="muted">&mdash;</span>')}${r.recording?`<div class="t-sub"><a href="${RECORDING_URL}&call_id=${encodeURIComponent(r.call_id)}" target="_blank" rel="noopener" style="color:var(--blue)">recording</a></div>`:''}</td>
+    </tr>${EX.open===r.call_id?exDetailHtml(r):''}`).join('')
+    : `<tr><td colspan="9">${emptyState('No calls match', 'Clear a filter or widen the date range.')}</td></tr>`;
+  $('ex-foot').innerHTML = `<span>Page ${EX.page+1} of ${pages}</span>${pages>1?`<button class="btn btn-quiet btn-sm" id="ex-prev" type="button" ${EX.page===0?'disabled':''}>Previous</button><button class="btn btn-quiet btn-sm" id="ex-next" type="button" ${EX.page>=pages-1?'disabled':''}>Next</button>`:''}`;
+}
+function exDetailHtml(r){
+  const kv = (k,v) => v ? `<div><b>${k}</b>${v}</div>` : '';
+  return `<tr class="detail"><td colspan="9"><div class="kv">
+    ${kv('Call id', `<span class="mono">${esc(r.call_id)}</span>`)}${kv('Gatekeeper reached', r.gatekeeper_reached?'yes':'no')}${kv('Owner reached', r.owner_reached?`yes · ${r.reach_source==='VIA_GATEKEEPER'?'via gatekeeper':r.reach_source==='DIRECT'?'direct':'route unknown'}`:'no')}
+    ${kv('Pitched', r.pitched?'yes':'no')}${kv('Callback', r.callback_at?esc(when(r.callback_at)):'')}${kv('Meeting', r.meeting_at?esc(when(r.meeting_at)):'')}
+    ${kv('Not interested reason', r.not_interested_reason?esc(labelOf(NI_REASONS, r.not_interested_reason)):'')}${kv('Asked for', r.more_info_type?esc(labelOf(INFO_TYPES, r.more_info_type)):'')}
+    ${kv('Main priority', r.main_priority?esc(labelOf(PRIORITIES, r.main_priority)):'')}${kv('Main constraint', r.main_constraint?esc(labelOf(CONSTRAINTS, r.main_constraint)):'')}
+    ${kv('Follow-up actions', r.followups.length?r.followups.map((f)=>`${esc(f.action_type.replace(/_/g,' ').toLowerCase())} · ${esc(f.action_status.toLowerCase())}${f.due_at?` · due ${esc(when(f.due_at))}`:''}`).join('<br>'):'none')}
+    ${kv('Note', r.note?esc(r.note):'')}
+  </div>${r.recording?`<audio controls preload="none" src="${RECORDING_URL}&call_id=${encodeURIComponent(r.call_id)}"></audio>`:''}</td></tr>`;
+}
+function exSet(patch){ Object.assign(EX, patch, { page:0, open:null }); renderExplorer(); }
+function exJump(patch){ Object.assign(EX, patch, { page:0, open:null }); renderAnalytics(); $('an-explorer-section').scrollIntoView({ behavior:'smooth', block:'start' }); }
+function exStep(step){
+  if(step==='owner_reached') exJump({ owner:'yes', gk:'', meeting:'', pitched:'', outcome:'' });
+  else if(step==='pitched') exJump({ pitched:'yes', owner:'', gk:'', meeting:'', outcome:'' });
+  else if(step==='meetings') exJump({ meeting:'yes', owner:'', gk:'', pitched:'', outcome:'' });
+  else if(step==='gatekeeper') exJump({ gk:'yes', owner:'', meeting:'', pitched:'', outcome:'' });
+  else if(step==='direct') exJump({ owner:'direct', gk:'', meeting:'', pitched:'', outcome:'' });
+  else if(step==='via') exJump({ owner:'via', gk:'', meeting:'', pitched:'', outcome:'' });
+  else exJump({ owner:'', gk:'', meeting:'', pitched:'', outcome:'', objection:'', script:'', q:'' });
+}
+document.addEventListener('click', (e) => {
+  if(VIEW!=='calling-analytics' || !$('v-calling-analytics').classList.contains('on')) return;
+  const t = e.target;
+  const rb = t.closest('#an-range button'); if(rb){ AN_Q.range = rb.dataset.range; if(AN_Q.range==='custom'){ $('an-custom').classList.remove('hidden'); document.querySelectorAll('#an-range button').forEach((b)=>b.classList.toggle('on', b===rb)); return; } loadAnalytics(false); return; }
+  if(t.id==='an-apply'){ AN_Q.from = $('an-from').value; AN_Q.to = $('an-to').value; AN_Q.range='custom'; loadAnalytics(false); return; }
+  if(!AN) return;
+  const step = t.closest('[data-step]'); if(step){ exStep(step.dataset.step); return; }
+  const ob = t.closest('[data-objection]'); if(ob){ exJump({ objection: EX.objection===ob.dataset.objection && ob.closest('.rank-row') ? '' : ob.dataset.objection }); return; }
+  const oc = t.closest('[data-outcome]'); if(oc){ exJump({ outcome: EX.outcome===oc.dataset.outcome && oc.closest('.rank-row') ? '' : oc.dataset.outcome }); return; }
+  if(t.id==='an-obj-all'){ AN_DRILL = AN_DRILL==='objections' ? null : 'objections'; renderAnalytics(); return; }
+  if(t.id==='an-out-all'){ AN_DRILL = AN_DRILL==='outcomes' ? null : 'outcomes'; renderAnalytics(); return; }
+  if(t.id==='an-fu-all'){ AN_DRILL = AN_DRILL==='followups' ? null : 'followups'; renderAnalytics(); if(AN_DRILL) $('an-drill').scrollIntoView({ behavior:'smooth', block:'nearest' }); return; }
+  if(t.closest('[data-drill-close]')){ AN_DRILL = null; renderAnalytics(); return; }
+  const exs = t.closest('[data-ex-script]'); if(exs){ exJump({ script: exs.dataset.exScript }); return; }
+  const sr = t.closest('#an-scripts tr[data-script]'); if(sr){ AN_SCRIPT_OPEN = AN_SCRIPT_OPEN===sr.dataset.script ? null : sr.dataset.script; renderScriptDetail(); return; }
+  if(t.id==='an-script-close'){ AN_SCRIPT_OPEN = null; renderScriptDetail(); return; }
+  if(t.id==='an-ex-clear'){ exSet({ outcome:'', objection:'', script:'', gk:'', owner:'', meeting:'', pitched:'', q:'' }); renderAnalytics(); return; }
+  if(t.id==='ex-prev'){ EX.page = Math.max(0, EX.page-1); EX.open=null; renderExplorer(); return; }
+  if(t.id==='ex-next'){ EX.page += 1; EX.open=null; renderExplorer(); return; }
+  const row = t.closest('#ex-rows tr[data-call]'); if(row && !t.closest('a')){ EX.open = EX.open===row.dataset.call ? null : row.dataset.call; renderExplorer(); return; }
+});
+document.addEventListener('change', (e) => {
+  if(VIEW!=='calling-analytics') return;
+  const id = e.target.id;
+  if(id==='an-script'){ AN_Q.script_id = e.target.value; loadAnalytics(false); return; }
+  const map = { 'ex-outcome':'outcome', 'ex-objection':'objection', 'ex-script':'script', 'ex-gk':'gk', 'ex-owner':'owner', 'ex-meeting':'meeting', 'ex-pitched':'pitched' };
+  if(map[id]){ exSet({ [map[id]]: e.target.value }); renderAnalytics(); }
+});
+document.addEventListener('input', (e) => { if(VIEW==='calling-analytics' && e.target.id==='ex-q'){ EX.q = e.target.value; EX.page=0; renderExplorer(); } });
+
 /* ═══ WIRING ════════════════════════════════════════════════════════════ */
 window.addEventListener('hashchange', () => showView(routeFromHash(), { push:false }));
-$('refresh').addEventListener('click', () => load(true));
+$('refresh').addEventListener('click', () => { if(VIEW==='calling-analytics') loadAnalytics(true); else load(true); });
 $('start-all').addEventListener('click', () => startSession('all'));
 $('start-actions').addEventListener('click', () => startSession('actions'));
 $('cm-exit').addEventListener('click', () => {

@@ -1,6 +1,6 @@
 # NOVUS Calling workspace
 
-`/novus/calling` — Calling · Call Actions · Scripts, plus full-screen Calling Mode.
+`/novus/calling` — Calling · Call Actions · Scripts · Calling Analytics, plus full-screen Calling Mode.
 Page: `novus/calling.html`. Server: operations on `api/novus/personalisation.js`
 implemented in `lib/calling-*.mjs` (the 12-function ceiling rules out new files).
 
@@ -41,6 +41,43 @@ Suppression is **derived** from `CALLS` (`DO_NOT_CALL`, `WRONG_NUMBER`, `NOT_INT
 **Times.** Automatic callbacks/retries are computed on the Europe/London wall clock (`lib/london-time.mjs`) — "09:00 tomorrow" is 09:00 UK time in BST and GMT alike — and stored as UTC instants. Operator-chosen times come from the browser as explicit instants.
 
 **No transactions.** `calling-save` writes the `CALLS` row first, then runs the idempotent follow-up step (`applyCallFollowups`: actions keyed by `call_id`, terminal status only if unset, objection events only if missing). The row carries `metadata_json.followups = PENDING|COMPLETE`; a retried save or `calling-repair` re-runs the step for PENDING rows from the stored row alone, so a saved call never loses its callback.
+
+## Calling Analytics (`#calling-analytics`)
+
+Read-only. `GET ?novus_operation=calling-analytics&range=today|7d|30d|all|custom[&from=YYYY-MM-DD&to=YYYY-MM-DD][&script_id=…]`
+on `personalisation.js` → `lib/calling-handlers.mjs handleCallingAnalytics` → the pure
+read model `lib/calling-analytics.mjs buildCallingAnalytics(tables)`. Six tab reads in
+parallel (`CALLS`, `CALL_OBJECTION_EVENTS`, `SCRIPTS`, `OBJECTIONS`, `ACTIONS`, `AGENCIES`
+for names), one aggregation, cached 30s per filter set and cleared by every calling write.
+No new tab, no new column, no new function. Response sections: `summary`, `funnel`,
+`outcomes`, `objections`, `scripts`, `gatekeeper`, `timing`, `followups`, `explorer`, `enums`.
+
+**Filters.** Date range and `script_id` are applied server-side to every section (London-local
+calendar days; `to` is inclusive). Outcome / objection / gatekeeper / owner / meeting / pitched
+filters narrow only the call explorer, in the browser, so the sections above keep their true
+denominators. Clicking an outcome, objection, funnel step or KPI filters the explorer.
+
+**Denominators** (also in the module header):
+
+| figure | numerator / denominator |
+|---|---|
+| calls | classified `CALLS` rows (outcome set) with `started_at` in range; opened-but-unclassified rows are reported as `unclassified`, never counted |
+| connected | `connected=TRUE` |
+| gatekeeper reached | `gatekeeper_reached=TRUE` |
+| owner reached | `owner_reached=TRUE` **or** `owner_reach_source` ∈ {DIRECT, VIA_GATEKEEPER}; a call can be both gatekeeper- and owner-reached |
+| gatekeeper → owner % | gatekeeper reached **and** owner reached / gatekeeper reached |
+| owner → meeting % | `BOOKED_MEETING` / owner reached |
+| pitch → meeting % | `BOOKED_MEETING` / `pitched=TRUE` (NO_ANSWER and gatekept calls are not failed pitches) |
+| objection frequency | unique **owner** calls with ≥1 event for the objection family / owner calls |
+| objection → meeting % | `BOOKED_MEETING` calls containing the objection / unique calls containing it |
+| script objection rate | owner calls on that script with ≥1 event / owner calls on that script |
+| follow-ups | actions whose `metadata_json.call_id` names a call in range; the answering call is linked by `CALLS.source_action_id` or the action's `completion_reason "(call_id)"` — nothing is inferred from agency status |
+
+Objection events are grouped by `objection_key` (family), so a reworded objection is one line;
+`event_count` (clicks) and `call_count` (unique calls) are both returned and the page ranks by
+unique calls. Scripts are counted against `CALLS.script_id` exactly. Owner calls saved before the
+answer screen existed have `reach_source=UNKNOWN` and are counted on neither the direct nor the
+via-gatekeeper side. Timing uses `lib/london-time.mjs` (Europe/London weekday × hour).
 
 ## Queue order (`lib/calling-queue.mjs`)
 
@@ -90,3 +127,5 @@ account credentials.
 ## Tests
 
 `npm run novus:calling-selftest` — hermetic (in-memory workbook, signed fake Twilio webhooks).
+`npm run novus:calling-analytics-selftest` — hermetic denominator tests for the analytics read model and its operation.
+`npm run novus:sidebar-parity-selftest` — the four Calling tabs on both sidebars.
