@@ -70,6 +70,16 @@ import {
   manualReplyClaimKey,
 } from '../../lib/manual-reply.mjs';
 import { buildInstantlyReplyPayload } from '../../lib/instantly-reply-send.mjs';
+// COLD-CALLING WORKSPACE (novus/calling.html). Same Hobby-plan reason as every
+// other operation on this function: a thirteenth file is not available, so the
+// calling workspace is a set of operations here, implemented in lib/.
+import {
+  handleCallingWorkspace, handleCallingSetup, handleCallingStart, handleCallingSave, handleCallingRepair,
+  handleScriptSave, handleScriptDuplicate, handleScriptStatus, handleObjectionSave,
+} from '../../lib/calling-handlers.mjs';
+import {
+  handleTwilioToken, handleVoiceOutbound, handleVoiceStatus, handleVoiceRecording, handleCallingRecording,
+} from '../../lib/calling-twilio.mjs';
 import { novusMailboxes } from '../../lib/reply-router.mjs';
 import { evaluateManualReplyRequest } from '../../lib/manual-reply-context.mjs';
 import {
@@ -1641,8 +1651,23 @@ async function handleOperatorManualReplyLive(req, res) {
   }
 }
 
+// TWILIO WEBHOOKS FOR BROWSER CALLING. Reached through the
+// /api/novus/webhooks/voice-outbound* rewrites in vercel.json — a path
+// middleware.js deliberately leaves out of Basic Auth. They are authenticated
+// by Twilio's request signature INSIDE each handler (lib/calling-twilio.mjs),
+// never by requireAuth, exactly like voice-inbound.js. Nothing else on this
+// function is reachable without Basic Auth.
+const TWILIO_WEBHOOK_OPERATIONS = {
+  'twilio-voice-outbound': handleVoiceOutbound,
+  'twilio-voice-status': handleVoiceStatus,
+  'twilio-voice-recording': handleVoiceRecording,
+};
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (TWILIO_WEBHOOK_OPERATIONS[req.query?.novus_operation]) {
+    return TWILIO_WEBHOOK_OPERATIONS[req.query.novus_operation](req, res);
+  }
   if (req.query?.novus_operation === 'operator-manual-reply' && req.method !== 'POST') {
     if (!requireAuth(req, res)) return;
     return res.status(405).json({ success: false, sent: false, error: 'Method not allowed' });
@@ -1752,6 +1777,42 @@ export default async function handler(req, res) {
     if (!requireReplyPollerSecret(req, res)) return;
     return handleSendDemoLive(req, res);
   }
+  // ── Cold-calling workspace ────────────────────────────────────────────
+  if (req.method === 'GET' && req.query?.novus_operation === 'calling-workspace') {
+    // READ-ONLY by construction: Sheets reads only, no writer reachable.
+    if (!requireAuth(req, res)) return;
+    return handleCallingWorkspace(req, res);
+  }
+  if (req.method === 'GET' && req.query?.novus_operation === 'twilio-token') {
+    // Mints a short-lived browser token; reads nothing from Sheets.
+    if (!requireAuth(req, res)) return;
+    return handleTwilioToken(req, res);
+  }
+  if (req.method === 'GET' && req.query?.novus_operation === 'calling-recording') {
+    if (!requireAuth(req, res)) return;
+    return handleCallingRecording(req, res);
+  }
+  const CALLING_WRITE_OPERATIONS = {
+    'calling-setup': handleCallingSetup,
+    'calling-start': handleCallingStart,
+    'calling-save': handleCallingSave,
+    'calling-repair': handleCallingRepair,
+    'script-save': handleScriptSave,
+    'script-duplicate': handleScriptDuplicate,
+    'script-status': handleScriptStatus,
+    'objection-save': handleObjectionSave,
+  };
+  if (req.method === 'POST' && CALLING_WRITE_OPERATIONS[req.query?.novus_operation]) {
+    // Deliberate human actions from the Basic-Auth-protected calling page.
+    // Each handler checks its own explicit confirm token before any write.
+    if (!requireAuth(req, res)) return;
+    const out = await CALLING_WRITE_OPERATIONS[req.query.novus_operation](req, res);
+    // A saved call changes the ACTIONS ledger, so the Command Centre's cached
+    // projection must not outlive it.
+    invalidateOperatorCaches();
+    return out;
+  }
+
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   if (!requireAuth(req, res)) return;
 
