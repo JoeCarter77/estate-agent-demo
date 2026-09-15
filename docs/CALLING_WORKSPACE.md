@@ -19,6 +19,23 @@ Call follow-ups go into the existing `ACTIONS` ledger:
 * `SEND_INFORMATION`, `PREPARE_MEETING` → generic **Actions** (Joe's manual queue)
 * `NOT_INTERESTED` / `BOOKED_MEETING` also set `AGENCIES.current_pipeline_status`, exactly like the legacy drawer outcome
 
+**Gatekeeper/owner classification.** Once a call connects, Calling Mode shows a
+plain answer screen ("Hi, is that {{first_name}}?") with two buttons —
+`OWNER` and `GATEKEEPER` — before the sales script appears. `OWNER` opens the
+lead's assigned script and the objection sidebar as before. `GATEKEEPER` opens
+a fixed, global gatekeeper script (not versioned, not lead-specific) with a
+single `GOT THROUGH TO OWNER` button that switches the *same* call into the
+owner script + sidebar without ending the call or opening a new `CALLS` row.
+This is tracked on `CALLS` independently of the outcome-derived
+`owner_reached` column: `gatekeeper_reached`, `gatekeeper_reached_at`,
+`owner_reached_at`, `owner_reach_source` (`DIRECT` | `VIA_GATEKEEPER`) —
+appended at the end of `CALLS_HEADER` so an existing production sheet only
+needs those four header cells added to row 1 after `updated_at`, never a
+column insert that would shift existing data. `lib/calling-queue.mjs`'s
+`scriptFunnel` exposes `gatekeeper_reached`, `owner_reached_direct`,
+`owner_reached_via_gatekeeper` and `gatekeeper_to_owner_pct` for the
+conversion numbers.
+
 Suppression is **derived** from `CALLS` (`DO_NOT_CALL`, `WRONG_NUMBER`, `NOT_INTERESTED`, `BOOKED_MEETING`) plus terminal pipeline status and the agency-level all-contact flag `AGENCIES.suppression_status=SUPPRESSED`. An **email** opt-out (`REPLY_EVENTS`) is channel-specific: it is shown on the lead as context, never as phone suppression. Nothing is written to `AGENCIES` for it.
 
 **Times.** Automatic callbacks/retries are computed on the Europe/London wall clock (`lib/london-time.mjs`) — "09:00 tomorrow" is 09:00 UK time in BST and GMT alike — and stored as UTC instants. Operator-chosen times come from the browser as explicit instants.

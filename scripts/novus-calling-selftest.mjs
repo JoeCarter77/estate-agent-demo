@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { ACTIONS_HEADER } from '../lib/actions-store.mjs';
 import { actionQueue, isManualSalesAction } from '../lib/acquisition-actions.mjs';
-import { CALLS_HEADER, SCRIPTS_HEADER, OBJECTIONS_HEADER, CALL_OBJECTION_EVENTS_HEADER } from '../lib/calling-store.mjs';
+import { CALLS_HEADER, SCRIPTS_HEADER, OBJECTIONS_HEADER, CALL_OBJECTION_EVENTS_HEADER, callRecords } from '../lib/calling-store.mjs';
 import { buildCallingWorkspace, scriptFunnel } from '../lib/calling-queue.mjs';
 import { derivePitched, deriveOwnerReached, normaliseOutcomeInput, normalisedFromRow, planOutcome, addWorkingDaysMs } from '../lib/calling-outcomes.mjs';
 import { createVoiceAccessToken, decodeJwt, twilioCallingConfig } from '../lib/twilio-access-token.mjs';
@@ -689,6 +689,101 @@ const table = (header, objs) => ({ header: [...header], rows: objs.map((o) => he
   assert.equal(twRow().outcome, 'GATEKEPT'); assert.equal(twRow().recording_sid, 'REabc'); assert.equal(twRow().duration_seconds, 95, 'webhook timing wins over the browser clock');
   assert.equal(twRow().twilio_call_sid, 'CAparent'); assert.equal(twRow().call_status, 'completed');
   ok('saving the outcome patches the opened Twilio row in place, keeping webhook-written timing and recording');
+
+  // ── 5. gatekeeper / owner classification (answer-screen tracking) ───────
+  store.AGENCIES.push(
+    ['ag_gk1', 'Direct Owner Co', '01234100001', '', '', ''],
+    ['ag_gk2', 'Gatekeeper Only Co', '01234100002', '', '', ''],
+    ['ag_gk3', 'Gatekeeper Then Owner Co', '01234100003', '', '', ''],
+    ['ag_gk4', 'Gatekeeper Then Booked Co', '01234100004', '', '', ''],
+  );
+  const activeObjections = (await call('GET', 'calling-workspace', null, { refresh: '1' })).body.active_objections;
+
+  // 1) Direct owner: OWNER clicked, straight through to a booked meeting.
+  res = await call('POST', 'calling-save', {
+    confirm: 'SAVE_CALL', client_key: 'ck-gk-direct', agency_id: 'ag_gk1', call_mode: 'MANUAL',
+    owner_reached_at: iso(T0), owner_reach_source: 'DIRECT',
+    outcome: 'BOOKED_MEETING', meeting_at: iso(T0 + 7 * DAY), meeting_note: 'Zoom',
+  });
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.body.call.gatekeeper_reached, 'FALSE');
+  assert.equal(res.body.call.gatekeeper_reached_at, '');
+  assert.equal(res.body.call.owner_reach_source, 'DIRECT');
+  assert.equal(res.body.call.owner_reached_at, iso(T0));
+  assert.equal(res.body.call.owner_reached, 'TRUE', 'the existing outcome-derived column is untouched by this feature');
+  ok('direct owner: OWNER clicked once, owner_reach_source=DIRECT, gatekeeper never reached');
+
+  // 2) Gatekeeper only: GATEKEEPER clicked, call ends without ever reaching the owner.
+  res = await call('POST', 'calling-save', {
+    confirm: 'SAVE_CALL', client_key: 'ck-gk-only', agency_id: 'ag_gk2', call_mode: 'MANUAL',
+    gatekeeper_reached: true, gatekeeper_reached_at: iso(T0),
+    outcome: 'GATEKEPT',
+  });
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.body.call.gatekeeper_reached, 'TRUE');
+  assert.equal(res.body.call.gatekeeper_reached_at, iso(T0));
+  assert.equal(res.body.call.owner_reached_at, '');
+  assert.equal(res.body.call.owner_reach_source, '');
+  assert.equal(res.body.call.owner_reached, 'FALSE');
+  assert.equal(res.body.terminal, null);
+  assert.equal(res.body.actions_created[0].action_type, 'RETRY_CALL');
+  ok('gatekeeper only: gatekeeper_reached=true, owner never classified, GATEKEPT retry still scheduled');
+
+  // 3) Gatekeeper then owner: GATEKEEPER, then "Got through to owner", objection logged
+  //    once on the owner screen, outcome requires a real conversation.
+  res = await call('POST', 'calling-save', {
+    confirm: 'SAVE_CALL', client_key: 'ck-gk-then-owner', agency_id: 'ag_gk3', call_mode: 'MANUAL',
+    gatekeeper_reached: true, gatekeeper_reached_at: iso(T0), owner_reached_at: iso(T0 + 60_000), owner_reach_source: 'VIA_GATEKEEPER',
+    outcome: 'MORE_INFO_REQUESTED', more_info_type: 'PRICING',
+    objections: [{ objection_id: activeObjections[0].objection_id, clicked_at: iso(T0 + 90_000), offset_seconds: 90, source: 'LIVE' }],
+  });
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.body.call.gatekeeper_reached, 'TRUE');
+  assert.equal(res.body.call.owner_reached_at, iso(T0 + 60_000));
+  assert.equal(res.body.call.owner_reach_source, 'VIA_GATEKEEPER');
+  assert.equal(res.body.call.owner_reached, 'TRUE');
+  assert.equal(res.body.objection_events, 1);
+  assert.equal(res.body.call.objections, activeObjections[0].title);
+  ok('gatekeeper then owner: owner_reach_source=VIA_GATEKEEPER, gatekeeper_reached preserved, objection logging on the owner screen still works');
+
+  // 4) Gatekeeper -> owner -> booked meeting on a Twilio call: the row opened
+  //    by calling-start is the SAME row the final save patches — no duplicate.
+  res = await call('POST', 'calling-start', { confirm: 'START_CALL', client_key: 'ck-gk-booked', agency_id: 'ag_gk4', call_mode: 'TWILIO', phone: '01234100004' });
+  assert.equal(res.statusCode, 201);
+  const gkBookedCallId = res.body.call.call_id;
+  assert.equal(store.CALLS.filter((r) => r[0] === gkBookedCallId).length, 1);
+  res = await call('POST', 'calling-save', {
+    confirm: 'SAVE_CALL', client_key: 'ck-gk-booked', call_id: gkBookedCallId, agency_id: 'ag_gk4', call_mode: 'TWILIO',
+    gatekeeper_reached: true, gatekeeper_reached_at: iso(T0), owner_reached_at: iso(T0 + 60_000), owner_reach_source: 'VIA_GATEKEEPER',
+    outcome: 'BOOKED_MEETING', meeting_at: iso(T0 + 7 * DAY), meeting_note: 'In branch',
+  });
+  assert.equal(res.statusCode, 200); assert.equal(res.body.call.call_id, gkBookedCallId);
+  assert.equal(store.CALLS.filter((r) => r[0] === gkBookedCallId).length, 1, 'no duplicate CALLS row for the same call');
+  assert.equal(res.body.call.gatekeeper_reached, 'TRUE');
+  assert.equal(res.body.call.owner_reach_source, 'VIA_GATEKEEPER');
+  assert.equal(res.body.terminal, 'MEETING_BOOKED');
+  assert.equal(res.body.actions_created[0].action_type, 'PREPARE_MEETING');
+  ok('gatekeeper -> owner -> booked meeting stays one CALLS row: dial, gatekeeper, owner and meeting-booked all recorded together');
+
+  // 5) Repeated saves (e.g. a retried "Save & exit") never duplicate the
+  //    classification or the row — the already-saved branch returns exactly
+  //    what was first written.
+  const beforeRepeat = store.CALLS.length;
+  res = await call('POST', 'calling-save', { confirm: 'SAVE_CALL', client_key: 'ck-gk-then-owner', agency_id: 'ag_gk3', outcome: 'NOT_INTERESTED', not_interested_reason: 'TIMING' });
+  assert.equal(res.statusCode, 200); assert.equal(res.body.reused, true);
+  assert.equal(store.CALLS.length, beforeRepeat, 'no duplicate row on a repeated save');
+  assert.equal(res.body.call.owner_reach_source, 'VIA_GATEKEEPER', 'classification from the first save is untouched by the retry');
+  assert.equal(res.body.call.owner_reached_at, iso(T0 + 60_000));
+  ok('a repeated save of the same call is idempotent and cannot duplicate or overwrite the gatekeeper/owner classification');
+
+  // ── funnel counts the classification feeds ──────────────────────────────
+  const gkFunnel = scriptFunnel(callRecords({ header: CALLS_HEADER.slice(), rows: store.CALLS.slice(1) })
+    .filter((r) => ['ag_gk1', 'ag_gk2', 'ag_gk3', 'ag_gk4'].includes(r.agency_id)));
+  assert.equal(gkFunnel.gatekeeper_reached, 3);
+  assert.equal(gkFunnel.owner_reached_direct, 1);
+  assert.equal(gkFunnel.owner_reached_via_gatekeeper, 2);
+  assert.equal(gkFunnel.booked_meetings, 2);
+  ok('scriptFunnel exposes gatekeeper_reached / owner_reached_direct / owner_reached_via_gatekeeper for the conversion counts');
 
   __setRepoForTests(null);
 }

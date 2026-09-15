@@ -276,6 +276,28 @@ const CONSTRAINTS = [['INSUFFICIENT_DEMAND', 'Insufficient demand'], ['POOR_INCO
 const NEEDS_DETAILS = new Set(['OWNER_UNAVAILABLE', 'CALLBACK_REQUESTED', 'MORE_INFO_REQUESTED', 'NOT_INTERESTED', 'BOOKED_MEETING', 'NOT_THE_DECISION_MAKER', 'DO_NOT_CALL']);
 const BUCKET_LABEL = { 1: 'Callback overdue', 2: 'Callback due today', 3: 'No-answer retry', 4: 'Call action due', 5: 'Never called' };
 
+/* Fixed, global — not versioned per lead and not affected by the assigned
+   main script. Only {{first_name}} is substituted (via scriptHtml). */
+const GATEKEEPER_SCRIPT = `# GATEKEEPER
+
+JOE: Hi, is {{first_name}} around at all?
+
+If they ask who's calling:
+
+JOE: Yeah, Joe here.
+
+If they ask what it's regarding:
+
+JOE: Slightly strange one actually — I put an enquiry through to you guys a few days ago and just wanted to ask him about something I noticed with it.
+
+If they push:
+
+JOE: Nothing urgent — it was just something around how the enquiry was handled. I wanted to get his take on it directly.
+
+If unavailable:
+
+JOE: No worries. When's usually the best time to catch him?`;
+
 /* ── helpers ────────────────────────────────────────────────────────── */
 function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function dash(v){ return (v==null||v==='')?'&mdash;':esc(v); }
@@ -535,7 +557,8 @@ function beginCall(lead){
   const script = (lead.script && all.find((s)=>s.script_id===lead.script.script_id))
     || all.find((s)=>s.status==='CURRENT') || all.filter((s)=>s.status!=='ARCHIVED')[0] || null;
   CALL = { client_key: uid(), lead, script_id: script?script.script_id:'', source_action_id: lead.action_id||'', opened_at: new Date().toISOString(),
-    call_mode:'MANUAL', state:'idle', started_at:'', connected_at:'', ended_at:'', duration_seconds:0, objections:[], outcome:'', details:{}, commercial:{ main_priority:'', main_constraint:'', useful_note:'' }, stage:'live' };
+    call_mode:'MANUAL', state:'idle', started_at:'', connected_at:'', ended_at:'', duration_seconds:0, objections:[], outcome:'', details:{}, commercial:{ main_priority:'', main_constraint:'', useful_note:'' }, stage:'live',
+    reach: { stage:'ASK', gatekeeper_reached:false, gatekeeper_reached_at:'', owner_reached_at:'', owner_reach_source:'' } };
   saveDraft(); renderMode();
 }
 function resumeDraft(){
@@ -610,7 +633,42 @@ function renderMode(){
   if(CALL.state==='connected' && !TIMER) TIMER = setInterval(tick, 500);
   if(CALL.stage==='live') stage.querySelector('.cm-main')?.scrollTo(0,0);
 }
+function reach(){ return CALL.reach || (CALL.reach = { stage:'OWNER', gatekeeper_reached:false, gatekeeper_reached_at:'', owner_reached_at:'', owner_reach_source:'' }); }
+function markGatekeeper(){
+  const r = reach();
+  if(!r.gatekeeper_reached){ r.gatekeeper_reached = true; r.gatekeeper_reached_at = new Date().toISOString(); }
+  r.stage = 'GATEKEEPER'; saveDraft(); renderMode();
+}
+function markOwner(source){
+  const r = reach();
+  if(!r.owner_reached_at){ r.owner_reached_at = new Date().toISOString(); r.owner_reach_source = source; }
+  r.stage = 'OWNER'; saveDraft(); renderMode();
+}
+function askScreenHtml(){
+  const l = CALL.lead; const named = firstName(l.contact_name); const first = named || 'the owner';
+  /* A named contact ("Hi, is that Ian?") reads as speaking to them directly;
+     with no named contact at all — an office/main number and nobody to ask
+     for by name — "Hi, is the owner there?" asks a third party instead. */
+  const greeting = named ? `Hi, is that <span class="var">${esc(first)}</span>?` : `Hi, is <span class="var">${esc(first)}</span> there?`;
+  return `<div class="cm-main"><div class="cstage" style="text-align:center;padding-top:80px">
+    <div class="cstage-t">${greeting}</div><div class="cstage-s">Who picked up?</div>
+    <div class="outcomes" style="max-width:520px;margin:0 auto">
+      <button class="outcome" id="cm-owner" type="button"><span>Owner<span class="sub">Speaking to the decision-maker</span></span></button>
+      <button class="outcome" id="cm-gatekeeper" type="button"><span>Gatekeeper<span class="sub">Reception, colleague, or anyone else</span></span></button>
+    </div>
+  </div></div>`;
+}
+function gatekeeperScreenHtml(){
+  const l = CALL.lead;
+  return `<div class="cm-main">
+    <div class="cm-label">Gatekeeper script</div>
+    <div class="script">${scriptHtml(GATEKEEPER_SCRIPT, l)}</div>
+    <div style="margin-top:28px"><button class="btn btn-primary" id="cm-owner-through" type="button" style="padding:14px 28px;font-size:15px">Got through to owner &rarr;</button></div>
+  </div>`;
+}
 function liveHtml(){
+  if(CALL.state==='connected' && reach().stage==='ASK') return askScreenHtml();
+  if(CALL.state==='connected' && reach().stage==='GATEKEEPER') return gatekeeperScreenHtml();
   const s = currentScript(); const l = CALL.lead;
   const testing = (WS.scripts||[]).filter((x)=>x.status==='TESTING');
   /* Archived versions are not offered for a NEW assignment, but if this
@@ -874,6 +932,7 @@ function payload(){
     contact_name: l.contact_name||'', contact_role: l.contact_role||'', phone: l.phone||'', call_mode: CALL.call_mode, twilio_call_sid: CALL.twilio_call_sid||'',
     started_at: CALL.started_at || CALL.opened_at, connected_at: CALL.connected_at||'', ended_at: CALL.ended_at||'', duration_seconds: CALL.duration_seconds||0,
     outcome: CALL.outcome, callback_at: d.callback_at||'', callback_note: d.callback_note||'', owner_reached: d.owner_reached!==false, pitched_override: d.pitched_override===true,
+    gatekeeper_reached: reach().gatekeeper_reached===true, gatekeeper_reached_at: reach().gatekeeper_reached_at||'', owner_reached_at: reach().owner_reached_at||'', owner_reach_source: reach().owner_reach_source||'',
     more_info_type: d.more_info_type||'', more_info_note: d.more_info_note||'', followup_at: d.followup_at||'',
     not_interested_reason: d.not_interested_reason||'', not_interested_detail: d.not_interested_detail||'', meeting_at: d.meeting_at||'', meeting_note: d.meeting_note||'',
     referred_contact: d.referred_contact||null, objections: CALL.objections, main_priority: c.main_priority||'', main_constraint: c.main_constraint||'', useful_note: c.useful_note||'' };
@@ -951,6 +1010,9 @@ document.addEventListener('click', async (e) => {
   if(t.id==='cm-mute'){ if(DIALER.call){ DIALER.call.mute(!DIALER.call.isMuted()); } return; }
   if(t.id==='cm-keypad'){ KEYPAD=!KEYPAD; renderMode(); return; }
   const key = t.closest('.key[data-digit]'); if(key){ if(DIALER.call) DIALER.call.sendDigits(key.dataset.digit); return; }
+  if(t.closest('#cm-owner')){ markOwner('DIRECT'); return; }
+  if(t.closest('#cm-gatekeeper')){ markGatekeeper(); return; }
+  if(t.closest('#cm-owner-through')){ markOwner('VIA_GATEKEEPER'); return; }
   if(t.id==='cm-classify'){ CALL.stage='outcome'; saveDraft(); renderMode(); return; }
   if(t.id==='cm-skip'){ SESSION.done.add(CALL.lead.agency_id); const lead = nextLead(); CALL=null; saveDraft(); if(lead) beginCall(lead); else { CALL={ stage:'done', lead:{}, state:'idle', details:{}, commercial:{}, objections:[] }; renderMode(); } return; }
   if(t.id==='done-exit'){ closeMode(); return; }
