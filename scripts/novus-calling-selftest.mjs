@@ -322,6 +322,100 @@ const table = (header, objs) => ({ header: [...header], rows: objs.map((o) => he
   ok('a negative email signal (NOT_INTERESTED / OPT_OUT) drops a lead to the lowest cold-call tier without suppressing the phone');
 }
 
+// ── 2a2. decision-maker quality ranking within the general cold-call pool ──
+// Same engagement tier throughout (a sent probe, no reply, no demo — tier 3
+// "No interaction") so decision-maker quality is the only thing moving these
+// leads relative to each other. Engagement itself, and the explicit-callback
+// buckets, are asserted separately against this same signal.
+{
+  const AG2 = ['agency_id', 'clean_agency_name', 'main_phone', 'owner_md', 'outreach_contact_name'];
+  const agencies = [
+    { agency_id: 'ag_dm_unnamed', clean_agency_name: 'Unnamed Co', main_phone: '01234 800001' },
+    { agency_id: 'ag_dm_named', clean_agency_name: 'Named Contact Co', main_phone: '01234 800002' },
+    { agency_id: 'ag_dm_named_older_probe', clean_agency_name: 'Named Contact Older Probe Co', main_phone: '01234 800003' },
+    { agency_id: 'ag_dm_senior', clean_agency_name: 'Senior DM Co', main_phone: '01234 800004' },
+    { agency_id: 'ag_dm_partner_senior', clean_agency_name: 'Generic Partner Co', main_phone: '01234 800005' },
+    { agency_id: 'ag_dm_owner', clean_agency_name: 'Named Owner Co', main_phone: '01234 800006' },
+    { agency_id: 'ag_dm_business_partner', clean_agency_name: 'Business Partner Co', main_phone: '01234 800007' },
+    { agency_id: 'ag_dm_owner_md_match', clean_agency_name: 'Owner MD Field Match Co', main_phone: '01234 800008', owner_md: 'Jordan Lee', outreach_contact_name: 'Jordan Lee' },
+    { agency_id: 'ag_dm_owner_md_mismatch', clean_agency_name: 'Owner MD Field Mismatch Co', main_phone: '01234 800009', owner_md: 'Someone Else', outreach_contact_name: 'Taylor Reed' },
+    { agency_id: 'ag_dm_engaged_unnamed', clean_agency_name: 'Engaged But Unnamed Co', main_phone: '01234 800010' },
+    { agency_id: 'ag_dm_callback_owner', clean_agency_name: 'Callback Owner Co', main_phone: '01234 800011' },
+  ];
+  const probes = agencies.map(({ agency_id }) => ({
+    probe_id: `pr_${agency_id}`, agency_id, probe_status: 'CLOSED',
+    probe_timestamp: iso(T0 - (agency_id === 'ag_dm_named_older_probe' ? 50 * DAY : 10 * DAY)),
+  }));
+  const contacts = [
+    { contact_id: 'c_named', agency_id: 'ag_dm_named', contact_name: 'Priya Shah', contact_role: 'Sales Negotiator', is_selected_for_outreach: 'TRUE' },
+    { contact_id: 'c_named_older', agency_id: 'ag_dm_named_older_probe', contact_name: 'Morgan Hale', contact_role: 'Sales Negotiator', is_selected_for_outreach: 'TRUE' },
+    { contact_id: 'c_senior', agency_id: 'ag_dm_senior', contact_name: 'Alex Turner', contact_role: 'Managing Director', is_selected_for_outreach: 'TRUE' },
+    { contact_id: 'c_partner', agency_id: 'ag_dm_partner_senior', contact_name: 'Casey Fox', contact_role: 'Partner', is_selected_for_outreach: 'TRUE' },
+    { contact_id: 'c_owner', agency_id: 'ag_dm_owner', contact_name: 'Sam Ward', contact_role: 'Owner', is_selected_for_outreach: 'TRUE' },
+    { contact_id: 'c_bizpartner', agency_id: 'ag_dm_business_partner', contact_name: 'Robin Cole', contact_role: 'Business Partner', is_selected_for_outreach: 'TRUE' },
+    { contact_id: 'c_cbowner', agency_id: 'ag_dm_callback_owner', contact_name: 'Drew Palmer', contact_role: 'Owner', is_selected_for_outreach: 'TRUE' },
+  ];
+  const replies = [
+    { reply_event_id: 'r_engaged', agency_id: 'ag_dm_engaged_unnamed', classification: 'POSITIVE_MEETING', received_at: iso(T0 - 1 * DAY) },
+  ];
+  const actions = [
+    actionRow({ action_id: 'a_dm_cb', agency_id: 'ag_dm_callback_owner', action_type: 'CALL_PROSPECT', due_at: iso(T0 - 1 * DAY), metadata_json: JSON.stringify({ call_action: true, callback_reason: 'Callback requested' }) }),
+  ];
+  const ws2 = buildCallingWorkspace({
+    AGENCIES: table(AG2, agencies), ACTIONS: table(ACTIONS_HEADER, actions), CALLS: table(CALLS_HEADER, []),
+    SCRIPTS: table(SCRIPTS_HEADER, []), OBJECTIONS: table(OBJECTIONS_HEADER, []), CALL_OBJECTION_EVENTS: table(CALL_OBJECTION_EVENTS_HEADER, []),
+    REPLY_EVENTS: table(['reply_event_id', 'agency_id', 'classification', 'received_at'], replies),
+    PROBES: table(['probe_id', 'agency_id', 'probe_status', 'probe_timestamp'], probes),
+    DEMOS: { header: [], rows: [] },
+    CONTACTS: table(['contact_id', 'agency_id', 'contact_name', 'contact_role', 'is_selected_for_outreach'], contacts),
+    INTELLIGENCE: { header: [], rows: [] },
+  }, { now: iso(T0) });
+  const byId2 = Object.fromEntries(ws2.queue.map((l) => [l.agency_id, l]));
+
+  assert.equal(byId2.ag_dm_unnamed.decision_maker_tier, 'UNNAMED');
+  assert.equal(byId2.ag_dm_named.decision_maker_tier, 'NAMED_CONTACT');
+  assert.equal(byId2.ag_dm_senior.decision_maker_tier, 'NAMED_SENIOR_DECISION_MAKER');
+  assert.equal(byId2.ag_dm_partner_senior.decision_maker_tier, 'NAMED_SENIOR_DECISION_MAKER', 'a bare "Partner" is senior evidence, not ownership evidence');
+  assert.equal(byId2.ag_dm_owner.decision_maker_tier, 'NAMED_OWNER');
+  assert.equal(byId2.ag_dm_business_partner.decision_maker_tier, 'NAMED_OWNER', '"Business Partner" reads as ownership, unlike a bare "Partner"');
+  assert.equal(byId2.ag_dm_owner_md_match.decision_maker_tier, 'NAMED_OWNER', 'AGENCIES.owner_md naming this same contact is accepted as ownership evidence');
+  assert.equal(byId2.ag_dm_owner_md_mismatch.decision_maker_tier, 'NAMED_CONTACT', 'owner_md naming a DIFFERENT person is never borrowed as this lead\'s evidence');
+  ok('decision-maker tiers are classified from structured CONTACTS role text and AGENCIES.owner_md — never inferred from a name alone');
+
+  // Within the same engagement tier, decision-maker quality orders the pool:
+  // owner-equivalent > senior DM > named-but-unqualified > unnamed.
+  assert.deepEqual(
+    ['ag_dm_owner', 'ag_dm_business_partner', 'ag_dm_owner_md_match'].map((id) => ws2.queue.indexOf(byId2[id])).every((i) => i < ws2.queue.indexOf(byId2.ag_dm_senior)),
+    true, 'owner-tier leads outrank the senior-DM lead within the same engagement tier',
+  );
+  assert.ok(ws2.queue.indexOf(byId2.ag_dm_senior) < ws2.queue.indexOf(byId2.ag_dm_named), 'senior decision-maker outranks a generic named contact');
+  assert.ok(ws2.queue.indexOf(byId2.ag_dm_partner_senior) < ws2.queue.indexOf(byId2.ag_dm_named), 'senior decision-maker (partner) outranks a generic named contact');
+  assert.ok(ws2.queue.indexOf(byId2.ag_dm_named) < ws2.queue.indexOf(byId2.ag_dm_unnamed), 'any usable named contact outranks an unnamed lead');
+  ok('named owner beats unnamed lead, and named senior decision-maker beats a generic named contact, within the same engagement tier');
+
+  // Tie-break within the same decision-maker tier: oldest probe first, exactly
+  // as the existing engagement-tier tie-break already works.
+  assert.ok(ws2.queue.indexOf(byId2.ag_dm_named_older_probe) < ws2.queue.indexOf(byId2.ag_dm_named), 'within the same decision-maker tier, the older probe still wins the tie-break');
+  ok('oldest genuine probe timestamp remains the final tie-breaker once engagement tier and decision-maker quality are equal');
+
+  // Engagement tier is decided BEFORE decision-maker quality: a strongly
+  // engaged unnamed lead still outranks an unengaged named owner.
+  assert.equal(byId2.ag_dm_engaged_unnamed.engagement_tier, 1);
+  assert.equal(byId2.ag_dm_engaged_unnamed.decision_maker_tier, 'UNNAMED');
+  assert.ok(ws2.queue.indexOf(byId2.ag_dm_engaged_unnamed) < ws2.queue.indexOf(byId2.ag_dm_owner), 'engagement tier still outranks decision-maker quality');
+  ok('engagement tier is decided before decision-maker quality, unchanged by this ranking signal');
+
+  // Explicit due callback still sits above the entire general pool, including
+  // its own owner-quality contact.
+  assert.equal(byId2.ag_dm_callback_owner.bucket, 1);
+  assert.equal(ws2.queue[0].agency_id, 'ag_dm_callback_owner');
+  assert.ok(ws2.queue.indexOf(byId2.ag_dm_callback_owner) < ws2.queue.indexOf(byId2.ag_dm_owner), 'an explicit due callback outranks every bucket-5 lead regardless of decision-maker quality');
+  ok('an explicit due callback/call action still outranks the entire general pool, whatever the decision-maker quality of either lead');
+
+  // buckets 1-4 never carry a computed decision-maker tier: it is bucket-5-only.
+  assert.equal(byId2.ag_dm_callback_owner.decision_maker_tier, 'UNNAMED', 'decision-maker classification is never computed for a call-action bucket — it only affects bucket-5 ordering');
+}
+
 // ── 2b. deliberate script override becomes the new "last heard" version ────
 {
   const AG = ['agency_id', 'clean_agency_name', 'main_phone'];
