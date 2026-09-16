@@ -906,6 +906,44 @@ select.input.block{padding-right:30px;}
 .btn-call:hover{background:linear-gradient(180deg,var(--blue-vivid-hi),var(--blue-deep-hi));}
 .btn-hangup{background:var(--red-tint);color:var(--red);border-color:var(--red-line);font-weight:700;font-size:14px;padding:11px 22px;border-radius:var(--r-md);}
 .btn-hangup:hover{background:rgba(var(--red-rgb),.16);}
+
+/* ── KEYPAD (DTMF) — compact panel under the header, right-aligned ────── */
+#cm-kp-slot{position:relative;height:0;z-index:5;}
+.kp{position:absolute;right:var(--s-6);top:10px;width:212px;padding:10px 12px 12px;border:1px solid var(--hair-2);border-radius:var(--r-lg);
+  background:var(--bg-2);box-shadow:var(--shadow-md);animation:rise .18s var(--ease);}
+.kp-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);}
+.kp-sent{flex:1;min-width:0;font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:none;color:var(--blue-hi);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;}
+.kp-x{border:none;background:transparent;color:var(--ink-4);font-size:18px;line-height:1;cursor:pointer;padding:0 2px;}
+.kp-x:hover{color:var(--ink);}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.key{height:40px;border:1px solid var(--hair-2);border-radius:var(--r-md);background:rgba(var(--ink-rgb),.04);color:var(--ink);
+  font-family:var(--mono);font-size:17px;font-weight:500;cursor:pointer;transition:background .12s var(--ease),border-color .12s var(--ease),transform .12s var(--ease);}
+.key:hover:not(:disabled){border-color:var(--blue-line);background:var(--blue-tint);}
+.key:disabled{opacity:.38;cursor:not-allowed;}
+.key.hit{background:var(--blue-tint-2);border-color:var(--blue);color:var(--blue-hi);transform:scale(.94);}
+.btn-secondary.on{border-color:var(--blue-line);color:var(--blue-hi);background:var(--blue-tint);}
+
+/* ── TECHNICAL DISCARD — a quiet row under the outcomes, never an outcome ── */
+.discard{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:22px;padding-top:16px;border-top:1px dashed var(--hair-2);font-size:12px;color:var(--ink-4);line-height:1.5;}
+.discard .btn{color:var(--amber);}
+.discard .btn:hover{background:var(--amber-tint);}
+
+/* ── DUE CALL-ACTION TOASTS — top-right, small, above Calling Mode ─────── */
+.toasts{position:fixed;top:14px;right:16px;z-index:80;display:flex;flex-direction:column;gap:8px;width:320px;max-width:calc(100vw - 32px);pointer-events:none;}
+.toast{display:flex;align-items:stretch;border:1px solid var(--hair-2);border-radius:var(--r-lg);background:var(--bg-2);box-shadow:var(--shadow-md);
+  pointer-events:auto;animation:rise .22s var(--ease);overflow:hidden;}
+.toast.subtle{opacity:.78;box-shadow:none;}
+.toast.subtle:hover{opacity:1;}
+.toast-body{flex:1;min-width:0;text-align:left;border:none;background:transparent;color:var(--ink);font-family:inherit;cursor:pointer;padding:11px 12px;}
+.toast-body:hover{background:var(--blue-tint);}
+.toast-t{font-size:13px;font-weight:600;line-height:1.3;}
+.toast-s{font-size:11.5px;color:var(--ink-3);margin-top:3px;line-height:1.4;}
+.toast-s .over{color:var(--amber);}
+.toast-x{border:none;border-left:1px solid var(--hair);background:transparent;color:var(--ink-4);font-size:18px;line-height:1;cursor:pointer;padding:0 10px;}
+.toast-x:hover{color:var(--ink);background:rgba(var(--ink-rgb),.04);}
+.toast-more{align-self:flex-end;font-size:11px;color:var(--ink-4);padding:2px 6px;pointer-events:auto;}
+.task.flash{background:var(--blue-tint);box-shadow:inset 3px 0 0 var(--blue);transition:background .6s var(--ease);}
 .cm-body{flex:1;min-height:0;display:grid;grid-template-columns:1fr 340px;gap:0;}
 .cm-main{min-width:0;overflow:auto;padding:var(--s-6);}
 .cm-side{min-width:0;overflow:auto;border-left:1px solid var(--hair);padding:var(--s-5);background:var(--bg-2);}

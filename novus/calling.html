@@ -317,8 +317,11 @@
     </div>
     <div class="cm-call" id="cm-call"></div>
   </div>
+  <div id="cm-kp-slot"></div>
   <div id="cm-stage" style="flex:1;min-height:0;display:flex;flex-direction:column;"></div>
 </div>
+<!-- Due call-action toasts: top-right, small, never a modal, above Calling Mode. -->
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
@@ -347,6 +350,7 @@ const SCRIPT_DUP_URL    = OP('script-duplicate');
 const SCRIPT_STATUS_URL = OP('script-status');
 const OBJECTION_SAVE_URL = OP('objection-save');
 const REPAIR_URL        = OP('calling-repair');
+const DISCARD_URL       = OP('calling-discard');
 const TOKEN_URL         = OP('twilio-token');
 const RECORDING_URL     = OP('calling-recording');
 const ANALYTICS_URL     = OP('calling-analytics');
@@ -469,6 +473,7 @@ async function load(force){
     if(!res.ok || data.success===false) throw new Error(data.error || `Request failed (${res.status})`);
     WS = data; LOADED = true;
     renderSetup(); renderResume(); renderView();
+    notifyDue(data.call_actions);
     $('stamp').innerHTML = `<span class="nav-dot${data.cached?' stale':''}"></span>${esc(when(data.generated_at))}${data.cached?` · cached ${Math.round((data.cache_age_ms||0)/1000)}s`:''}`;
   }catch(err){
     showErr(`The calling workspace could not load. ${err.message||''}`);
@@ -545,7 +550,7 @@ function renderCallActions(){
 function callActionHtml(a){
   const t = Date.parse(a.due_at||''); const over = Number.isFinite(t) && t < Date.now();
   const time = Number.isFinite(t) ? new Date(t).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
-  return `<div class="task" data-id="${esc(a.agency_id)}">
+  return `<div class="task${NOTIFY.highlight===a.agency_id?' flash':''}" data-id="${esc(a.agency_id)}" data-action="${esc(a.action_id)}">
     <div class="task-rail ${over?(a.group==='overdue'?'over':'due'):''}"></div>
     <div class="task-main">
       <div class="task-top"><div class="task-what">${esc(a.reason||'Call back')}</div>
@@ -654,7 +659,7 @@ function startSession(mode, agencyId){
   openMode(); beginCall(lead);
 }
 function openMode(){ window.scrollTo(0,0); $('cm').classList.add('on'); $('cm').setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; }
-function closeMode(){ $('cm').classList.remove('on'); $('cm').setAttribute('aria-hidden','true'); document.body.style.overflow=''; stopTimer(); SESSION=null; CALL=null; saveDraft(); renderResume(); load(true); }
+function closeMode(){ $('cm').classList.remove('on'); $('cm').setAttribute('aria-hidden','true'); document.body.style.overflow=''; stopTimer(); KEYPAD=false; SESSION=null; CALL=null; saveDraft(); renderResume(); load(true); openDeferredToast(); }
 function beginCall(lead){
   /* The server already decided this: a lead with a previous call stays on
      that exact version even if it is now archived (cohort integrity), and
@@ -668,6 +673,7 @@ function beginCall(lead){
   CALL = { client_key: uid(), lead, script_id: script?script.script_id:'', source_action_id: lead.action_id||'', opened_at: new Date().toISOString(),
     call_mode:'MANUAL', state:'idle', started_at:'', connected_at:'', ended_at:'', duration_seconds:0, objections:[], outcome:'', details:{}, commercial:{ main_priority:'', main_constraint:'', useful_note:'' }, stage:'live',
     reach: { stage:'ASK', gatekeeper_reached:false, gatekeeper_reached_at:'', owner_reached_at:'', owner_reach_source:'' } };
+  DTMF.sent = []; KEYPAD = false;
   saveDraft(); renderMode();
 }
 function resumeDraft(){
@@ -717,17 +723,18 @@ function renderCallControls(){
   const st = CALL.state; const box = $('cm-call');
   const label = { idle:'Ready', connecting:'Connecting', ringing:'Ringing', connected:'Connected', ended:'Ended', failed:'Failed' }[st] || st;
   const modeNote = DIALER.enabled ? '' : `<span class="cm-state" title="${esc(DIALER.reason||'')}" style="min-width:0;color:var(--amber)">Manual</span>`;
-  if(CALL.stage!=='live'){ box.innerHTML = `<span class="cm-state">${esc(label)}</span><span class="cm-timer">${mmss(CALL.duration_seconds)}</span>`; return; }
+  if(CALL.stage!=='live'){ box.innerHTML = `<span class="cm-state">${esc(label)}</span><span class="cm-timer">${mmss(CALL.duration_seconds)}</span>`; renderKeypad(); return; }
   if(st==='idle') box.innerHTML = `${modeNote}<span class="cm-state">Ready</span>
       <button class="btn btn-quiet btn-sm" id="cm-skip" type="button" title="Skip without logging a call">Skip</button>
       <button class="btn btn-call" id="cm-dial" type="button"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg>${DIALER.enabled?'Call':'Start call'}</button>`;
   else if(st==='connected'||st==='connecting'||st==='ringing') box.innerHTML = `<span class="cm-state ${st}">${esc(label)}</span><span class="cm-timer" id="cm-timer">${st==='connected'?'00:00':'&nbsp;'}</span>
-      ${DIALER.enabled&&st==='connected'?`<button class="btn btn-secondary btn-sm ${CALL.muted?'on':''}" id="cm-mute" type="button" aria-pressed="${CALL.muted?'true':'false'}">${CALL.muted?'Unmute':'Mute'}</button>
-      <button class="btn btn-secondary btn-sm" id="cm-keypad" type="button" aria-pressed="${KEYPAD?'true':'false'}">Keypad</button>`:''}
+      ${DIALER.enabled&&st==='connected'?`<button class="btn btn-secondary btn-sm ${CALL.muted?'on':''}" id="cm-mute" type="button" aria-pressed="${CALL.muted?'true':'false'}">${CALL.muted?'Unmute':'Mute'}</button>`:''}
+      ${DIALER.enabled?`<button class="btn btn-secondary btn-sm ${KEYPAD?'on':''}" id="cm-keypad" type="button" aria-pressed="${KEYPAD?'true':'false'}">Keypad</button>`:''}
       <button class="btn btn-hangup" id="cm-hangup" type="button">End call</button>`;
   else box.innerHTML = `<span class="cm-state ${st}">${esc(label)}${st==='failed'&&CALL.error?` <span class="muted" style="font-weight:500;letter-spacing:0;text-transform:none">· ${esc(CALL.error)}</span>`:''}</span><span class="cm-timer">${mmss(CALL.duration_seconds)}</span>
       ${st==='failed'?`<button class="btn btn-secondary btn-sm" id="cm-redial" type="button">Retry</button>`:''}
       <button class="btn btn-primary" id="cm-classify" type="button">Log outcome</button>`;
+  renderKeypad();
 }
 function renderMode(){
   if(!CALL) return;
@@ -753,14 +760,28 @@ function markOwner(source){
   if(!r.owner_reached_at){ r.owner_reached_at = new Date().toISOString(); r.owner_reach_source = source; }
   r.stage = 'OWNER'; saveDraft(); renderMode();
 }
+/* WHICH LIVE SCREEN. The first line + OWNER / GATEKEEPER routing is shown
+   the moment the operator presses Call — through connecting and ringing, and
+   still once connected — so the line is in front of them BEFORE anyone picks
+   up. Showing it marks nothing: gatekeeper/owner facts are written only by
+   markGatekeeper()/markOwner() on a click, and connected_at only by Twilio's
+   accept event (or manual dial). Pure: (state, reach stage) → screen. */
+const LIVE_STATES = ['connecting','ringing','connected'];
+function liveScreen(state, reachStage){
+  if(!LIVE_STATES.includes(state)) return 'SCRIPT';
+  if(reachStage==='ASK') return 'ASK';
+  if(reachStage==='GATEKEEPER') return 'GATEKEEPER';
+  return 'SCRIPT';
+}
 function askScreenHtml(){
   const l = CALL.lead; const named = firstName(l.contact_name); const first = named || 'the owner';
+  const hint = CALL.state==='connected' ? 'Who picked up?' : (CALL.state==='ringing' ? 'Ringing — say the line as soon as someone answers, then route.' : 'Connecting — be ready with the line.');
   /* A named contact ("Hi, is that Ian?") reads as speaking to them directly;
      with no named contact at all — an office/main number and nobody to ask
      for by name — "Hi, is the owner there?" asks a third party instead. */
   const greeting = named ? `Hi, is that <span class="var">${esc(first)}</span>?` : `Hi, is <span class="var">${esc(first)}</span> there?`;
   return `<div class="cm-main"><div class="cstage" style="text-align:center;padding-top:80px">
-    <div class="cstage-t">${greeting}</div><div class="cstage-s">Who picked up?</div>
+    <div class="cstage-t">${greeting}</div><div class="cstage-s">${esc(hint)}</div>
     <div class="outcomes" style="max-width:520px;margin:0 auto">
       <button class="outcome" id="cm-owner" type="button"><span>Owner<span class="sub">Speaking to the decision-maker</span></span></button>
       <button class="outcome" id="cm-gatekeeper" type="button"><span>Gatekeeper<span class="sub">Reception, colleague, or anyone else</span></span></button>
@@ -776,8 +797,9 @@ function gatekeeperScreenHtml(){
   </div>`;
 }
 function liveHtml(){
-  if(CALL.state==='connected' && reach().stage==='ASK') return askScreenHtml();
-  if(CALL.state==='connected' && reach().stage==='GATEKEEPER') return gatekeeperScreenHtml();
+  const screen = liveScreen(CALL.state, reach().stage);
+  if(screen==='ASK') return askScreenHtml();
+  if(screen==='GATEKEEPER') return gatekeeperScreenHtml();
   const s = currentScript(); const l = CALL.lead;
   const testing = (WS.scripts||[]).filter((x)=>x.status==='TESTING');
   /* Archived versions are not offered for a NEW assignment, but if this
@@ -791,6 +813,7 @@ function liveHtml(){
   const clicked = new Set(CALL.objections.map((o)=>o.objection_id));
   return `<div class="cm-body">
     <div class="cm-main">
+      ${CALL.discarded_note?`<div class="banner" style="margin-bottom:18px">${esc(CALL.discarded_note)}</div>`:''}
       <div class="cm-label">Current script ${s?`<span class="mono muted">${esc(s.name)} v${s.version}</span>`:''}${switcher}</div>
       <div class="script">${s?scriptHtml(s.content, l):'<span class="muted">No script. Add one in Scripts.</span>'}</div>
       ${l.calls&&l.calls.length?`<div class="cm-label" style="margin-top:34px">Previous calls</div><ul class="cm-list">${l.calls.map((c)=>`<li><b>${esc(when(c.at))}</b><span>${esc(outcomeLabel(c.outcome))}${c.pitched?' · pitched':''}${c.callback_at?` · callback ${esc(when(c.callback_at))}`:''}${c.note?` — ${esc(c.note)}`:''}${c.recording?` · <a href="${RECORDING_URL}&call_id=${encodeURIComponent(c.call_id)}" target="_blank" rel="noopener" style="color:var(--blue)">recording</a>`:''}</span></li>`).join('')}</ul>`:''}
@@ -798,7 +821,6 @@ function liveHtml(){
       ${l.context?.probe_grade_reason?`<div class="cm-label" style="margin-top:24px">Probe finding</div><div class="note">${esc(l.context.probe_grade_reason)}</div>`:''}
     </div>
     <div class="cm-side">
-      ${KEYPAD&&CALL.state==='connected'?`<div class="cm-label">Keypad</div><div class="keypad" id="cm-keys">${['1','2','3','4','5','6','7','8','9','*','0','#'].map((d)=>`<button class="key" data-digit="${d}" type="button">${d}</button>`).join('')}</div>`:''}
       <div class="cm-label">Common objections ${CALL.state==='connected'?pill('logging','t-blue',true):''}</div>
       <div id="cm-objs">${(WS.active_objections||[]).map((o)=>`<div class="obj" data-obj="${esc(o.objection_id)}">
         <button class="obj-t" type="button">${esc(o.title)}${clicked.has(o.objection_id)?'<span class="obj-n">logged</span>':''}</button>
@@ -810,6 +832,9 @@ function outcomeHtml(){
     <div class="cstage-t">What happened?</div>
     <div class="cstage-s">Press a number or click. Pitched is worked out from the outcome — you never select it.</div>
     <div class="outcomes">${OUTCOMES.map(([k,l,sub],i)=>`<button class="outcome ${CALL.outcome===k?'on':''} ${k==='DO_NOT_CALL'?'warn':''}" data-outcome="${k}" type="button"><kbd>${(i+1)%10}</kbd><span>${esc(l)}<span class="sub">${esc(sub)}</span></span></button>`).join('')}</div>
+    <div class="discard"><button class="btn btn-quiet" id="cm-discard" type="button">Technical issue &mdash; discard call</button>
+      <span>Keypad, Twilio, audio or browser fault, accidental dial, IVR could not be navigated. Not a dial, not an attempt &mdash; nothing about the lead changes.</span></div>
+    <div id="o-err" class="formerr"></div>
     <div class="cstage-actions"><button class="btn btn-quiet" data-back="live" type="button">&larr; Back</button><span class="spacer"></span></div>
   </div></div>`;
 }
@@ -943,6 +968,37 @@ function doneHtml(){
    patched onto the row by webhooks; nothing here waits for them.           */
 let KEYPAD = false;
 const DIALER = { enabled:false, reason:'', device:null, call:null, expires:0, ready:null };
+
+/* ── KEYPAD / DTMF ────────────────────────────────────────────────────────
+   Real tones through the Twilio Voice JS SDK: Call.sendDigits(digit) on the
+   active Call object (the same object dial() gets back from
+   Device.connect()). Nothing is synthesised locally. Keys are disabled until
+   that Call exists and ends with it. DTMF.sent is only on-screen feedback. */
+const DTMF_KEYS = ['1','2','3','4','5','6','7','8','9','*','0','#'];
+const DTMF = { sent: [] };
+function dtmfActive(){ return Boolean(DIALER.call) && Boolean(CALL) && LIVE_STATES.includes(CALL.state); }
+function sendDigit(d){
+  if(!DTMF_KEYS.includes(d) || !dtmfActive()) return '';
+  DIALER.call.sendDigits(d);
+  DTMF.sent.push(d); if(DTMF.sent.length>24) DTMF.sent.shift();
+  return d;
+}
+function keypadHtml(){
+  if(!KEYPAD || !CALL || CALL.stage!=='live' || !LIVE_STATES.includes(CALL.state)) return '';
+  const live = dtmfActive();
+  return `<div class="kp" id="cm-kp" role="group" aria-label="Keypad">
+    <div class="kp-head"><span>Keypad</span><span class="kp-sent" id="kp-sent">${DTMF.sent.length?esc(DTMF.sent.join(' ')):(live?'Tones go to the call':'Waiting for the call')}</span>
+      <button class="kp-x" id="cm-keypad-close" type="button" aria-label="Close keypad" title="Close (the call carries on)">&times;</button></div>
+    <div class="keypad" id="cm-keys">${DTMF_KEYS.map((d)=>`<button class="key" data-digit="${d}" type="button" ${live?'':'disabled'}>${d}</button>`).join('')}</div>
+  </div>`;
+}
+function renderKeypad(){ const slot=$('cm-kp-slot'); if(slot) slot.innerHTML = keypadHtml(); }
+function pressKey(d){
+  const sent = sendDigit(d); if(!sent) return;
+  const el = document.querySelector(`#cm-keys .key[data-digit="${d}"]`);
+  if(el){ el.classList.add('hit'); setTimeout(()=>el.classList.remove('hit'), 220); }
+  const fb = $('kp-sent'); if(fb) fb.textContent = DTMF.sent.join(' ');
+}
 function logDeviceError(label, e){
   // Never log e.g. the access token or any field carrying it — only the
   // error's own identifying fields, which Twilio documents as safe to log.
@@ -989,7 +1045,7 @@ async function dial(){
   }
   const l = CALL.lead;
   if(!l.phone_e164){ CALL.state='failed'; CALL.error='no dialable number'; saveDraft(); renderMode(); return; }
-  CALL.call_mode='TWILIO'; CALL.state='connecting'; CALL.started_at = new Date().toISOString(); CALL.error=''; saveDraft(); renderMode();
+  CALL.call_mode='TWILIO'; CALL.state='connecting'; CALL.started_at = new Date().toISOString(); CALL.error=''; DTMF.sent=[]; saveDraft(); renderMode();
   try{
     const opened = await post(START_URL, { confirm:'START_CALL', client_key: CALL.client_key, agency_id: l.agency_id, script_id: CALL.script_id, source_action_id: CALL.source_action_id||'',
       contact_name: l.contact_name||'', contact_role: l.contact_role||'', phone: l.phone||'', call_mode:'TWILIO', started_at: CALL.started_at });
@@ -1027,6 +1083,62 @@ function hangup(){
   CALL.ended_at = new Date().toISOString();
   CALL.duration_seconds = Math.max(0, Math.round((Date.parse(CALL.ended_at) - Date.parse(CALL.connected_at||CALL.started_at))/1000));
   CALL.state='ended'; CALL.stage='outcome'; saveDraft(); renderMode();
+}
+/* TECHNICAL DISCARD. Server: calling-discard flags the opened CALLS row so
+   every counting path ignores it (see lib/calling-handlers.mjs). Here: the
+   draft is dropped, the lead is NOT added to SESSION.done, and the same lead
+   is reopened idle with a fresh client_key — exactly as if the attempt had
+   never happened. A manual-mode call has no row; the server answers
+   discarded=false and the browser side is identical. */
+let DISCARDING = false;
+const DISCARD_CONFIRM = 'Discard this call as a technical issue? It will not count as an attempt and the lead will remain available to call.';
+/* The one client-side discard path. Hangs up any live leg and asks the
+   server to flag the opened row (calling-discard). Resolves to the server's
+   answer, or { discarded:false } when no row was ever opened (manual mode /
+   dial rejected before calling-start returned). Used by the operator's
+   explicit "Technical issue" option AND by Retry after a failed dial. */
+async function discardOpenedRow(){
+  if(DIALER.call){ try{ DIALER.call.disconnect(); }catch{} DIALER.call = null; }
+  if(!CALL || !CALL.call_id) return { discarded:false, reused:false };
+  return post(DISCARD_URL, { confirm:'DISCARD_CALL', call_id: CALL.call_id, client_key: CALL.client_key, agency_id: CALL.lead.agency_id, reason:'TECHNICAL_ISSUE' });
+}
+/* RETRY after a FAILED dial. `failed` is only ever set before the call
+   connected (connect() rejected, device/signalling error while connecting or
+   ringing, no dialable number — see finishTwilioCall), so the row opened for
+   it was never a legitimate attempt. It is discarded through the same path
+   as above before a fresh client_key / CALLS row is opened. A dial that
+   connected and ended goes to the outcome screen, never here. */
+let REDIALING = false;
+async function redial(){
+  if(!CALL || CALL.state!=='failed' || REDIALING) return;
+  REDIALING = true;
+  const btn = $('cm-redial'); if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Retry'; }
+  try{
+    await discardOpenedRow();
+    CALL.state='idle'; CALL.error=''; CALL.call_id=''; CALL.twilio_call_sid=''; CALL.started_at=''; CALL.client_key=uid(); DTMF.sent=[];
+    saveDraft(); renderMode();
+  }catch(e){
+    CALL.error = `previous attempt could not be discarded (${e.message}) — retry again`; saveDraft(); renderCallControls();
+  }finally{ REDIALING = false; }
+}
+async function discardCall(){
+  if(!CALL || DISCARDING) return;
+  if(!confirm(DISCARD_CONFIRM)) return;
+  DISCARDING = true;
+  const btn = $('cm-discard'); if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Discarding'; }
+  const err = $('o-err'); if(err) err.classList.remove('show');
+  try{
+    await discardOpenedRow();
+    const lead = CALL.lead;
+    stopTimer(); KEYPAD = false; CALL = null; saveDraft();
+    load(true);
+    beginCall(lead);
+    CALL.discarded_note = 'Previous attempt discarded as a technical issue — it is not counted and nothing about this lead has changed.';
+    saveDraft(); renderMode();
+  }catch(e){
+    if(err){ err.textContent = `Not discarded: ${e.message}. The call is still here — try again or log an outcome.`; err.classList.add('show'); }
+    if(btn){ btn.disabled = false; btn.innerHTML = 'Technical issue &mdash; discard call'; }
+  }finally{ DISCARDING = false; }
 }
 function chooseOutcome(k){
   CALL.outcome = k;
@@ -1100,6 +1212,107 @@ function logObjection(id){
   saveDraft();
 }
 
+
+/* ═══ DUE CALL-ACTION NOTIFICATIONS ═════════════════════════════════════
+   Small toasts, top-right, never a modal. The source is the existing
+   ACTIONS ledger as the workspace already projects it (call_actions: active
+   phone actions with due_at) — no new table, no new operation. The
+   workspace payload is re-read every NOTIFY_POLL_MS (server-cached 30s, so
+   this is one cheap GET) and also every time load() runs.
+   Acknowledging (click or dismiss) is LOCAL to this browser session
+   (sessionStorage) and never completes the ACTION — only saving a call does.
+   Mid-call the toast is subtler and a click DEFERS the jump until Calling
+   Mode closes: it never changes the current call's state or focus. */
+const NOTIFY_POLL_MS = 60_000;
+const NOTIFY_MAX_VISIBLE = 3;
+const NOTIFY_ACK_KEY = 'novus.calling.toast-ack';
+const ACTIVE_ACTION_STATUSES = new Set(['PENDING','DUE','IN_PROGRESS','SNOOZED']);
+const NOTIFY = { acked: new Set(), visible: [], queue: [], deferred: null, highlight: '' };
+try{ (JSON.parse(sessionStorage.getItem(NOTIFY_ACK_KEY)||'[]')||[]).forEach((id)=>NOTIFY.acked.add(id)); }catch{}
+function ackToast(id){ NOTIFY.acked.add(id); try{ sessionStorage.setItem(NOTIFY_ACK_KEY, JSON.stringify([...NOTIFY.acked])); }catch{} }
+/* Pure: the call actions that deserve a toast right now — genuinely due,
+   still active, actionable (a number, not suppressed), not yet acknowledged. */
+function dueCallActionAlerts(callActions, { nowMs, acknowledged }){
+  return (callActions||[]).filter((a) => {
+    const due = Date.parse(a.due_at||'');
+    return Boolean(a.action_id) && Number.isFinite(due) && due <= nowMs
+      && ACTIVE_ACTION_STATUSES.has(String(a.status||'').toUpperCase())
+      && !a.suppressed && !a.no_phone
+      && !(acknowledged && acknowledged.has(a.action_id));
+  }).sort((a,b) => Date.parse(a.due_at) - Date.parse(b.due_at));
+}
+/* Pure: what a click does. In Calling Mode (any call on screen) the jump is
+   deferred; the call object is never touched either way. */
+function toastClickPlan(action, { callingModeOpen }){
+  return callingModeOpen
+    ? { kind:'defer', view:'call-actions', agency_id: action.agency_id, action_id: action.action_id }
+    : { kind:'open',  view:'call-actions', agency_id: action.agency_id, action_id: action.action_id };
+}
+function toastHtml(a){
+  const t = Date.parse(a.due_at||''); const over = Number.isFinite(t) && Date.now()-t > 60_000;
+  const time = Number.isFinite(t) ? new Date(t).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
+  const who = [a.contact_name, a.contact_role?`(${a.contact_role})`:''].filter(Boolean).join(' ');
+  return `<div class="toast${CALL?' subtle':''}" data-toast="${esc(a.action_id)}" role="status">
+    <button class="toast-body" type="button" data-toast-open="${esc(a.action_id)}">
+      <div class="toast-t">Time to call ${esc(a.agency_name||'this lead')}</div>
+      <div class="toast-s">${a.reason?`${esc(a.reason)} &middot; `:''}${who?`${esc(who)} &middot; `:''}<span class="${over?'over':''}">${over?'due '+esc(ago(a.due_at)):('due '+esc(time))}</span></div>
+    </button>
+    <button class="toast-x" type="button" data-toast-dismiss="${esc(a.action_id)}" aria-label="Dismiss">&times;</button>
+  </div>`;
+}
+function notifyDue(callActions){
+  const due = dueCallActionAlerts(callActions, { nowMs: Date.now(), acknowledged: NOTIFY.acked });
+  const known = new Set([...NOTIFY.visible, ...NOTIFY.queue].map((a)=>a.action_id));
+  for(const a of due){ if(!known.has(a.action_id)) NOTIFY.queue.push(a); }
+  /* Anything no longer due/active (saved, cancelled, snoozed on) leaves quietly. */
+  const still = new Set(due.map((a)=>a.action_id));
+  NOTIFY.visible = NOTIFY.visible.filter((a)=>still.has(a.action_id));
+  NOTIFY.queue = NOTIFY.queue.filter((a)=>still.has(a.action_id));
+  renderToasts();
+}
+function renderToasts(){
+  while(NOTIFY.visible.length < NOTIFY_MAX_VISIBLE && NOTIFY.queue.length) NOTIFY.visible.push(NOTIFY.queue.shift());
+  const box = $('toasts'); if(!box) return;
+  const more = NOTIFY.queue.length;
+  box.innerHTML = NOTIFY.visible.map(toastHtml).join('') + (more?`<div class="toast-more">${more} more due call${more===1?'':'s'}</div>`:'');
+}
+function removeToast(id){
+  NOTIFY.visible = NOTIFY.visible.filter((a)=>a.action_id!==id); NOTIFY.queue = NOTIFY.queue.filter((a)=>a.action_id!==id);
+  renderToasts();
+}
+function openCallAction(plan){
+  NOTIFY.highlight = plan.agency_id;
+  showView(plan.view);
+  const el = document.querySelector(`#ca-sections .task[data-id="${plan.agency_id}"]`);
+  if(el){ el.classList.add('flash'); el.scrollIntoView({ behavior:'smooth', block:'center' }); }
+  setTimeout(() => { NOTIFY.highlight=''; document.querySelectorAll('#ca-sections .task.flash').forEach((x)=>x.classList.remove('flash')); }, 6000);
+}
+function openDeferredToast(){ const plan = NOTIFY.deferred; if(!plan) return; NOTIFY.deferred = null; openCallAction(plan); }
+function onToastOpen(id){
+  const a = [...NOTIFY.visible, ...NOTIFY.queue].find((x)=>x.action_id===id); if(!a) return;
+  ackToast(id);
+  const plan = toastClickPlan(a, { callingModeOpen: Boolean(CALL) && $('cm').classList.contains('on') });
+  if(plan.kind==='defer'){
+    NOTIFY.deferred = plan;
+    const el = document.querySelector(`.toast[data-toast="${id}"] .toast-s`); if(el) el.textContent = 'Opens in Call actions when this call is over.';
+    setTimeout(() => removeToast(id), 2500);
+    return;
+  }
+  removeToast(id); openCallAction(plan);
+}
+async function pollDueActions(){
+  if(document.hidden) return;
+  try{
+    const res = await fetch(WORKSPACE_URL, { headers:{ Accept:'application/json' } });
+    const data = await res.json();
+    if(res.ok && data.success!==false) notifyDue(data.call_actions);
+  }catch{}
+}
+setInterval(pollDueActions, NOTIFY_POLL_MS);
+document.addEventListener('click', (e) => {
+  const open = e.target.closest('[data-toast-open]'); if(open){ onToastOpen(open.dataset.toastOpen); return; }
+  const dismiss = e.target.closest('[data-toast-dismiss]'); if(dismiss){ ackToast(dismiss.dataset.toastDismiss); removeToast(dismiss.dataset.toastDismiss); }
+});
 
 /* ═══ CALLING ANALYTICS ═════════════════════════════════════════════════
    Everything here is presentation. The read model — every count, rate and
@@ -1443,10 +1656,12 @@ document.addEventListener('click', async (e) => {
   if(!CALL) return;
   if(t.id==='cm-dial'){ dial(); return; }
   if(t.id==='cm-hangup'){ hangup(); return; }
-  if(t.id==='cm-redial'){ CALL.state='idle'; CALL.error=''; CALL.call_id=''; CALL.client_key=uid(); saveDraft(); renderMode(); return; }
+  if(t.id==='cm-redial'){ redial(); return; }
   if(t.id==='cm-mute'){ if(DIALER.call){ DIALER.call.mute(!DIALER.call.isMuted()); } return; }
-  if(t.id==='cm-keypad'){ KEYPAD=!KEYPAD; renderMode(); return; }
-  const key = t.closest('.key[data-digit]'); if(key){ if(DIALER.call) DIALER.call.sendDigits(key.dataset.digit); return; }
+  if(t.id==='cm-keypad'){ KEYPAD=!KEYPAD; renderCallControls(); return; }
+  if(t.id==='cm-keypad-close'){ KEYPAD=false; renderCallControls(); return; }
+  const key = t.closest('.key[data-digit]'); if(key){ if(!key.disabled) pressKey(key.dataset.digit); return; }
+  if(t.id==='cm-discard'){ discardCall(); return; }
   if(t.closest('#cm-owner')){ markOwner('DIRECT'); return; }
   if(t.closest('#cm-gatekeeper')){ markGatekeeper(); return; }
   if(t.closest('#cm-owner-through')){ markOwner('VIA_GATEKEEPER'); return; }
@@ -1485,6 +1700,7 @@ document.addEventListener('input', (e) => {
 document.addEventListener('keydown', (e) => {
   if(!CALL || !$('cm').classList.contains('on')) return;
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  if(CALL.stage==='live' && KEYPAD && !typing && DTMF_KEYS.includes(e.key) && dtmfActive()){ e.preventDefault(); pressKey(e.key); return; }
   if(e.key==='Escape' && CALL.stage!=='live'){ if(!typing) goto(CALL.stage==='outcome'?'live':CALL.stage==='details'?'outcome':CALL.stage==='commercial'?(NEEDS_DETAILS.has(CALL.outcome)?'details':'outcome'):CALL.stage==='review'?(ownerReached()?'commercial':NEEDS_DETAILS.has(CALL.outcome)?'details':'outcome'):'live'); return; }
   if(CALL.stage==='outcome' && !typing && /^[0-9]$/.test(e.key)){ const i = e.key==='0'?9:Number(e.key)-1; if(OUTCOMES[i]){ e.preventDefault(); chooseOutcome(OUTCOMES[i][0]); } return; }
   if((CALL.stage==='details'||CALL.stage==='commercial') && !typing && /^[1-9]$/.test(e.key)){

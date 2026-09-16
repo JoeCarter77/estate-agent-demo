@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { ACTIONS_HEADER } from '../lib/actions-store.mjs';
 import { actionQueue, isManualSalesAction } from '../lib/acquisition-actions.mjs';
-import { CALLS_HEADER, SCRIPTS_HEADER, OBJECTIONS_HEADER, CALL_OBJECTION_EVENTS_HEADER, callRecords } from '../lib/calling-store.mjs';
+import { CALLS_HEADER, SCRIPTS_HEADER, OBJECTIONS_HEADER, CALL_OBJECTION_EVENTS_HEADER, callRecords, liveCallRecords, isDiscardedCall } from '../lib/calling-store.mjs';
 import { buildCallingWorkspace, scriptFunnel } from '../lib/calling-queue.mjs';
 import { derivePitched, deriveOwnerReached, normaliseOutcomeInput, normalisedFromRow, planOutcome, addWorkingDaysMs } from '../lib/calling-outcomes.mjs';
 import { createVoiceAccessToken, decodeJwt, twilioCallingConfig } from '../lib/twilio-access-token.mjs';
@@ -39,6 +39,7 @@ function makeStore(initial) {
     async batchUpdate(data) { for (const { range, values } of data) await api.update(range, values); },
     async listTabs() { return Object.keys(store); },
     async addTab(tab) { store[tab] = []; },
+    async deleteRows(tab, rowNumbers) { for (const n of [...new Set(rowNumbers)].sort((a, b) => b - a)) store[tab].splice(n - 1, 1); },
   };
   return { store, repo: createRepo(api) };
 }
@@ -429,6 +430,115 @@ const table = (header, objs) => ({ header: [...header], rows: objs.map((o) => he
   ok('a missing property fails gracefully — a labelled fallback, never raw template syntax and never a substituted wrong field');
 }
 
+// ── 2e. Calling Mode UI logic (novus/calling.html): keypad DTMF, initial
+//        screen timing, due call-action toasts ──────────────────────────────
+// Same approach as 2d: the real functions are lifted out of the shipped page
+// so these checks cannot drift from it. DOM-free — the page keeps every
+// decision in small pure functions and the DOM wiring thin for this reason.
+{
+  const fs = await import('node:fs');
+  const url = await import('node:url');
+  const html = fs.readFileSync(url.fileURLToPath(new URL('../novus/calling.html', import.meta.url)), 'utf8');
+  const fn = (name) => { const m = html.match(new RegExp(`function ${name}\\([^)]*\\)\\{(?:.*\\}$|[\\s\\S]*?\\n\\})`, 'm')); assert.ok(m, `function ${name}() missing from novus/calling.html`); return m[0]; };
+  const cst = (name) => { const m = html.match(new RegExp(`^const ${name} = [^\\n]*;`, 'm')); assert.ok(m, `const ${name} missing from novus/calling.html`); return m[0]; };
+
+  // Keypad: real DTMF through the SDK's Call.sendDigits(), nothing else.
+  const keypad = new Function('DIALER', 'CALL', `${cst('LIVE_STATES')}\n${cst('DTMF_KEYS')}\n${cst('DTMF')}\n${fn('dtmfActive')}\n${fn('sendDigit')}\nreturn { sendDigit, dtmfActive, DTMF };`);
+  const sdkCalls = [];
+  const mockCall = { sendDigits(d) { sdkCalls.push(d); }, disconnect() {}, mute() {} };
+  let k = keypad({ enabled: true, call: mockCall }, { state: 'connected', stage: 'live' });
+  assert.equal(k.dtmfActive(), true);
+  assert.equal(k.sendDigit('1'), '1'); assert.deepEqual(sdkCalls, ['1']);
+  assert.equal(k.sendDigit('*'), '*'); assert.equal(k.sendDigit('0'), '0'); assert.equal(k.sendDigit('#'), '#');
+  assert.deepEqual(sdkCalls, ['1', '*', '0', '#'], 'each key calls Call.sendDigits() with exactly that digit');
+  assert.deepEqual(k.DTMF.sent, ['1', '*', '0', '#'], 'the on-screen "sent" feedback mirrors what went to the SDK');
+  assert.equal(k.sendDigit('A'), ''); assert.equal(sdkCalls.length, 4, 'a non-keypad character is never sent');
+  ok('keypad keys send real DTMF via Call.sendDigits("1"), "*", "0", "#" on the active Twilio call');
+
+  sdkCalls.length = 0;
+  k = keypad({ enabled: true, call: null }, { state: 'connected', stage: 'live' });
+  assert.equal(k.dtmfActive(), false); assert.equal(k.sendDigit('1'), ''); assert.deepEqual(sdkCalls, []);
+  k = keypad({ enabled: true, call: mockCall }, { state: 'ended', stage: 'outcome' });
+  assert.equal(k.dtmfActive(), false); assert.equal(k.sendDigit('1'), ''); assert.deepEqual(sdkCalls, []);
+  k = keypad({ enabled: true, call: mockCall }, null);
+  assert.equal(k.sendDigit('1'), ''); assert.deepEqual(sdkCalls, []);
+  assert.ok(/data-digit="\$\{d\}"[^>]*\$\{live\?'':'disabled'\}/.test(html), 'keys render disabled until the Call exists');
+  assert.ok(!/new Audio\(|AudioContext|createOscillator/.test(html), 'no locally synthesised tones');
+  ok('keypad does nothing without an active call — no SDK call, keys disabled, no fake audio');
+
+  // Initial screen: the first line + OWNER / GATEKEEPER routing from the moment dialling starts.
+  const liveScreen = new Function(`${cst('LIVE_STATES')}\n${fn('liveScreen')}\nreturn liveScreen;`)();
+  assert.equal(liveScreen('idle', 'ASK'), 'SCRIPT', 'before Call is pressed: the script view with the Call button');
+  assert.equal(liveScreen('connecting', 'ASK'), 'ASK', 'the moment the outbound call begins');
+  assert.equal(liveScreen('ringing', 'ASK'), 'ASK', 'stays through ringing');
+  assert.equal(liveScreen('connected', 'ASK'), 'ASK', 'and once connected, until the operator routes');
+  assert.equal(liveScreen('ringing', 'GATEKEEPER'), 'GATEKEEPER');
+  assert.equal(liveScreen('connected', 'OWNER'), 'SCRIPT', 'OWNER routes to the sales script');
+  assert.equal(liveScreen('ended', 'ASK'), 'SCRIPT');
+  // Showing the screen marks nothing: only the click handlers write reach facts, and only Twilio's accept event writes connected_at.
+  const markOwner = fn('markOwner'); const markGatekeeper = fn('markGatekeeper');
+  assert.ok(/owner_reached_at = new Date/.test(markOwner) && /gatekeeper_reached = true/.test(markGatekeeper));
+  assert.ok(!/owner_reached_at|gatekeeper_reached|connected_at/.test(fn('askScreenHtml')), 'rendering the ask screen writes no reach or connection fact');
+  assert.ok(!/owner_reached_at|gatekeeper_reached|connected_at/.test(fn('liveScreen')));
+  assert.ok(/#cm-owner'\)\)\{ markOwner\('DIRECT'\)/.test(html) && /#cm-gatekeeper'\)\)\{ markGatekeeper\(\)/.test(html), 'reach facts are written only by the OWNER / GATEKEEPER clicks');
+  assert.ok(/call\.on\('accept', \(\) => \{[^\n]*CALL\.state='connected'; CALL\.connected_at = CALL\.connected_at \|\| new Date/.test(html), "connected is still Twilio's accept event, unchanged");
+  ok('initial call screen shows from connecting → ringing → connected; OWNER/GATEKEEPER/connected are only ever set by clicks and the Twilio accept event');
+
+  // Due call-action toasts.
+  const notify = new Function(`${cst('ACTIVE_ACTION_STATUSES')}\n${fn('dueCallActionAlerts')}\n${fn('toastClickPlan')}\nreturn { dueCallActionAlerts, toastClickPlan };`)();
+  const NOW = T0;
+  const ca = (o) => ({ action_id: 'a1', agency_id: 'ag_x', agency_name: 'Jukes Estate Agents', contact_name: 'Sam', due_at: iso(NOW - 60_000), status: 'PENDING', kind: 'CALLBACK', reason: 'Callback requested', suppressed: false, no_phone: false, ...o });
+  const none = new Set();
+  assert.deepEqual(notify.dueCallActionAlerts([ca({ due_at: iso(NOW + 3_600_000) })], { nowMs: NOW, acknowledged: none }), [], 'a future action does not notify');
+  assert.equal(notify.dueCallActionAlerts([ca()], { nowMs: NOW, acknowledged: none }).length, 1, 'a newly due action notifies');
+  assert.equal(notify.dueCallActionAlerts([ca({ due_at: iso(NOW) })], { nowMs: NOW, acknowledged: none }).length, 1, 'due exactly now counts');
+  assert.deepEqual(notify.dueCallActionAlerts([ca({ status: 'COMPLETED' }), ca({ action_id: 'a2', status: 'CANCELLED' }), ca({ action_id: 'a3', status: 'FAILED' })], { nowMs: NOW, acknowledged: none }), [], 'completed / cancelled / failed actions never notify');
+  assert.deepEqual(notify.dueCallActionAlerts([ca({ suppressed: true }), ca({ action_id: 'a2', no_phone: true })], { nowMs: NOW, acknowledged: none }), [], 'not actionable (suppressed lead, no number) → no toast');
+  assert.deepEqual(notify.dueCallActionAlerts([ca()], { nowMs: NOW, acknowledged: new Set(['a1']) }), [], 'an acknowledged action does not pop again this session');
+  const two = notify.dueCallActionAlerts([ca({ action_id: 'later', due_at: iso(NOW - 60_000) }), ca({ action_id: 'earlier', due_at: iso(NOW - 3 * 3_600_000) })], { nowMs: NOW, acknowledged: none });
+  assert.deepEqual(two.map((a) => a.action_id), ['earlier', 'later'], 'multiple due actions queue oldest-due first');
+  ok('due-action toasts: future/completed/cancelled/acknowledged never notify; newly due does; several queue in due order');
+
+  // Against the real server projection: the workspace's call_actions ARE the source (ACTIONS ledger, no new table).
+  const wsTables = {
+    AGENCIES: table(['agency_id', 'clean_agency_name', 'main_phone'], [{ agency_id: 'ag_due', clean_agency_name: 'Jukes Estate Agents', main_phone: '01234 567890' }, { agency_id: 'ag_future', clean_agency_name: 'Later Co', main_phone: '01234 567891' }, { agency_id: 'ag_done', clean_agency_name: 'Done Co', main_phone: '01234 567892' }]),
+    ACTIONS: table(ACTIONS_HEADER, [
+      actionRow({ action_id: 'act_due', agency_id: 'ag_due', action_type: 'CALL_PROSPECT', due_at: iso(T0 - 5 * 60_000), metadata_json: JSON.stringify({ call_action: true, callback_reason: 'Callback requested' }) }),
+      actionRow({ action_id: 'act_future', agency_id: 'ag_future', action_type: 'CALL_PROSPECT', due_at: iso(T0 + DAY), metadata_json: JSON.stringify({ call_action: true }) }),
+      actionRow({ action_id: 'act_done', agency_id: 'ag_done', action_type: 'CALL_PROSPECT', action_status: 'COMPLETED', due_at: iso(T0 - DAY), metadata_json: JSON.stringify({ call_action: true }) }),
+      actionRow({ action_id: 'act_cancelled', agency_id: 'ag_done', action_type: 'RETRY_CALL', action_status: 'CANCELLED', due_at: iso(T0 - DAY), metadata_json: JSON.stringify({ call_action: true }) }),
+    ]),
+    CALLS: table(CALLS_HEADER, []), SCRIPTS: table(SCRIPTS_HEADER, []), REPLY_EVENTS: { header: [], rows: [] }, CONTACTS: { header: [], rows: [] }, INTELLIGENCE: { header: [], rows: [] }, PROBES: { header: [], rows: [] }, DEMOS: { header: [], rows: [] },
+  };
+  const projected = buildCallingWorkspace(wsTables, { now: iso(T0) }).call_actions;
+  const alerts = notify.dueCallActionAlerts(projected, { nowMs: T0, acknowledged: none });
+  assert.deepEqual(alerts.map((a) => [a.action_id, a.agency_name, a.reason]), [['act_due', 'Jukes Estate Agents', 'Callback requested']]);
+  ok('fed by the existing workspace projection of the ACTIONS ledger: only the genuinely due, active call action notifies ("Time to call Jukes Estate Agents")');
+
+  // Clicking: opens the right lead in Call actions; mid-call it defers and never touches the call.
+  const plan = notify.toastClickPlan(alerts[0], { callingModeOpen: false });
+  assert.deepEqual(plan, { kind: 'open', view: 'call-actions', agency_id: 'ag_due', action_id: 'act_due' });
+  const liveCall = Object.freeze({ state: 'connected', stage: 'live', call_id: 'cal_live', reach: Object.freeze({ stage: 'ASK' }) });
+  const snapshot = JSON.stringify(liveCall);
+  const deferred = notify.toastClickPlan(alerts[0], { callingModeOpen: true, call: liveCall });
+  assert.equal(deferred.kind, 'defer'); assert.equal(deferred.agency_id, 'ag_due');
+  assert.equal(JSON.stringify(liveCall), snapshot, 'the live call object is untouched');
+  assert.ok(/plan\.kind==='defer'\)\{\s*NOTIFY\.deferred = plan;/.test(html) && /function openDeferredToast/.test(html) && /openDeferredToast\(\); \}$/m.test(fn('closeMode')), 'a mid-call click is parked until Calling Mode closes');
+  assert.ok(!/action_status|COMPLETED|calling-save|SAVE_CALL/.test(fn('onToastOpen') + fn('ackToast') + fn('removeToast')), 'clicking or dismissing a toast never completes the ACTION');
+  assert.ok(/class="toast\$\{CALL\?' subtle':''\}"/.test(html), 'mid-call toasts render in the subtle style');
+  ok('a toast click opens the correct lead in Call actions, defers mid-call without changing call state, and never completes the action');
+
+  // Retry after a failed dial goes through the SAME discard path as the operator's option.
+  const redial = fn('redial'); const discardCall = fn('discardCall'); const finish = fn('finishTwilioCall');
+  assert.ok(/await discardOpenedRow\(\);/.test(redial) && /await discardOpenedRow\(\);/.test(discardCall), 'both call discardOpenedRow()');
+  assert.equal((html.match(/DISCARD_URL, \{ confirm:'DISCARD_CALL'/g) || []).length, 1, 'exactly one client-side discard request, inside discardOpenedRow()');
+  assert.ok(/CALL\.state!=='failed'[^\n]*return;/.test(redial), 'redial() refuses any state but failed');
+  assert.ok(/CALL\.client_key=uid\(\)/.test(redial) && /CALL\.call_id=''/.test(redial), 'then opens a fresh client_key / row');
+  assert.ok(/CALL\.state = failed && !connected \? 'failed' : 'ended'/.test(finish), 'failed is only ever a pre-connection state — a connected dial always ends on the outcome screen');
+  assert.ok(/st==='failed'\?`<button[^`]*id="cm-redial"/.test(html), 'the Retry button renders only in the failed state');
+  ok('Retry after a failed dial discards the previous row via the shared discardOpenedRow() path and only ever runs from the failed (never-connected) state');
+}
+
 // ── 3. handlers end to end against the in-memory workbook ──────────────────
 {
   const AG = ['agency_id', 'clean_agency_name', 'main_phone', 'outreach_contact_name', 'current_pipeline_status', 'updated_at'];
@@ -784,6 +894,128 @@ const table = (header, objs) => ({ header: [...header], rows: objs.map((o) => he
   assert.equal(gkFunnel.owner_reached_via_gatekeeper, 2);
   assert.equal(gkFunnel.booked_meetings, 2);
   ok('scriptFunnel exposes gatekeeper_reached / owner_reached_direct / owner_reached_via_gatekeeper for the conversion counts');
+
+  // ── 6. "Technical issue — discard call" ─────────────────────────────────
+  // ag_disc has a sent probe and no calls: bucket 5, attempts 0. A discarded
+  // attempt must leave every one of those facts exactly as they were.
+  store.AGENCIES.push(['ag_disc', 'Discard Test Co', '01277 781030', 'Dee', '', '']);
+  store.PROBES.push(['pr_disc', 'ag_disc', 'CLOSED', iso(T0 - 3 * DAY)]);
+  const leadOf = async () => (await call('GET', 'calling-workspace', null, { refresh: '1' })).body;
+  let wsd = await leadOf();
+  const before = { attempts: wsd.leads.ag_disc.attempts, bucket: wsd.queue.find((l) => l.agency_id === 'ag_disc')?.bucket, calls_total: wsd.counts.calls_total, actions: store.ACTIONS.length };
+  assert.equal(before.attempts, 0); assert.equal(before.bucket, 5);
+
+  // Open the row, let Twilio connect it briefly, click an objection live, then discard.
+  res = await call('POST', 'calling-start', { confirm: 'START_CALL', client_key: 'ck-disc-1', agency_id: 'ag_disc', call_mode: 'TWILIO', phone: '01277 781030', started_at: iso(T0 + 3 * DAY) });
+  assert.equal(res.statusCode, 201); const discId = res.body.call.call_id; assert.equal(res.body.call.attempt_number, 1);
+  await webhook('twilio-voice-outbound', '/api/novus/webhooks/voice-outbound', { CallSid: 'CAdisc', call_id: discId });
+  await webhook('twilio-voice-status', '/api/novus/webhooks/voice-outbound-status', { CallSid: 'CAdisc-c', ParentCallSid: 'CAdisc', CallStatus: 'in-progress' });
+  const discRow = () => Object.fromEntries(CALLS_HEADER.map((k, i) => [k, store.CALLS.find((r) => r[0] === discId)[i] ?? '']));
+  assert.ok(discRow().connected_at, 'the call connected briefly');
+  store.CALL_OBJECTION_EVENTS.push(CALL_OBJECTION_EVENTS_HEADER.map((k) => ({ event_id: 'coe_disc', call_id: discId, agency_id: 'ag_disc', objection_id: activeObjections[0].objection_id, objection_key: activeObjections[0].objection_key, objection_title: activeObjections[0].title, clicked_at: iso(T0), offset_seconds: 5, source: 'LIVE', created_at: iso(T0) }[k] ?? '')));
+  // A stray action keyed to this call (what a partially failed save would leave).
+  store.ACTIONS.push(ACTIONS_HEADER.map((k) => ({ action_id: 'act_disc', agency_id: 'ag_disc', action_type: 'RETRY_CALL', action_owner: 'JOE', action_status: 'PENDING', due_at: iso(T0 + 4 * DAY), dedupe_key: `ag_disc:retry:call:${discId}`, created_at: iso(T0), updated_at: iso(T0), metadata_json: JSON.stringify({ call_action: true, call_id: discId }) }[k] ?? '')));
+
+  res = await call('POST', 'calling-discard', { confirm: 'DISCARD_CALL', call_id: discId, client_key: 'ck-disc-1', agency_id: 'ag_disc', reason: 'TECHNICAL_ISSUE' });
+  assert.equal(res.statusCode, 200); assert.equal(res.body.discarded, true); assert.equal(res.body.reused, false);
+  assert.equal(res.body.objection_events_removed, 1); assert.deepEqual(res.body.actions_cancelled, ['act_disc']);
+  assert.equal(store.CALLS.filter((r) => r[0] === discId).length, 1, 'the row is flagged, not deleted');
+  assert.equal(discRow().call_status, 'discarded'); assert.equal(discRow().outcome, '');
+  assert.equal(JSON.parse(discRow().metadata_json).discarded, true); assert.equal(JSON.parse(discRow().metadata_json).discard_reason, 'TECHNICAL_ISSUE');
+  assert.ok(isDiscardedCall(discRow()));
+  assert.equal(store.CALL_OBJECTION_EVENTS.some((r) => r[1] === discId), false, 'no objection events remain for the discarded call');
+  const actDisc = Object.fromEntries(ACTIONS_HEADER.map((k, i) => [k, store.ACTIONS.find((r) => r[0] === 'act_disc')[i] ?? '']));
+  assert.equal(actDisc.action_status, 'CANCELLED'); assert.match(actDisc.completion_reason, /CALL_DISCARDED/);
+  ok('discard flags the CALLS row (call_status=discarded, outcome blank), deletes its objection events and cancels any action it created');
+
+  wsd = await leadOf();
+  assert.equal(wsd.leads.ag_disc.attempts, before.attempts, 'attempts unchanged');
+  assert.equal(wsd.leads.ag_disc.last_call, null, 'no last call recorded');
+  assert.equal(wsd.queue.find((l) => l.agency_id === 'ag_disc')?.bucket, before.bucket, 'still in the same queue bucket');
+  assert.equal(wsd.counts.calls_total, before.calls_total, 'workspace call counts exclude the discarded row');
+  assert.equal(wsd.followups_pending.some((f) => f.call_id === discId), false);
+  assert.equal(wsd.call_actions.some((a) => a.agency_id === 'ag_disc'), false, 'no follow-up call action exists for the lead');
+  assert.equal(store.ACTIONS.filter((r) => r[1] === 'ag_disc' && ['PENDING', 'DUE', 'IN_PROGRESS', 'SNOOZED'].includes(r[7])).length, 0, 'no active action for the lead');
+  assert.equal(store.AGENCIES.find((r) => r[0] === 'ag_disc')[4], '', 'pipeline status untouched');
+  ok('after a discard the lead is exactly as before: same attempts, same bucket, no follow-up, no state change');
+
+  // Attempt numbering skips it; the analytics read model never sees it.
+  res = await call('POST', 'calling-start', { confirm: 'START_CALL', client_key: 'ck-disc-2', agency_id: 'ag_disc', call_mode: 'TWILIO', phone: '01277 781030' });
+  assert.equal(res.body.call.attempt_number, 1, 'the next dial is still attempt #1');
+  assert.notEqual(res.body.call.call_id, discId, 'a discarded row is never reused');
+  const analytics = (await call('GET', 'calling-analytics', null, { range: 'all', refresh: '1' })).body;
+  assert.equal(analytics.explorer.rows.some((r) => r.call_id === discId), false);
+  assert.equal(analytics.summary.unclassified, 1, 'only the genuinely open ck-disc-2 row is unclassified — the discarded one is not even that');
+  assert.equal(scriptFunnel(callRecords({ header: CALLS_HEADER.slice(), rows: store.CALLS.slice(1) }).filter((r) => r.agency_id === 'ag_disc')).dials, 0);
+  assert.equal(liveCallRecords({ header: CALLS_HEADER.slice(), rows: store.CALLS.slice(1) }).some((r) => r.call_id === discId), false);
+  ok('a discarded call is excluded from attempt numbering, the funnel, analytics and unclassified counts');
+
+  // Idempotent, and never applied to a saved call or an unknown one.
+  const snapshot = JSON.stringify(store.CALLS);
+  res = await call('POST', 'calling-discard', { confirm: 'DISCARD_CALL', call_id: discId, agency_id: 'ag_disc' });
+  assert.equal(res.statusCode, 200); assert.equal(res.body.discarded, true); assert.equal(res.body.reused, true);
+  assert.equal(JSON.stringify(store.CALLS), snapshot, 'a repeated discard writes nothing');
+  res = await call('POST', 'calling-discard', { confirm: 'DISCARD_CALL', call_id: 'cal_never_opened', client_key: 'ck-manual-only' });
+  assert.equal(res.statusCode, 200); assert.equal(res.body.discarded, false);
+  res = await call('POST', 'calling-discard', { confirm: 'DISCARD_CALL', call_id: gkBookedCallId, agency_id: 'ag_gk4' });
+  assert.equal(res.statusCode, 409, 'a call with a saved outcome cannot be discarded');
+  res = await call('POST', 'calling-discard', { call_id: discId });
+  assert.equal(res.statusCode, 400);
+  ok('discard is idempotent, a no-op for a call that never opened a row, and refused for a saved call');
+
+  // The discarded row cannot be resurrected: no outcome save, no TwiML, no status regression.
+  res = await call('POST', 'calling-save', { confirm: 'SAVE_CALL', client_key: 'ck-disc-1', call_id: discId, agency_id: 'ag_disc', call_mode: 'TWILIO', outcome: 'NO_ANSWER' });
+  assert.equal(res.statusCode, 409); assert.equal(res.body.discarded, true);
+  res = await webhook('twilio-voice-outbound', '/api/novus/webhooks/voice-outbound', { CallSid: 'CAdisc2', call_id: discId });
+  assert.match(res.body, /discarded/); assert.match(res.body, /<Hangup\/>/);
+  await webhook('twilio-voice-status', '/api/novus/webhooks/voice-outbound-status', { CallSid: 'CAdisc-c', ParentCallSid: 'CAdisc', CallStatus: 'completed', CallDuration: '12' });
+  assert.equal(discRow().call_status, 'discarded', 'a late Twilio status callback cannot un-discard the row');
+  assert.equal(discRow().duration_seconds, 12, 'but its timings are still recorded for the audit trail');
+  ok('a discarded call cannot be saved, re-dialled through TwiML, or un-flagged by a late webhook');
+
+  // ── 7. Retry after a failed dial (the browser's redial() sequence) ──────
+  store.AGENCIES.push(['ag_retry2', 'Retry After Fail Co', '01234 200000', 'Ray', '', '']);
+  store.PROBES.push(['pr_retry2', 'ag_retry2', 'CLOSED', iso(T0 - 3 * DAY)]);
+  // 1) the dial that fails: row opened, Twilio reports failed before any answer
+  res = await call('POST', 'calling-start', { confirm: 'START_CALL', client_key: 'ck-rf-1', agency_id: 'ag_retry2', call_mode: 'TWILIO', phone: '01234 200000' });
+  const failedDialId = res.body.call.call_id; assert.equal(res.body.call.attempt_number, 1);
+  await webhook('twilio-voice-outbound', '/api/novus/webhooks/voice-outbound', { CallSid: 'CAfail', call_id: failedDialId });
+  await webhook('twilio-voice-status', '/api/novus/webhooks/voice-outbound-status', { CallSid: 'CAfail-c', ParentCallSid: 'CAfail', CallStatus: 'failed' });
+  const rowOf = (id) => Object.fromEntries(CALLS_HEADER.map((k, i) => [k, store.CALLS.find((r) => r[0] === id)[i] ?? '']));
+  assert.equal(rowOf(failedDialId).call_status, 'failed'); assert.equal(rowOf(failedDialId).connected_at, '');
+  // 2) Retry → discardOpenedRow() → calling-discard, then a fresh client_key row
+  res = await call('POST', 'calling-discard', { confirm: 'DISCARD_CALL', call_id: failedDialId, client_key: 'ck-rf-1', agency_id: 'ag_retry2', reason: 'TECHNICAL_ISSUE' });
+  assert.equal(res.statusCode, 200); assert.equal(res.body.discarded, true);
+  assert.equal(rowOf(failedDialId).call_status, 'discarded'); assert.ok(isDiscardedCall(rowOf(failedDialId)));
+  res = await call('POST', 'calling-start', { confirm: 'START_CALL', client_key: 'ck-rf-2', agency_id: 'ag_retry2', call_mode: 'TWILIO', phone: '01234 200000' });
+  const retryDialId = res.body.call.call_id;
+  assert.notEqual(retryDialId, failedDialId); assert.equal(res.body.call.attempt_number, 1, 'the retry is still attempt #1');
+  ok('failed dial → Retry: the failed row is discarded and the retry opens a fresh row as attempt #1');
+
+  // 3) the retry is a legitimate call, saved as NO_ANSWER
+  res = await call('POST', 'calling-save', { confirm: 'SAVE_CALL', client_key: 'ck-rf-2', call_id: retryDialId, agency_id: 'ag_retry2', call_mode: 'TWILIO', outcome: 'NO_ANSWER' });
+  assert.equal(res.statusCode, 200); assert.equal(res.body.call.attempt_number, 1);
+  assert.equal(res.body.actions_created[0].action_type, 'RETRY_CALL', 'the legitimate retry call keeps its normal follow-up');
+  const an2 = (await call('GET', 'calling-analytics', null, { range: 'all', refresh: '1' })).body;
+  const agRows = an2.explorer.rows.filter((r) => r.agency_id === 'ag_retry2');
+  assert.deepEqual(agRows.map((r) => r.call_id), [retryDialId], 'analytics sees only the valid retry call');
+  assert.equal(an2.explorer.rows.some((r) => r.call_id === failedDialId), false);
+  const ws7 = (await call('GET', 'calling-workspace', null, { refresh: '1' })).body;
+  assert.equal(ws7.leads.ag_retry2.attempts, 1); assert.equal(ws7.leads.ag_retry2.last_call.call_id, retryDialId);
+  assert.equal(ws7.followups_pending.some((f) => f.call_id === failedDialId), false);
+  ok('after the retry is saved the lead has exactly one attempt — the failed dial is invisible to analytics, the queue and the follow-up list');
+
+  // 4) repeated Retry/discard cannot corrupt state
+  const snap7 = JSON.stringify([store.CALLS, store.ACTIONS, store.CALL_OBJECTION_EVENTS]);
+  for (let i = 0; i < 3; i += 1) {
+    res = await call('POST', 'calling-discard', { confirm: 'DISCARD_CALL', call_id: failedDialId, client_key: 'ck-rf-1', agency_id: 'ag_retry2' });
+    assert.equal(res.statusCode, 200); assert.equal(res.body.reused, true);
+  }
+  res = await call('POST', 'calling-discard', { confirm: 'DISCARD_CALL', call_id: retryDialId, client_key: 'ck-rf-2', agency_id: 'ag_retry2' });
+  assert.equal(res.statusCode, 409, 'the legitimate saved retry call can never be discarded by a stray Retry');
+  assert.equal(JSON.stringify([store.CALLS, store.ACTIONS, store.CALL_OBJECTION_EVENTS]), snap7, 'nothing in the workbook changed');
+  assert.equal(store.CALLS.filter((r) => r[2] === 'ag_retry2').length, 2, 'still exactly two rows: one discarded, one real');
+  ok('repeated Retry/discard is idempotent and cannot touch the legitimate call or duplicate rows');
 
   __setRepoForTests(null);
 }

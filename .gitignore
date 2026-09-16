@@ -4,3 +4,4 @@ node_modules/
 scraper-bench-results.json
 dump-*.html
 .DS_Store
+.vercel

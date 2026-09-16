@@ -74,7 +74,7 @@ import { buildInstantlyReplyPayload } from '../../lib/instantly-reply-send.mjs';
 // other operation on this function: a thirteenth file is not available, so the
 // calling workspace is a set of operations here, implemented in lib/.
 import {
-  handleCallingWorkspace, handleCallingAnalytics, handleCallingSetup, handleCallingStart, handleCallingSave, handleCallingRepair,
+  handleCallingWorkspace, handleCallingAnalytics, handleCallingSetup, handleCallingStart, handleCallingSave, handleCallingDiscard, handleCallingRepair,
   handleScriptSave, handleScriptDuplicate, handleScriptStatus, handleObjectionSave,
 } from '../../lib/calling-handlers.mjs';
 import {
@@ -1802,6 +1802,7 @@ export default async function handler(req, res) {
     'calling-setup': handleCallingSetup,
     'calling-start': handleCallingStart,
     'calling-save': handleCallingSave,
+    'calling-discard': handleCallingDiscard,
     'calling-repair': handleCallingRepair,
     'script-save': handleScriptSave,
     'script-duplicate': handleScriptDuplicate,

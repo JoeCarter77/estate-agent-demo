@@ -10,7 +10,7 @@ implemented in `lib/calling-*.mjs` (the 12-function ceiling rules out new files)
 |---|---|---|
 | `SCRIPTS` | script **version** | `script_key` groups versions; only one row is `CURRENT`; content is frozen once a call references it |
 | `OBJECTIONS` | objection **version** | `active=TRUE` rows show in Calling Mode; rewording a clicked objection makes a new version |
-| `CALLS` | dial | immutable; `outcome`, `connected`, `owner_reached`, `pitched` drive the funnel; Twilio ids + recording live here |
+| `CALLS` | dial | immutable; `outcome`, `connected`, `owner_reached`, `pitched` drive the funnel; Twilio ids + recording live here; `call_status=discarded` marks a technical discard that every reader ignores |
 | `CALL_OBJECTION_EVENTS` | objection encountered on a call | `source=LIVE` (clicked during the call) or `MANUAL` (added in review) |
 
 Call follow-ups go into the existing `ACTIONS` ledger:
@@ -19,9 +19,13 @@ Call follow-ups go into the existing `ACTIONS` ledger:
 * `SEND_INFORMATION`, `PREPARE_MEETING` → generic **Actions** (Joe's manual queue)
 * `NOT_INTERESTED` / `BOOKED_MEETING` also set `AGENCIES.current_pipeline_status`, exactly like the legacy drawer outcome
 
-**Gatekeeper/owner classification.** Once a call connects, Calling Mode shows a
+**Gatekeeper/owner classification.** The moment the operator presses Call
+(state `connecting`, then `ringing`, then `connected`) Calling Mode shows a
 plain answer screen ("Hi, is that {{first_name}}?") with two buttons —
-`OWNER` and `GATEKEEPER` — before the sales script appears. `OWNER` opens the
+`OWNER` and `GATEKEEPER` — plus End call and Keypad, so the first line is in
+front of the operator before anyone picks up. Showing the screen records
+nothing: the reach fields below are written only by those two clicks, and
+`connected_at` only by Twilio's `accept` event (or a manual-mode dial). `OWNER` opens the
 lead's assigned script and the objection sidebar as before. `GATEKEEPER` opens
 a fixed, global gatekeeper script (not versioned, not lead-specific) with a
 single `GOT THROUGH TO OWNER` button that switches the *same* call into the
@@ -35,6 +39,52 @@ column insert that would shift existing data. `lib/calling-queue.mjs`'s
 `scriptFunnel` exposes `gatekeeper_reached`, `owner_reached_direct`,
 `owner_reached_via_gatekeeper` and `gatekeeper_to_owner_pct` for the
 conversion numbers.
+
+**Technical issue — discard call.** The outcome screen carries one option that is
+not an outcome: "Technical issue — discard call" (keypad/Twilio/audio/browser
+fault, accidental dial, IVR could not be navigated), behind the confirmation
+"Discard this call as a technical issue? It will not count as an attempt and the
+lead will remain available to call." `POST ?novus_operation=calling-discard`
+(`confirm=DISCARD_CALL`, `call_id`/`client_key`, `agency_id`) **flags** the opened
+`CALLS` row — `call_status=discarded`, `outcome` blank,
+`metadata_json.discarded=true` + `discard_reason`/`discarded_at` — and
+`lib/calling-store.mjs liveCallRecords()` hides it from every reader: queue
+(attempts, last call, suppression), attempt numbering in `calling-start` /
+`calling-save`, `scriptFunnel`, the analytics read model (not even
+`unclassified`), workspace counts and the follow-up integrity list. Any
+`CALL_OBJECTION_EVENTS` rows for the call are physically deleted and any ACTIONS
+it created (`dedupe_key` ending `:call:<call_id>`) are `CANCELLED`; both are
+normally empty because the option is offered before an outcome is saved. A
+discarded call cannot be saved (`calling-save` → 409), re-dialled (the TwiML
+webhook hangs up) or un-flagged by a late Twilio status callback; a repeated
+discard is a no-op (`reused=true`); a call with a saved outcome cannot be
+discarded (409). Why a flag and not a delete: the status/recording webhooks
+patch `CALLS` by row number for seconds after hangup, and a row deletion in that
+window would shift a concurrent patch onto another call. In the browser the lead
+is reopened idle with a fresh `client_key` and is **not** added to the session's
+done set, so it stays in the pool exactly where it was. **Retry** after a failed
+dial (connect rejected, signalling error while connecting/ringing, no dialable
+number — `failed` is only ever a pre-connection state) runs the same
+`discardOpenedRow()` path on the failed row before opening the fresh
+`client_key` / row, so a failed dial never lingers as an unclassified attempt.
+
+**Keypad (DTMF).** The Keypad button (visible from `connecting` onwards) opens a
+compact 3×4 panel under the header. Each key calls the Twilio Voice SDK's
+`Call.sendDigits(digit)` on the Call object returned by `Device.connect()` — real
+in-band DTMF for IVRs, nothing synthesised locally. Keys are disabled until that
+Call exists, digit keys on the keyboard work while the panel is open, the panel
+shows the digits sent, and closing it never touches the call.
+
+**Due call-action notifications.** Every 60s (and on every workspace load) the page
+re-reads `call_actions` from the workspace payload (server-cached 30s — the
+existing ACTIONS projection, no new table or operation) and shows a small top-right
+toast for each call action that is due, still active and actionable (a number, not
+suppressed): "Time to call {agency}" · reason · contact · due time. At most three
+are visible; the rest queue. Clicking opens that lead in Call actions (highlighted);
+in Calling Mode the toast is subtler and a click defers the jump until the call is
+over, never changing call state. Click or dismiss acknowledges the toast for this
+browser session only (`sessionStorage`); the ACTION itself is never completed by a
+toast — only by saving a call.
 
 Suppression is **derived** from `CALLS` (`DO_NOT_CALL`, `WRONG_NUMBER`, `NOT_INTERESTED`, `BOOKED_MEETING`) plus terminal pipeline status and the agency-level all-contact flag `AGENCIES.suppression_status=SUPPRESSED`. An **email** opt-out (`REPLY_EVENTS`) is channel-specific: it is shown on the lead as context, never as phone suppression. Nothing is written to `AGENCIES` for it.
 

@@ -268,6 +268,25 @@ const build = (calls, events = [], actions = [], opts = {}) => buildCallingAnaly
   ok('follow-ups count callback / more-info actions and attribute meetings only through source_action_id or completion_reason links');
 }
 
+// ── 6b. discarded (technical-issue) calls are invisible ────────────────────
+{
+  const discardedFlag = callRow({ call_id: 'cal_disc_flag', call_status: 'discarded', outcome: '', connected: '', connected_at: iso(NOW - HOUR), metadata_json: JSON.stringify({ discarded: true, discard_reason: 'TECHNICAL_ISSUE' }), script_id: 'scr_a2' });
+  const discardedMetaOnly = callRow({ call_id: 'cal_disc_meta', call_status: 'completed', outcome: '', metadata_json: JSON.stringify({ discarded: true }) });
+  const open = callRow({ call_id: 'cal_open', call_status: 'in-progress', outcome: '' });
+  const real = callRow({ call_id: 'cal_real', outcome: 'BOOKED_MEETING', owner_reached: 'TRUE', pitched: 'TRUE', owner_reach_source: 'DIRECT', script_id: 'scr_a2' });
+  const a = build([discardedFlag, discardedMetaOnly, open, real], [eventRow('cal_disc_flag', 'busy'), eventRow('cal_real', 'send')], [
+    actionRow({ action_type: 'RETRY_CALL', due_at: iso(NOW + DAY), dedupe_key: 'ag_1:retry:call:cal_disc_flag', metadata_json: JSON.stringify({ call_action: true, call_id: 'cal_disc_flag' }) }),
+  ]);
+  assert.equal(a.summary.calls, 1, 'only the classified real call is a call');
+  assert.equal(a.summary.unclassified, 1, 'the genuinely open row is unclassified; discarded rows are not even that');
+  assert.equal(a.summary.meetings, 1);
+  assert.equal(a.explorer.rows.map((r) => r.call_id).sort().join(','), 'cal_real');
+  assert.equal(a.objections.rows.find((o) => o.objection_key === 'busy'), undefined, 'an objection event on a discarded call is not counted');
+  assert.equal(a.summary.followup_actions_created, 0, 'an action keyed to a discarded call is not a follow-up');
+  assert.equal(a.scripts.find((sc) => sc.script_id === 'scr_a2').calls, 1, 'script call counts exclude discarded rows');
+  ok('discarded calls (call_status=discarded or metadata_json.discarded) are excluded from every analytics figure, including unclassified');
+}
+
 // ── 7. the operation on personalisation.js ────────────────────────────────
 {
   const store = {
