@@ -1,12 +1,10 @@
 /* NOVUS Command Centre — shared shell behaviour.
  *
  * Theme behaviour lives here, plus tiny page-specific presentation hooks that
- * do not read or write backend state.
+ * do not mutate NOVUS backend state.
  *
  * The theme is applied by a tiny inline snippet in each page's <head> BEFORE
- * first paint (see `data-theme-boot`), so there is no light/dark flash. This
- * file only handles the toggle, the chrome metadata, cross-tab sync, and the
- * calling-page gatekeeper context panel.
+ * first paint (see `data-theme-boot`), so there is no light/dark flash.
  */
 (function () {
   var KEY = 'novus.theme';
@@ -45,11 +43,12 @@
     apply(current());
   }
 
-  function installCallingGatekeeperContext() {
+  function installCallingContext() {
     if (!/\/novus\/calling(?:\.html)?$/.test(window.location.pathname)) return;
-    if (typeof gatekeeperScreenHtml !== 'function') return;
+    if (typeof renderModeHead !== 'function') return;
 
-    var originalGatekeeperScreenHtml = gatekeeperScreenHtml;
+    var cache = Object.create(null);
+    var originalRenderModeHead = renderModeHead;
     var dateFormatter = new Intl.DateTimeFormat('en-GB', {
       day: 'numeric',
       month: 'short',
@@ -59,6 +58,13 @@
       hour12: false,
       timeZone: 'Europe/London'
     });
+    var sellerLabels = {
+      none: 'Not mentioned',
+      asked_position: 'Asked about your sale',
+      acknowledged: 'Acknowledged',
+      valuation_offered: 'Valuation offered',
+      valuation_booked: 'Valuation booked'
+    };
 
     function safe(value) {
       return String(value == null ? '' : value)
@@ -74,26 +80,102 @@
       return Number.isFinite(ms) ? dateFormatter.format(new Date(ms)) : '';
     }
 
-    gatekeeperScreenHtml = function () {
-      var html = originalGatekeeperScreenHtml();
-      var lead = (typeof CALL !== 'undefined' && CALL && CALL.lead) ? CALL.lead : null;
-      if (!lead) return html;
+    function roleLabel(lead) {
+      var role = String(lead && lead.contact_role || '').trim();
+      if (role) return role;
+      var tier = String(lead && lead.decision_maker_tier || '').trim();
+      if (tier === 'NAMED_OWNER') return 'Owner';
+      if (tier === 'NAMED_SENIOR_DECISION_MAKER') return 'Senior decision-maker';
+      if (tier === 'NAMED_CONTACT') return 'Role unknown';
+      return 'Unknown';
+    }
 
-      var ctx = lead.context || {};
-      var property = String(ctx.property || '').trim();
-      var sentAt = formatProbeSentAt(lead.probe_sent_at);
-      if (!property && !sentAt) return html;
-
-      var context = '<div class="banner" style="margin-bottom:20px">'
-        + '<div style="font-weight:700;margin-bottom:5px">Probe enquiry</div>'
-        + '<div><b>Property:</b> ' + safe(property || 'Not recorded') + '</div>'
-        + '<div><b>Enquiry sent:</b> ' + safe(sentAt || 'Not recorded') + '</div>'
+    function field(label, value, emphasis) {
+      return '<div style="min-width:150px;flex:1 1 170px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);">'
+        + '<div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px">' + safe(label) + '</div>'
+        + '<div style="font-size:13px;font-weight:' + (emphasis ? '700' : '600') + ';line-height:1.35">' + safe(value || 'Unknown') + '</div>'
         + '</div>';
+    }
 
-      return html.replace(
-        '<div class="cm-label">Gatekeeper script</div>',
-        context + '<div class="cm-label">Gatekeeper script</div>'
-      );
+    function sellerLabel(data) {
+      if (!data) return 'Loading…';
+      var raw = String(data.seller_recognition || '').trim().toLowerCase();
+      return raw ? (sellerLabels[raw] || raw.replace(/_/g, ' ')) : 'Not assessed yet';
+    }
+
+    function followupLabel(data) {
+      if (!data) return 'Loading…';
+      if (data.contact_attempts == null) return 'Not recorded';
+      var n = Number(data.contact_attempts) || 0;
+      var out = n + ' contact attempt' + (n === 1 ? '' : 's');
+      var channels = String(data.channels_used || '').trim();
+      if (channels) out += ' · ' + channels.replace(/\s*,\s*/g, ' / ');
+      return out;
+    }
+
+    function ensureContext(lead) {
+      var agencyId = String(lead && lead.agency_id || '').trim();
+      if (!agencyId || cache[agencyId]) return;
+      cache[agencyId] = { status: 'loading', data: null };
+      fetch('/api/lead?call_context=1&agency_id=' + encodeURIComponent(agencyId), {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('Context request failed');
+          return res.json();
+        })
+        .then(function (body) {
+          cache[agencyId] = { status: 'done', data: body.call_context || {} };
+        })
+        .catch(function () {
+          cache[agencyId] = { status: 'error', data: null };
+        })
+        .finally(function () {
+          try {
+            if (typeof CALL !== 'undefined' && CALL && CALL.lead && String(CALL.lead.agency_id || '') === agencyId) renderCallingContext();
+          } catch (e) { /* call ended while the request was in flight */ }
+        });
+    }
+
+    function renderCallingContext() {
+      var existing = document.getElementById('cm-probe-context');
+      var lead = (typeof CALL !== 'undefined' && CALL && CALL.lead) ? CALL.lead : null;
+      if (!lead) {
+        if (existing) existing.remove();
+        return;
+      }
+
+      ensureContext(lead);
+      var state = cache[String(lead.agency_id || '').trim()] || { status: 'loading', data: null };
+      var data = state.data;
+      var base = lead.context || {};
+      var property = String((data && data.property) || base.property || '').trim() || 'Not recorded';
+      var sentAt = formatProbeSentAt((data && data.probe_sent_at) || lead.probe_sent_at) || 'Not recorded';
+      var contactName = String(lead.contact_name || 'Unknown contact').trim();
+      var contact = contactName + ' · ' + roleLabel(lead);
+      var seller = state.status === 'error' ? 'Unavailable' : sellerLabel(data);
+      var followup = state.status === 'error' ? 'Unavailable' : followupLabel(data);
+
+      var html = '<div id="cm-probe-context" style="padding:10px 18px;border-bottom:1px solid var(--line);background:var(--bg);">'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:stretch">'
+        + field('Property', property, true)
+        + field('Seller signal', seller, seller === 'Not mentioned')
+        + field('Follow-up', followup, false)
+        + field('Contact', contact, true)
+        + field('Enquiry sent', sentAt, false)
+        + '</div></div>';
+
+      if (existing) existing.outerHTML = html;
+      else {
+        var head = document.querySelector('#cm .cm-head');
+        if (head) head.insertAdjacentHTML('afterend', html);
+      }
+    }
+
+    renderModeHead = function () {
+      originalRenderModeHead();
+      renderCallingContext();
     };
   }
 
@@ -101,9 +183,8 @@
   else wire();
 
   // calling.html declares its renderer during parsing; this deferred shared
-  // script runs afterwards, so the wrapper can add probe context without
-  // changing any call-state or outcome logic.
-  installCallingGatekeeperContext();
+  // script runs afterwards and adds read-only context around it.
+  installCallingContext();
 
   // Another Command Centre tab switched theme — follow it, so the console is
   // one product across every open page.
