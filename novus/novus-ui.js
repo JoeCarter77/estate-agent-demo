@@ -1,12 +1,12 @@
 /* NOVUS Command Centre — shared shell behaviour.
  *
- * Theme only. This file deliberately owns nothing else: every page's own
- * <script> keeps its own data logic, and nothing here reads or writes NOVUS
- * state.
+ * Theme behaviour lives here, plus tiny page-specific presentation hooks that
+ * do not read or write backend state.
  *
  * The theme is applied by a tiny inline snippet in each page's <head> BEFORE
  * first paint (see `data-theme-boot`), so there is no light/dark flash. This
- * file only handles the toggle, the chrome metadata and cross-tab sync.
+ * file only handles the toggle, the chrome metadata, cross-tab sync, and the
+ * calling-page gatekeeper context panel.
  */
 (function () {
   var KEY = 'novus.theme';
@@ -45,8 +45,65 @@
     apply(current());
   }
 
+  function installCallingGatekeeperContext() {
+    if (!/\/novus\/calling(?:\.html)?$/.test(window.location.pathname)) return;
+    if (typeof gatekeeperScreenHtml !== 'function') return;
+
+    var originalGatekeeperScreenHtml = gatekeeperScreenHtml;
+    var dateFormatter = new Intl.DateTimeFormat('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Europe/London'
+    });
+
+    function safe(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatProbeSentAt(value) {
+      var ms = Date.parse(String(value || ''));
+      return Number.isFinite(ms) ? dateFormatter.format(new Date(ms)) : '';
+    }
+
+    gatekeeperScreenHtml = function () {
+      var html = originalGatekeeperScreenHtml();
+      var lead = (typeof CALL !== 'undefined' && CALL && CALL.lead) ? CALL.lead : null;
+      if (!lead) return html;
+
+      var ctx = lead.context || {};
+      var property = String(ctx.property || '').trim();
+      var sentAt = formatProbeSentAt(lead.probe_sent_at);
+      if (!property && !sentAt) return html;
+
+      var context = '<div class="banner" style="margin-bottom:20px">'
+        + '<div style="font-weight:700;margin-bottom:5px">Probe enquiry</div>'
+        + '<div><b>Property:</b> ' + safe(property || 'Not recorded') + '</div>'
+        + '<div><b>Enquiry sent:</b> ' + safe(sentAt || 'Not recorded') + '</div>'
+        + '</div>';
+
+      return html.replace(
+        '<div class="cm-label">Gatekeeper script</div>',
+        context + '<div class="cm-label">Gatekeeper script</div>'
+      );
+    };
+  }
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
   else wire();
+
+  // calling.html declares its renderer during parsing; this deferred shared
+  // script runs afterwards, so the wrapper can add probe context without
+  // changing any call-state or outcome logic.
+  installCallingGatekeeperContext();
 
   // Another Command Centre tab switched theme — follow it, so the console is
   // one product across every open page.
