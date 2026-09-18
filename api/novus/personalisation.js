@@ -80,6 +80,14 @@ import {
 import {
   handleTwilioToken, handleVoiceOutbound, handleVoiceStatus, handleVoiceRecording, handleCallingRecording,
 } from '../../lib/calling-twilio.mjs';
+// INCOMING CALLBACK RECOGNITION + GLOBAL LEAD SEARCH (lib/calling-inbound.mjs,
+// lib/lead-search.mjs). Same ceiling: the inbound <Dial> action webhook is a
+// vercel.json rewrite onto this function; the read/intent operations sit
+// behind Basic Auth like the rest of the calling workspace.
+import {
+  handleVoiceInboundAction, handleCallingInbound, handleCallingInboundIntent, handleLeadSearch,
+} from '../../lib/calling-inbound.mjs';
+import { invalidateLeadIndex } from '../../lib/lead-search.mjs';
 import { novusMailboxes } from '../../lib/reply-router.mjs';
 import { evaluateManualReplyRequest } from '../../lib/manual-reply-context.mjs';
 import {
@@ -1661,6 +1669,9 @@ const TWILIO_WEBHOOK_OPERATIONS = {
   'twilio-voice-outbound': handleVoiceOutbound,
   'twilio-voice-status': handleVoiceStatus,
   'twilio-voice-recording': handleVoiceRecording,
+  // /api/novus/webhooks/voice-inbound-action — the inbound <Dial>'s action
+  // (re-ring on handoff/refresh, else voicemail). Signature-verified inside.
+  'twilio-voice-inbound-action': handleVoiceInboundAction,
 };
 
 export default async function handler(req, res) {
@@ -1798,12 +1809,23 @@ export default async function handler(req, res) {
     if (!requireAuth(req, res)) return;
     return handleCallingRecording(req, res);
   }
+  if (req.method === 'GET' && req.query?.novus_operation === 'lead-search') {
+    // READ-ONLY: the ⌘K palette. Sheets reads only, cached index, no writer.
+    if (!requireAuth(req, res)) return;
+    return handleLeadSearch(req, res);
+  }
+  if (req.method === 'GET' && req.query?.novus_operation === 'calling-inbound') {
+    // READ-ONLY: the incoming-call overlay's view of one ringing/answered call.
+    if (!requireAuth(req, res)) return;
+    return handleCallingInbound(req, res);
+  }
   const CALLING_WRITE_OPERATIONS = {
     'calling-setup': handleCallingSetup,
     'calling-start': handleCallingStart,
     'calling-save': handleCallingSave,
     'calling-discard': handleCallingDiscard,
     'calling-repair': handleCallingRepair,
+    'calling-inbound-intent': handleCallingInboundIntent,
     'script-save': handleScriptSave,
     'script-duplicate': handleScriptDuplicate,
     'script-status': handleScriptStatus,
@@ -1815,8 +1837,10 @@ export default async function handler(req, res) {
     if (!requireAuth(req, res)) return;
     const out = await CALLING_WRITE_OPERATIONS[req.query.novus_operation](req, res);
     // A saved call changes the ACTIONS ledger, so the Command Centre's cached
-    // projection must not outlive it.
+    // projection must not outlive it — nor the lead-search index, whose
+    // "last activity" and callback signals come from CALLS/ACTIONS.
     invalidateOperatorCaches();
+    invalidateLeadIndex();
     return out;
   }
 

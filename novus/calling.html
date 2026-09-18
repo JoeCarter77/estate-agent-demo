@@ -18,10 +18,17 @@
   </script>
   <!-- Same product, same stylesheet as the Command Centre and the Prober. -->
   <link rel="stylesheet" href="/novus/novus-ui.css" />
+  <link rel="stylesheet" href="/novus/novus-shell.css" />
   <script src="/novus/novus-ui.js" defer></script>
   <!-- Twilio Voice JS SDK, vendored (novus/vendor). It only ever receives a
        short-lived access token minted server-side; no Twilio secret is here. -->
   <script src="/novus/vendor/twilio-voice-sdk-2.18.5.min.js" defer></script>
+  <!-- Shared shell (owns the Twilio Device on every /novus page): global lead
+       search (⌘K) and the incoming-callback overlay. This page dials through
+       NovusVoice.ready()'s Device and installs the Answer handler that opens
+       Calling Mode with the identified lead. -->
+  <script src="/novus/novus-search.js" defer></script>
+  <script src="/novus/novus-inbound.js" defer></script>
 </head>
 <body>
 <div class="app">
@@ -87,6 +94,9 @@
     <div class="topbar">
       <div class="crumb">NOVUS <span class="muted">/</span> <b id="crumb">Calling</b></div>
       <div class="topbar-right">
+        <button class="gsearch" type="button" data-global-search title="Search leads (⌘K / Ctrl+K)" aria-label="Search leads">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <span>Search leads, agencies, numbers, properties…</span><kbd>⌘K</kbd></button>
         <button class="btn btn-secondary btn-sm" id="refresh" type="button">
           <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 019-9 9 9 0 016.7 3M21 12a9 9 0 01-9 9 9 9 0 01-6.7-3"/><path d="M21 3v6h-6M3 21v-6h6"/></svg>Refresh</button>
         <button class="btn btn-quiet btn-sm themebtn" data-theme-toggle type="button" title="Switch to light theme" aria-label="Switch to light theme" aria-pressed="false">
@@ -374,6 +384,7 @@ const OUTCOMES = [
   ['WRONG_NUMBER', 'Wrong number', 'Number is never dialled again'],
   ['NOT_THE_DECISION_MAKER', 'Not the decision-maker', 'Who should we speak to?'],
   ['DO_NOT_CALL', 'Do not call again', 'Hard suppression from calling'],
+  ['REFERRED_TO_EMAIL', 'Referred to email', 'Gatekeeper gave us an email route'],
 ];
 const OUTCOME_LABEL = Object.fromEntries(OUTCOMES.map(([k, l]) => [k, l]));
 const NI_REASONS = [
@@ -386,7 +397,7 @@ const NI_REASONS = [
 const INFO_TYPES = [['EMAIL_OVERVIEW', 'Email overview'], ['DEMO', 'Demo'], ['WEBSITE', 'Website'], ['CASE_STUDY', 'Case study'], ['PRICING', 'Pricing'], ['OTHER', 'Other']];
 const PRIORITIES = [['VALUATIONS', 'Valuations'], ['INSTRUCTIONS', 'Instructions'], ['STOCK', 'Stock'], ['BUYER_BUSINESS', 'Buyer business'], ['LEAD_GENERATION', 'Lead generation'], ['DATABASE_UTILISATION', 'Database utilisation'], ['OTHER', 'Other']];
 const CONSTRAINTS = [['INSUFFICIENT_DEMAND', 'Insufficient demand'], ['POOR_INCONSISTENT_FOLLOW_UP', 'Poor / inconsistent follow-up'], ['TEAM_CAPACITY', 'Team capacity'], ['DATABASE_NOT_WORKED', 'Database not worked'], ['SELLER_OPPORTUNITIES_NOT_IDENTIFIED', 'Seller opportunities not identified'], ['LOW_VALUATION_CONVERSION', 'Low valuation conversion'], ['UNCLEAR', 'Unclear'], ['OTHER', 'Other']];
-const NEEDS_DETAILS = new Set(['OWNER_UNAVAILABLE', 'CALLBACK_REQUESTED', 'MORE_INFO_REQUESTED', 'NOT_INTERESTED', 'BOOKED_MEETING', 'NOT_THE_DECISION_MAKER', 'DO_NOT_CALL']);
+const NEEDS_DETAILS = new Set(['OWNER_UNAVAILABLE', 'CALLBACK_REQUESTED', 'MORE_INFO_REQUESTED', 'NOT_INTERESTED', 'BOOKED_MEETING', 'NOT_THE_DECISION_MAKER', 'DO_NOT_CALL', 'REFERRED_TO_EMAIL']);
 const BUCKET_LABEL = { 1: 'Callback overdue', 2: 'Callback due today', 3: 'No-answer retry', 4: 'Call action due', 5: 'Never called' };
 
 /* Fixed, global — not versioned per lead and not affected by the assigned
@@ -463,7 +474,9 @@ function showView(name, { push = true } = {}){
 function renderView(){ if(VIEW==='calling-analytics'){ loadAnalytics(false); return; } if(!LOADED) return; if(VIEW==='calling') renderCalling(); if(VIEW==='call-actions') renderCallActions(); if(VIEW==='scripts') renderScripts(); }
 
 /* ═══ LOAD ══════════════════════════════════════════════════════════════ */
-async function load(force){
+let LOAD_PROMISE = null;
+function load(force){ LOAD_PROMISE = loadWorkspace(force); return LOAD_PROMISE; }
+async function loadWorkspace(force){
   $('refresh').disabled = true;
   $('stamp').innerHTML = '<span class="spin"></span>Loading';
   $('load-err').classList.add('hidden');
@@ -702,7 +715,9 @@ function tick(){ const el=$('cm-timer'); if(!el||!CALL) return; const from=Date.
 
 function renderModeHead(){
   const l = CALL.lead; const s = currentScript();
-  $('cm-name').innerHTML = `${esc(l.contact_name||'Unknown contact')}${l.contact_role?`<small>${esc(l.contact_role)}</small>`:''}<small>${esc(l.agency_name)}</small>`;
+  $('cm-name').innerHTML = `${esc(l.contact_name||(l.unidentified?'Unknown caller':'Unknown contact'))}${l.contact_role?`<small>${esc(l.contact_role)}</small>`:''}<small>${esc(l.agency_name)}</small>`
+    + (CALL.inbound ? ` <span class="pill t-blue bare" style="vertical-align:middle;margin-left:8px">callback</span>` : '')
+    + (CALL.inbound && (l.unidentified || CALL.stage!=='done') ? ` <button class="btn btn-quiet btn-sm" id="cm-link" type="button" style="vertical-align:middle;margin-left:6px" title="Associate this call and number with a lead">${l.unidentified?'Link to lead':'Change lead'}</button>` : '');
   const ctx = l.context||{};
   const bits = [
     `<span class="cm-phone">${esc(l.phone||'no number')}</span>`,
@@ -831,7 +846,7 @@ function outcomeHtml(){
   return `<div class="cm-main"><div class="cstage">
     <div class="cstage-t">What happened?</div>
     <div class="cstage-s">Press a number or click. Pitched is worked out from the outcome — you never select it.</div>
-    <div class="outcomes">${OUTCOMES.map(([k,l,sub],i)=>`<button class="outcome ${CALL.outcome===k?'on':''} ${k==='DO_NOT_CALL'?'warn':''}" data-outcome="${k}" type="button"><kbd>${(i+1)%10}</kbd><span>${esc(l)}<span class="sub">${esc(sub)}</span></span></button>`).join('')}</div>
+    <div class="outcomes">${OUTCOMES.map(([k,l,sub],i)=>`<button class="outcome ${CALL.outcome===k?'on':''} ${k==='DO_NOT_CALL'?'warn':''}" data-outcome="${k}" type="button">${i<10?`<kbd>${(i+1)%10}</kbd>`:''}<span>${esc(l)}<span class="sub">${esc(sub)}</span></span></button>`).join('')}</div>
     <div class="discard"><button class="btn btn-quiet" id="cm-discard" type="button">Technical issue &mdash; discard call</button>
       <span>Keypad, Twilio, audio or browser fault, accidental dial, IVR could not be navigated. Not a dial, not an attempt &mdash; nothing about the lead changes.</span></div>
     <div id="o-err" class="formerr"></div>
@@ -878,6 +893,16 @@ function detailsHtml(){
   } else if(o==='DO_NOT_CALL'){
     body = `<div class="field"><label class="field-l">Who said it?</label>${picks('owner_reached',[['TRUE','The decision-maker'],['FALSE','Someone else']], d.owner_reached===false?'FALSE':'TRUE',{keys:false})}</div>
       <div class="hintbox">This lead is removed from every future calling queue. Email follow-ups are unaffected.</div>`;
+  } else if(o==='REFERRED_TO_EMAIL'){
+    const r = d.referred_contact||{};
+    body = `<div class="field" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label class="field-l">Referred contact</label><input class="input block" id="r-name" value="${esc(r.name||'')}" placeholder="Name" /></div>
+        <div><label class="field-l">Role</label><input class="input block" id="r-role" value="${esc(r.role||'')}" placeholder="Owner / Director" /></div>
+        <div><label class="field-l">Email (required)</label><input class="input block" id="r-email" value="${esc(r.email||'')}" placeholder="name@company.com" /></div>
+        <div><label class="field-l">Phone</label><input class="input block" id="r-phone" value="${esc(r.phone||'')}" placeholder="If known" /></div></div>
+      <div class="field"><label class="field-l">Note (optional)</label><input class="input block" id="d-note" value="${esc(r.notes||'')}" placeholder="Context for the follow-up email" /></div>
+      ${dtField('followup_at', d.followup_at || shortcut('2d'), { shortcuts:['tomorrow','2d','monday','1w'], label:'Follow up by' })}
+      <div class="hintbox">Not suppressed — this stays out of the phone queue only while the email follow-up is pending.</div>`;
   }
   return `<div class="cm-main"><div class="cstage">
     <div class="cstage-t">${esc(outcomeLabel(o))}</div><div class="cstage-s">A couple of details, then next.</div>
@@ -925,6 +950,7 @@ function followupSummary(){
   if(o==='WRONG_NUMBER') return `${CALL.lead.phone} will not be dialled again`;
   if(o==='NOT_THE_DECISION_MAKER'){ const r=d.referred_contact||{}; return r.name||r.phone ? `Call ${r.name||'the decision-maker'}${r.role?` (${r.role})`:''}${r.phone?` on ${r.phone}`:''} ${when(d.callback_at)}` : 'No contact captured — nothing scheduled'; }
   if(o==='DO_NOT_CALL') return 'Removed from all future calling queues';
+  if(o==='REFERRED_TO_EMAIL'){ const r=d.referred_contact||{}; return `Follow up ${r.name||'the contact'} by email${r.email?` (${r.email})`:''} ${when(d.followup_at)} — gatekeeper referred us`; }
   return '';
 }
 function reviewHtml(){
@@ -1017,25 +1043,31 @@ async function fetchToken(){
   }catch(err){ console.warn('[twilio] token fetch failed', err?.message || err); throw err; }
 }
 async function initDialer(){
+  /* The Device is owned by the shared shell (novus/novus-inbound.js) so a
+     callback can ring THIS page as well as every other /novus page; this
+     page only wires its own outbound-failure handling onto it. */
   try{
-    const data = await fetchToken();
-    if(!data.enabled){ DIALER.enabled=false; DIALER.reason = `Browser calling not configured — missing ${(data.missing||[]).join(', ')}`; return; }
-    if(!window.Twilio || !window.Twilio.Device){ DIALER.enabled=false; DIALER.reason='Twilio Voice SDK failed to load'; return; }
-    DIALER.device = new Twilio.Device(data.token, {
-      codecPreferences:['opus','pcmu'], closeProtection:true, logLevel:'error',
-      // Without this, most signalling/connection failures (declined,
-      // invalid/expired JWT, etc.) collapse into the generic 31005 —
-      // this asks the SDK to surface the specific underlying error code instead.
-      enableImprovedSignalingErrorPrecision: true,
-    });
-    DIALER.expires = Date.parse(data.expires_at||'') || (Date.now()+3600000);
-    DIALER.device.on('registered', () => console.debug('[twilio] device registered/ready'));
-    DIALER.device.on('unregistered', () => console.debug('[twilio] device unregistered'));
-    DIALER.device.on('tokenWillExpire', async () => { try{ const t = await fetchToken(); if(t.enabled) DIALER.device.updateToken(t.token); }catch(e){ console.warn('token refresh failed', e); } });
+    if(!window.NovusVoice){ DIALER.enabled=false; DIALER.reason='Shared voice module failed to load'; return; }
+    const voice = await NovusVoice.ready();
+    if(!voice.enabled){ DIALER.enabled=false; DIALER.reason = voice.reason || 'Browser calling unavailable'; return; }
+    DIALER.device = voice.device;
+    DIALER.expires = Date.parse(voice.expires_at||'') || (Date.now()+3600000);
     DIALER.device.on('error', (e) => { logDeviceError('device error', e); if(CALL && (CALL.state==='connecting'||CALL.state==='ringing')){ CALL.state='failed'; CALL.error = e?.message || 'device error'; saveDraft(); renderMode(); } });
     DIALER.enabled = true; DIALER.reason = '';
   }catch(err){ DIALER.enabled=false; DIALER.reason = `Browser calling unavailable: ${err.message}`; }
   finally{ if(CALL) renderCallControls(); }
+}
+/* The Call object's events drive the state shown here — identical for a
+   call this page dialled and for an answered inbound callback. */
+function wireTwilioCall(call){
+  DIALER.call = call;
+  call.on('ringing', () => { console.debug('[twilio] call ringing'); if(CALL && CALL.state!=='connected'){ CALL.state='ringing'; saveDraft(); renderCallControls(); } });
+  call.on('accept', () => { console.debug('[twilio] call accepted', { CallSid: call.parameters?.CallSid }); CALL.twilio_call_sid = call.parameters?.CallSid || CALL.twilio_call_sid || ''; CALL.state='connected'; CALL.connected_at = CALL.connected_at || new Date().toISOString(); saveDraft(); renderMode(); });
+  call.on('disconnect', () => { console.debug('[twilio] call disconnect'); finishTwilioCall(false); });
+  call.on('cancel', () => { console.debug('[twilio] call cancel'); finishTwilioCall(false); });
+  call.on('error', (e) => { logDeviceError('call error', e); CALL.error = e?.message || 'call error'; finishTwilioCall(true); });
+  call.on('mute', (muted) => { CALL.muted = muted; renderCallControls(); });
+  CALL.twilio_call_sid = call.parameters?.CallSid || CALL.twilio_call_sid || '';
 }
 async function dial(){
   if(!CALL || CALL.state!=='idle') return;
@@ -1052,14 +1084,7 @@ async function dial(){
     CALL.call_id = opened.call.call_id; saveDraft();
     console.debug('[twilio] call connecting', { call_id: CALL.call_id });
     const call = await DIALER.device.connect({ params: { call_id: CALL.call_id, To: l.phone_e164 } });
-    DIALER.call = call;
-    call.on('ringing', () => { console.debug('[twilio] call ringing'); if(CALL && CALL.state!=='connected'){ CALL.state='ringing'; saveDraft(); renderCallControls(); } });
-    call.on('accept', () => { console.debug('[twilio] call accepted', { CallSid: call.parameters?.CallSid }); CALL.twilio_call_sid = call.parameters?.CallSid || CALL.twilio_call_sid || ''; CALL.state='connected'; CALL.connected_at = CALL.connected_at || new Date().toISOString(); saveDraft(); renderMode(); });
-    call.on('disconnect', () => { console.debug('[twilio] call disconnect'); finishTwilioCall(false); });
-    call.on('cancel', () => { console.debug('[twilio] call cancel'); finishTwilioCall(false); });
-    call.on('error', (e) => { logDeviceError('call error', e); CALL.error = e?.message || 'call error'; finishTwilioCall(true); });
-    call.on('mute', (muted) => { CALL.muted = muted; renderCallControls(); });
-    CALL.twilio_call_sid = call.parameters?.CallSid || '';
+    wireTwilioCall(call);
   }catch(err){
     logDeviceError('connect() rejected', err);
     CALL.state='failed'; CALL.error = err.message || 'could not connect'; saveDraft(); renderMode();
@@ -1144,6 +1169,10 @@ function chooseOutcome(k){
   CALL.outcome = k;
   if(k==='MORE_INFO_REQUESTED' && !CALL.details.followup_at) CALL.details.followup_at = shortcut('2d');
   if(k==='NOT_THE_DECISION_MAKER' && !CALL.details.callback_at) CALL.details.callback_at = shortcut('tomorrow');
+  if(k==='REFERRED_TO_EMAIL'){
+    if(!CALL.details.followup_at) CALL.details.followup_at = shortcut('2d');
+    if(!CALL.details.referred_contact) CALL.details.referred_contact = { name: CALL.lead.contact_name||'', role: CALL.lead.contact_role||'', phone:'', email:'', notes:'' };
+  }
   CALL.stage = NEEDS_DETAILS.has(k) ? 'details' : 'review';
   saveDraft(); renderMode();
 }
@@ -1155,6 +1184,7 @@ function collectDetails(){
   if(o==='NOT_INTERESTED'){ d.not_interested_detail = val('d-note'); if(!d.not_interested_reason) errs.push('Pick a reason — it is required.'); }
   if(o==='BOOKED_MEETING'){ d.meeting_at = fromLocalInput(val('meeting_at')); d.meeting_note = val('d-note'); if(!d.meeting_at) errs.push('Pick the meeting date and time.'); else if(Date.parse(d.meeting_at)<Date.now()-60000) errs.push('The meeting time is in the past.'); }
   if(o==='NOT_THE_DECISION_MAKER'){ d.referred_contact = { name:val('r-name'), role:val('r-role'), phone:val('r-phone'), email:val('r-email'), notes:val('d-note') }; d.callback_at = fromLocalInput(val('callback_at')); }
+  if(o==='REFERRED_TO_EMAIL'){ d.referred_contact = { name:val('r-name'), role:val('r-role'), phone:val('r-phone'), email:val('r-email'), notes:val('d-note') }; d.followup_at = fromLocalInput(val('followup_at')); if(!d.referred_contact.email) errs.push('An email address is required.'); if(!d.followup_at) errs.push('Pick a follow-up date.'); }
   return errs;
 }
 function collectCommercial(){ if($('c-note')) CALL.commercial.useful_note = $('c-note').value; }
@@ -1181,8 +1211,10 @@ function payload(){
 }
 let SAVING = false;
 async function saveCall(thenNext){
-  if(SAVING) return; SAVING = true;
+  if(SAVING) return;
   const err = $('r-err'); if(err) err.classList.remove('show');
+  if(!CALL.lead.agency_id){ if(err){ err.textContent = 'This caller is not linked to a lead yet — use "Link to lead" in the header to choose who it was, then save.'; err.classList.add('show'); } return; }
+  SAVING = true;
   ['r-next','r-exit'].forEach((id)=>{ if($(id)) $(id).disabled = true; });
   if($('r-next')) $('r-next').innerHTML = '<span class="spinner"></span>Saving';
   try{
@@ -1655,6 +1687,7 @@ document.addEventListener('click', async (e) => {
   /* Calling Mode */
   if(!CALL) return;
   if(t.id==='cm-dial'){ dial(); return; }
+  if(t.id==='cm-link'){ linkInboundLead(); return; }
   if(t.id==='cm-hangup'){ hangup(); return; }
   if(t.id==='cm-redial'){ redial(); return; }
   if(t.id==='cm-mute'){ if(DIALER.call){ DIALER.call.mute(!DIALER.call.isMuted()); } return; }
@@ -1716,8 +1749,134 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+/* ═══ INCOMING CALLBACKS ════════════════════════════════════════════════
+   The shared shell (novus/novus-inbound.js) owns the ring and the overlay.
+   This page contributes the one thing only it can do: put the answered
+   call on the NORMAL call screen with the identified lead loaded. Nothing
+   below is a second calling interface — answerInbound() builds the same
+   CALL object beginCall() builds and hands the live Twilio Call to the same
+   wireTwilioCall()/hangup()/finishTwilioCall() path an outbound dial uses.
+   The CALLS row already exists (opened by the inbound webhook), so
+   calling-save patches the outcome onto it exactly as for a dialled call. */
+const INBOUND = { pending: null, timer: null };
+function leadFromSummary(c, info){
+  return { agency_id: c.agency_id||'', agency_name: c.agency_name||'', contact_name: c.contact_name||'', contact_role: c.contact_role||'',
+    phone: c.phone||'', phone_e164: c.phone_e164||'', email: c.email||'', location: c.location||'', pipeline_status: c.pipeline_status||'',
+    attempts: c.attempts||0, last_call: c.last_call ? { at: c.last_call.at, outcome: c.last_call.outcome } : null, calls: [], script: null, action_id:'',
+    context: { property: c.property||'', probe_grade: c.probe_grade||'' }, due_reason:'', bucket:null };
+}
+function unidentifiedLead(info){
+  const caller = info?.caller || {};
+  return { agency_id:'', agency_name:'No matching lead', contact_name:'', contact_role:'', phone: caller.display||'', phone_e164: caller.e164||'', email:'', location:'',
+    attempts:0, last_call:null, calls:[], script:null, action_id:'', context:{}, due_reason:'', bucket:null, unidentified:true };
+}
+/* What Calling Mode should show for an answered callback: the workspace's
+   own lead record when it is loaded (script assignment, history, context —
+   exactly what an outbound call gets), else the overlay's summary of it. */
+function inboundLead(info, selection){
+  const caller = info?.caller || {};
+  let lead = null;
+  if(selection && selection.agency_id){
+    lead = WS?.leads?.[selection.agency_id] ? { ...WS.leads[selection.agency_id] } : leadFromSummary(selection, info);
+    if(selection.contact_name) { lead.contact_name = selection.contact_name; lead.contact_role = selection.contact_role || lead.contact_role; }
+  } else lead = unidentifiedLead(info);
+  /* The number on screen is the one that is actually calling. */
+  if(caller.display){ lead.phone = caller.display; lead.phone_e164 = caller.e164 || lead.phone_e164; }
+  lead.inbound = true;
+  return lead;
+}
+function busyForInbound(){
+  if(DIALER.call) return true;
+  if(!CALL) return false;
+  if(LIVE_STATES.includes(CALL.state)) return true;
+  return CALL.stage!=='live' && CALL.stage!=='done';   // an outcome half-logged is not to be interrupted
+}
+async function answerInbound(call, info, selection, { accepted = false } = {}){
+  if(!accepted){ try{ call.accept(); }catch(e){ logDeviceError('accept() failed', e); return; } }
+  const now = new Date().toISOString();
+  if(!LOADED && LOAD_PROMISE){ try{ await LOAD_PROMISE; }catch{} }
+  const lead = inboundLead(info, selection);
+  const all = WS?.scripts||[];
+  const script = (lead.script && all.find((s)=>s.script_id===lead.script.script_id)) || all.find((s)=>s.status==='CURRENT') || all.filter((s)=>s.status!=='ARCHIVED')[0] || null;
+  if(!SESSION) SESSION = { mode:'all', done:new Set(), count:0 };
+  CALL = { client_key: uid(), call_id: info?.call?.call_id || '', inbound: true, lead, script_id: script?script.script_id:'', source_action_id: lead.action_id||'', opened_at: now,
+    call_mode:'TWILIO', state:'connected', started_at: info?.call?.started_at || now, connected_at: info?.call?.connected_at || now, ended_at:'', duration_seconds:0, objections:[], outcome:'', details:{}, commercial:{ main_priority:'', main_constraint:'', useful_note:'' }, stage:'live',
+    reach: { stage:'ASK', gatekeeper_reached:false, gatekeeper_reached_at:'', owner_reached_at:'', owner_reach_source:'' } };
+  DTMF.sent = []; KEYPAD = false;
+  wireTwilioCall(call);
+  saveDraft(); openMode(); renderMode();
+  if(CALL.call_id){
+    NovusVoice.intent(CALL.call_id, 'answer', lead.agency_id ? { agency_id: lead.agency_id, contact_name: lead.contact_name||'', contact_role: lead.contact_role||'', script_id: CALL.script_id } : {})
+      .catch((e) => console.warn('[inbound] answer intent failed (the save will still link the call)', e?.message||e));
+  }
+}
+/* "Link to lead" — an unidentified caller (or the wrong preselection) is
+   associated with a lead during or after the call. The number then matches
+   automatically next time through the CALLS row alone. */
+async function linkInboundLead(){
+  if(!CALL || !CALL.inbound || !window.NovusSearch) return;
+  const picked = await NovusSearch.pick({ title: 'Link this call to', query: CALL.lead.unidentified ? (CALL.lead.phone||'') : '' });
+  if(!picked || !CALL) return;
+  const info = { caller: { display: CALL.lead.phone, e164: CALL.lead.phone_e164 } };
+  const lead = inboundLead(info, picked);
+  CALL.lead = lead;
+  if(!CALL.script_id){ const all = WS?.scripts||[]; const script = (lead.script && all.find((s)=>s.script_id===lead.script.script_id)) || all.find((s)=>s.status==='CURRENT') || null; CALL.script_id = script?script.script_id:''; }
+  saveDraft(); renderMode();
+  if(CALL.call_id) NovusVoice.intent(CALL.call_id, 'link', { agency_id: lead.agency_id, contact_name: lead.contact_name||'', contact_role: lead.contact_role||'', script_id: CALL.script_id }).catch((e) => console.warn('[inbound] link intent failed (the save will still link the call)', e?.message||e));
+}
+/* A ring that arrives while this page is open and free: the shell shows the
+   overlay and, on Answer, calls answerInbound through answerHandler. A ring
+   this page was sent here to answer (?inbound=… after a handoff from another
+   page, or a refresh mid-ring) is taken straight away, no second overlay. */
+/* The shell modules are deferred scripts, so they run after this inline
+   script: hook into them once the DOM (and therefore they) are ready. */
+function installShellHooks(){
+if(window.NovusVoice){
+  NovusVoice.isBusy = busyForInbound;
+  NovusVoice.answerHandler = (call, info, selection) => answerInbound(call, info, selection);
+  NovusVoice.onIncoming = (call, { call_id }) => {
+    const pending = INBOUND.pending;
+    if(!pending || !call_id || pending.call_id !== call_id) return false;
+    INBOUND.pending = null; if(INBOUND.timer){ clearTimeout(INBOUND.timer); INBOUND.timer=null; }
+    try{ call.accept(); }catch(e){ logDeviceError('accept() failed', e); return true; }
+    NovusVoice.loadInbound(call_id).then((info) => {
+      const cands = info.candidates||[];
+      const wanted = info.inbound?.handoff?.agency_id || pending.agency_id || '';
+      const selection = cands.find((c) => wanted && c.agency_id===wanted) || (wanted && info.linked_lead && info.linked_lead.agency_id===wanted ? info.linked_lead : null) || cands.find((c) => c.preselected) || (cands.length===1 ? cands[0] : null);
+      return answerInbound(call, info, selection, { accepted:true });
+    }).catch((e) => { console.warn('[inbound] could not read the call after answering', e?.message||e); return answerInbound(call, { caller:{ display:'', e164:'' }, call:{ call_id } }, null, { accepted:true }); });
+    return true;
+  };
+}
+if(window.NovusSearch){
+  /* A search result opens the lead here, in Calling Mode, without a reload. */
+  NovusSearch.navigate = (r) => {
+    if(!LOADED || !WS?.leads?.[r.agency_id]){ location.href = `/novus/calling.html?lead=${encodeURIComponent(r.agency_id)}`; return; }
+    if(busyForInbound()){ window.NovusVoice?.toast?.('On a call', `${r.agency_name} will not open until this call is finished.`); return; }
+    if(CALL) { CALL=null; saveDraft(); }
+    startSession('all', r.agency_id);
+  };
+}
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', installShellHooks); else installShellHooks();
+/* Deep links: ?inbound=<call_id> (answer the re-ring for this call) and
+   ?lead=<agency_id> (open the lead in Calling Mode). Both are consumed once. */
+(function bootParams(){
+  const params = new URLSearchParams(location.search);
+  const inboundId = params.get('inbound') || '';
+  const leadId = params.get('lead') || '';
+  if(!inboundId && !leadId) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if(inboundId){
+    INBOUND.pending = { call_id: inboundId, agency_id: leadId };
+    INBOUND.timer = setTimeout(() => { if(INBOUND.pending && INBOUND.pending.call_id===inboundId){ INBOUND.pending=null; window.NovusVoice?.toast?.('Callback not connected', 'The caller was not re-connected in time and will have been offered voicemail.'); } }, 60000);
+    return;
+  }
+  load(false).then(() => { if(LOADED && WS?.leads?.[leadId]) startSession('all', leadId); else showErr('That lead is not in the calling workspace.'); });
+})();
+
 showView(routeFromHash(), { push:false });
-load(false);
+if(!LOAD_PROMISE) load(false);
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initDialer); else initDialer();
 window.addEventListener('beforeunload', (e) => { if(DIALER.call || (CALL && CALL.state==='connected')){ e.preventDefault(); e.returnValue=''; } });
 </script>

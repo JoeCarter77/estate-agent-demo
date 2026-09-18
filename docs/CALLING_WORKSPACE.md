@@ -174,8 +174,96 @@ URL reaches the browser. Switch on **Enforce HTTP Auth on media URLs** in the
 Twilio Console (Voice → Settings) so the media URLs are useless without the
 account credentials.
 
+## Global lead search (⌘K / Ctrl+K)
+
+Every `/novus` page loads the shared shell — `novus/novus-shell.css`,
+`novus/novus-search.js`, `novus/novus-inbound.js` (after the vendored Twilio SDK) —
+and carries a search control in its topbar. The palette calls one read-only
+operation, `GET ?novus_operation=lead-search&q=…` (`lib/calling-inbound.mjs
+handleLeadSearch` → `lib/lead-search.mjs`), which searches every AGENCIES row
+regardless of status: agency name, contact names/roles (AGENCIES + CONTACTS),
+email, website/domain, town, PROBES property address / street, enquiry text and
+the `agency_id`. A query that looks like a number goes through the **same phone
+path the callback overlay uses** (`normalizePhoneNumber` → `findLeadsByPhone` →
+`rankPhoneMatches`), then partial digit matching for a half-typed number. The
+index (`buildLeadIndex`, seven tab reads in parallel: AGENCIES, CONTACTS, PROBES,
+CALLS, ACTIONS, INTELLIGENCE, DIAGNOSIS) is cached in-process for 30s and cleared
+by every calling write. Choosing a result opens the lead in Calling Mode
+(`/novus/calling.html?lead=<agency_id>`; in place when already on the calling page).
+
+**Phone normalisation** (`normalizePhoneNumber`): `07700 900123`, `07700900123`,
+`+447700900123`, `447700900123`, `07700-900-123`, `0044…`, `+44 (0)…`, a trailing
+extension and a national number typed without its 0 all normalise to
+`+447700900123`. Only matching uses it; the number shown is always the stored string.
+Numbers are read from every AGENCIES/CONTACTS column named *phone/mobile/tel*,
+referral numbers on ACTIONS (`metadata_json.contact_override`) and CALLS
+(`referred_contact_json`), and the `phone` of every CALLS row — so a number linked
+to a lead during an unknown-caller call matches automatically next time with
+nothing written to AGENCIES.
+
+## Incoming callbacks (`lib/calling-inbound.mjs`)
+
+`api/novus/webhooks/voice-inbound.js` (the NOVUS number's Voice webhook) still
+writes RAW_EVENTS + COMMUNICATIONS exactly as before, then — when browser calling
+is configured — `ringInboundCall()`: `findLeadsByPhone` + `rankPhoneMatches` on the
+caller id, a **CALLS row opened at ring time** (`metadata_json.direction=INBOUND`,
+`metadata_json.inbound = { from, candidates, attempts, … }`, `twilio_call_sid` =
+the inbound CallSid, `agency_id`/contact preset when one candidate is
+overwhelmingly likely), and TwiML `<Dial answerOnBridge record="record-from-answer-dual"
+action=/api/novus/webhooks/voice-inbound-action><Client>novus-operator
+<Parameter call_id/></Client></Dial>`. Twilio delivers that to the open NOVUS
+page as the Voice SDK's `incoming` event — **the SDK is the real-time channel**;
+no polling. The `<Client>` leg's status callback and the recording callback are
+the existing outbound handlers (they find the row by the parent CallSid). Without
+browser calling configured the caller gets the voicemail prompt, as before.
+
+Ranking is deterministic (`rankPhoneMatches`): last **outbound** call to the lead
+(≤1h +60, ≤24h +40, ≤7d +20), callback expected (last outcome NO_ANSWER /
+OWNER_UNAVAILABLE / CALLBACK_REQUESTED / GATEKEPT / MORE_INFO or an active call
+action) +10, the number being a specific contact's +5, latest activity as tie-break.
+The top candidate is **preselected** when it is the only one or leads by ≥20.
+Duplicate records on one number stay separate candidates; nothing is merged.
+
+Browser (`novus/novus-inbound.js`, which owns the one `Twilio.Device` per page —
+`calling.html` dials through `NovusVoice.ready()`'s Device, and the token now
+grants `incoming.allow`): the overlay reads `GET ?novus_operation=calling-inbound
+&call_id=…` (caller, ranked candidates with role / last call / probe property /
+diagnosis summary, flags) and posts `?novus_operation=calling-inbound-intent`
+(`confirm=INBOUND_CALL`, `intent=decline|handoff|answer|link`, optional
+`agency_id`/`contact_name`/`contact_role`/`script_id`).
+
+* **Answer on calling.html** → `call.accept()`, then `answerInbound()` builds the
+  same `CALL` object `beginCall()` builds (lead from the workspace payload, assigned
+  script, `call_id` of the ring row) and opens the **existing** Calling Mode — answer
+  screen, script, objections, keypad, outcome, follow-ups, all unchanged.
+  `calling-save` patches the outcome onto the ring row (an inbound row may adopt
+  the agency chosen at answer/link time; outbound rows still never change agency).
+* **Answer on any other page** → intent `handoff`, the ring is rejected, the page
+  goes to `/novus/calling.html?inbound=<call_id>&lead=<agency_id>`. Rejecting ends
+  the `<Dial>`; the Dial action (`handleVoiceInboundAction`, a `vercel.json`
+  rewrite onto `personalisation.js?novus_operation=twilio-voice-inbound-action`)
+  sees the handoff flag and **rings again** ("Connecting you now." once); the
+  calling page auto-answers the re-ring. The same re-ring covers a refresh mid-ring
+  or a page that had not registered yet (`failed`/`canceled` inside 45s), bounded
+  by `MAX_RING_ATTEMPTS`; then voicemail. `completed` → `<Hangup/>`; `no-answer` →
+  voicemail (`inbound.result=missed`); declined → voicemail.
+* **Multiple matches** → "Incoming callback — N possible leads", pick then Answer.
+  **Unknown caller** → Answer / Search leads / Dismiss; Answer opens Calling Mode as
+  "Unknown caller" with **Link to lead** (⌘K in pick mode) available during or after
+  the call; saving requires a linked lead.
+* **Never over a live call**: the SDK refuses a second incoming while a Twilio call
+  is up (busy → voicemail); a manual-mode call or a half-logged outcome is reported
+  by `NovusVoice.isBusy()` and the callback is declined to voicemail with a toast.
+
+A missed/declined inbound ring has no outcome by design: it is not an attempt,
+does not move the queue, and is excluded from analytics `unclassified`; the lead's
+search row shows "Called back … · missed". Answered callbacks with an outcome
+count in the funnel like any call (`metadata_json.direction=INBOUND` distinguishes
+them). No tab or column was added.
+
 ## Tests
 
 `npm run novus:calling-selftest` — hermetic (in-memory workbook, signed fake Twilio webhooks).
 `npm run novus:calling-analytics-selftest` — hermetic denominator tests for the analytics read model and its operation.
+`npm run novus:lead-search-selftest` — phone normalisation, ⌘K search, phone-match ranking, and the inbound flow end to end through the real handlers (ring → overlay read → handoff re-ring → answer → `calling-save` on the same row; unknown caller linked mid-call).
 `npm run novus:sidebar-parity-selftest` — the four Calling tabs on both sidebars.

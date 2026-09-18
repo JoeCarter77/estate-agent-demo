@@ -4,14 +4,17 @@
 // NOT wired up in the Twilio console by this change — the code is ready, the
 // console configuration is a separate, deliberate step.
 //
-// NOVUS Project Source Master §16: "V1 does not answer calls or ring Joe's
-// personal phone. Calls are captured as missed/voicemail evidence." This
-// handler therefore never <Dial>s anywhere — it plays a short message and
-// records a voicemail. §16 also means no V1 call can ever be a live 2-way
-// conversation, so successful_conversation is deterministically FALSE for
-// every voice communication this milestone (Source Master §11: a callback is
-// evidence of persistence but not automatically a successful conversation
-// "when Joe deliberately does not answer" — true of every V1 call).
+// NOVUS Project Source Master §16 originally said "V1 does not answer calls
+// or ring Joe's personal phone" — calls were captured as missed/voicemail
+// evidence only. Since the calling workspace exists, an inbound call is now
+// treated as a CALLBACK: after the evidence below is written exactly as
+// before, lib/calling-inbound.mjs matches the caller id to its lead(s), opens
+// a CALLS row and rings the operator's BROWSER (never a personal phone) with
+// the identification attached. If nobody answers, or browser calling is not
+// configured, the caller still gets the same voicemail prompt as before, so
+// nothing about the evidence path changes. The COMMUNICATIONS row written
+// here is still the ringing-time record (successful_conversation FALSE at
+// this point); the conversation itself is recorded on the CALLS row.
 //
 // AUTH: verified by Twilio's request signature (TWILIO_AUTH_TOKEN), never the
 // human NOVUS_BASIC_AUTH and never the email webhook's NOVUS_INGEST_SECRET —
@@ -30,22 +33,32 @@ import { newRawEventId, newCommunicationId } from '../../../lib/ids.mjs';
 import { normalizePhone, canonicalTimestamp } from '../../../lib/normalize.mjs';
 import { matchInboundCommunication } from '../../../lib/inbound-matching.mjs';
 import { classifyCommunication } from '../../../lib/classification.mjs';
-import { requireTwilioSignature, parseTwilioBody, sendTwiml, escapeXml } from '../../../lib/twilio-webhook.mjs';
+import { requireTwilioSignature, parseTwilioBody, sendTwiml } from '../../../lib/twilio-webhook.mjs';
 import { recomputeProbeObservation } from '../../../lib/observation-recompute.mjs';
+import { ringInboundCall, voicemailTwimlBody } from '../../../lib/calling-inbound.mjs';
+import { twilioCallingConfig } from '../../../lib/twilio-access-token.mjs';
 
 export const maxDuration = 20;
 
 const WEBHOOK_PATH = '/api/novus/webhooks/voice-inbound';
-const RECORDING_CALLBACK_PATH = '/api/novus/webhooks/voice-recording';
 
 function voicemailTwiml(res) {
-  const base = process.env.NOVUS_PUBLIC_BASE_URL || '';
-  const callbackUrl = base ? `${base.replace(/\/$/, '')}${RECORDING_CALLBACK_PATH}` : RECORDING_CALLBACK_PATH;
-  sendTwiml(res, [
-    '<Say voice="alice">Thanks for calling. Please leave a brief message after the tone and we will get back to you.</Say>',
-    `<Record maxLength="120" playBeep="true" transcribe="true" transcribeCallback="${escapeXml(callbackUrl)}" recordingStatusCallback="${escapeXml(callbackUrl)}" recordingStatusCallbackEvent="completed" />`,
-    '<Say voice="alice">Thank you, goodbye.</Say>',
-  ].join(''));
+  sendTwiml(res, voicemailTwimlBody());
+}
+
+// Ring the browser with the matched lead attached (lib/calling-inbound.mjs).
+// Only when browser calling is configured — otherwise there is no Device to
+// ring and the caller goes straight to voicemail as before. Any failure here
+// also falls back to voicemail: Twilio must always get valid TwiML.
+async function ringOrVoicemail(res, repo, params) {
+  if (!twilioCallingConfig().enabled) return voicemailTwiml(res);
+  try {
+    const ring = await ringInboundCall(repo, params);
+    return sendTwiml(res, ring.twiml);
+  } catch (err) {
+    console.error('voice-inbound: could not ring the browser, falling back to voicemail:', err);
+    return voicemailTwiml(res);
+  }
 }
 
 export default async function handler(req, res) {
@@ -71,7 +84,9 @@ export default async function handler(req, res) {
     const existingEvents = await repo.getRecords('RAW_EVENTS', 'raw_event_id');
     const dup = existingEvents.find((r) => r.obj.provider === provider && r.obj.provider_event_id === callSid);
     if (dup) {
-      return voicemailTwiml(res);
+      // ringInboundCall is idempotent on CallSid too: the same ring TwiML
+      // comes back for the CALLS row already opened for this call.
+      return ringOrVoicemail(res, repo, { callSid, from: fromRaw, to: String(body.To || '').trim(), rawEventId: dup.obj.raw_event_id, communicationId: dup.obj.processed_communication_id });
     }
 
     const now = new Date();
@@ -172,7 +187,7 @@ export default async function handler(req, res) {
       }
     }
 
-    return voicemailTwiml(res);
+    return ringOrVoicemail(res, repo, { callSid, from: fromRaw, to: String(body.To || '').trim(), communicationId, rawEventId, now: nowIso });
   } catch (err) {
     console.error('voice-inbound error:', err);
     // Twilio still needs valid TwiML even on our own failure, or the caller

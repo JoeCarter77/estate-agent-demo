@@ -77,6 +77,7 @@
     "novus:calling-selftest": "node scripts/novus-calling-selftest.mjs",
     "novus:calling-analytics-selftest": "node scripts/novus-calling-analytics-selftest.mjs",
     "novus:calling-setup": "node scripts/novus-calling-setup.mjs",
+    "novus:lead-search-selftest": "node scripts/novus-lead-search-selftest.mjs",
     "novus:sidebar-parity-selftest": "node scripts/novus-sidebar-parity-selftest.mjs"
   },
   "dependencies": {

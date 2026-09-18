@@ -112,6 +112,30 @@ const DAY = 86_400_000;
   assert.equal(ndm.call_actions[0].action_type, 'CALL_PROSPECT');
   assert.equal(JSON.parse(ndm.call_actions[0].metadata_json).contact_override.name, 'Sara');
   ok('meeting / more-info / do-not-call / not-the-DM plans produce the right terminal state and follow-ups');
+
+  // Gatekeeper reached, never got through to the owner, but was given an
+  // email route in.
+  const noEmail = normaliseOutcomeInput({ outcome: 'REFERRED_TO_EMAIL', referred_contact: { name: 'Adam' } }, T0);
+  assert.equal(noEmail.valid, false); assert.match(noEmail.errors.join(' '), /email/);
+  const rte = normaliseOutcomeInput({ outcome: 'REFERRED_TO_EMAIL', referred_contact: { name: 'Adam', role: 'Owner', email: 'adam@example.com', notes: 'Ask for Adam directly' } }, T0);
+  assert.equal(rte.valid, true);
+  assert.equal(rte.normalised.followup_at, iso(addWorkingDaysMs(T0, 2)), 'defaults to two working days out');
+  assert.equal(rte.normalised.callback_at, rte.normalised.followup_at, 'follow-up stored on the row as callback_at, same convention as more-info');
+  assert.equal(derivePitched('REFERRED_TO_EMAIL'), false);
+  assert.equal(deriveOwnerReached('REFERRED_TO_EMAIL'), false, 'owner_reached stays false — the gatekeeper referred us, the owner was never on the line');
+  const referredToEmail = planOutcome(call, rte.normalised, { nowMs: T0 });
+  assert.equal(referredToEmail.call_actions.length, 0, 'not a phone call action — it must not re-enter the calling queue');
+  assert.equal(referredToEmail.suppress_calling, false, 'not suppressed — just an email follow-up');
+  assert.equal(referredToEmail.terminal, null);
+  assert.equal(referredToEmail.actions.length, 1);
+  assert.equal(referredToEmail.actions[0].action_type, 'FOLLOW_UP');
+  assert.equal(referredToEmail.actions[0].due_at, rte.normalised.followup_at);
+  assert.match(referredToEmail.actions[0].reason, /Follow up Adam by email.*gatekeeper referred us/);
+  assert.equal(JSON.parse(referredToEmail.actions[0].metadata_json).referred_contact.email, 'adam@example.com', 'contact/email preserved on the follow-up action');
+  const rteRebuilt = normalisedFromRow({ outcome: 'REFERRED_TO_EMAIL', callback_at: rte.normalised.callback_at, referred_contact_json: JSON.stringify(rte.normalised.referred_contact), metadata_json: '{}' });
+  assert.equal(rteRebuilt.followup_at, rte.normalised.callback_at, 'a stored REFERRED_TO_EMAIL row alone rebuilds its follow-up date');
+  assert.equal(rteRebuilt.referred_contact.email, 'adam@example.com', 'referred_contact_json round-trips the email/contact details');
+  ok('gatekeeper referred to email: requires an email, defaults a two-working-day follow-up, creates a FOLLOW_UP action (not a call action), and never suppresses or marks the lead dead');
 }
 
 // ── 2. queue prioritisation ────────────────────────────────────────────────
@@ -140,6 +164,7 @@ const table = (header, objs) => ({ header: [...header], rows: objs.map((o) => he
     { agency_id: 'ag_optout', clean_agency_name: 'Email Opt Out', main_phone: '01234 567801' },
     { agency_id: 'ag_allsupp', clean_agency_name: 'All-contact Suppressed', main_phone: '01234 567802', suppression_status: 'SUPPRESSED' },
     { agency_id: 'ag_no_probe', clean_agency_name: 'Never Probed', main_phone: '01234 567803' },
+    { agency_id: 'ag_referred_email', clean_agency_name: 'Referred To Email', main_phone: '01234 567804' },
   ];
   const callMeta = (extra) => JSON.stringify({ manual: true, call_action: true, ...extra });
   const actions = [
@@ -149,12 +174,16 @@ const table = (header, objs) => ({ header: [...header], rows: objs.map((o) => he
     actionRow({ action_id: 'a_engine', agency_id: 'ag_engine', action_type: 'CALL_PROSPECT', due_at: iso(T0 - 1000), reason: 'Strong demo engagement' }),
     actionRow({ action_id: 'a_later', agency_id: 'ag_later', action_type: 'CALL_PROSPECT', due_at: iso(T0 + DAY + 3600_000), metadata_json: callMeta({ callback_reason: 'Callback requested' }) }),
     actionRow({ action_id: 'a_ref', agency_id: 'ag_referral', action_type: 'CALL_PROSPECT', due_at: iso(T0 - 1000), metadata_json: callMeta({ callback_reason: 'Referred to decision-maker', contact_override: { name: 'Sara Owner', role: 'Director', phone: '07700 900123' } }) }),
+    // The email follow-up is an ordinary manual action, not a call_action —
+    // it must never surface in Call Actions or pull the lead into the phone queue.
+    actionRow({ action_id: 'a_email_followup', agency_id: 'ag_referred_email', action_type: 'FOLLOW_UP', due_at: iso(T0 + 2 * DAY), metadata_json: JSON.stringify({ manual: true, call_id: 'c5', outcome: 'REFERRED_TO_EMAIL', referred_contact: { name: 'Adam', email: 'adam@example.com' } }) }),
   ];
   const calls = [
     callRow({ call_id: 'c1', agency_id: 'ag_retry', phone: '01234 567894', started_at: iso(T0 - DAY), outcome: 'NO_ANSWER', connected: 'FALSE', owner_reached: 'FALSE', pitched: 'FALSE', script_id: 'scr_v1' }),
     callRow({ call_id: 'c2', agency_id: 'ag_dnc', phone: '01234 567897', started_at: iso(T0 - DAY), outcome: 'DO_NOT_CALL', connected: 'TRUE', owner_reached: 'TRUE', pitched: 'FALSE' }),
     callRow({ call_id: 'c3', agency_id: 'ag_wrong', phone: '01234 567898', started_at: iso(T0 - DAY), outcome: 'WRONG_NUMBER', connected: 'TRUE', owner_reached: 'FALSE', pitched: 'FALSE' }),
     callRow({ call_id: 'c4', agency_id: 'ag_referral', phone: '01234 567800', started_at: iso(T0 - DAY), outcome: 'NOT_THE_DECISION_MAKER', connected: 'TRUE', owner_reached: 'FALSE', pitched: 'FALSE' }),
+    callRow({ call_id: 'c5', agency_id: 'ag_referred_email', phone: '01234 567804', started_at: iso(T0 - DAY), outcome: 'REFERRED_TO_EMAIL', connected: 'TRUE', owner_reached: 'FALSE', pitched: 'FALSE', referred_contact_json: JSON.stringify({ name: 'Adam', role: 'Manager', email: 'adam@example.com', phone: '', notes: '' }) }),
   ];
   const scripts = [
     { script_id: 'scr_v1', script_key: 'k', name: 'Seller Opportunity', version: 1, status: 'ARCHIVED' },
@@ -204,6 +233,11 @@ const table = (header, objs) => ({ header: [...header], rows: objs.map((o) => he
   assert.equal(ws.leads.ag_meeting.suppression, 'pipeline status MEETING_BOOKED');
   assert.equal(ws.counts.suppressed, 3); assert.equal(ws.counts.no_phone, 2); assert.equal(ws.counts.scheduled_later, 1);
   ok('do-not-call, wrong-number-only, terminal and phoneless leads never enter the queue');
+
+  assert.ok(!ws.queue.some((l) => l.agency_id === 'ag_referred_email'), 'referred-to-email stays out of the queue while its email follow-up is pending');
+  assert.equal(ws.leads.ag_referred_email.suppression, '', 'not suppressed — just temporarily out of the phone queue, unlike DO_NOT_CALL/NOT_INTERESTED/BOOKED_MEETING');
+  assert.ok(!ws.call_actions.some((a) => a.agency_id === 'ag_referred_email'), 'the email follow-up is a manual Actions item, not a Call Action');
+  ok('a lead referred to email is neither suppressed nor dropped back into the general cold-calling pool while the follow-up is active');
   assert.deepEqual(ws.call_actions.map((a) => [a.agency_id, a.group]), [['ag_overdue', 'overdue'], ['ag_today', 'today'], ['ag_retry', 'today'], ['ag_engine', 'today'], ['ag_referral', 'today'], ['ag_later', 'tomorrow']]);
   assert.equal(ws.call_actions[0].reason, 'Callback requested');
   assert.equal(ws.call_actions[2].previous_outcome, 'NO_ANSWER');
@@ -828,7 +862,7 @@ const table = (header, objs) => ({ header: [...header], rows: objs.map((o) => he
   const jwt = decodeJwt(res.body.token);
   assert.equal(jwt.header.cty, 'twilio-fpa;v=1'); assert.equal(jwt.header.alg, 'HS256');
   assert.equal(jwt.payload.iss, 'SKtest'); assert.equal(jwt.payload.sub, 'ACtest');
-  assert.equal(jwt.payload.grants.voice.outgoing.application_sid, 'APtest'); assert.equal(jwt.payload.grants.voice.incoming.allow, false);
+  assert.equal(jwt.payload.grants.voice.outgoing.application_sid, 'APtest'); assert.equal(jwt.payload.grants.voice.incoming.allow, true, 'incoming allowed: voice-inbound.js now rings the browser identity');
   assert.ok(jwt.payload.exp - jwt.payload.iat === 3600);
   assert.ok(!res.body.token.includes('sekret'));
   const denied2 = response();

@@ -23,7 +23,14 @@
   </script>
 
   <link rel="stylesheet" href="/novus/novus-ui.css" />
+  <link rel="stylesheet" href="/novus/novus-shell.css" />
   <script src="/novus/novus-ui.js" defer></script>
+  <!-- Shared shell: global lead search (⌘K) and the incoming-callback overlay.
+       The Twilio Voice SDK is vendored; it only ever receives a short-lived
+       access token minted server-side (novus/novus-inbound.js). -->
+  <script src="/novus/vendor/twilio-voice-sdk-2.18.5.min.js" defer></script>
+  <script src="/novus/novus-search.js" defer></script>
+  <script src="/novus/novus-inbound.js" defer></script>
 </head>
 <body>
 <div class="app">
@@ -88,6 +95,9 @@
     <div class="topbar">
       <div class="crumb">NOVUS <span class="muted">/</span> <b id="crumb">Overview</b></div>
       <div class="topbar-right">
+        <button class="gsearch" type="button" data-global-search title="Search leads (⌘K / Ctrl+K)" aria-label="Search leads">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <span>Search leads, agencies, numbers, properties…</span><kbd>⌘K</kbd></button>
         <button class="btn btn-quiet btn-sm" id="reconcile" type="button">
           <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/></svg>Reconcile</button>
         <button class="btn btn-secondary btn-sm" id="refresh" type="button">

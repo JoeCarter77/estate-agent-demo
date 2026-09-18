@@ -63,7 +63,7 @@ const build = (calls, events = [], actions = [], opts = {}) => buildCallingAnaly
   assert.equal(a.summary.pitch_to_meeting_pct, null);
   assert.equal(a.summary.avg_duration_seconds, null);
   assert.deepEqual(a.funnel.steps.map((s) => s.count), [0, 0, 0, 0, 0]);
-  assert.equal(a.outcomes.length, 10, 'every system outcome is listed even at zero');
+  assert.equal(a.outcomes.length, 11, 'every system outcome is listed even at zero');
   assert.ok(a.outcomes.every((o) => o.count === 0 && o.pct_of_calls === null));
   assert.deepEqual(a.objections.rows, []);
   assert.equal(a.scripts.length, 3, 'every script version is listed even with no calls');
@@ -133,6 +133,23 @@ const build = (calls, events = [], actions = [], opts = {}) => buildCallingAnaly
   assert.equal(a.outcomes[0].outcome, 'NO_ANSWER', 'sorted by count, ties by system order');
   assert.equal(a.outcomes[1].outcome, 'BOOKED_MEETING');
   ok('outcome percentages: % of calls for every outcome, % of owner conversations only where the outcome implies one');
+}
+
+// ── 3b. REFERRED_TO_EMAIL is tracked as its own outcome ─────────────────────
+{
+  const calls = [
+    callRow({ outcome: 'REFERRED_TO_EMAIL', gatekeeper_reached: 'TRUE', owner_reached: 'FALSE', pitched: 'FALSE' }),
+    callRow({ outcome: 'REFERRED_TO_EMAIL', gatekeeper_reached: 'TRUE', owner_reached: 'FALSE', pitched: 'FALSE' }),
+    callRow({ outcome: 'GATEKEPT', gatekeeper_reached: 'TRUE' }),
+    callRow({ outcome: 'BOOKED_MEETING', owner_reached: 'TRUE', pitched: 'TRUE', owner_reach_source: 'DIRECT' }),
+  ];
+  const a = build(calls);
+  const byOutcome = Object.fromEntries(a.outcomes.map((o) => [o.outcome, o]));
+  assert.equal(byOutcome.REFERRED_TO_EMAIL.count, 2);
+  assert.equal(byOutcome.REFERRED_TO_EMAIL.pct_of_calls, 50);
+  assert.equal(byOutcome.REFERRED_TO_EMAIL.pct_of_owner_calls, null, 'not counted as an owner conversation — the gatekeeper referred us, the owner was never reached');
+  assert.equal(a.summary.owner_reached, 1, 'referred-to-email calls do not count toward owner_reached');
+  ok('REFERRED_TO_EMAIL is tracked as its own call outcome, distinct from GATEKEPT, and correctly excluded from owner-reached denominators');
 }
 
 // ── 4. objections: repeats, multiples, versions, script split ──────────────

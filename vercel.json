@@ -27,6 +27,7 @@
     { "source": "/api/novus/webhooks/voice-outbound", "destination": "/api/novus/personalisation?novus_operation=twilio-voice-outbound" },
     { "source": "/api/novus/webhooks/voice-outbound-status", "destination": "/api/novus/personalisation?novus_operation=twilio-voice-status" },
     { "source": "/api/novus/webhooks/voice-outbound-recording", "destination": "/api/novus/personalisation?novus_operation=twilio-voice-recording" },
+    { "source": "/api/novus/webhooks/voice-inbound-action", "destination": "/api/novus/personalisation?novus_operation=twilio-voice-inbound-action" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/d/(.*)", "destination": "/index.html" },
     { "source": "/:demo_slug((?!api$|demo$|novus$|capture$|privacy$|terms$|d$)[^/]+)", "destination": "/demo.html" }
