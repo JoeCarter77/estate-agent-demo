@@ -1,581 +1,246 @@
-/* ═══════════════════════════════════════════════════════════════════════════
-   NOVUS — SECTIONS
-   One chapter per block, in reading order. Anything used twice lives in
-   components.css; everything here is a one-off composition.
+/* Homepage compositions. Shared type, colour, spacing and navigation remain
+   in tokens.css and components.css. Diagrams use HTML for all their labels. */
+.meaning,.copy strong.meaning{color:var(--blue-hi)}
+.head .eyebrow{font-size:var(--t-label);line-height:1.4;color:var(--ink-3);max-width:none}
+.head--centre{margin-inline:auto;text-align:center;max-width:800px}
+.head--centre .eyebrow{justify-content:center}
+.head--centre p{margin-inline:auto}
+.statement{font-family:var(--serif);font-size:clamp(1.5rem,1.2rem + 1.3vw,2.35rem);line-height:1.3;letter-spacing:-.018em;text-align:center;text-wrap:balance}
+.diagram-caption{text-align:center;color:var(--ink-3);font-size:var(--t-xs);margin-top:32px}
 
-   The page sells a commercial end state, and only then explains the mechanism
-   that produces it:
-     01 HERO       demand you already have, becoming valuations
-     02 GAP        the opportunity already sitting inside the agency
-     03 CONTEXT    the same enquiry, meaning four different things
-     04 PROGRESS   an opportunity becomes exactly one next step
-     05 PICTURE    where growth is actually being constrained
-     06 METHOD     the four layers, stated once and compactly
-     07 PILOT      one offer, one price, one question
-     08 CLOSE
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* A quiet first screen: the proposition is the hero. */
+.hero{padding-block:clamp(136px,11vw,165px) clamp(70px,6vw,92px);overflow:hidden}
+.hero__head{position:relative;max-width:1000px;margin-inline:auto;text-align:center}
+.hero .eyebrow{justify-content:center;margin-bottom:28px}
+.hero h1{font-size:clamp(2.55rem,1.35rem + 3.6vw,4.6rem);line-height:1.08;max-width:15em;margin-inline:auto}
+@media(min-width:901px){.hero h1 .meaning{display:block}}
+.hero__sub{max-width:650px;margin:28px auto 0;font-size:var(--t-lede);color:var(--ink-2);line-height:1.65}
+.hero__actions{display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:32px}
+.hero__line{font-size:var(--t-xs);color:var(--ink-3);margin-top:25px}
+.ambient-network{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.25}
+.ambient-network path{stroke:var(--blue-line);stroke-width:1;fill:none}
+.ambient-network circle{fill:var(--blue-dim)}
 
-/* ═══ 01 · HERO ══════════════════════════════════════════════════════════════
-   One commercial claim, then the movement it describes. */
-.hero{ padding-top:clamp(112px,14vh,164px); padding-bottom:0; }
-.hero__head{ max-width:1080px; margin-inline:auto; text-align:center; }
-.hero .eyebrow{ justify-content:center; margin-bottom:clamp(26px,3vw,40px); }
-.hero .eyebrow::before{ width:28px; }
-.hero .eyebrow::after{ content:''; width:28px; height:1px; background:var(--blue-line); }
+/* Human analogy flows directly into the agency-wide diagram. */
+.human__grid{display:grid;grid-template-columns:1.05fr 1fr;gap:clamp(48px,8vw,120px);align-items:center}
+.human h2{max-width:12em}
+.human__history{margin-top:28px;color:var(--ink-2);font-size:var(--t-lede);line-height:1.85}
+.human__understands h3{font-size:clamp(1.5rem,2vw,1.9rem);margin-bottom:20px}
+.human__understands>p{color:var(--ink-3);font-size:var(--t-sm);margin-bottom:8px}
+.understanding-lines li{padding-block:10px;border-bottom:1px solid var(--hair-soft);color:var(--ink-2)}
+.understanding-lines strong{font-weight:500}
+.human + .intelligence{padding-top:0}
+.agency-flow{display:grid;grid-template-columns:minmax(0,1.15fr) 64px 172px 64px minmax(0,1fr);align-items:center;padding-top:42px;border-top:1px solid var(--hair)}
+.agency-flow .sys{margin-bottom:22px;color:var(--ink-3);font-size:11px}
+.signal-cloud{display:flex;flex-wrap:wrap;gap:12px 10px;align-items:center;padding-right:20px}
+.signal{display:flex;align-items:center;gap:7px;color:var(--ink-3);font-size:11px;line-height:1.6;white-space:nowrap;padding:4px 9px;border:1px solid var(--hair-soft);border-radius:var(--r-full)}
+.signal i{height:3px;width:3px;flex:none;background:var(--ink-4);border-radius:50%}
+.signal--active{color:var(--ink-2)}
+.signal--active i{background:var(--blue);box-shadow:0 0 8px var(--blue-line)}
+.flow-link{width:100%;height:260px;fill:none;stroke:var(--blue-line);stroke-width:1}
+.flow-link--in{stroke:var(--ink-5)}
+.intelligence-core{width:172px;height:172px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:7px;border:1px solid var(--blue-line);border-radius:50%;background:radial-gradient(circle,rgba(78,155,255,.09),rgba(78,155,255,.015) 70%),var(--bg);position:relative}
+.intelligence-core img{width:44px;height:auto;margin-bottom:3px}
+.intelligence-core b{font-size:13px;letter-spacing:.19em;font-weight:700}
+.intelligence-core span{font-size:11px;color:var(--blue-hi)}
+.agency-flow__outputs{padding-left:22px}
+.agency-flow__outputs li{font-size:var(--t-sm);padding-block:9px;border-bottom:1px solid var(--hair-soft);color:var(--ink-2)}
+.agency-flow__outputs li:last-child{border:0}
 
-/* The largest thing on the site. The measure forces the break rather than
-   leaving it to the viewport. */
-.hero h1{
-  font-size:clamp(2.4rem,1.05rem + 4.6vw,4.9rem);
-  line-height:.98;
-  letter-spacing:-.034em;
-  max-width:13em;
-  margin-inline:auto;
-  margin-bottom:clamp(24px,2.6vw,34px);
-}
+/* The direction reverses: knowledge is applied to a few concrete decisions. */
+.head .applied__context{font-size:var(--t-body);max-width:650px;color:var(--ink-3)}
+.applied-map{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 260px minmax(0,1fr);grid-template-rows:1fr 1fr;column-gap:64px;row-gap:42px;margin-top:54px;min-height:440px;align-items:center}
+.applied-map__core{grid-column:2;grid-row:1 / 3;display:flex;justify-content:center;z-index:1}
+.applied-map__paths{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke:var(--blue-line);stroke-width:1;pointer-events:none}
+.opportunity-example{position:relative;border-left:1px solid var(--blue-line);padding:4px 0 4px 20px;z-index:1}
+.opportunity-example:nth-of-type(1){grid-column:1;grid-row:1}
+.opportunity-example:nth-of-type(2){grid-column:3;grid-row:1}
+.opportunity-example:nth-of-type(3){grid-column:1;grid-row:2}
+.opportunity-example:nth-of-type(4){grid-column:3;grid-row:2}
+.opportunity-example .sys{font-size:11px;color:var(--ink-3);margin-bottom:13px}
+.opportunity-example h3{font-size:clamp(1.15rem,1.65vw,1.4rem);max-width:15em;margin-bottom:9px}
+.opportunity-example>p:not(.sys){font-size:var(--t-sm);color:var(--ink-3)}
+.opportunity-example>strong{display:block;margin-top:18px;color:var(--blue-hi);font-size:var(--t-sm);font-weight:500}
+.opportunity-example>strong span{margin-left:6px;color:var(--blue)}
+.opportunity-example--now{border-color:var(--blue)}
+.opportunity-example--quiet{border-color:var(--hair-2)}
+.opportunity-example--quiet h3,.opportunity-example--quiet>strong,.opportunity-example--quiet>strong span{color:var(--ink-2)}
+.applied__statement{max-width:760px;margin:64px auto 0}
 
-.hero__sub{
-  font-size:var(--t-lede);
-  color:var(--ink-2);
-  max-width:38em;
-  margin-inline:auto;
-}
+/* Commercial effects are four readable rows, not another set of cards. */
+.commercial__head{display:grid;grid-template-columns:1.7fr 1fr;align-items:end;gap:70px;margin-bottom:40px}
+.commercial__head h2{margin-bottom:0;max-width:17em}
+.commercial__constant{color:var(--ink-3);font-size:var(--t-sm);line-height:1.9;padding-left:32px;border-left:1px solid var(--hair-2)}
+.commercial-effects li{display:grid;grid-template-columns:42px minmax(0,1fr) minmax(0,1fr);gap:28px;padding-block:28px;border-top:1px solid var(--hair);align-items:start}
+.effect-number{font:11px var(--mono);color:var(--ink-4);padding-top:6px}
+.commercial-effects h3{max-width:18em;font-size:clamp(1.22rem,1.7vw,1.5rem);line-height:1.3}
+.commercial-effects p{color:var(--ink-2);font-size:var(--t-sm);max-width:35em}
+.delegation__intro{display:grid;grid-template-columns:1fr 1fr;gap:clamp(40px,8vw,120px);align-items:center}
+.delegation__intro h2{max-width:12em;margin-bottom:0}
+.delegation__intro .copy{font-size:var(--t-body)}
+.work-split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(40px,8vw,120px);margin-top:52px}
+.work-split>div{border-top:1px solid var(--hair-2);padding-top:24px}
+.work-split>div.work-split__novus{border-color:var(--blue-line)}
+.work-split h3{font-family:var(--sans);font-size:var(--t-body);font-weight:600;letter-spacing:0;margin-bottom:20px}
+.work-split__novus h3{color:var(--blue-hi)}
+.work-split ul{display:grid;grid-template-columns:1fr 1fr;gap:14px 22px}
+.work-split li{color:var(--ink-2);font-size:var(--t-sm)}
+.delegation__statement{margin:62px auto 0;max-width:840px}
 
-.hero__actions{
-  display:flex; align-items:center; justify-content:center;
-  gap:14px; flex-wrap:wrap;
-  margin-top:clamp(28px,3vw,40px);
-}
+/* A compact, single-pass feedback loop. Labels remain readable HTML. */
+.learning__grid{display:grid;grid-template-columns:1.25fr 1fr;gap:clamp(50px,8vw,120px);align-items:center}
+.learning .head h2{max-width:12em}
+.learning .head p{font-size:var(--t-body)}
+.learning .head .learning__copy{color:var(--ink-3)}
+.learning .head .learning__promise{font-family:var(--serif);font-size:clamp(1.4rem,2vw,1.8rem);line-height:1.35;margin-top:28px;color:var(--ink)}
+.learning-orbit{position:relative;width:100%;max-width:380px;aspect-ratio:1;margin:auto}
+.learning-orbit svg{width:100%;height:100%;fill:none;stroke-width:1;transform:rotate(-90deg)}
+.orbit-track{stroke:var(--hair-2)}
+.orbit-flow{stroke:var(--blue-line)}
+.orbit-label{position:absolute;transform:translate(-50%,-50%);font-size:12px;line-height:1.5;color:var(--ink-2);text-align:center;background:var(--black);padding:7px 10px}
+.orbit-label--1{left:50%;top:11.75%}
+.orbit-label--2{left:86.4%;top:38.2%}
+.orbit-label--3{left:72.5%;top:80.9%}
+.orbit-label--4{left:27.5%;top:80.9%}
+.orbit-label--5{left:13.6%;top:38.2%;color:var(--blue-hi)}
+.orbit-core{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;pointer-events:none}
+.orbit-core img{width:42px}
+.orbit-core b{font-size:12px;font-weight:700;letter-spacing:.2em}
 
-/* Two clauses, set as one line of system text under the CTA. */
-.hero__line{
-  display:flex; align-items:center; justify-content:center;
-  flex-wrap:wrap; gap:10px;
-  margin-top:clamp(20px,2.2vw,28px);
-  font-family:var(--mono); font-size:var(--t-micro);
-  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-4);
-}
-.hero__line i{ width:14px; height:1px; background:var(--hair-2); flex:none; }
+.pilot{margin-top:42px;padding:clamp(24px,3.4vw,46px)}
+.pilot__stages{display:grid;grid-template-columns:repeat(3,1fr);gap:32px}
+.pilot__stages li+li{border-left:1px solid var(--hair);padding-left:32px}
+.pilot__stages .sys{color:var(--blue-hi);font-size:11px}
+.pilot__stages p{font-size:var(--t-sm);color:var(--ink-2);margin-top:16px}
+.pilot__chain{justify-content:center;border-block:1px solid var(--hair);padding-block:24px;margin-top:32px;font-size:11px;gap:14px}
+.pilot__chain span:nth-of-type(3){color:var(--blue-dim)}
+.pilot__chain span:nth-of-type(4){color:var(--blue)}
+.pilot__chain span:nth-of-type(5){color:var(--blue-hi)}
+.pilot__foot{display:flex;justify-content:space-between;align-items:center;gap:24px;margin-top:28px}
+.pilot__outcome{display:flex;flex-wrap:wrap;gap:8px;color:var(--ink-3);font-size:var(--t-xs)}
+.pilot__outcome i{font-style:normal}
+/* Quiet disclosures before the final invitation. Native details also work
+   without JavaScript; the enhancement only adds a short height transition. */
+.faq__inner{max-width:760px;margin-inline:auto}
+.faq .head h2{margin-bottom:0}
+.faq__rows{margin-top:36px;border-top:1px solid var(--hair)}
+.faq__item{border-bottom:1px solid var(--hair);overflow:hidden}
+.faq__item summary{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:22px 2px;min-height:64px;list-style:none;cursor:pointer;color:var(--ink);font-size:clamp(1rem,.95rem + .2vw,1.125rem);line-height:1.5;transition:color .2s var(--ease)}
+.faq__item summary::-webkit-details-marker{display:none}
+.faq__item summary::marker{content:''}
+.faq__item summary:focus-visible{outline-offset:-2px}
+.faq__item[open] summary,.faq__item summary:focus-visible{color:var(--blue-hi)}
+.faq__icon{position:relative;flex:0 0 14px;width:14px;height:14px;color:var(--ink-3);transition:color .2s var(--ease)}
+.faq__icon::before,.faq__icon::after{content:'';position:absolute;left:0;top:6px;width:14px;height:1px;background:currentColor;transition:transform .2s var(--ease)}
+.faq__icon::after{transform:rotate(90deg)}
+.faq__item[open] .faq__icon{color:var(--blue)}
+.faq__item[open] .faq__icon::after{transform:rotate(0)}
+.faq__answer{padding:0 38px 24px 2px;color:var(--ink-2);font-size:var(--t-body);line-height:1.75}
+@media(hover:hover){.faq__item summary:hover{color:var(--blue-hi)}.faq__item summary:hover .faq__icon{color:var(--blue)}}
+@media(max-width:480px){.faq__item summary{gap:20px;padding-block:20px;font-size:16px}.faq__answer{padding-right:18px;font-size:15px}}
 
-/* ── THE FIELD ───────────────────────────────────────────────────────────────
-   Full width by construction (it is not inside .frame), so no 100vw and no
-   scrollbar overflow. Masked at the edges so it dissolves rather than stops. */
-.field{
-  position:relative;
-  margin-top:clamp(20px,2.8vw,44px);
-  -webkit-mask-image:
-    linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent),
-    linear-gradient(180deg,#000 74%,rgba(0,0,0,.35));
-  mask-image:
-    linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent),
-    linear-gradient(180deg,#000 74%,rgba(0,0,0,.35));
-  -webkit-mask-composite:source-in;
-  mask-composite:intersect;
-}
-.field svg{ width:100%; height:auto; }
-.field__desktop{ display:block; }
-.field__mobile{ display:none; }
+.close{overflow:hidden}
+.final{position:relative;max-width:740px;margin:auto;text-align:center}
+.final h2{font-size:clamp(2rem,1.2rem + 2.7vw,3.8rem)}
+.final__promise{color:var(--ink-2);font-size:var(--t-lede);margin-top:24px}
+.final__actions{margin-top:32px}
 
-/* field type */
-.f-col{
-  font-family:var(--mono); font-size:11px; letter-spacing:.2em;
-  text-transform:uppercase; fill:var(--ink-4);
+/* Entry motion makes direction clear once, then leaves a settled page. */
+@media (prefers-reduced-motion:no-preference){
+  .is-connected .flow-link--in path{animation:gather-signal 3.5s ease both}
+  .is-connected .flow-link--out path{animation:understanding-arrives 3.5s ease both}
+  .is-connected .applied-map__paths path{animation:apply-understanding 4s ease both}
+  .is-connected .orbit-flow{animation:learn-once 9s linear both}
 }
-.f-sig{
-  font-family:var(--sans); font-size:12.5px; font-weight:500;
-  letter-spacing:.11em; text-transform:uppercase; fill:var(--ink-3);
-  transition:fill .6s var(--ease);
-}
-.f-opp{
-  font-family:var(--sans); font-size:12.5px; font-weight:600;
-  letter-spacing:.1em; text-transform:uppercase; fill:var(--ink-4);
-  transition:fill .5s var(--ease);
-}
-.f-act{
-  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
-  text-transform:uppercase; fill:var(--ink-5);
-  transition:fill .5s var(--ease),opacity .5s var(--ease);
-  opacity:0;
-}
-.f-core-label{
-  font-family:var(--sans); font-size:12px; font-weight:700;
-  letter-spacing:.24em; text-transform:uppercase; fill:var(--ink-2);
-}
+@keyframes gather-signal{0%{stroke:var(--ink-5);stroke-dasharray:1;stroke-dashoffset:1}65%{stroke:var(--blue-dim);stroke-dashoffset:0}100%{stroke:var(--blue-line);stroke-dashoffset:0}}
+@keyframes understanding-arrives{0%,50%{stroke-dasharray:1;stroke-dashoffset:1}100%{stroke-dasharray:1;stroke-dashoffset:0}}
+@keyframes apply-understanding{0%{stroke-dasharray:1;stroke-dashoffset:1}100%{stroke-dasharray:1;stroke-dashoffset:0}}
+@keyframes learn-once{0%{stroke-dasharray:1;stroke-dashoffset:1}100%{stroke-dasharray:1;stroke-dashoffset:0}}
 
-.f-line{ fill:none; stroke:var(--hair-2); stroke-width:1; }
-.f-line--soft{ fill:none; stroke:var(--hair); stroke-width:1; }
-.f-dot{ fill:var(--ink-5); transition:fill .5s var(--ease); }
-.f-ring{ fill:none; stroke:var(--blue-line); stroke-width:1; }
-.f-ring--faint{ fill:none; stroke:var(--hair); stroke-width:1; }
-.f-ring--dash{
-  fill:none; stroke:var(--hair-2); stroke-width:1; stroke-dasharray:2 9;
-  transform-box:view-box; transform-origin:720px 216px;
-  animation:fspin 46s linear infinite;
+@media(max-width:1050px){
+  .agency-flow{grid-template-columns:minmax(0,1fr) 35px 148px 35px minmax(0,1fr)}
+  .intelligence-core{width:148px;height:148px}
+  .signal-cloud{gap:12px}
+  .applied-map{grid-template-columns:minmax(0,1fr) 170px minmax(0,1fr);column-gap:32px}
+  .pilot__foot{flex-direction:column;align-items:center}
 }
-@keyframes fspin{ to{ transform:rotate(360deg); } }
-
-/* a line of the commercial ledger, lit one at a time */
-.f-row{ transition:color .5s var(--ease); }
-.f-row--risk{ color:var(--red); }
-.f-row--open{ color:var(--amber); }
-.f-row--good{ color:var(--blue); }
-.f-row.is-live .f-opp{ fill:var(--ink); }
-.f-row.is-live .f-dot{ fill:currentColor; }
-.f-row.is-live .f-act{ opacity:1; fill:currentColor; }
-
-/* signal labels brighten as their pulse departs */
-.f-sig.is-hot{ fill:var(--ink); }
-
-/* travelling pips — injected by JS only where offset-path is supported */
-.pip{ fill:var(--blue); offset-rotate:0deg; }
-.pip--out{ fill:var(--ink-2); }
-@keyframes pipflow{
-  0%{ offset-distance:0%; opacity:0; }
-  12%{ opacity:.95; }
-  86%{ opacity:.95; }
-  100%{ offset-distance:100%; opacity:0; }
+@media(max-width:760px){
+  .hero{padding-top:124px;padding-bottom:70px}
+  .hero h1{max-width:14em;font-size:clamp(2.5rem,7vw,3.5rem)}
+  .hero__sub{font-size:1rem;max-width:34em}
+  .human__grid{grid-template-columns:1fr;gap:42px}
+  .human h2{max-width:15em}
+  .human__history{font-size:1rem}
+  .agency-flow{grid-template-columns:1fr;justify-items:center;padding-top:32px}
+  .agency-flow__sources{width:100%;max-width:470px;text-align:center}
+  .signal-cloud{justify-content:center;padding-right:0;gap:10px 8px}
+  .signal{font-size:12px}
+  .flow-link{width:1px;height:56px;overflow:visible;background:linear-gradient(var(--hair-2),var(--blue-line));margin-block:14px}
+  .flow-link path{display:none}
+  .flow-link--out{height:40px;background:var(--blue-line)}
+  .agency-flow__outputs{padding:0;width:100%;max-width:380px;text-align:center}
+  .agency-flow__outputs .sys{margin-bottom:12px}
+  .agency-flow__outputs li{font-size:14px}
+  .applied-map{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;gap:32px 26px;margin-top:36px;min-height:0}
+  .applied-map__core{grid-column:1 / 3;grid-row:1;padding-bottom:18px}
+  .applied-map__paths{display:none}
+  .opportunity-example:nth-of-type(1){grid-column:1;grid-row:2}
+  .opportunity-example:nth-of-type(2){grid-column:2;grid-row:2}
+  .opportunity-example:nth-of-type(3){grid-column:1;grid-row:3}
+  .opportunity-example:nth-of-type(4){grid-column:2;grid-row:3}
+  .opportunity-example{padding-left:16px;align-self:stretch}
+  .applied__statement{margin-top:44px}
+  .commercial__head{grid-template-columns:1fr;gap:26px}
+  .commercial__constant{padding-left:18px;line-height:1.7}
+  .commercial-effects li{grid-template-columns:28px 1fr;gap:10px 16px;padding-block:24px}
+  .commercial-effects p{grid-column:2;max-width:40em}
+  .delegation__intro{grid-template-columns:1fr;gap:26px}
+  .delegation__intro h2{max-width:16em}
+  .work-split{gap:28px;margin-top:34px}
+  .work-split ul{grid-template-columns:1fr;gap:13px}
+  .delegation__statement{margin-top:42px}
+  .learning__grid{grid-template-columns:1fr;gap:28px}
+  .learning .head{max-width:640px}
+  .learning .head h2{max-width:17em}
+  .learning-orbit{max-width:340px}
+  .pilot__stages{grid-template-columns:1fr;gap:24px}
+  .pilot__stages li+li{border-left:0;border-top:1px solid var(--hair);padding:24px 0 0}
+  .pilot__stages p{margin-top:10px}
+  .pilot__chain{gap:10px;font-size:10px}
+  .pilot__outcome{justify-content:center}
+  .pilot__foot .btn{white-space:normal;text-align:center;justify-content:center}
 }
-
-/* the mobile field runs vertically and needs its own optical sizes */
-.field__mobile .f-col{ font-size:9.5px; letter-spacing:.18em; }
-.field__mobile .f-sig{ font-size:10.5px; letter-spacing:.07em; }
-.field__mobile .f-opp{ font-size:11px; letter-spacing:.07em; }
-.field__mobile .f-act{ font-size:9.5px; letter-spacing:.1em; }
-.field__mobile .f-core-label{ font-size:10.5px; letter-spacing:.2em; }
-.field__mobile .f-ring--dash{ transform-origin:200px 270px; }
-
-/* ── SHARED CHAPTER FURNITURE ────────────────────────────────────────────────
-   A caption is a note UNDER a diagram; a statement is the one line a chapter
-   is allowed to raise its voice for. Most chapters below are centred, because
-   each one is a single argument rather than a column of prose. */
-.head--centre{
-  max-width:var(--measure-wide); margin-inline:auto; text-align:center;
+@media(max-width:480px){
+  .hero{padding-top:112px;padding-bottom:58px}
+  .hero h1{font-size:clamp(2.35rem,9.7vw,2.9rem);max-width:12em}
+  .hero .eyebrow{font-size:9px;letter-spacing:.14em;margin-bottom:24px}
+  .hero__sub{margin-top:23px;font-size:15px}
+  .hero__actions{flex-direction:column;align-items:center;gap:12px;margin-top:26px}
+  .hero__line{font-size:11px;max-width:24em;margin-inline:auto}
+  .ambient-network{opacity:.14}
+  .human__understands h3{font-size:1.45rem}
+  .understanding-lines li{font-size:14px}
+  .applied-map{grid-template-columns:1fr;gap:0;margin-top:32px}
+  .applied-map__core{grid-column:1;grid-row:auto;padding-bottom:42px;position:relative}
+  .applied-map__core::after{content:'';position:absolute;bottom:0;left:12px;width:calc(50% - 12px);height:42px;border-right:1px solid var(--blue-line);border-bottom:1px solid var(--blue-line)}
+  .opportunity-example:nth-of-type(n){grid-column:1;grid-row:auto;padding:23px 0 23px 20px;margin-left:12px;border-bottom:1px solid var(--hair-soft)}
+  .opportunity-example .sys{margin-bottom:10px}
+  .opportunity-example h3{font-size:1.35rem;max-width:none}
+  .opportunity-example>strong{margin-top:12px}
+  .diagram-caption{font-size:11px;max-width:26em;margin-inline:auto;margin-top:24px}
+  .head .applied__context{font-size:14px}
+  .work-split{gap:20px}
+  .work-split li{font-size:12px}
+  .work-split h3{font-size:14px}
+  .learning-orbit{max-width:310px}
+  .orbit-label{font-size:11px;padding:6px}
+  .pilot__chain{flex-direction:column;gap:7px;font-size:11px;padding-block:22px}
+  .pilot__chain i{transform:rotate(90deg)}
+  .pilot__outcome{flex-direction:column;gap:3px;text-align:center;font-size:11px}
+  .pilot__outcome i{display:none}
+  .pilot__foot .btn{font-size:12px;padding:13px 17px}
+  .final h2{font-size:2rem}
 }
-.head--centre h2{ max-width:16em; margin-inline:auto; }
-.head--centre .eyebrow{ justify-content:center; }
-.head--centre p{ margin-inline:auto; }
-
-.caption{
-  margin:clamp(28px,3.2vw,44px) auto 0;
-  max-width:44em;
-  text-align:center;
-  font-size:var(--t-lede);
-  color:var(--ink-3);
-}
-.caption strong{ color:var(--ink-2); font-weight:400; }
-
-.statement{
-  margin:clamp(34px,4vw,56px) auto 0;
-  max-width:20em; text-align:center;
-  font-family:var(--serif); font-size:var(--t-h2);
-  line-height:1.08; letter-spacing:-.018em; color:var(--ink);
-}
-.statement em{ font-style:normal; display:block; color:var(--ink-4); }
-
-/* ═══ 02 · THE COMMERCIAL GAP ════════════════════════════════════════════════
-   Six kinds of demand the agency already has, converging on the one thing it
-   is trying to produce. NOVUS is not in this drawing: this is their business,
-   before anything is added to it. */
-.gp{ margin-top:clamp(34px,4vw,58px); }
-.gp__k{ padding-bottom:14px; color:var(--ink-4); }
-
-.gp__src{
-  display:grid; grid-template-columns:repeat(6,minmax(0,1fr));
-  border-top:1px solid var(--hair);
-}
-.gp__s{
-  display:flex; flex-direction:column;
-  padding:clamp(20px,2.2vw,30px) clamp(12px,1.4vw,22px);
-  border-left:1px solid var(--hair);
-}
-.gp__s:first-child{ border-left:0; padding-left:0; }
-.gp__s b{
-  display:block;
-  font-family:var(--serif); font-size:var(--t-h4); font-weight:400;
-  letter-spacing:-.01em; color:var(--ink);
-}
-.gp__s b{ flex:1 1 auto; }
-.gp__s .sys{ display:block; margin-top:7px; }
-
-/* Six sources, one destination. Non-scaling strokes so the hairline stays a
-   hairline however far the drawing is stretched. */
-.gp__fan{
-  display:block; width:100%; height:clamp(60px,6.4vw,104px);
-  margin-top:6px;
-}
-.gp__v{ fill:none; stroke:var(--blue-line); }
-
-.gp__out{
-  margin-inline:auto;
-  width:fit-content; max-width:100%;
-  padding:clamp(15px,1.7vw,22px) clamp(20px,2.4vw,34px);
-  border:1px solid var(--blue-line);
-  border-radius:var(--r-md);
-  background:linear-gradient(180deg,rgba(78,155,255,.10),rgba(10,11,14,.5));
-  box-shadow:0 0 0 1px rgba(78,155,255,.05),0 24px 70px -34px rgba(78,155,255,.6);
-  text-align:center;
-  font-family:var(--serif); font-size:var(--t-h3);
-  letter-spacing:-.014em; color:var(--ink);
-}
-
-/* ═══ 03 · CONTEXT REVEALS WHAT MATTERS ══════════════════════════════════════
-   Four cards that begin identically and end nowhere near each other. The top
-   line is deliberately the same on all four; everything that separates them
-   is the context underneath. */
-.sxs{
-  margin-top:clamp(34px,4vw,58px);
-  display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:clamp(10px,1.1vw,16px);
-}
-.sx{
-  display:flex; flex-direction:column;
-  padding:clamp(18px,1.9vw,26px) clamp(16px,1.7vw,24px) clamp(16px,1.7vw,22px);
-  border:1px solid var(--hair);
-  border-radius:var(--r-md);
-  background:linear-gradient(180deg,rgba(241,237,230,.028),rgba(241,237,230,.008));
-  transition:border-color .3s var(--ease);
-}
-.sx__k{ color:var(--ink-3); }
-
-/* The expansion, drawn: the enquiry opens into what surrounds it. */
-.sx__drop{
-  display:block; width:1px; height:clamp(14px,1.6vw,22px);
-  margin:10px 0 12px;
-  background:linear-gradient(180deg,var(--hair-2),var(--blue-line));
-}
-
-.sx__ctx{ flex:1 1 auto; }
-.sx__ctx li{
-  position:relative;
-  padding-left:15px;
-  padding-block:5px;
-  font-size:var(--t-xs); color:var(--ink-2);
-  line-height:1.45;
-}
-.sx__ctx li::before{
-  content:''; position:absolute; left:0; top:1.12em;
-  width:5px; height:1px; background:var(--ink-5);
-}
-.sx__ctx li + li{ border-top:1px solid var(--hair-soft); }
-
-.sx__o{
-  margin-top:clamp(16px,1.8vw,22px);
-  padding-top:clamp(13px,1.4vw,17px);
-  border-top:1px solid var(--hair);
-  font-family:var(--mono); font-size:var(--t-micro);
-  letter-spacing:.14em; text-transform:uppercase;
-  color:currentColor;
-}
-/* Colour carries the verdict, and only the verdict. */
-.sx--quiet{ color:var(--ink-4); }
-.sx--opp{ color:var(--amber); border-color:var(--amber-line); background:linear-gradient(180deg,rgba(214,167,107,.055),rgba(241,237,230,.008)); }
-.sx--opp .sx__drop{ background:linear-gradient(180deg,var(--hair-2),var(--amber-line)); }
-.sx--now{ color:var(--blue); border-color:var(--blue-line); background:linear-gradient(180deg,rgba(78,155,255,.055),rgba(241,237,230,.008)); }
-
-/* ═══ 04 · PROGRESS — ONE NEXT STEP ══════════════════════════════════════════
-   The chain descends, the branch opens, and exactly one step is selected.
-   Sometimes that step is to do nothing, which is the entire point. */
-.ac{
-  margin-top:clamp(30px,3.6vw,52px);
-  display:flex; flex-direction:column; align-items:center;
-}
-
-.ac__chain{ display:flex; flex-direction:column; align-items:center; width:100%; }
-.ac__step{
-  width:min(100%,30em);
-  text-align:center;
-  padding:clamp(13px,1.4vw,18px) clamp(16px,1.8vw,26px);
-  border:1px solid var(--hair);
-  border-radius:var(--r-md);
-  background:linear-gradient(180deg,rgba(241,237,230,.028),rgba(241,237,230,.01));
-}
-.ac__k{ margin-bottom:6px; }
-.ac__v{
-  font-size:var(--t-sm); font-weight:600; color:var(--ink);
-  letter-spacing:-.004em;
-  transition:opacity .26s var(--ease);
-}
-.ac__v.is-swap{ opacity:0; }
-
-.ac__drop{
-  display:block; width:1px; height:clamp(16px,1.8vw,26px);
-  background:linear-gradient(180deg,var(--hair-2),var(--blue-line));
-}
-
-.ac__step--q{
-  border-color:var(--blue-line);
-  background:var(--blue-tint);
-}
-.ac__step--q .ac__v{
-  font-family:var(--serif); font-weight:400; font-size:var(--t-h3);
-  letter-spacing:-.014em; color:var(--blue-hi);
-}
-
-.ac__fan{
-  display:block; width:100%; max-width:1020px;
-  height:clamp(44px,4.6vw,84px);
-}
-.ac__branch{
-  fill:none; stroke:var(--hair); stroke-width:1;
-  transition:stroke .45s var(--ease);
-}
-.ac__branch.is-on{ stroke:var(--blue); }
-
-.ac__actions{
-  width:100%; max-width:1020px;
-  display:grid; grid-template-columns:repeat(7,minmax(0,1fr));
-  gap:clamp(6px,.7vw,10px);
-}
-.ax{
-  display:flex; align-items:center; justify-content:center;
-  text-align:center;
-  padding:clamp(11px,1.2vw,15px) 6px;
-  border:1px solid var(--hair); border-radius:var(--r-sm);
-  font-family:var(--mono); font-size:var(--t-micro);
-  letter-spacing:.12em; text-transform:uppercase; color:var(--ink-4);
-  transition:color .35s var(--ease),border-color .35s var(--ease),
-             background .35s var(--ease),transform .35s var(--ease);
-}
-.ax.is-on{
-  color:var(--blue); border-color:var(--blue-line); background:var(--blue-tint);
-  transform:translateY(-2px);
-  box-shadow:0 14px 34px -20px rgba(78,155,255,.85);
-}
-
-/* The commercial destination. Whatever the step was, this is what it was for —
-   so above ~1080 the paths gather back in rather than one line running through
-   the middle chip and reading as a single selected route. */
-.ac__gather{
-  display:block; width:100%; max-width:1020px;
-  height:clamp(44px,4.6vw,84px);
-  margin-top:clamp(14px,1.6vw,22px);
-}
-.ac__g{ fill:none; stroke:var(--hair); stroke-width:1; }
-
-.ac__spine{
-  display:none; width:1px; height:clamp(22px,2.6vw,38px);
-  margin-top:clamp(18px,2vw,26px);
-  background:linear-gradient(180deg,var(--hair-2),var(--blue-line));
-}
-.ac__dest{
-  padding:clamp(15px,1.7vw,22px) clamp(22px,2.6vw,38px);
-  border:1px solid var(--blue-line);
-  border-radius:var(--r-md);
-  background:linear-gradient(180deg,rgba(78,155,255,.10),rgba(10,11,14,.5));
-  box-shadow:0 0 0 1px rgba(78,155,255,.05),0 24px 70px -34px rgba(78,155,255,.6);
-  text-align:center;
-  font-family:var(--serif); font-size:var(--t-h3);
-  letter-spacing:-.014em; color:var(--ink);
-}
-
-/* ═══ 05 · THE WIDER BUSINESS PICTURE ════════════════════════════════════════
-   What the agency observes on the left; what it is then able to decide on the
-   right. The benefit is the clarity, not the fact that a system learned. */
-.ln{
-  margin-top:clamp(30px,3.6vw,52px);
-  display:grid;
-  grid-template-columns:minmax(0,1fr) clamp(70px,8vw,140px) minmax(0,.94fr);
-  align-items:center;
-  gap:0;
-}
-
-.runs__hd{ padding-bottom:12px; }
-.runs ol{ border-top:1px solid var(--hair); }
-.run{
-  display:flex; align-items:baseline; flex-wrap:wrap;
-  gap:0 14px;
-  padding-block:clamp(15px,1.7vw,22px);
-  border-bottom:1px solid var(--hair);
-  color:var(--ink-3);
-}
-.run__o{ font-size:var(--t-sm); font-weight:650; color:var(--ink); }
-.run__r{
-  margin-left:auto;
-  font-size:var(--t-xs); font-weight:600; color:currentColor;
-}
-.run--good{ color:var(--blue); }
-.run--open{ color:var(--amber); }
-.run--miss{ color:var(--red); }
-
-.ln__collect{
-  display:block; width:100%; height:clamp(200px,26vw,400px);
-  align-self:center;
-}
-.ln__c{ fill:none; stroke:var(--hair-2); stroke-width:1; }
-
-.insights{ display:grid; gap:clamp(10px,1.1vw,14px); }
-.ins{
-  padding:clamp(17px,1.8vw,24px) clamp(18px,2vw,26px);
-  border:1px solid var(--hair);
-  border-left:2px solid var(--hair-2);
-  border-radius:0 var(--r-md) var(--r-md) 0;
-  background:linear-gradient(90deg,rgba(241,237,230,.03),transparent 70%);
-}
-.ins__k{
-  font-family:var(--mono); font-size:var(--t-micro);
-  letter-spacing:.18em; text-transform:uppercase;
-  color:var(--ink-4); margin-bottom:9px;
-}
-.ins__t{ font-size:var(--t-sm); font-weight:650; color:var(--ink); letter-spacing:-.004em; }
-.ins__m{ margin-top:5px; font-size:var(--t-xs); color:var(--ink-3); }
-.ins--pattern{ border-left-color:var(--blue); }
-.ins--pattern .ins__k{ color:var(--blue); }
-.ins--pattern .ins__up{ color:var(--blue); }
-.ins--priority{ border-left-color:var(--ink-2); background:linear-gradient(90deg,rgba(241,237,230,.055),transparent 70%); }
-.ins--priority .ins__k{ color:var(--ink-2); }
-.ins--priority .ins__t{ font-size:var(--t-h4); font-family:var(--serif); font-weight:400; letter-spacing:-.012em; line-height:1.24; }
-
-/* The compounding statement, set as a system chain rather than a sentence. */
-.compound{
-  justify-content:center;
-  margin-top:clamp(30px,3.6vw,50px);
-  padding-top:clamp(24px,2.6vw,34px);
-  border-top:1px solid var(--hair);
-  gap:12px;
-}
-.compound i{ color:var(--ink-5); font-style:normal; }
-
-/* ═══ 06 · HOW NOVUS GETS YOU THERE ══════════════════════════════════════════
-   Four parts of one method, connected by a single rail. Four cells separated
-   by rules, not four cards: boxes would argue this is four products. */
-.method{
-  margin-top:clamp(30px,3.6vw,48px);
-  position:relative;
-  display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
-  border-top:1px solid var(--hair);
-}
-/* The rail that makes four cells read as one sequence. */
-.method::before{
-  content:''; position:absolute; z-index:0;
-  left:0; right:0; top:30px;
-  height:1px;
-  background:linear-gradient(90deg,var(--hair-2),var(--blue-line),var(--hair-2));
-}
-.method__s{
-  position:relative; z-index:1;
-  padding:26px clamp(16px,1.6vw,26px) clamp(22px,2.3vw,30px);
-  border-left:1px solid var(--hair);
-}
-.method__s:first-child{ border-left:0; }
-.method__s em{
-  display:block; margin-top:22px;
-  font-family:var(--mono); font-size:var(--t-micro);
-  font-style:normal; letter-spacing:.14em; color:var(--blue-dim);
-}
-/* The node the rail runs through. */
-.method__s::before{
-  content:''; position:absolute;
-  top:25px; left:clamp(16px,1.6vw,26px);
-  width:9px; height:9px; border-radius:50%;
-  background:var(--black); border:1px solid var(--blue);
-}
-.method__s:first-child::before{ left:0; }
-.method__s b{
-  display:block; margin-top:8px;
-  font-size:var(--t-h4); font-family:var(--serif);
-  font-weight:400; letter-spacing:-.01em; color:var(--ink);
-}
-.method__s span{
-  display:block; margin-top:6px;
-  font-size:var(--t-xs); color:var(--ink-3);
-}
-
-/* ═══ 07 · THE FOUNDING PILOT ════════════════════════════════════════════════
-   One offer, one price, one commercial question. Everything else belongs in
-   the conversation, not on the homepage. */
-.pilot{ margin-top:clamp(30px,3.6vw,52px); }
-
-.pilot__bar{
-  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-  padding:16px clamp(20px,2.4vw,34px);
-  border-bottom:1px solid var(--hair);
-  background:rgba(241,237,230,.014);
-}
-.pilot__name{
-  font-size:var(--t-xs); font-weight:700;
-  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-2);
-}
-.pilot__bar .chip{ margin-left:auto; }
-
-.pilot__price{
-  padding:clamp(30px,3.4vw,50px) clamp(20px,2.4vw,34px) clamp(24px,2.6vw,34px);
-  border-bottom:1px solid var(--hair);
-  text-align:center;
-}
-.pilot__fig{ display:flex; align-items:baseline; justify-content:center; gap:14px; flex-wrap:wrap; }
-.pilot__fig b{
-  font-family:var(--serif); font-weight:400;
-  font-size:clamp(3rem,1.6rem + 4.4vw,5.4rem);
-  line-height:1; letter-spacing:-.03em; color:var(--ink);
-}
-.pilot__fig span{
-  font-family:var(--mono); font-size:var(--t-micro);
-  letter-spacing:.2em; text-transform:uppercase; color:var(--blue);
-  padding:5px 11px; border:1px solid var(--blue-line);
-  border-radius:var(--r-full); background:var(--blue-tint);
-}
-.pilot__figNote{
-  margin:16px auto 0; max-width:30em;
-  font-size:var(--t-sm); color:var(--ink-3);
-}
-/* Shown only when public pricing is switched off in index.html. */
-.pilot__off{ display:none; font-size:var(--t-lede); color:var(--ink-2); }
-body[data-pricing="off"] .pilot__fig,
-body[data-pricing="off"] .pilot__figNote{ display:none; }
-body[data-pricing="off"] .pilot__off{ display:block; }
-
-/* The one question the pilot exists to answer. */
-.pilot__q{
-  padding:clamp(28px,3.2vw,44px) clamp(20px,2.4vw,34px);
-  border-bottom:1px solid var(--hair);
-  text-align:center;
-}
-.pilot__q .sys{ display:block; margin-bottom:14px; }
-.pilot__qt{
-  margin-inline:auto; max-width:22em;
-  font-family:var(--serif); font-size:var(--t-h3); font-weight:400;
-  line-height:1.24; letter-spacing:-.014em; color:var(--ink);
-}
-
-.pilot__foot{
-  display:flex; align-items:center; justify-content:space-between;
-  gap:clamp(18px,2.4vw,36px); flex-wrap:wrap;
-  padding:clamp(20px,2.4vw,32px) clamp(20px,2.4vw,34px);
-}
-.pilot__outcome{
-  display:flex; align-items:center; flex-wrap:wrap; gap:0;
-  font-family:var(--mono); font-size:var(--t-micro);
-  letter-spacing:.13em; text-transform:uppercase; color:var(--ink-4);
-}
-.pilot__outcome i{ font-style:normal; color:var(--ink-5); margin-inline:6px; }
-
-/* ═══ 08 · CLOSE ═════════════════════════════════════════════════════════════ */
-.final{ text-align:center; }
-.final h2{ font-size:var(--t-h1); max-width:14em; margin-inline:auto; }
-.final h2 .soft{ display:block; color:rgba(241,237,230,.52); }
-
-.final__lines{
-  margin:clamp(30px,3.4vw,46px) auto 0;
-  max-width:30em;
-  border-top:1px solid var(--hair);
-}
-.final__lines li{
-  padding-block:clamp(12px,1.4vw,17px);
-  border-bottom:1px solid var(--hair);
-  font-family:var(--serif); font-size:var(--t-h4); font-weight:400;
-  letter-spacing:-.01em; color:var(--ink-2);
-}
-.final__lines li:last-child{ color:var(--ink); }
-
-.final__actions{ margin-top:clamp(30px,3.4vw,44px); display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:wrap; }
-.final__mail{
-  font-size:var(--t-sm); color:var(--ink-3);
-  border-bottom:1px solid var(--hair-2); padding-bottom:2px;
-  transition:color .2s var(--ease),border-color .2s var(--ease);
-}
-.final__mail:hover{ color:var(--blue); border-color:var(--blue-line); }
-
-/* ═══ FOOTER ═════════════════════════════════════════════════════════════════ */
 .ftr{ border-top:1px solid var(--hair); padding-block:clamp(44px,4.6vw,66px) clamp(28px,2.8vw,40px); }
 .ftr__grid{
   display:grid; grid-template-columns:2fr 1fr 1fr 1fr;
@@ -597,200 +262,13 @@ body[data-pricing="off"] .pilot__off{ display:block; }
 }
 .ftr__base .sys{ margin-left:auto; }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   RESPONSIVE
-   Mobile is a designed composition, not a stacked desktop. Layouts change
-   shape here — they do not simply fall into one column.
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* ── TABLET ────────────────────────────────────────────────────────────────
-   Between roughly 900 and 1180 the wide field still composes, but its type is
-   scaling down with the drawing. The labels have room, so they are set larger
-   in user units to hold their rendered size — which is why the field does NOT
-   flip to the phone drawing here. */
-@media (max-width:1180px){
-  .field__desktop .f-sig,
-  .field__desktop .f-opp{ font-size:15.5px; letter-spacing:.06em; }
-  .field__desktop .f-act{ font-size:13px; letter-spacing:.08em; }
-  .field__desktop .f-col{ font-size:13px; letter-spacing:.14em; }
-  .field__desktop .f-core-label{ font-size:14.5px; letter-spacing:.18em; }
+@media(max-width:760px){
+  .ftr__grid{grid-template-columns:repeat(3,1fr);gap:32px 18px}
+  .ftr__brand{grid-column:1 / -1}
+  .ftr__brand p{max-width:32em}
+  .ftr__base{gap:12px;font-size:11px}
 }
-
-@media (max-width:1080px){
-  /* Six sources become two rows of three, and the six-way fan — which only
-     works when each source sits above its own vein — becomes one spine. */
-  .gp__src{ grid-template-columns:repeat(3,minmax(0,1fr)); }
-  .gp__s:nth-child(3n+1){ border-left:0; padding-left:0; }
-  .gp__s:nth-child(n+4){ border-top:1px solid var(--hair); }
-  .gp__fan{ display:none; }
-  .gp__out{
-    position:relative;
-    margin-top:clamp(44px,5vw,64px);
-  }
-  .gp__out::before{
-    content:''; position:absolute; top:calc(-1 * clamp(44px,5vw,64px) + 6px);
-    left:50%; width:1px; height:calc(clamp(44px,5vw,64px) - 12px);
-    background:linear-gradient(180deg,var(--hair-2),var(--blue-line));
-  }
-
-  /* Two rows of two: the four readings stay side by side so they can still be
-     compared, which is the entire point of the section. */
-  .sxs{ grid-template-columns:repeat(2,minmax(0,1fr)); }
-
-  /* The branch cannot fan into seven columns at this width without the labels
-     colliding, so the fan becomes one spine and the steps become a block. */
-  .ac__fan,.ac__gather{ display:none; }
-  .ac__spine{ display:block; }
-  .ac__actions{
-    position:relative;
-    margin-top:clamp(28px,3.4vw,40px);
-    grid-template-columns:repeat(4,minmax(0,1fr));
-  }
-  .ac__actions::before{
-    content:''; position:absolute; top:calc(-1 * clamp(28px,3.4vw,40px));
-    left:50%; width:1px; height:clamp(28px,3.4vw,40px);
-    background:linear-gradient(180deg,var(--blue-line),var(--hair-2));
-  }
-
-  /* Observations above, what they make clear below, joined by a single drop. */
-  .ln{ grid-template-columns:minmax(0,1fr); }
-  .ln__collect{ display:none; }
-  .insights{
-    position:relative;
-    margin-top:clamp(40px,5vw,60px);
-  }
-  .insights::before{
-    content:''; position:absolute; top:calc(-1 * clamp(40px,5vw,60px) + 8px);
-    left:50%; width:1px; height:calc(clamp(40px,5vw,60px) - 16px);
-    background:linear-gradient(180deg,var(--hair-2),var(--blue-line));
-  }
-
-  /* The method's rail turns with it: two pairs, each pair a run of two. */
-  .method{ grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .method::before{ display:none; }
-  .method__s:nth-child(odd){ border-left:0; }
-  .method__s:nth-child(n+3){ border-top:1px solid var(--hair); }
-  .method__s::before{ left:clamp(16px,1.6vw,26px); }
-  .method__s:nth-child(odd)::before{ left:0; }
-
-  .ftr__grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
-}
-
-/* ── SMALL TABLET / LARGE PHONE ────────────────────────────────────────────
-   Set from composition, not from a round number: at this width the wide
-   field's output column can no longer hold "Progressed at the right moment"
-   on one line, so the vertical drawing takes over. */
-@media (max-width:900px){
-  .field__desktop{ display:none; }
-  .field__mobile{ display:block; }
-  .field{
-    -webkit-mask-image:linear-gradient(180deg,#000 88%,transparent);
-    mask-image:linear-gradient(180deg,#000 88%,transparent);
-  }
-  /* A tablet is not a large phone. Stretched to 800px the vertical drawing
-     becomes a poster. Capped and centred it reads as a diagram in a page. */
-  .field__mobile{ max-width:470px; margin-inline:auto; }
-
-  .pilot__foot{ justify-content:center; text-align:center; }
-}
-
-@media (max-width:560px){
-  .field__mobile{ max-width:none; }
-
-  /* ── THE HERO ON A PHONE ────────────────────────────────────────────────
-     Same composition as the desktop, not a squeezed copy of it. The order the
-     reader gets is header → eyebrow → headline → copy → CTA, and the field is
-     allowed to begin below the fold so that sequence can breathe. */
-  .hero .frame{ padding-inline:15px; }
-  .hero{ padding-top:clamp(88px,11vh,110px); }
-
-  .hero .eyebrow{ font-size:.63rem; letter-spacing:.16em; margin-bottom:22px; }
-  .hero .eyebrow::before,
-  .hero .eyebrow::after{ display:none; }
-
-  .hero h1{
-    font-size:clamp(1.95rem,.35rem + 7.4vw,2.8rem);
-    line-height:1.02;
-    letter-spacing:-.03em;
-    max-width:none;
-    margin-bottom:20px;
-  }
-
-  .hero__sub{ font-size:.975rem; line-height:1.55; max-width:26em; }
-
-  .hero__actions{
-    flex-direction:column; align-items:stretch;
-    gap:9px; margin-top:26px;
-  }
-  .hero__actions .btn{ justify-content:center; padding-block:12px; text-align:center; white-space:normal; }
-  .hero__line i{ display:none; }
-  .hero__line{ gap:6px 14px; }
-
-  /* The message finishes before the product visual starts. */
-  .field{ margin-top:52px; }
-
-  /* Six sources become two per row, still as rules rather than cards. */
-  .gp__src{ grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .gp__s{ border-left:1px solid var(--hair); padding-left:clamp(14px,4vw,20px); padding-right:0; }
-  .gp__s:nth-child(odd){ border-left:0; padding-left:0; }
-  .gp__s:nth-child(n+3){ border-top:1px solid var(--hair); }
-  .gp__out{ font-size:var(--t-h4); }
-
-  /* Four readings, one under another. The repeated opening line is what makes
-     the comparison work, so it survives the stack. */
-  .sxs{ grid-template-columns:minmax(0,1fr); gap:10px; }
-  .sx__drop{ height:14px; margin:8px 0 10px; }
-
-  .ac__step{ width:100%; }
-  .ac__actions{ grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .ac__dest{ width:100%; font-size:var(--t-h4); }
-
-  /* An observation is one line on a phone: what it is, then what it shows. */
-  .run{ gap:0; }
-  .run__r{ margin-left:0; width:100%; margin-top:4px; }
-
-  /* The method stacks as four rules — a contents page for the mechanism. */
-  .method{ grid-template-columns:minmax(0,1fr); }
-  .method__s{ border-left:0; padding:18px 0 18px 24px; }
-  .method__s + .method__s{ border-top:1px solid var(--hair); }
-  .method__s::before,
-  .method__s:nth-child(odd)::before{ left:0; top:22px; }
-  .method__s em{ margin-top:0; }
-  .method__s b{ margin-top:6px; }
-  /* The rail turns with the list, so four steps still read as one sequence. */
-  .method::before{
-    display:block; left:5px; right:auto; top:27px; bottom:auto;
-    width:1px; height:calc(100% - 54px);
-    background:linear-gradient(180deg,var(--hair-2),var(--blue-line),var(--hair-2));
-  }
-
-  /* Two terms, two lines — rather than one hyphenated word broken in half. */
-  .pilot__outcome{ flex-direction:column; gap:7px; }
-  .pilot__outcome i{ display:none; }
-  .pilot__foot .btn{ width:100%; justify-content:center; }
-  .final__actions{ flex-direction:column; gap:16px; }
-  .final__actions .btn{ width:100%; justify-content:center; }
-}
-
-/* Wide displays get more air, never more content. */
-@media (min-width:1600px){
-  :root{ --frame:1400px; }
-}
-
-/* Print: the page still reads as a document. */
-@media print{
-  body::before,body::after,.hdr,.menu{ display:none !important; }
-  body{ background:#fff; color:#111; }
-  .section{ padding-block:24px; break-inside:avoid; }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   MOTION POLICY
-   base.css lands every .reveal element for a visitor who has asked for less
-   movement. The one thing that moves on its own — the field's dashed ring —
-   is stopped here, in the same way and for the same reason: the finished
-   state is the readable one, and it must not depend on an observer firing.
-   ═══════════════════════════════════════════════════════════════════════════ */
-@media (prefers-reduced-motion:reduce){
-  .f-ring--dash{ animation:none; }
+@media(max-width:480px){
+  .ftr__grid{grid-template-columns:1fr 1fr}
+  .ftr__base .sys{margin-left:0;font-size:9px}
 }

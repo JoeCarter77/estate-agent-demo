@@ -7,13 +7,13 @@
 import { initReveal } from './reveal.js';
 import { initNav } from './nav.js';
 import { initField } from './field.js';
-import { initSequences } from './sequences.js';
+import { initFaq } from './faq.js';
 
 function boot(){
   initNav();
   initReveal();
   initField();
-  initSequences();
+  initFaq();
   document.documentElement.classList.add('js-ready');
 }
 

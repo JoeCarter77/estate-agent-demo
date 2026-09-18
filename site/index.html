@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>NOVUS — Turn more of the demand you already have into valuations</title>
-<meta name="description" content="Independent estate agencies already generate enquiries, conversations and database activity. NOVUS helps uncover and progress more of the valuation opportunity already inside it." />
+<title>NOVUS — More value from the demand your agency already has</title>
+<meta name="description" content="Intelligence for established independent estate agencies. NOVUS connects agency-wide signals, applies that understanding to every opportunity, and learns from every outcome." />
 <meta name="theme-color" content="#0A0B0E" />
 <link rel="canonical" href="https://getnovus.co.uk/" />
 
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="NOVUS" />
-<meta property="og:title" content="Turn more of the demand you already have into valuations and instructions." />
-<meta property="og:description" content="More valuation opportunities, more valuation conversations, and more chances to win instructions — from the demand your agency already has." />
+<meta property="og:title" content="More value from the demand your agency already has." />
+<meta property="og:description" content="More of the right conversations. More valuations. More instructions. NOVUS connects, acts and learns around your existing agency." />
 <meta property="og:url" content="https://getnovus.co.uk/" />
 <meta name="twitter:card" content="summary_large_image" />
 
@@ -36,15 +36,10 @@
   /* Every reveal is a transition FROM a shifted state TO the real composition.
      With no JS there is nothing to trigger it, so land the page directly. */
   .reveal,.reveal-child{ opacity:1 !important; transform:none !important; }
-  /* The ledger's outputs are revealed as each row resolves. */
-  .f-act{ opacity:1; }
-  /* The action branch settles on one recommended step. */
-  .ax[data-default]{ border-color:var(--blue-line); color:var(--blue); background:var(--blue-tint); }
 </style></noscript>
 </head>
 
-<!-- Public pricing is switched here, and nowhere else: "on" | "off". -->
-<body data-pricing="on">
+<body>
 
 <a class="skip" href="#main">Skip to content</a>
 
@@ -80,529 +75,205 @@
 
 <main id="main">
 
-<!-- ═══ 01 · HERO ════════════════════════════════════════════════════════
-     One commercial claim, and underneath it the movement that claim
-     describes: what the agency already produces, becoming things that are
-     worth money to it. The diagram is deliberately NOT an architecture
-     drawing — every label on it is a commercial noun. -->
 <section class="section hero" id="top">
+  <svg class="ambient-network" viewBox="0 0 1400 620" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"><g><path d="M70 470 L200 365 L330 445 L470 390 M1060 150 L1210 230 L1330 130 M1120 490 L1240 425 L1380 500 M40 170 L170 100 L270 185"/><circle cx="70" cy="470" r="3"/><circle cx="200" cy="365" r="3"/><circle cx="330" cy="445" r="3"/><circle cx="470" cy="390" r="2"/><circle cx="1060" cy="150" r="2"/><circle cx="1210" cy="230" r="3"/><circle cx="1330" cy="130" r="2"/><circle cx="1120" cy="490" r="3"/><circle cx="1240" cy="425" r="3"/><circle cx="1380" cy="500" r="2"/><circle cx="40" cy="170" r="2"/><circle cx="170" cy="100" r="3"/><circle cx="270" cy="185" r="2"/></g></svg>
   <div class="frame">
-    <div class="hero__head" data-reveal data-stagger="120">
-      <p class="eyebrow reveal-child">For independent estate agencies</p>
-
-      <h1 class="reveal-child">Turn more of the demand you already have into valuations and instructions.</h1>
-
-      <p class="hero__sub reveal-child">
-        You’re already generating enquiries, conversations and database activity.
-        NOVUS helps uncover and progress more of the valuation opportunity
-        already inside it.
-      </p>
-
+    <div class="hero__head" data-reveal data-stagger="100">
+      <p class="eyebrow reveal-child">Intelligence for existing demand</p>
+      <h1 class="reveal-child">More value from the demand <span class="meaning">your agency already has.</span></h1>
+      <p class="hero__sub reveal-child">NOVUS works around your existing systems to know where attention should go, help the <span class="meaning">right action</span> happen, and learn from every outcome — turning more of your existing demand into business.</p>
       <div class="hero__actions reveal-child">
-        <a class="btn btn--primary" href="https://calendly.com/joe-getnovus/10min" target="_blank" rel="noopener noreferrer">See what this could look like in your agency <span class="arw" aria-hidden="true">→</span></a>
+        <a class="btn btn--primary" href="#how">See how NOVUS works <span class="arw" aria-hidden="true">→</span></a>
+        <a class="btn btn--ghost" href="https://calendly.com/joe-getnovus/10min" target="_blank" rel="noopener noreferrer">Book a conversation</a>
       </div>
-
-      <p class="hero__line reveal-child">
-        <span>Demand you already have.</span><i aria-hidden="true"></i><span>More of it progressed.</span>
-      </p>
+      <p class="hero__line reveal-child">For established independent estate agencies</p>
     </div>
-  </div>
-
-  <!-- COMMERCIAL MOVEMENT.
-       Left: what the agency already produces. Right: what it can become.
-       Two drawings of one diagram — wide, and vertical for small screens. -->
-  <div class="field" role="img"
-       aria-label="Diagram: enquiries, conversations, database, viewings and past activity flow through NOVUS and become seller opportunities, valuation conversations, instruction opportunities and commercial insight.">
-
-    <svg class="field__desktop" viewBox="0 14 1440 416" aria-hidden="true" focusable="false">
-      <defs>
-        <radialGradient id="fhalo" cx="50%" cy="50%" r="50%">
-          <stop offset="0%"   stop-color="#4E9BFF" stop-opacity=".10" />
-          <stop offset="55%"  stop-color="#4E9BFF" stop-opacity=".032" />
-          <stop offset="100%" stop-color="#4E9BFF" stop-opacity="0" />
-        </radialGradient>
-      </defs>
-
-      <text class="f-col" x="350" y="44" text-anchor="end">What you already have</text>
-      <text class="f-col" x="976" y="44">What it can become</text>
-
-      <!-- what the agency already produces -->
-      <g class="f-signals">
-        <text class="f-sig" x="350" y="100" text-anchor="end">Enquiries</text>
-        <text class="f-sig" x="350" y="158" text-anchor="end">Conversations</text>
-        <text class="f-sig" x="350" y="216" text-anchor="end">Database</text>
-        <text class="f-sig" x="350" y="274" text-anchor="end">Viewings</text>
-        <text class="f-sig" x="350" y="332" text-anchor="end">Past activity</text>
-      </g>
-      <g>
-        <circle class="f-dot" cx="372" cy="96"  r="2.5" />
-        <circle class="f-dot" cx="372" cy="154" r="2.5" />
-        <circle class="f-dot" cx="372" cy="212" r="2.5" />
-        <circle class="f-dot" cx="372" cy="270" r="2.5" />
-        <circle class="f-dot" cx="372" cy="328" r="2.5" />
-      </g>
-
-      <!-- agency &#8594; NOVUS -->
-      <g>
-        <path class="f-line f-flow" d="M372 96  C500 96  570 216 652 216" />
-        <path class="f-line f-flow" d="M372 154 C500 154 570 216 652 216" />
-        <path class="f-line f-flow" d="M372 212 C500 212 570 216 652 216" />
-        <path class="f-line f-flow" d="M372 270 C500 270 570 216 652 216" />
-        <path class="f-line f-flow" d="M372 328 C500 328 570 216 652 216" />
-      </g>
-
-      <!-- NOVUS &#8594; commercial movement -->
-      <g>
-        <path class="f-line--soft f-flow f-flow--out" d="M788 216 C860 216 890 126 952 126" />
-        <path class="f-line--soft f-flow f-flow--out" d="M788 216 C860 216 890 186 952 186" />
-        <path class="f-line--soft f-flow f-flow--out" d="M788 216 C860 216 890 246 952 246" />
-        <path class="f-line--soft f-flow f-flow--out" d="M788 216 C860 216 890 306 952 306" />
-      </g>
-
-      <!-- NOVUS -->
-      <circle cx="720" cy="216" r="168" fill="url(#fhalo)" />
-      <circle class="f-ring--faint" cx="720" cy="216" r="124" />
-      <circle class="f-ring--dash"  cx="720" cy="216" r="96" />
-      <circle class="f-ring"        cx="720" cy="216" r="68" />
-      <image class="f-mark" href="assets/img/novus-mark.png"
-             x="677.3" y="176" width="85.34" height="80"
-             preserveAspectRatio="xMidYMid meet" />
-      <text class="f-core-label" x="720" y="322" text-anchor="middle">NOVUS</text>
-
-      <!-- the commercial ledger: one line resolving at a time -->
-      <g class="f-row f-row--open">
-        <circle class="f-dot" cx="960" cy="126" r="3" />
-        <text class="f-opp" x="976" y="122">Seller opportunity</text>
-        <text class="f-act" x="976" y="141" data-actions="Surfaced with its full context|Not just another enquiry">Surfaced with its full context</text>
-      </g>
-      <g class="f-row f-row--good">
-        <circle class="f-dot" cx="960" cy="186" r="3" />
-        <text class="f-opp" x="976" y="182">Valuation conversation</text>
-        <text class="f-act" x="976" y="201" data-actions="Progressed at the right moment|More of them actually happen">Progressed at the right moment</text>
-      </g>
-      <g class="f-row f-row--good">
-        <circle class="f-dot" cx="960" cy="246" r="3" />
-        <text class="f-opp" x="976" y="242">Instruction opportunity</text>
-        <text class="f-act" x="976" y="261" data-actions="More chances to win the listing|Where the real value sits">More chances to win the listing</text>
-      </g>
-      <g class="f-row f-row--open">
-        <circle class="f-dot" cx="960" cy="306" r="3" />
-        <text class="f-opp" x="976" y="302">Commercial insight</text>
-        <text class="f-act" x="976" y="321" data-actions="Where growth is constrained|What consistently converts">Where growth is constrained</text>
-      </g>
-
-      <g class="f-pips"></g>
-    </svg>
-
-    <svg class="field__mobile" viewBox="0 8 400 660" aria-hidden="true" focusable="false">
-      <text class="f-col" x="200" y="26" text-anchor="middle">What you already have</text>
-
-      <g class="f-signals">
-        <text class="f-sig" x="192" y="62" text-anchor="end">Enquiries</text>
-        <text class="f-sig" x="208" y="62">Conversations</text>
-        <text class="f-sig" x="192" y="90" text-anchor="end">Database</text>
-        <text class="f-sig" x="208" y="90">Viewings</text>
-        <text class="f-sig" x="200" y="118" text-anchor="middle">Past activity</text>
-      </g>
-
-      <path class="f-line--soft" d="M60 140 L340 140" />
-      <path class="f-line--soft" d="M120 134 L120 140" />
-      <path class="f-line--soft" d="M280 134 L280 140" />
-
-      <path class="f-line--soft f-flow" d="M200 140 L200 224" />
-      <path class="f-line--soft f-flow" d="M120 140 C120 186 200 194 200 224" />
-      <path class="f-line--soft f-flow" d="M280 140 C280 186 200 194 200 224" />
-
-      <circle cx="200" cy="270" r="104" fill="url(#fhalo)" />
-      <circle class="f-ring--dash" cx="200" cy="270" r="64" />
-      <circle class="f-ring"       cx="200" cy="270" r="46" />
-      <image class="f-mark" href="assets/img/novus-mark.png"
-             x="171.2" y="241" width="57.6" height="54"
-             preserveAspectRatio="xMidYMid meet" />
-      <text class="f-core-label" x="200" y="358" text-anchor="middle">NOVUS</text>
-
-      <path class="f-line--soft f-flow f-flow--out" d="M200 374 C200 410 130 412 44 428" />
-      <path class="f-line--soft" d="M44 428 L44 622" />
-      <text class="f-col" x="58" y="400">What it can become</text>
-
-      <g class="f-row f-row--open">
-        <circle class="f-dot" cx="44" cy="444" r="3" />
-        <text class="f-opp" x="58" y="448">Seller opportunity</text>
-        <text class="f-act" x="58" y="463" data-actions="Surfaced with its full context|Not just another enquiry">Surfaced with its full context</text>
-      </g>
-      <g class="f-row f-row--good">
-        <circle class="f-dot" cx="44" cy="504" r="3" />
-        <text class="f-opp" x="58" y="508">Valuation conversation</text>
-        <text class="f-act" x="58" y="523" data-actions="Progressed at the right moment|More of them actually happen">Progressed at the right moment</text>
-      </g>
-      <g class="f-row f-row--good">
-        <circle class="f-dot" cx="44" cy="564" r="3" />
-        <text class="f-opp" x="58" y="568">Instruction opportunity</text>
-        <text class="f-act" x="58" y="583" data-actions="More chances to win the listing|Where the real value sits">More chances to win the listing</text>
-      </g>
-      <g class="f-row f-row--open">
-        <circle class="f-dot" cx="44" cy="622" r="3" />
-        <text class="f-opp" x="58" y="626">Commercial insight</text>
-        <text class="f-act" x="58" y="641" data-actions="Where growth is constrained|What consistently converts">Where growth is constrained</text>
-      </g>
-
-      <g class="f-pips"></g>
-    </svg>
   </div>
 </section>
 
-<!-- ═══ 02 · THE COMMERCIAL GAP ══════════════════════════════════════════
-     This chapter is about THEIR business. NOVUS is not named in it, and is
-     not drawn in it. Everything shown here already exists in the agency. -->
-<section class="section section--lg section--dark section--ruled" id="gap">
-  <div class="frame">
-    <div class="head head--centre" data-reveal>
-      <p class="eyebrow reveal-child">The commercial gap</p>
-      <h2 class="reveal-child">You may already have more valuation opportunity than you realise.</h2>
-    </div>
-
-    <div class="gp" data-reveal role="img"
-         aria-label="Diagram: enquiries, past applicants, buyer conversations, old valuations, database contacts and viewing activity all converge into potential seller opportunities.">
-      <p class="gp__k sys reveal-child">Already inside your agency</p>
-
-      <div class="gp__src">
-        <article class="gp__s reveal-child"><b>Enquiries</b><span class="sys">Every week</span></article>
-        <article class="gp__s reveal-child"><b>Past applicants</b><span class="sys">Never revisited</span></article>
-        <article class="gp__s reveal-child"><b>Buyer conversations</b><span class="sys">Seller signals inside</span></article>
-        <article class="gp__s reveal-child"><b>Old valuations</b><span class="sys">Still unlisted</span></article>
-        <article class="gp__s reveal-child"><b>Database contacts</b><span class="sys">Dormant</span></article>
-        <article class="gp__s reveal-child"><b>Viewing activity</b><span class="sys">Ongoing</span></article>
+<section class="section section--lg section--dark section--ruled human" id="gap">
+  <div class="frame human__grid" data-reveal>
+    <div class="human__knows reveal-child">
+      <h2>Imagine a human who knew your whole agency.</h2>
+      <div class="human__history">
+        <p>Every enquiry. Every conversation.</p>
+        <p>Every <span class="meaning">instruction won</span> — or lost.</p>
+        <p>Every old opportunity. Every recent change.</p>
       </div>
-
-      <svg class="gp__fan reveal-child" viewBox="0 0 1200 104" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <path class="gp__v" vector-effect="non-scaling-stroke" d="M100 0  C100 66 600 34 600 104" />
-        <path class="gp__v" vector-effect="non-scaling-stroke" d="M300 0  C300 66 600 34 600 104" />
-        <path class="gp__v" vector-effect="non-scaling-stroke" d="M500 0  C500 66 600 34 600 104" />
-        <path class="gp__v" vector-effect="non-scaling-stroke" d="M700 0  C700 66 600 34 600 104" />
-        <path class="gp__v" vector-effect="non-scaling-stroke" d="M900 0  C900 66 600 34 600 104" />
-        <path class="gp__v" vector-effect="non-scaling-stroke" d="M1100 0 C1100 66 600 34 600 104" />
-      </svg>
-
-      <p class="gp__out reveal-child">Potential seller opportunities</p>
     </div>
-
-    <p class="statement reveal" data-reveal>
-      The problem isn’t always generating more demand.
-      <em>It’s recognising where the valuable opportunities already are.</em>
-    </p>
+    <div class="human__understands reveal-child">
+      <h3>They could <span class="meaning">connect all of it.</span></h3>
+      <p>And understand</p>
+      <ul class="understanding-lines">
+        <li>Why opportunities are <strong>won or lost</strong></li>
+        <li>What consistently <strong class="meaning">produces business</strong></li>
+        <li>Which <strong>patterns</strong> keep repeating</li>
+        <li>Where <strong>value is being left behind</strong></li>
+      </ul>
+    </div>
   </div>
 </section>
 
-<!-- ═══ 03 · CONTEXT REVEALS WHAT MATTERS ════════════════════════════════
-     Four enquiries that look identical at the top of the card and mean
-     completely different things by the bottom of it. The expansion IS the
-     argument, so it is drawn rather than described. -->
-<section class="section section--lg section--ruled" id="context">
+<section class="section section--sm section--dark section--joined intelligence" id="how" aria-labelledby="intelligence-heading">
+  <div class="frame">
+    <h2 id="intelligence-heading" class="sr">Signals across your agency become useful commercial understanding.</h2>
+    <div class="agency-flow" data-flow="gather">
+      <div class="agency-flow__sources"><p class="sys">Across your agency</p><ul class="signal-cloud"><li class="signal"><i aria-hidden="true"></i>Buyer enquiry</li>
+<li class="signal signal--active"><i aria-hidden="true"></i>Seller signal</li>
+<li class="signal"><i aria-hidden="true"></i>Email</li>
+<li class="signal"><i aria-hidden="true"></i>Call</li>
+<li class="signal"><i aria-hidden="true"></i>Valuation</li>
+<li class="signal"><i aria-hidden="true"></i>Lost valuation</li>
+<li class="signal"><i aria-hidden="true"></i>Old contact</li>
+<li class="signal"><i aria-hidden="true"></i>Viewing</li>
+<li class="signal signal--active"><i aria-hidden="true"></i>Price reduction</li>
+<li class="signal"><i aria-hidden="true"></i>Instruction</li>
+<li class="signal"><i aria-hidden="true"></i>Withdrawal</li>
+<li class="signal"><i aria-hidden="true"></i>Follow-up</li>
+<li class="signal signal--active"><i aria-hidden="true"></i>Recent change</li>
+<li class="signal"><i aria-hidden="true"></i>Conversation</li>
+<li class="signal"><i aria-hidden="true"></i>Database activity</li>
+<li class="signal"><i aria-hidden="true"></i>Resurfaced contact</li></ul></div>
+      <svg class="flow-link flow-link--in" viewBox="0 0 80 260" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M0 25 C40 25 40 130 80 130 M0 95 C40 95 40 130 80 130 M0 165 C40 165 40 130 80 130 M0 235 C40 235 40 130 80 130"/></svg>
+      <div class="intelligence-core"><img src="assets/img/novus-mark.png" alt="" width="384" height="360" /><b>NOVUS</b><span>Agency intelligence</span></div>
+      <svg class="flow-link flow-link--out" viewBox="0 0 80 260" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M0 130 H80 M72 124 L80 130 L72 136"/></svg>
+      <div class="agency-flow__outputs"><p class="sys">What NOVUS understands</p><ul>
+        <li>Why business is <span class="meaning">won</span></li>
+        <li>Why business is lost</li>
+        <li>What consistently <span class="meaning">converts</span></li>
+        <li>Repeating patterns</li>
+        <li>Where value is being missed</li>
+      </ul></div>
+    </div>
+    <p class="diagram-caption">The intelligence of the whole agency, brought together.</p>
+  </div>
+</section>
+
+<section class="section section--lg section--ruled applied" id="context">
   <div class="frame">
     <div class="head head--centre" data-reveal>
-      <p class="eyebrow reveal-child">Context</p>
-      <h2 class="reveal-child">The same enquiry can mean very different things.</h2>
-      <p class="reveal-child">
-        An enquiry alone rarely tells the full story. Its value changes when you
-        understand the context around it.
-      </p>
+      <p class="eyebrow reveal-child">Agency intelligence. Applied individually.</p>
+      <h2 class="reveal-child">Then use everything the agency knows on <span class="meaning">every opportunity.</span></h2>
+      <p class="reveal-child">An enquiry shouldn’t have to be understood in isolation.</p>
+      <p class="applied__context reveal-child">NOVUS can assess what is happening now in the context of what has happened before, what is happening elsewhere in the agency, and what has historically produced value.</p>
     </div>
-
-    <div class="sxs" data-reveal data-stagger="110">
-      <article class="sx sx--quiet reveal-child">
-        <p class="sx__k sys">Enquiry received</p>
-        <span class="sx__drop" aria-hidden="true"></span>
-        <ul class="sx__ctx">
-          <li>Buyer enquiry</li>
-          <li>Viewing booked, offer discussed</li>
-          <li>No seller signals</li>
-        </ul>
-        <p class="sx__o">Low priority</p>
+    <div class="applied-map" data-flow="apply" id="picture">
+      <div class="applied-map__core"><div class="intelligence-core"><img src="assets/img/novus-mark.png" alt="" width="384" height="360" /><b>NOVUS</b><span>Agency intelligence</span></div></div>
+      <svg class="applied-map__paths" viewBox="0 0 1200 440" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M600 220 C470 220 460 105 406 105 M414 101 L406 105 L414 109 M600 220 C730 220 740 105 794 105 M786 101 L794 105 L786 109 M600 220 C470 220 460 335 406 335 M414 331 L406 335 L414 339 M600 220 C730 220 740 335 794 335 M786 331 L794 335 L786 339"/></svg>
+      <article class="opportunity-example opportunity-example--now">
+        <p class="sys">New enquiry</p><h3>Seller intent detected</h3><p>High commercial potential.</p><strong>Needs attention now <span aria-hidden="true">↗</span></strong>
       </article>
-
-      <article class="sx sx--opp reveal-child">
-        <p class="sx__k sys">Enquiry received</p>
-        <span class="sx__drop" aria-hidden="true"></span>
-        <ul class="sx__ctx">
-          <li>Buyer enquiry</li>
-          <li>Has a property to sell</li>
-          <li>No valuation conversation yet</li>
-        </ul>
-        <p class="sx__o">High-value opportunity</p>
+      <article class="opportunity-example">
+        <p class="sys">Database contact</p><h3>Previous interest. Recent change.</h3><p>Potentially relevant again.</p><strong>Resurface <span aria-hidden="true">↗</span></strong>
       </article>
-
-      <article class="sx sx--now reveal-child">
-        <p class="sx__k sys">Enquiry received</p>
-        <span class="sx__drop" aria-hidden="true"></span>
-        <ul class="sx__ctx">
-          <li>Valued 14 months ago</li>
-          <li>Active again this week</li>
-          <li>Re-engaged at the right time</li>
-        </ul>
-        <p class="sx__o">Priority follow-up</p>
+      <article class="opportunity-example opportunity-example--quiet">
+        <p class="sys">New enquiry</p><h3>Low commercial relevance</h3><p>No immediate action required.</p><strong>Monitor <span aria-hidden="true">—</span></strong>
       </article>
-
-      <article class="sx sx--quiet reveal-child">
-        <p class="sx__k sys">Enquiry received</p>
-        <span class="sx__drop" aria-hidden="true"></span>
-        <ul class="sx__ctx">
-          <li>Buyer enquiry</li>
-          <li>Viewing already booked</li>
-          <li>Being handled correctly</li>
-        </ul>
-        <p class="sx__o">No action needed</p>
+      <article class="opportunity-example">
+        <p class="sys">Lost valuation</p><h3>Similar cases later converted</h3><p>Potential to re-engage.</p><strong>Review <span aria-hidden="true">↗</span></strong>
       </article>
     </div>
-
-    <p class="statement reveal" data-reveal>
-      The opportunity is in the context.
-    </p>
-
-    <p class="caption reveal" data-reveal>
-      NOVUS identifies which opportunities matter, which need attention now, and
-      <strong>which are already being handled correctly.</strong>
-    </p>
+    <p class="diagram-caption">Illustrative opportunity assessments</p>
+    <p class="statement applied__statement reveal" data-reveal>So every new signal can be understood with <span class="meaning">the intelligence of the whole agency behind it.</span></p>
   </div>
 </section>
 
-<!-- ═══ 04 · PROGRESS ════════════════════════════════════════════════════
-     Finding is worthless without movement. One opportunity descends, the
-     branch opens, exactly one step is selected — and one of the available
-     steps is none, which is what separates this from blanket automation. -->
-<section class="section section--lg section--dark section--ruled" id="progress">
+<section class="section section--ruled section--dark commercial" id="commercial">
   <div class="frame">
-    <div class="head head--centre" data-reveal>
-      <p class="eyebrow reveal-child">Progress</p>
-      <h2 class="reveal-child">Finding opportunity only matters if it gets progressed.</h2>
+    <div class="commercial__head" data-reveal>
+      <div class="head"><p class="eyebrow reveal-child">The commercial effect</p><h2 class="reveal-child">Get more from the demand and team you <span class="meaning">already have.</span></h2></div>
+      <p class="commercial__constant reveal-child">Same agency.<br>Same team.<br>Same existing demand.</p>
     </div>
-
-    <div class="ac" data-seq="act" data-choices="call|task|wait|none" data-reveal>
-      <div class="ac__chain">
-        <article class="ac__step reveal-child">
-          <p class="ac__k sys">Identified</p>
-          <p class="ac__v" data-cycle="Potential seller · property to sell|Dormant vendor · valued last year|Stalled seller conversation|Buyer enquiry · viewing booked">Potential seller · property to sell</p>
-        </article>
-
-        <span class="ac__drop reveal-child" aria-hidden="true"></span>
-
-        <article class="ac__step ac__step--q reveal-child">
-          <p class="ac__v">Best next step?</p>
-        </article>
-      </div>
-
-      <svg class="ac__fan reveal-child" viewBox="0 0 1200 84" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <path class="ac__branch" data-key="call"     vector-effect="non-scaling-stroke" d="M600 0 C600 52 86 32 86 84" />
-        <path class="ac__branch" data-key="task"     vector-effect="non-scaling-stroke" d="M600 0 C600 52 257 32 257 84" />
-        <path class="ac__branch" data-key="email"    vector-effect="non-scaling-stroke" d="M600 0 C600 52 429 32 429 84" />
-        <path class="ac__branch" data-key="sms"      vector-effect="non-scaling-stroke" d="M600 0 L600 84" />
-        <path class="ac__branch" data-key="escalate" vector-effect="non-scaling-stroke" d="M600 0 C600 52 771 32 771 84" />
-        <path class="ac__branch" data-key="wait"     vector-effect="non-scaling-stroke" d="M600 0 C600 52 943 32 943 84" />
-        <path class="ac__branch" data-key="none"     vector-effect="non-scaling-stroke" d="M600 0 C600 52 1114 32 1114 84" />
-      </svg>
-
-      <div class="ac__actions">
-        <span class="ax reveal-child" data-key="call" data-default>Call</span>
-        <span class="ax reveal-child" data-key="task">Human task</span>
-        <span class="ax reveal-child" data-key="email">Email</span>
-        <span class="ax reveal-child" data-key="sms">SMS</span>
-        <span class="ax reveal-child" data-key="escalate">Escalate</span>
-        <span class="ax reveal-child" data-key="wait">Wait</span>
-        <span class="ax reveal-child" data-key="none">No action</span>
-      </div>
-
-      <!-- Whichever step was right, this is what it was for. The gather is the
-           mirror of the fan above it, so the destination reads as the shared
-           outcome rather than as the continuation of one branch. -->
-      <svg class="ac__gather reveal-child" viewBox="0 0 1200 84" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <path class="ac__g" vector-effect="non-scaling-stroke" d="M86 0   C86 52 600 32 600 84" />
-        <path class="ac__g" vector-effect="non-scaling-stroke" d="M257 0  C257 52 600 32 600 84" />
-        <path class="ac__g" vector-effect="non-scaling-stroke" d="M429 0  C429 52 600 32 600 84" />
-        <path class="ac__g" vector-effect="non-scaling-stroke" d="M600 0  L600 84" />
-        <path class="ac__g" vector-effect="non-scaling-stroke" d="M771 0  C771 52 600 32 600 84" />
-        <path class="ac__g" vector-effect="non-scaling-stroke" d="M943 0  C943 52 600 32 600 84" />
-        <path class="ac__g" vector-effect="non-scaling-stroke" d="M1114 0 C1114 52 600 32 600 84" />
-      </svg>
-
-      <span class="ac__spine reveal-child" aria-hidden="true"></span>
-
-      <p class="ac__dest reveal-child">Valuation conversation</p>
-    </div>
-
-    <p class="caption reveal" data-reveal>
-      Sometimes NOVUS acts. Sometimes your team does.
-      <strong>Sometimes the right decision is to wait.</strong>
-    </p>
-
-    <p class="statement reveal" data-reveal>
-      Move more worthwhile opportunities toward valuations.
-    </p>
-  </div>
-</section>
-
-<!-- ═══ 05 · THE WIDER BUSINESS PICTURE ══════════════════════════════════
-     Applied across enough interactions, the same reading of context becomes
-     a map of where the agency's growth is actually being constrained. -->
-<section class="section section--lg section--ruled" id="picture">
-  <div class="frame">
-    <div class="head head--centre" data-reveal>
-      <p class="eyebrow reveal-child">The wider picture</p>
-      <h2 class="reveal-child">The wider picture starts to become clear.</h2>
-    </div>
-
-    <div class="ln" data-reveal>
-      <div class="runs">
-        <p class="runs__hd sys reveal-child">Across enough interactions</p>
-        <ol>
-          <li class="run run--good reveal-child">
-            <span class="run__o">Where opportunity is created</span>
-            <span class="run__r">Buyer conversations</span>
-          </li>
-          <li class="run run--open reveal-child">
-            <span class="run__o">Where it stalls</span>
-            <span class="run__r">After the first contact</span>
-          </li>
-          <li class="run run--miss reveal-child">
-            <span class="run__o">Where it gets lost</span>
-            <span class="run__r">Dormant vendors</span>
-          </li>
-          <li class="run run--good reveal-child">
-            <span class="run__o">What tends to convert</span>
-            <span class="run__r">Seller signals, progressed early</span>
-          </li>
-        </ol>
-      </div>
-
-      <svg class="ln__collect" viewBox="0 0 140 400" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <path class="ln__c" vector-effect="non-scaling-stroke" d="M0 60  C70 60  70 200 136 200" />
-        <path class="ln__c" vector-effect="non-scaling-stroke" d="M0 153 C70 153 70 200 136 200" />
-        <path class="ln__c" vector-effect="non-scaling-stroke" d="M0 247 C70 247 70 200 136 200" />
-        <path class="ln__c" vector-effect="non-scaling-stroke" d="M0 340 C70 340 70 200 136 200" />
-      </svg>
-
-      <div class="insights">
-        <article class="ins ins--priority reveal-child">
-          <p class="ins__k">Clearer growth priorities</p>
-          <p class="ins__t">Which part of the commercial process is limiting more valuations</p>
-          <p class="ins__m">and where improving it is most likely to matter</p>
-        </article>
-        <article class="ins ins--pattern reveal-child">
-          <p class="ins__k">More predictable growth</p>
-          <p class="ins__t">Improvements made where they change the outcome</p>
-          <p class="ins__m"><span class="ins__up" aria-hidden="true">↑</span> rather than everywhere at once</p>
-        </article>
-      </div>
-    </div>
-
-    <p class="chain compound reveal" data-reveal>
-      <span>Where value is created</span><i aria-hidden="true">→</i>
-      <span>Where it stalls</span><i aria-hidden="true">→</i>
-      <span>Where it is lost</span><i aria-hidden="true">→</i>
-      <span class="on">Clearer growth priorities</span>
-    </p>
-  </div>
-</section>
-
-<!-- ═══ 06 · HOW NOVUS GETS YOU THERE ════════════════════════════════════
-     The methodology, stated once and compactly. It exists to support belief
-     in everything above it — it is not the subject of the page. -->
-<section class="section section--dark section--ruled" id="how">
-  <div class="frame">
-    <div class="head head--centre" data-reveal>
-      <p class="eyebrow reveal-child">The mechanism</p>
-      <h2 class="reveal-child">How NOVUS gets you there.</h2>
-    </div>
-
-    <ol class="method" data-reveal data-stagger="110">
-      <li class="method__s reveal-child">
-        <em>01</em>
-        <b>Understand</b>
-        <span>Build the full commercial context.</span>
-      </li>
-      <li class="method__s reveal-child">
-        <em>02</em>
-        <b>Prioritise</b>
-        <span>Identify what matters most.</span>
-      </li>
-      <li class="method__s reveal-child">
-        <em>03</em>
-        <b>Progress</b>
-        <span>Take the right next action.</span>
-      </li>
-      <li class="method__s reveal-child">
-        <em>04</em>
-        <b>Learn</b>
-        <span>See what consistently produces results.</span>
-      </li>
+    <ol class="commercial-effects" data-reveal data-stagger="90">
+      <li class="reveal-child"><span class="effect-number">01</span><h3>Fewer valuable opportunities missed</h3><p>The important things are less likely to disappear amongst everything else happening inside the agency.</p></li>
+      <li class="reveal-child"><span class="effect-number">02</span><h3>Less time wasted on the wrong things</h3><p>Not every enquiry deserves equal attention.</p></li>
+      <li class="reveal-child"><span class="effect-number">03</span><h3>More of the <span class="meaning">right conversations</span></h3><p>Your team can spend more time on the people and situations with genuine commercial potential.</p></li>
+      <li class="reveal-child"><span class="effect-number">04</span><h3>More opportunity from existing demand</h3><p>More of what already comes through the agency gets the chance to become <span class="meaning">valuations, instructions and fee income.</span></p></li>
     </ol>
   </div>
 </section>
 
-<!-- ═══ 07 · THE FOUNDING PILOT ══════════════════════════════════════════
-     One offer, one price, one commercial question. -->
+<section class="section section--lg section--ruled delegation" id="agency">
+  <div class="frame">
+    <div class="delegation__intro" data-reveal>
+      <div class="head"><p class="eyebrow reveal-child">Intelligence before automation</p><h2 class="reveal-child">And not every next step needs a person.</h2></div>
+      <div class="copy reveal-child"><p>Some actions require judgement, relationships and a real conversation.</p><p>Others are repetitive, predictable and can be handled by a system that <strong class="meaning">already understands the context.</strong></p><p>NOVUS can take care of those actions itself — while your team focuses <strong>where people create the most value.</strong></p></div>
+    </div>
+    <div class="work-split" data-reveal data-stagger="120">
+      <div class="work-split__novus reveal-child"><h3>NOVUS</h3><ul><li>Routine follow-up</li><li>Reminders</li><li>Resurfacing old opportunities</li><li>Simple routing</li><li>Timing-based contact</li><li>Repetitive progression</li></ul></div>
+      <div class="work-split__team reveal-child"><h3>Your team</h3><ul><li>Important conversations</li><li>Valuations</li><li>Negotiation</li><li>Relationships</li><li>Complex situations</li><li>Winning instructions</li></ul></div>
+    </div>
+    <p class="statement delegation__statement reveal" data-reveal>Machines handle the <span class="meaning">repeatable work.</span><br>People spend their time where people matter.</p>
+  </div>
+</section>
+
+<section class="section section--ruled section--dark learning" id="learning">
+  <div class="frame learning__grid">
+    <div class="head" data-reveal><h2 class="reveal-child">And every outcome adds to what NOVUS knows.</h2><p class="reveal-child">A valuation gets booked. An opportunity goes cold. A certain type of contact responds. Another doesn’t.</p><p class="learning__copy reveal-child">Every outcome adds context to what NOVUS understands about your agency — helping future opportunities be recognised, prioritised and progressed with more information behind them.</p><p class="learning__promise reveal-child">Your agency’s own history becomes <span class="meaning">useful intelligence.</span></p></div>
+    <div class="learning-orbit" data-flow="learn" role="img" aria-label="Signal, understand, action, outcome, agency intelligence — feeding back to help understand the next signal.">
+      <svg viewBox="0 0 400 400" aria-hidden="true"><circle class="orbit-track" cx="200" cy="200" r="153"/><circle class="orbit-flow" pathLength="1" cx="200" cy="200" r="153"/><g class="orbit-arrows" stroke="var(--blue-dim)"><path transform="rotate(36 200 200)" d="M357 194 L353 200 L347 197"/><path transform="rotate(108 200 200)" d="M357 194 L353 200 L347 197"/><path transform="rotate(180 200 200)" d="M357 194 L353 200 L347 197"/><path transform="rotate(252 200 200)" d="M357 194 L353 200 L347 197"/><path transform="rotate(324 200 200)" d="M357 194 L353 200 L347 197"/></g></svg>
+      <span class="orbit-label orbit-label--1">Signal</span><span class="orbit-label orbit-label--2">Understand</span><span class="orbit-label orbit-label--3">Action</span><span class="orbit-label orbit-label--4">Outcome</span><span class="orbit-label orbit-label--5">Agency<br>intelligence</span>
+      <div class="orbit-core"><img src="assets/img/novus-mark.png" alt="" width="384" height="360" /><b>NOVUS</b></div>
+    </div>
+  </div>
+</section>
+
 <section class="section section--lg section--ruled" id="pilot">
   <div class="frame">
-    <div class="head head--centre" data-reveal>
-      <p class="eyebrow reveal-child">The founding offer</p>
-      <h2 class="reveal-child">Prove how much more opportunity exists inside the demand you already have.</h2>
-    </div>
-
+    <div class="head head--centre" data-reveal><p class="eyebrow reveal-child">The Founding Agency Pilot</p><h2 class="reveal-child">60 days to prove NOVUS <span class="meaning">creates commercial value.</span></h2><p class="reveal-child">We agree what success looks like upfront. Then we give NOVUS 60 days to prove it.</p></div>
     <div class="pilot panel" data-reveal>
-      <div class="pilot__bar reveal-child">
-        <p class="pilot__name">60-day Founding Agency Pilot</p>
-        <span class="chip chip--novus"><span class="dot pulse"></span>Limited cohort</span>
-      </div>
+      <ol class="pilot__stages">
+        <li class="reveal-child"><span class="sys">01 / Connect</span><p>Connect NOVUS around the relevant existing systems, data and processes.</p></li>
+        <li class="reveal-child"><span class="sys">02 / Run</span><p>Let NOVUS identify, prioritise and progress commercial opportunities.</p></li>
+        <li class="reveal-child"><span class="sys">03 / Measure</span><p>Track what progresses into conversations, valuations, instructions and ultimately fee income.</p></li>
+      </ol>
+      <p class="chain pilot__chain reveal-child"><span>Opportunity</span><i aria-hidden="true">→</i><span>Conversation</span><i aria-hidden="true">→</i><span>Valuation</span><i aria-hidden="true">→</i><span>Instruction</span><i aria-hidden="true">→</i><span>Fee value</span></p>
+      <div class="pilot__foot reveal-child"><p class="pilot__outcome"><span>Success agreed upfront</span><i aria-hidden="true">·</i><span>No long-term commitment</span></p><a class="btn btn--primary" href="https://calendly.com/joe-getnovus/10min" target="_blank" rel="noopener noreferrer">Apply for the Founding Agency Pilot <span class="arw" aria-hidden="true">→</span></a></div>
+    </div>
+  </div>
+</section>
 
-      <div class="pilot__price reveal-child">
-        <p class="pilot__fig"><b>£1,500</b><span>60 days</span></p>
-        <p class="pilot__figNote">
-          We aim to have NOVUS operational within around 14 days.
-        </p>
-        <p class="pilot__off">Pricing for the founding cohort is agreed per agency.</p>
+<section class="section section--ruled faq" id="faq" aria-labelledby="faq-heading">
+  <div class="frame">
+    <div class="faq__inner">
+      <div class="head head--centre" data-reveal>
+        <p class="eyebrow reveal-child">FAQ</p>
+        <h2 class="reveal-child" id="faq-heading">Questions you might have.</h2>
       </div>
-
-      <div class="pilot__q reveal-child">
-        <p class="sys">Then the pilot answers one question</p>
-        <p class="pilot__qt">
-          Can your agency create more valuation opportunity from the demand it
-          already has?
-        </p>
-      </div>
-
-      <div class="pilot__foot reveal-child">
-        <p class="pilot__outcome">
-          <span>Success agreed upfront</span><i aria-hidden="true">·</i><span>No long-term commitment</span>
-        </p>
-        <a class="btn btn--primary" href="https://calendly.com/joe-getnovus/10min" target="_blank" rel="noopener noreferrer">Book a conversation <span class="arw" aria-hidden="true">→</span></a>
+      <div class="faq__rows">
+      <details class="faq__item">
+        <summary><span>How much does NOVUS cost?</span><span class="faq__icon" aria-hidden="true"></span></summary>
+        <div class="faq__answer"><p>We’re currently running a fixed-price 60-day Founding Agency Pilot with a small group of agencies. Ongoing pricing is agreed after the pilot, based on the commercial value NOVUS has actually created for your agency — rather than setting an arbitrary monthly fee before we have the evidence.</p></div>
+      </details>
+      <details class="faq__item">
+        <summary><span>What happens after the 60-day pilot?</span><span class="faq__icon" aria-hidden="true"></span></summary>
+        <div class="faq__answer"><p>We review the commercial impact NOVUS has created — opportunities progressed, valuations generated, instructions won and attributable fee value. That gives us a real basis for agreeing an ongoing price that makes sense relative to the value NOVUS is creating.</p></div>
+      </details>
+      <details class="faq__item">
+        <summary><span>Does NOVUS replace our CRM or existing systems?</span><span class="faq__icon" aria-hidden="true"></span></summary>
+        <div class="faq__answer"><p>No. NOVUS works around your existing systems rather than replacing them. It uses the information already flowing through the agency to understand what matters, where attention should go and what should happen next.</p></div>
+      </details>
+      <details class="faq__item">
+        <summary><span>Does NOVUS automatically contact every lead?</span><span class="faq__icon" aria-hidden="true"></span></summary>
+        <div class="faq__answer"><p>No. Not every enquiry deserves the same action. NOVUS can prioritise, recommend, wait, route something to your team or handle an appropriate repetitive action itself depending on the context.</p></div>
+      </details>
+      <details class="faq__item">
+        <summary><span>How much work does NOVUS create for our team?</span><span class="faq__icon" aria-hidden="true"></span></summary>
+        <div class="faq__answer"><p>The goal is the opposite. NOVUS should reduce the amount of manual interpretation and repetitive progression your team has to do, while directing their attention towards the opportunities where human involvement creates the most value.</p></div>
+      </details>
+      <details class="faq__item">
+        <summary><span>How do we measure the commercial impact?</span><span class="faq__icon" aria-hidden="true"></span></summary>
+        <div class="faq__answer"><p>We agree what success looks like before the pilot starts, then track commercial progression through opportunities, conversations, valuations, instructions and ultimately fee income.</p></div>
+      </details>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══ 08 · CLOSE ═══════════════════════════════════════════════════════ -->
-<section class="section section--sm section--ruled" id="contact">
-  <div class="frame frame--narrow">
-    <div class="final" data-reveal data-stagger="100">
-      <h2 class="reveal-child">
-        You may not need more demand.
-        <span class="soft">You may need to get more from what you already have.</span>
-      </h2>
-
-      <ul class="final__lines">
-        <li class="reveal-child">More valuation conversations.</li>
-        <li class="reveal-child">More chances to win instructions.</li>
-        <li class="reveal-child">More value from the demand you already generate.</li>
-      </ul>
-
-      <div class="final__actions reveal-child">
-        <a class="btn btn--primary" href="https://calendly.com/joe-getnovus/10min" target="_blank" rel="noopener noreferrer">
-          Book a conversation <span class="arw" aria-hidden="true">→</span>
-        </a>
-        <a class="final__mail" href="mailto:joe@getnovus.co.uk">joe@getnovus.co.uk</a>
-      </div>
-    </div>
-  </div>
+<section class="section section--lg section--ruled close" id="contact">
+  <svg class="ambient-network" viewBox="0 0 1400 620" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"><g><path d="M70 470 L200 365 L330 445 L470 390 M1060 150 L1210 230 L1330 130 M1120 490 L1240 425 L1380 500 M40 170 L170 100 L270 185"/><circle cx="70" cy="470" r="3"/><circle cx="200" cy="365" r="3"/><circle cx="330" cy="445" r="3"/><circle cx="470" cy="390" r="2"/><circle cx="1060" cy="150" r="2"/><circle cx="1210" cy="230" r="3"/><circle cx="1330" cy="130" r="2"/><circle cx="1120" cy="490" r="3"/><circle cx="1240" cy="425" r="3"/><circle cx="1380" cy="500" r="2"/><circle cx="40" cy="170" r="2"/><circle cx="170" cy="100" r="3"/><circle cx="270" cy="185" r="2"/></g></svg>
+  <div class="frame frame--narrow"><div class="final" data-reveal><h2 class="reveal-child">There may already be more value inside the demand you have.</h2><p class="final__promise reveal-child">Give NOVUS 60 days to find out.</p><div class="final__actions reveal-child"><a class="btn btn--primary" href="https://calendly.com/joe-getnovus/10min" target="_blank" rel="noopener noreferrer">Book a conversation <span class="arw" aria-hidden="true">→</span></a></div></div></div>
 </section>
-
 </main>
 
 <!-- ═══ FOOTER ═══════════════════════════════════════════════════════════ -->
@@ -621,7 +292,7 @@
         <h5>Product</h5>
         <ul>
           <li><a href="#gap">The opportunity</a></li>
-          <li><a href="#context">Context</a></li>
+          <li><a href="#context">Applied intelligence</a></li>
           <li><a href="#how">How it works</a></li>
           <li><a href="#pilot">Founding pilot</a></li>
         </ul>
@@ -646,7 +317,7 @@
 
     <div class="ftr__base">
       <span>© NOVUS 2026</span>
-      <span class="sys">Understand · Prioritise · Progress · Learn</span>
+      <span class="sys">Connect · Action · Learn</span>
     </div>
   </div>
 </footer>

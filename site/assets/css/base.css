@@ -108,6 +108,4 @@ strong{ font-weight:600; color:var(--ink); }
     scroll-behavior:auto !important;
   }
   .reveal,.reveal-child{ opacity:1 !important; transform:none !important; }
-  .f-act{ opacity:1 !important; }
-  .conf u::after{ transform:scaleX(1) !important; }
 }
