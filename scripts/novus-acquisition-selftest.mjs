@@ -374,6 +374,92 @@ console.log('\nManual action queue semantics (Needs your attention)');
     assert.equal(lead.current_stage, 'PREPARING_OUTREACH');
     assert.match(lead.current_stage_reason, /contact resolution/);
   });
+
+  // SORT LEADS: LEAD_POOL housekeeping, never a commercial exception. A
+  // missing named contact is explicitly NOT a reason to block a lead —
+  // isProbeQueueEligible only ever checks the outreach email, never a name —
+  // and a genuinely blocked lead (no usable email, no eligible probe path)
+  // must go to Sort leads, not the manual sales Reviews queue.
+  check('a generic contact with no name at all still proceeds to READY_TO_PROBE', () => {
+    assert.equal(stage(base({ agency: {
+      agency_id: 'ag_generic', agency_name: 'Generic Only', rightmove_sales_branch_url: 'https://rightmove.test/generic',
+      outreach_contact_name: '', outreach_contact_email: 'info@generic-agency.test', email_verification_status: 'VALID',
+    } })), 'READY_TO_PROBE');
+  });
+  check('a named, verified contact proceeds identically to a generic one', () => {
+    assert.equal(stage(base({ agency: {
+      agency_id: 'ag_named', agency_name: 'Named Contact', rightmove_sales_branch_url: 'https://rightmove.test/named',
+      outreach_contact_name: 'Jane Doe', outreach_contact_email: 'jane@named-agency.test', email_verification_status: 'VALID',
+    } })), 'READY_TO_PROBE');
+  });
+  check('a lead with no usable outreach email at all derives SORT_LEAD, not RESOLVE_EXCEPTION', () => {
+    const blockedEvidence = base({ agency: {
+      agency_id: 'ag_blocked', agency_name: 'No Email Agency', rightmove_sales_branch_url: 'https://rightmove.test/blocked',
+      outreach_contact_name: '', outreach_contact_email: '', email_verification_status: '',
+    } });
+    const resolved = resolveLifecycleStage(blockedEvidence);
+    blockedEvidence.stage = resolved.stage;
+    blockedEvidence.stageReason = resolved.reason;
+    assert.equal(blockedEvidence.stage, 'LEAD_POOL');
+    assert.match(blockedEvidence.stageReason, /no outreach email/);
+    const [action] = deriveExpectedActions(blockedEvidence, NOW);
+    assert.equal(action.action_type, 'SORT_LEAD');
+    assert.equal(actionQueue(action), 'SORT');
+    assert.equal(isManualSalesAction(action), false);
+  });
+  {
+    const sortHeader = ['agency_id', 'agency_name', 'rightmove_sales_branch_url', 'probe_sent', 'outreach_contact_name', 'outreach_contact_email', 'email_verification_status'];
+    const sortTables = {
+      AGENCIES: { header: sortHeader, rows: [
+        // No email resolved yet at all — the largest real-world bucket.
+        ['ag_sort_noemail', 'No Email Agency', 'https://rightmove.test/sort1', '', '', '', ''],
+        // A resolved GENERIC email that only verified RISKY — still genuinely
+        // blocked under the existing VALID-only deliverability gate, and still
+        // must never be presented as a name problem.
+        ['ag_sort_risky', 'Risky Generic Agency', 'https://rightmove.test/sort2', '', '', 'sales@sort2.test', 'RISKY'],
+        // A genuine live-conversation exception, untouched by this change.
+        ['ag_reply_sort', 'Genuine Reply Agency', 'https://rightmove.test/sort3', 'YES', '', 'reply2@example.test', 'VALID'],
+      ] },
+      PROBES: { header: ['probe_id', 'agency_id', 'probe_status', 'observation_deadline'], rows: [] },
+      INTELLIGENCE: { header: ['intelligence_id', 'probe_id'], rows: [] },
+      PERSONALISATION: { header: ['probe_id', 'agency_id'], rows: [] },
+      DEMOS: { header: ['demo_id', 'agency_id', 'probe_id'], rows: [] },
+      OUTBOUND: { header: ['outbound_id', 'agency_id', 'probe_id'], rows: [] },
+      REPLY_EVENTS: { header: ['reply_event_id', 'agency_id', 'classification', 'received_at'], rows: [
+        ['r_sort', 'ag_reply_sort', 'QUESTION', hoursAgo(1)],
+      ] },
+      SALES_MESSAGES: { header: [], rows: [] },
+      ACTIONS: { header: [], rows: [] },
+    };
+    const board = buildAcquisitionDashboard(sortTables, { now: NOW, actionsAvailable: false });
+    const sortLead = (id) => board.leads.find((row) => row.agency_id === id);
+    check('Sort leads carry SORT_LEAD/needs_sort and are excluded from needs_human', () => {
+      for (const id of ['ag_sort_noemail', 'ag_sort_risky']) {
+        assert.equal(sortLead(id).current_stage, 'LEAD_POOL');
+        assert.equal(sortLead(id).next_action.type, 'SORT_LEAD');
+        assert.equal(sortLead(id).action_queue, 'SORT');
+        assert.equal(sortLead(id).needs_human, false);
+        assert.equal(sortLead(id).needs_sort, true);
+      }
+    });
+    check('Sort leads never invent a fallback/default contact name', () => {
+      assert.equal(sortLead('ag_sort_noemail').contact.name, '');
+      assert.equal(sortLead('ag_sort_risky').contact.name, '');
+    });
+    check('Sort leads are excluded from needs_attention (the sidebar Actions badge/All source) and get their own count', () => {
+      assert.equal(board.counts.needs_attention, 1);
+      assert.equal(board.counts.sort_leads, 2);
+      // The exact predicate the operator UI's dueActions()/manualActions() and
+      // sidebar badge use — proving Sort leads cannot leak into either.
+      assert.equal(board.leads.filter((l) => l.needs_human).length, 1);
+      assert.equal(board.leads.filter((l) => l.needs_sort).length, 2);
+    });
+    check('a genuine reply exception is untouched: still needs_human, still HUMAN_REPLY', () => {
+      assert.equal(sortLead('ag_reply_sort').needs_human, true);
+      assert.equal(sortLead('ag_reply_sort').needs_sort, false);
+      assert.equal(sortLead('ag_reply_sort').next_action.type, 'HUMAN_REPLY');
+    });
+  }
 }
 
 console.log('\nAPI security and read shape');
