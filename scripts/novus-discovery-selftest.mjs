@@ -619,12 +619,18 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   ok('Louis: 2–3 intervention groups (problem / change / effect / preserve / conditions), four adapted phases with expandable detail, £1,500 pilot with scope, success criteria, review and a short pricing script');
 
   // The presentation payload carries nothing internal.
-  assert.equal(p.screens.length, 6); assert.deepEqual(p.screens.map((x) => x.id), ['today', 'established', 'opportunity', 'help', 'deployment', 'pilot']);
+  assert.equal(p.screens.length, 7); assert.deepEqual(p.screens.map((x) => x.id), ['today', 'established', 'opportunity', 'help', 'needs', 'deployment', 'pilot']);
+  assert.ok(p.screens[3].cards.length >= 2 && p.screens[3].cards.length <= 3, 'at most three solution cards');
+  for (const card of p.screens[3].cards) { assert.ok(card.heading.length < 45); assert.match(card.sentence, /^We'd .+\.$/); assert.equal(card.sentence.split(/(?<=[.!?])\s+/).length, 1, 'one sentence'); }
+  assert.match(p.screens[3].cards[0].sentence, /read every incoming enquiry/);
+  assert.equal(p.screens[4].cards.length, 3); assert.equal(p.screens[4].cards[0].heading, 'Access to the relevant systems & information');
+  assert.match(p.screens[4].cards[2].sentence, /records what they hear about selling/, 'third card adapted because capture (F1) is in scope');
+  assert.equal(p.screens[5].title, 'Your first 60 days');
   assert.deepEqual(leak(p), [], `presentation leaks: ${leak(p).join(', ')}`);
   assert.ok(!JSON.stringify(p).includes(c.pilot.pricing_script), 'the pricing script is not on a client screen');
   assert.equal(p.screens[1].findings.length, 3, 'before any agreement every finding is presentable');
   assert.equal(p.screens[2].per_valuation, '£1,350'); assert.equal(p.screens[2].rows[1].monthly, '£2,700'); assert.equal(p.screens[2].rows[1].annual, '£32,400');
-  assert.equal(p.screens[5].price, '£1,500');
+  assert.equal(p.screens[6].price, '£1,500');
   ok('presentation payload: six screens, no rule ids, evidence codes, notes, scripts or controls; economics and price as figures');
 }
 {
@@ -672,7 +678,8 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   assert.ok(c.changes.groups.find((g) => g.id === 'opportunities').preserve.length >= 1, 'reused foundations named as preserved');
   assert.equal(c.deployment.phases[0].heading, 'Scope, access and reuse of what already works');
   assert.match(c.deployment.phases[0].summary, /stays as it is and NOVUS plugs into it/);
-  assert.ok(p.screens[3].preserved.length === 5 && /What already works stays as it is/.test(p.screens[3].foundations_note) === false);
+  assert.ok(p.screens[3].preserved.length === 5 && p.screens[3].cards.every((x) => !/capture|record/.test(x.heading)));
+  assert.match(p.screens[4].cards[2].sentence, /^Your team contacts the relevant customers and records the outcomes/, 'no capture work → the plain third card');
   assert.deepEqual(leak(p), []);
   ok('strong-foundation agency: findings and changes on the intelligence side only, all five foundations preserved and reused, week 1 says so');
 
@@ -685,8 +692,8 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   assert.ok(inc.c.understanding.findings.every((f) => /I think/.test(f.statement)), 'everything hedged');
   assert.ok(inc.c.understanding.unknown.length >= 5);
   assert.equal(inc.c.pilot.proposed, false); assert.equal(inc.c.pilot.pricing_script, ''); assert.match(inc.c.next_step, /^I'm not going to put a pilot to you today/); assert.ok(!/\b[FI][1-5]\b|do not pitch/i.test(inc.c.next_step), 'owner-facing, not the internal recommendation');
-  assert.equal(inc.p.screens[2].available, false); assert.equal(inc.p.screens[5].proposed, false); assert.ok(inc.p.screens[5].next_step);
-  assert.ok(!inc.p.screens[5].scope.length || true);
+  assert.equal(inc.p.screens[2].available, false); assert.equal(inc.p.screens[6].proposed, false); assert.ok(inc.p.screens[6].next_step);
+  
   assert.deepEqual(leak(inc.p), []);
   const empty = conclude({ ...louisSession, answers: {} });
   assert.equal(empty.c.understanding.findings.length, 0); assert.equal(empty.c.mode, 'VALIDATION'); assert.equal(empty.p.screens[1].findings.length, 0);
@@ -703,7 +710,7 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   const unsureG = unsure.c.changes.groups.find((g) => g.id === 'opportunities');
   assert.ok(unsureG.conditions.some((x) => x.kind === 'assess' && /CRM/.test(x.text)), 'CRM access appears as a condition');
   assert.notEqual(unsureG.status, 'FEASIBLE');
-  assert.ok(unsure.p.screens[3].groups.find((g) => g.title === 'Opportunities go unfound').subject_to.length === 1, 'one "to confirm first" line reaches the client, no code');
+  assert.ok(unsure.p.screens[3].cards.some((g) => /read every incoming enquiry/.test(g.sentence)), 'the feasible change leads the card');
   assert.deepEqual(leak(unsure.p), []);
   ok('technical blockers: a blocked CRM keeps the finding but drops the infeasible changes from the proposal and scope; an unsure CRM becomes a stated feasibility condition on the change and one plain line on the client screen');
 
@@ -711,7 +718,7 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   const nf = conclude({ ...louisSession, answers: { ...COMMERCIAL, ...ALL_STRONG_F, ...ALL_STRONG_I } });
   assert.equal(nf.c.mode, 'NO_PITCH'); assert.equal(nf.c.understanding.findings.length, 0); assert.equal(nf.c.changes.groups.length, 0); assert.equal(nf.c.pilot.proposed, false);
   assert.match(nf.c.next_step, /^I'll be straight with you: from what you've told me you already have most of what we'd put in/); assert.ok(!/do not pitch|say so plainly/i.test(nf.c.next_step), 'owner-facing, not the internal recommendation');
-  assert.equal(nf.p.screens[3].groups.length, 0); assert.ok(nf.p.screens[3].next_step); assert.equal(nf.p.screens[4].proposed, false); assert.equal(nf.p.screens[5].subtitle, 'Not today');
+  assert.equal(nf.p.screens[3].cards.length, 0); assert.ok(nf.p.screens[3].next_step); assert.equal(nf.p.screens[5].proposed, false); assert.equal(nf.p.screens[6].subtitle, 'Not today');
   const small = conclude({ ...louisSession, answers: { ...ALL_WEAK, C4: a(12), C5: a(150) } });
   assert.equal(small.c.mode, 'NO_PITCH'); assert.ok(small.c.understanding.findings.length >= 2, 'the problems are still reflected honestly'); assert.equal(small.c.pilot.proposed, false);
   assert.match(small.c.next_step, /wouldn't have enough to work with/); assert.match(small.c.next_step, /12 a month, 150 contacts/);
@@ -910,7 +917,7 @@ console.log('\n7. Conclusion handlers, persistence and an older tab header');
   assert.equal(r.statusCode, 200); assert.ok(r.body.conclusion && r.body.presentation, 'autosave returns the conclusion and the presentation');
   assert.equal(r.body.conclusion.understanding.findings.length, 3);
   r = res(); await handleDiscoverySession(req('GET', { session_id: sid }), r);
-  assert.equal(r.body.conclusion.mode, 'PILOT'); assert.equal(r.body.presentation.screens.length, 6); assert.ok(r.body.registry.conclusion_steps.length === 5);
+  assert.equal(r.body.conclusion.mode, 'PILOT'); assert.equal(r.body.presentation.screens.length, 7); assert.ok(r.body.registry.conclusion_steps.length === 5);
   assert.equal(store.DISCOVERY_SESSIONS[0].length, oldHeader.length, 'nothing extended yet — no conclusion has been written');
   ok('older tab header: still available, session read and autosave carry the deterministic conclusion and the presentation payload');
 

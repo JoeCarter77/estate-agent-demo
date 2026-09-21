@@ -210,6 +210,7 @@
     .pres-sub{font-size:1.5cqw;color:rgba(241,237,230,.62);margin-top:1.2cqh;max-width:70cqw;line-height:1.35;}
     .pres-body{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;margin-top:2.5cqh;}
     .pres-body.top{justify-content:flex-start;overflow:hidden;}
+    .pres-card.simple{padding:3.2cqh 2.2cqw;gap:1.6cqh;} .pres-card.simple .h{font-size:2.1cqw;} .pres-card.simple p{font-size:1.45cqw;line-height:1.5;}
     .pres-cols.dense .pres-card ul{font-size:1.05cqw;} .pres-cols.dense .pres-card{padding:1.8cqh 1.5cqw;}
     .pres-price{margin-top:.5cqh;}
     .pres-facts{display:grid;grid-template-columns:repeat(3,1fr);gap:1.4cqw;}
@@ -1220,7 +1221,7 @@ function cStepPilot(c){
 }
 
 /* ═══ PRESENTATION MODE ═════════════════════════════════════════════════
-   Six client-facing screens from S.presentation (the server strips every
+   Seven client-facing screens from S.presentation (the server strips every
    internal id, code, note and control). Arrow keys / click edges to move,
    Esc to exit, F for the Fullscreen API (edge-to-edge fallback if it is
    unavailable). The slide index survives switching between the internal
@@ -1272,8 +1273,9 @@ function presSlideHtml(sc, i){
         <div class="out"><div class="o"><div class="v">${esc(row.monthly)}</div><div class="l">a month</div></div><div class="o"><div class="v">${esc(row.annual)}</div><div class="l">a year, if sustained</div></div></div></div>
       <div class="pres-note">${esc(sc.label)}. ${esc(sc.footnote)}</div></div>`;
   }
-  if(sc.id === 'help') return `${head(sc.subtitle)}<div class="pres-body top">${sc.groups.length ? `<div class="pres-cols" style="--n:${sc.groups.length}">${sc.groups.map((g) => `<div class="pres-card"><div class="h">${esc(g.title)}</div><div class="k">Today</div><ul>${g.problem_points.map((x) => `<li>${esc(x)}</li>`).join('')}</ul><div class="k">What changes</div><ul>${g.change_points.map((x) => `<li>${esc(x)}</li>`).join('')}</ul><div class="k">What that means</div><p>${esc(g.effect)}</p>${g.preserve.length ? `<div class="k">Stays as it is</div><p>${esc(g.preserve.join(', '))}</p>` : ''}${g.subject_to.length ? `<div class="k">To confirm first</div><p>${esc(g.subject_to.join('. '))}</p>` : ''}</div>`).join('')}</div>` : `<div class="pres-next">${esc(sc.next_step)}</div>`}
-      ${sc.preserved.length || sc.foundations_note ? `<div class="pres-note">${esc(sc.foundations_note)}${sc.preserved.length ? ` What already works stays as it is: ${esc(sc.preserved.join(', ').toLowerCase())}.` : ''}</div>` : ''}</div>`;
+  if(sc.id === 'help') return `${head(sc.subtitle)}<div class="pres-body">${sc.cards.length ? `<div class="pres-cols" style="--n:${sc.cards.length}">${sc.cards.map((g, k) => `<div class="pres-card simple"><div class="num">0${k+1}</div><div class="h">${esc(g.heading)}</div><p>${esc(g.sentence)}</p></div>`).join('')}</div>` : `<div class="pres-next">${esc(sc.next_step)}</div>`}
+      ${sc.preserved.length && sc.cards.length ? `<div class="pres-note">What already works stays as it is: ${esc(sc.preserved.join(', ').toLowerCase())}.</div>` : ''}</div>`;
+  if(sc.id === 'needs') return `${head(sc.subtitle)}<div class="pres-body"><div class="pres-cols" style="--n:3">${sc.cards.map((g, k) => `<div class="pres-card simple"><div class="num">0${k+1}</div><div class="h">${esc(g.heading)}</div><p>${esc(g.sentence)}</p></div>`).join('')}</div></div>`;
   if(sc.id === 'deployment') return `${head(sc.subtitle)}<div class="pres-body">${sc.proposed ? `<div class="pres-timeline">${sc.phases.map((p) => `<div class="pres-phase"><div class="w">${esc(p.title)}</div><div class="h">${esc(p.heading)}</div><p>${esc(p.summary)}</p></div>`).join('')}</div><div class="pres-note">${esc(sc.caveat)}</div>` : `<div class="pres-next">${esc(S.presentation.screens.find((x) => x.id === 'pilot')?.next_step || '')}</div>`}</div>`;
   if(sc.id === 'pilot') return `${head('')}<div class="pres-body top">${sc.proposed ? `<div class="pres-price"><span class="p">${esc(sc.price)}</span><span class="d">all-in · ${esc(sc.duration)} · no long-term commitment</span></div>
       <div class="pres-cols dense" style="--n:${sc.scope.length ? 3 : 2};margin-top:2.4cqh"><div class="pres-card"><div class="k">What's included</div><ul>${sc.includes.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>${sc.scope.length ? `<div class="pres-card"><div class="k">Scope</div><ul>${sc.scope.slice(0, 5).map((x) => `<li>${esc(x)}</li>`).join('')}${sc.scope.length > 5 ? `<li>and ${sc.scope.length - 5} more</li>` : ''}</ul></div>` : ''}<div class="pres-card"><div class="k">How we'll judge it</div><ul>${sc.success_criteria.slice(0, 4).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div></div>

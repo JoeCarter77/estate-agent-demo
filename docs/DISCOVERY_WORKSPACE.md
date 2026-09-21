@@ -124,10 +124,10 @@ guarantees/marketing/jargon, no figures, no rule ids, no bullets) and stored wit
 sentence is applied only while its deterministic original is unchanged, so a correction drops stale polish.
 Failure or rejection leaves the plain wording.
 
-**Present to client** opens a full-screen, 16:9, NOVUS-branded presentation of six screens rendered from
+**Present to client** opens a full-screen, 16:9, NOVUS-branded presentation of seven screens rendered from
 `presentationPayload` (server-built; no rule ids, evidence codes, notes, scripts or controls; only findings
 approved for presentation): *Your agency today · What we've established · Commercial opportunity (live
-1–5 calculator) · How NOVUS would help · Your 60-day deployment · Founding pilot* (non-fit sessions show
+1–5 calculator) · How NOVUS would help · Your 60-day deployment · Founding pilot* — with *What we'd need from you* between help and deployment (non-fit sessions show
 the owner-facing next step instead of a price). ←/→/space, Home/End, Esc exits (also leaves fullscreen), F
 or the hover button uses the Fullscreen API with the edge-to-edge overlay as the fallback. The slide index
 is kept per session (`sessionStorage`) so switching between the workspace and the presentation resumes
