@@ -80,7 +80,8 @@
     "novus:lead-search-selftest": "node scripts/novus-lead-search-selftest.mjs",
     "novus:campaigns-selftest": "node scripts/novus-campaigns-selftest.mjs",
     "novus:instantly-link": "node scripts/novus-instantly-link.mjs",
-    "novus:sidebar-parity-selftest": "node scripts/novus-sidebar-parity-selftest.mjs"
+    "novus:sidebar-parity-selftest": "node scripts/novus-sidebar-parity-selftest.mjs",
+    "novus:discovery-selftest": "node scripts/novus-discovery-selftest.mjs"
   },
   "dependencies": {
     "@vercel/oidc": "^3.8.4",

@@ -14,6 +14,7 @@
     { "source": "/novus/communications", "destination": "/novus/communications.html" },
     { "source": "/novus/calling", "destination": "/novus/calling.html" },
     { "source": "/novus/campaigns", "destination": "/novus/campaigns.html" },
+    { "source": "/novus/meetings", "destination": "/novus/meetings.html" },
     { "source": "/api/novus/contacts/verify", "destination": "/api/novus/personalisation?novus_operation=verify-contact" },
     { "source": "/api/novus/contacts/resolve", "destination": "/api/novus/personalisation?novus_operation=resolve-contact" },
     { "source": "/api/novus/contacts/resolution-backlog", "destination": "/api/novus/personalisation?novus_operation=resolution-backlog" },

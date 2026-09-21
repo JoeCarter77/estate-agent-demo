@@ -108,6 +108,15 @@ import {
   handleCampaignLaunch, handleCampaignPause, handleCampaignResume, handleCampaignSync, handleCampaignSyncPoll, handleInstantlyWebhook,
   handleCampaignDiscover, handleCampaignLink, handleCampaignImportActivity, handleCampaignReconciliation,
 } from '../../lib/campaign-handlers.mjs';
+// MEETING DISCOVERY + PERSONALISED PITCH (novus/meetings.html,
+// lib/discovery-*.mjs). Same ceiling: read operations behind Basic Auth,
+// write operations behind Basic Auth + their own confirm token. The
+// diagnosis is deterministic (lib/discovery-engine.mjs); the only model call
+// is the pitch wording, and it is validated and stored as a new version.
+import {
+  handleDiscoveryMeetings, handleDiscoverySession, handleDiscoverySetup, handleDiscoveryStart,
+  handleDiscoverySave, handleDiscoveryPitch, handleDiscoveryOutcome,
+} from '../../lib/discovery-handlers.mjs';
 
 // Contact resolution can run Hunter Domain Search, Finder and several Verifier
 // checks in one invocation; 20s was sized for the read-only
@@ -1748,6 +1757,25 @@ export default async function handler(req, res) {
     // context and the lead-search index's "last activity".
     invalidateOperatorCaches();
     invalidateLeadIndex();
+    return out;
+  }
+  // ── Meeting discovery ────────────────────────────────────────────────
+  const DISCOVERY_READ_OPERATIONS = { 'discovery-meetings': handleDiscoveryMeetings, 'discovery-session': handleDiscoverySession };
+  if (req.method === 'GET' && DISCOVERY_READ_OPERATIONS[req.query?.novus_operation]) {
+    // READ-ONLY by construction: Sheets reads, a pure diagnosis, no writer.
+    if (!requireAuth(req, res)) return;
+    return DISCOVERY_READ_OPERATIONS[req.query.novus_operation](req, res);
+  }
+  const DISCOVERY_WRITE_OPERATIONS = {
+    'discovery-setup': handleDiscoverySetup, 'discovery-start': handleDiscoveryStart, 'discovery-save': handleDiscoverySave,
+    'discovery-pitch': handleDiscoveryPitch, 'discovery-outcome': handleDiscoveryOutcome,
+  };
+  if (req.method === 'POST' && DISCOVERY_WRITE_OPERATIONS[req.query?.novus_operation]) {
+    // Deliberate human actions from the Basic-Auth-protected meetings page.
+    if (!requireAuth(req, res)) return;
+    const out = await DISCOVERY_WRITE_OPERATIONS[req.query.novus_operation](req, res);
+    // An outcome can change AGENCIES.current_pipeline_status and add an ACTIONS row.
+    if (req.query.novus_operation === 'discovery-outcome') { invalidateOperatorCaches(); invalidateLeadIndex(); }
     return out;
   }
   if (req.query?.novus_operation === 'operator-manual-reply' && req.method !== 'POST') {

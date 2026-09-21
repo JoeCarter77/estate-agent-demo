@@ -86,6 +86,12 @@
     </div>
 
     <div class="nav-group">
+      <div class="nav-label">Meetings</div>
+      <a class="nav-item" href="/novus/meetings.html#meetings">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v15H4z"/><path d="M4 10h16"/><path d="M9 3v4M15 3v4"/></svg><span>Meetings</span></a>
+    </div>
+
+    <div class="nav-group">
       <div class="nav-label">System</div>
       <a class="nav-item" href="/novus/operator.html#exceptions">
         <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
@@ -954,7 +960,7 @@ function followupSummary(){
   if(o==='OWNER_UNAVAILABLE'||o==='CALLBACK_REQUESTED') return `Callback ${when(d.callback_at)}${d.callback_note?` — ${d.callback_note}`:''}`;
   if(o==='MORE_INFO_REQUESTED') return `Send ${labelOf(INFO_TYPES,d.more_info_type).toLowerCase()} (Actions) · follow-up call ${when(d.followup_at)}`;
   if(o==='NOT_INTERESTED') return `Closed as not interested — ${labelOf(NI_REASONS,d.not_interested_reason)}${d.not_interested_detail?` — ${d.not_interested_detail}`:''}`;
-  if(o==='BOOKED_MEETING') return `Meeting ${when(d.meeting_at)}${d.meeting_note?` — ${d.meeting_note}`:''} · agency marked meeting booked · prepare-for-meeting action`;
+  if(o==='BOOKED_MEETING') return `Meeting ${when(d.meeting_at)}${d.meeting_note?` — ${d.meeting_note}`:''} · agency marked meeting booked · prepare-for-meeting action · discovery workspace ready under Meetings`;
   if(o==='WRONG_NUMBER') return `${CALL.lead.phone} will not be dialled again`;
   if(o==='NOT_THE_DECISION_MAKER'){ const r=d.referred_contact||{}; return r.name||r.phone ? `Call ${r.name||'the decision-maker'}${r.role?` (${r.role})`:''}${r.phone?` on ${r.phone}`:''} ${when(d.callback_at)}` : 'No contact captured — nothing scheduled'; }
   if(o==='DO_NOT_CALL') return 'Removed from all future calling queues';
