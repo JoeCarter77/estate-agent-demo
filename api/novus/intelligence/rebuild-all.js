@@ -280,15 +280,16 @@ export default async function handler(req, res) {
 
     const summary = await runRebuildPass(repo, {
       forceAi,
-      maxAiCalls: batchSize,
+      maxAiCalls: 0,
       probeIds: probeIds || undefined,
       rebuildOutbound: true,
     });
 
     return res.status(200).json({
       ...summary,
-      max_ai_calls: batchSize,
+      max_ai_calls: 0,
       batch_size: batchSize,
+      ai_generation_disabled: true,
       ...(probeIds ? { targeted_probe_ids: probeIds } : {}),
     });
   } catch (err) {

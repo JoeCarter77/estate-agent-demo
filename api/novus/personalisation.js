@@ -374,7 +374,7 @@ async function handleInstantlyReplyPollDryRun(req, res) {
     // Semantic classification is opt-in and only runs when a key exists. In
     // dry-run it classifies and reports what it WOULD write; it updates
     // nothing. ?classify=0 turns it off for a pure zero-cost pass.
-    const classify = hasAnthropicApiKey() ? req.query?.classify !== '0' : false;
+    const classify = false;
     const summary = await pollInstantlyReplies({ repo: getRepo(), apiKey, limit, dryRun: true, classify, minTimestampCreated, startingAfter });
     return res.status(200).json({
       success: true,
@@ -425,6 +425,11 @@ async function handleInstantlyReplyPollDryRun(req, res) {
 // ingested/classified: each call is isolated in its own try/catch, and a
 // thrown error becomes its own recorded result rather than aborting the pass.
 async function runAutoSendDemo({ repo, apiKey, events }) {
+  // Preserve reply ingestion and the historical demo records, but never turn
+  // an inbound reply into an automatic demo send.
+  void repo; void apiKey; void events;
+  return [{ attempted: false, disabled: true, reason: 'Automatic demo sends are disabled.' }];
+  /* c8 ignore next */
   const candidates = (events || []).filter(
     (event) => event.persisted === true && event.classification?.classification === 'POSITIVE_SEND_DEMO',
   );
@@ -495,7 +500,7 @@ async function handleInstantlyReplyPoll(req, res) {
     // Deterministic call invitations, opt-outs and OOO handling must run even
     // when the optional AI classifier is unavailable; AI failures fall back to
     // human review on the already-persisted row.
-    const classify = req.query?.classify !== '0';
+    const classify = false;
     const repo = getRepo();
     const summary = await pollInstantlyReplies({ repo, apiKey, limit, dryRun: false, classify, startingAfter });
     const autoSend = await runAutoSendDemo({ repo, apiKey, events: summary.events });
@@ -600,8 +605,8 @@ async function handleInstantlyReplyReconcile(req, res) {
     // Re-run durable unresolved events first. This repairs rows created before
     // Campaign UI members were part of reply matching, without fetching or
     // sending any message and without appending a second REPLY_EVENTS row.
-    const recovery = await recoverUnresolvedReplyEvents({ repo, dryRun: false, classify: true });
-    const classify = true;
+    const recovery = await recoverUnresolvedReplyEvents({ repo, dryRun: false, classify: false });
+    const classify = false;
     const summary = await pollInstantlyReplies({
       repo, apiKey, limit: 100, dryRun: false, classify, minTimestampCreated, startingAfter,
     });

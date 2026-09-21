@@ -15,6 +15,11 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  // The public AI demo chat is retired to prevent unbounded anonymous model
+  // usage. The static demo and lead capture routes remain available.
+  if (process.env.NOVUS_ALLOW_RETIRED_AI !== 'true') {
+    return res.status(410).json({ error: 'AI demo chat is disabled.' });
+  }
 
   const { messages, systemPrompt, agencyName, agencyUrl } = req.body;
 

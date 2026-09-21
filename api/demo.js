@@ -159,6 +159,9 @@ async function handleTelemetry(body, res, action) {
 // probe and forced, so what comes out is byte-identical to what the pipeline
 // would have written.
 async function handleBuild(body, res) {
+  if (process.env.NOVUS_ENABLE_DEMO_GENERATION !== 'true') {
+    return res.status(410).json({ error: 'Demo generation is disabled; historical demos remain available.' });
+  }
   const probeId = text(body?.probe_id);
   if (!probeId) return res.status(400).json({ error: 'Missing probe_id' });
 
@@ -270,7 +273,7 @@ async function handleAudit(body, res) {
   let rows = auditRows();
   const fixed = { recompiled: 0, repaired: 0, still_broken: 0, problems: [] };
 
-  if (fix) {
+  if (fix && process.env.NOVUS_ENABLE_DEMO_GENERATION === 'true') {
     const probeIds = [
       ...new Set([...rows.filter((r) => !r.resolves).map((r) => r.probe_id).filter(Boolean), ...missing]),
     ];

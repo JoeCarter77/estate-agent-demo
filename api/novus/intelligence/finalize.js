@@ -113,7 +113,7 @@ export async function runNightlyFinalizer(repo, {
   instantlyOptions = {},
 } = {}) {
   const summary = await rebuild(repo, {
-    maxAiCalls: batchSize,
+    maxAiCalls: 0,
     rebuildOutbound: true,
   });
   if (!summary?.outbound) throw new Error('Nightly OUTBOUND rebuild did not complete');
@@ -157,6 +157,7 @@ export async function runNightlyFinalizer(repo, {
     actions,
     campaigns,
     batch_size: batchSize,
+    ai_generation_disabled: true,
     // Restated AFTER the handoff and reconciliation, so the reported request
     // counts cover the whole invocation rather than the rebuild alone.
     sheets: typeof repo.snapshotStats === 'function' ? repo.snapshotStats() : summary.sheets,
