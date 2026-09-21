@@ -3,7 +3,7 @@
 // → Calling Mode projection → call outcome follow-up plan.
 import assert from 'node:assert/strict';
 import { createMemoryClaimStore, __setClaimStoreForTests } from '../lib/reply-claim.mjs';
-import { pollInstantlyReplies } from '../lib/instantly-reply-poll.mjs';
+import { pollInstantlyReplies, recoverUnresolvedReplyEvents, matchCampaignMemberDeterministically } from '../lib/instantly-reply-poll.mjs';
 import { matchOutboundDeterministically } from '../lib/instantly-reply-poll.mjs';
 import { reconcileActionEngine } from '../lib/action-engine.mjs';
 import { buildCallingWorkspace } from '../lib/calling-queue.mjs';
@@ -18,7 +18,7 @@ import { replyPhoneNumbers, replyCallbackTiming } from '../lib/reply-call-contex
 import { ACTIONS_HEADER } from '../lib/actions-store.mjs';
 import { CALLS_HEADER } from '../lib/calling-store.mjs';
 import { REPLY_EVENTS_HEADER } from '../lib/reply-router.mjs';
-import { CAMPAIGN_EVENTS_HEADER } from '../lib/campaign-store.mjs';
+import { CAMPAIGN_EVENTS_HEADER, CAMPAIGN_MEMBERS_HEADER } from '../lib/campaign-store.mjs';
 import { buildLeadTimeline } from '../lib/lead-timeline.mjs';
 import { OUTBOUND_HEADER } from '../lib/outbound.mjs';
 
@@ -239,5 +239,47 @@ assert.equal(planOutcome(call, { outcome: 'NO_ANSWER' }, { nowMs: Date.parse(NOW
 assert.equal(planOutcome(call, { outcome: 'BOOKED_MEETING', meeting_at: '2026-09-25T10:00:00Z' }, { nowMs: Date.parse(NOW) }).actions[0].action_type, 'PREPARE_MEETING');
 assert.equal(planOutcome(call, { outcome: 'NOT_INTERESTED' }, { nowMs: Date.parse(NOW) }).terminal, 'NOT_INTERESTED');
 assert.equal(planOutcome(call, normaliseOutcomeInput({ outcome: 'MORE_INFO_REQUESTED', more_info_type: 'DEMO' }, Date.parse(NOW)).normalised, { nowMs: Date.parse(NOW) }).actions[0].action_type, 'SEND_INFORMATION');
+
+// Campaign UI enrolment has no legacy OUTBOUND row. It must still match by
+// Instantly campaign + lead/email and create the ordinary email call action.
+const campaignOnly = structuredClone(store);
+campaignOnly.OUTBOUND = table(OUTBOUND_HEADER);
+campaignOnly.REPLY_EVENTS = table(REPLY_EVENTS_HEADER);
+campaignOnly.ACTIONS = table(ACTIONS_HEADER);
+campaignOnly.CALLS = table(CALLS_HEADER);
+campaignOnly.AGENCIES = table(campaignOnly.AGENCIES.header, [{ agency_id: 'ag_campaign_only', agency_name: 'Campaign Only Agents', main_phone: '01277 999999', outreach_contact_name: 'Joe Test', outreach_contact_email: 'joedcarter1@gmail.com' }]);
+campaignOnly.CONTACTS = table(campaignOnly.CONTACTS.header, [{ contact_id: 'cnt_campaign_only', agency_id: 'ag_campaign_only', email: 'joedcarter1@gmail.com', contact_name: 'Joe Test', contact_role: 'Owner' }]);
+campaignOnly.CAMPAIGNS = table(['campaign_id', 'instantly_campaign_id', 'name'], [{ campaign_id: 'cmp_campaign_only', instantly_campaign_id: 'inst_campaign_only', name: 'TEST — Email to Calling' }]);
+campaignOnly.CAMPAIGN_MEMBERS = table(CAMPAIGN_MEMBERS_HEADER, [{ member_id: 'mem_campaign_only', campaign_id: 'cmp_campaign_only', agency_id: 'ag_campaign_only', contact_id: 'cnt_campaign_only', email: 'joedcarter1@gmail.com', instantly_lead_id: 'lead_campaign_only', member_status: 'PUSHED' }]);
+Object.assign(store, campaignOnly);
+const campaignReply = raw('mail_campaign_only', 'Yeah absolutely, give me a call whenever. My number is 07398 753165.', {
+  lead: 'joedcarter1@gmail.com', from_address_email: 'joedcarter1@gmail.com', lead_id: 'lead_campaign_only', campaign_id: 'inst_campaign_only', thread_id: 'thread_campaign_only',
+});
+const campaignFetch = async () => ({ ok: true, text: async () => JSON.stringify({ items: [campaignReply] }) });
+const campaignPoll = await pollInstantlyReplies({ repo, apiKey: 'test-only', fetchImpl: campaignFetch, dryRun: false, classify: true, now: NOW });
+assert.equal(campaignPoll.matched, 1);
+assert.equal(campaignPoll.events[0].match_method, 'CAMPAIGN_MEMBER_LEAD_ID');
+const campaignEmailMatch = matchCampaignMemberDeterministically(await repo.getRecords('CAMPAIGNS', 'campaign_id'), await repo.getRecords('CAMPAIGN_MEMBERS', 'member_id'), { campaign_id: 'inst_campaign_only', lead_email: 'joedcarter1@gmail.com' });
+assert.equal(campaignEmailMatch.match_method, 'CAMPAIGN_MEMBER_EMAIL');
+assert.equal(campaignEmailMatch.match.agency_id, 'ag_campaign_only');
+assert.equal(objs(store.REPLY_EVENTS)[0].agency_id, 'ag_campaign_only');
+assert.equal(objs(store.REPLY_EVENTS)[0].classification, 'CALL_REQUESTED');
+assert.equal((await reconcileActionEngine(repo, { now: NOW, agencyId: 'ag_campaign_only', execution: { available: true } })).created, 1);
+assert.equal(buildCallingWorkspace(store, { now: NOW }).call_actions[0].phone_e164, '+447398753165');
+
+// The same durable event, as it existed before campaign-member matching, is
+// repaired in place: no second REPLY_EVENTS record and no duplicate action.
+const unresolved = { ...objs(store.REPLY_EVENTS)[0], agency_id: '', outreach_id: '', classification: 'OTHER_UNCLEAR', next_action: 'MANUAL_REVIEW', priority: 'CRITICAL', action_status: 'REVIEW', error: 'UNRESOLVED_INBOUND_UNMATCHED' };
+store.REPLY_EVENTS = table(REPLY_EVENTS_HEADER, [unresolved]);
+store.ACTIONS = table(ACTIONS_HEADER);
+const recovery = await recoverUnresolvedReplyEvents({ repo, classify: true });
+assert.equal(recovery.repaired, 1, JSON.stringify(recovery));
+assert.equal(objs(store.REPLY_EVENTS).length, 1);
+assert.equal(objs(store.REPLY_EVENTS)[0].agency_id, 'ag_campaign_only');
+assert.equal(objs(store.REPLY_EVENTS)[0].classification, 'CALL_REQUESTED');
+assert.equal((await reconcileActionEngine(repo, { now: NOW, agencyId: 'ag_campaign_only', execution: { available: true } })).created, 1);
+assert.equal((await recoverUnresolvedReplyEvents({ repo, classify: true })).repaired, 0);
+assert.equal((await reconcileActionEngine(repo, { now: NOW, agencyId: 'ag_campaign_only', execution: { available: true } })).created, 0);
+assert.equal(objs(store.ACTIONS).length, 1);
 
 console.log('✅ Email reply → calling action → Calling Mode → outcome self-test passed');

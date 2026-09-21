@@ -184,7 +184,7 @@ check(() => assert.notEqual(appended.received_at, appended.processed_at));
 // REPLY_EVENTS is loaded ONCE per pass for idempotency; no per-email findById.
 check(() => assert.equal(repo.calls.filter((c) => c[0] === 'getTable').length, 1, 'REPLY_EVENTS read once'));
 check(() => assert.equal(repo.calls.filter((c) => c[0] === 'findById').length, 0, 'no per-email tab reads'));
-check(() => assert.equal(repo.calls.filter((c) => c[0] === 'getRecords').length, 1, 'OUTBOUND read once'));
+check(() => assert.equal(repo.calls.filter((c) => c[0] === 'getRecords').length, 3, 'OUTBOUND and Campaign identity tables read once'));
 // Exactly one Instantly call, and it is a GET.
 check(() => assert.equal(repo.calls.filter((c) => c[0] === 'appendRecord').length, 1));
 

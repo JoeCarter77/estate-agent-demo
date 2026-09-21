@@ -32,7 +32,7 @@ import { getRepo } from '../../lib/sheets.mjs';
 import { NeverBounceError, verifyEmail } from '../../lib/neverbounce.mjs';
 import { resolveAgencyContact, listResolutionBacklog } from '../../lib/contact-resolution.mjs';
 import { requireAuth, requireReplyPollerSecret, requireCampaignPollerSecret } from './_auth.mjs';
-import { pollInstantlyReplies } from '../../lib/instantly-reply-poll.mjs';
+import { pollInstantlyReplies, recoverUnresolvedReplyEvents } from '../../lib/instantly-reply-poll.mjs';
 import {
   evaluateSendDemoDryRun,
   executeSendDemo,
@@ -115,7 +115,7 @@ import {
 // is the pitch wording, and it is validated and stored as a new version.
 import {
   handleDiscoveryMeetings, handleDiscoverySession, handleDiscoverySetup, handleDiscoveryStart,
-  handleDiscoverySave, handleDiscoveryPitch, handleDiscoveryOutcome,
+  handleDiscoverySave, handleDiscoveryPitch, handleDiscoveryOutcome, handleDiscoveryConclusion, handleDiscoveryConclusionPolish,
 } from '../../lib/discovery-handlers.mjs';
 
 // Contact resolution can run Hunter Domain Search, Finder and several Verifier
@@ -597,13 +597,19 @@ async function handleInstantlyReplyReconcile(req, res) {
   const startingAfter = String(req.body?.starting_after || '').trim();
   try {
     const repo = getRepo();
+    // Re-run durable unresolved events first. This repairs rows created before
+    // Campaign UI members were part of reply matching, without fetching or
+    // sending any message and without appending a second REPLY_EVENTS row.
+    const recovery = await recoverUnresolvedReplyEvents({ repo, dryRun: false, classify: true });
     const classify = true;
     const summary = await pollInstantlyReplies({
       repo, apiKey, limit: 100, dryRun: false, classify, minTimestampCreated, startingAfter,
     });
-    if (summary.persisted > 0) invalidateOperatorCaches();
-    const affectedAgencyIds = [...new Set(summary.events
-      .map((event) => String(event.row?.agency_id || '').trim()).filter(Boolean))];
+    if (summary.persisted > 0 || recovery.repaired > 0) invalidateOperatorCaches();
+    const affectedAgencyIds = [...new Set([
+      ...recovery.affected_agency_ids,
+      ...summary.events.map((event) => String(event.row?.agency_id || '').trim()).filter(Boolean),
+    ])];
     let actionReconciliation = { available: true, agencies: 0 };
     if (affectedAgencyIds.length) {
       try { actionReconciliation = await reconcileActionEngine(repo, { agencyIds: affectedAgencyIds }); }
@@ -625,6 +631,9 @@ async function handleInstantlyReplyReconcile(req, res) {
         next_starting_after: summary.next_starting_after,
         historical_auto_execution: false,
         auto_send_attempts: 0,
+        recovered_existing_events: recovery.repaired,
+        recovery_unmatched: recovery.unmatched,
+        recovery_ambiguous: recovery.ambiguous,
       },
       action_reconciliation: actionReconciliation,
     });
@@ -1778,6 +1787,7 @@ export default async function handler(req, res) {
   const DISCOVERY_WRITE_OPERATIONS = {
     'discovery-setup': handleDiscoverySetup, 'discovery-start': handleDiscoveryStart, 'discovery-save': handleDiscoverySave,
     'discovery-pitch': handleDiscoveryPitch, 'discovery-outcome': handleDiscoveryOutcome,
+    'discovery-conclusion': handleDiscoveryConclusion, 'discovery-conclusion-polish': handleDiscoveryConclusionPolish,
   };
   if (req.method === 'POST' && DISCOVERY_WRITE_OPERATIONS[req.query?.novus_operation]) {
     // Deliberate human actions from the Basic-Auth-protected meetings page.
