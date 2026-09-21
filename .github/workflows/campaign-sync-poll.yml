@@ -28,7 +28,13 @@ on:
     # schedules tighter than ~15 can be delayed under platform load, so this
     # is the reliable choice for the documented "10-15 minutes" cadence.
     - cron: '*/15 * * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      reconcile_existing_replies:
+        description: 'Repair existing unresolved reply events without sending email'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   poll:
@@ -75,5 +81,29 @@ jobs:
           echo
           if [ "${reply_status}" -lt 200 ] || [ "${reply_status}" -ge 300 ]; then
             echo "::error::instantly-reply-poll returned HTTP ${reply_status}"
+            exit 1
+          fi
+      - name: Reconcile existing replies without sending
+        if: ${{ inputs.reconcile_existing_replies == true }}
+        env:
+          NOVUS_BASE_URL: ${{ secrets.NOVUS_BASE_URL }}
+          NOVUS_BASIC_AUTH_USER: ${{ secrets.NOVUS_BASIC_AUTH_USER }}
+          NOVUS_BASIC_AUTH_PASS: ${{ secrets.NOVUS_BASIC_AUTH_PASS }}
+          NOVUS_REPLY_POLLER_SECRET: ${{ secrets.NOVUS_REPLY_POLLER_SECRET }}
+        run: |
+          set -euo pipefail
+          http_status=$(curl -sS -o reconcile-response.json -w '%{http_code}' \
+            -X POST \
+            -u "${NOVUS_BASIC_AUTH_USER}:${NOVUS_BASIC_AUTH_PASS}" \
+            -H "X-Novus-Reply-Poller-Secret: ${NOVUS_REPLY_POLLER_SECRET}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            --data '{"confirm":"RECONCILE_REPLIES_NO_SEND","days":30}' \
+            "${NOVUS_BASE_URL%/}/api/novus/personalisation?novus_operation=instantly-reply-reconcile")
+          echo "Reconcile HTTP ${http_status}"
+          cat reconcile-response.json || true
+          echo
+          if [ "${http_status}" -lt 200 ] || [ "${http_status}" -ge 300 ]; then
+            echo "::error::instantly-reply-reconcile returned HTTP ${http_status}"
             exit 1
           fi
