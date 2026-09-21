@@ -8,7 +8,7 @@
 //
 // Modes are selected by an explicit confirmation value:
 //   RESOLVE_NEEDS_RESEARCH_AFTER_ROW_180 — NEEDS_RESEARCH, physical row > 180
-//   RESOLVE_BLANK_AFTER_ROW_247           — blank status, physical row >= 247
+//   RESOLVE_BLANK_AFTER_ROW_759           — blank status, physical row >= 247
 // sheet_row_number comes from the server's repo record metadata, not array
 // position, agency order or timestamps.
 //
@@ -17,8 +17,12 @@
 // existing one-agency-per-call contract. The 3-call Hunter Verifier cap per
 // agency is enforced inside resolveAgencyContact, not here.
 //
-// Safety: immediately before EACH resolve, the script re-fetches the full
-// AGENCIES snapshot and re-checks both status and physical row boundary.
+// Safety: immediately before EACH resolve, the resolve endpoint itself
+// rechecks status and physical row boundary against the AGENCIES row it
+// already loads for the resolve — via require_status/min_sheet_row on the
+// POST body — instead of the script re-fetching the full AGENCIES snapshot
+// per agency (that duplicate full-sheet read is what was driving Google
+// Sheets read-quota 429s during the bulk run).
 //
 // This is a REAL run: it spends Hunter credits and writes
 // to AGENCIES/CONTACTS. It never touches Instantly and never runs
@@ -26,7 +30,7 @@
 //
 // Usage:
 //   node scripts/novus-contact-resolution-blank-status-run.mjs \
-//     --confirm RESOLVE_BLANK_AFTER_ROW_247 [--limit 5|--limit=5] [--base=...] [--user=...] [--pass=...]
+//     --confirm RESOLVE_BLANK_AFTER_ROW_759 [--limit 5|--limit=5] [--base=...] [--user=...] [--pass=...]
 //
 // Requires (same production auth already used elsewhere in this repo):
 //   NOVUS_BASE_URL (or --base)                — defaults to https://demo.getnovus.co.uk
@@ -37,10 +41,10 @@ import { fileURLToPath } from 'node:url';
 
 // CONFIRMATION remains the original NEEDS_RESEARCH mode for existing callers.
 export const NEEDS_RESEARCH_CONFIRMATION = 'RESOLVE_NEEDS_RESEARCH_AFTER_ROW_180';
-export const BLANK_STATUS_CONFIRMATION = 'RESOLVE_BLANK_AFTER_ROW_247';
+export const BLANK_STATUS_CONFIRMATION = 'RESOLVE_BLANK_AFTER_ROW_759';
 export const CONFIRMATION = NEEDS_RESEARCH_CONFIRMATION;
 export const NEEDS_RESEARCH_MIN_EXCLUSIVE_SHEET_ROW = 180;
-export const MIN_INCLUSIVE_SHEET_ROW = 247;
+export const MIN_INCLUSIVE_SHEET_ROW = 759;
 const DEFAULT_BASE = 'https://demo.getnovus.co.uk';
 const DEFAULT_THROTTLE_MS = 1000;
 const RATE_LIMIT_RETRY_DELAYS_MS = [1000, 2000, 4000];
@@ -118,6 +122,8 @@ function modeForConfirmation(confirmation) {
       totalLabel: 'Total NEEDS_RESEARCH rows',
       excludedLabel: `Excluded at sheet row <= ${NEEDS_RESEARCH_MIN_EXCLUSIVE_SHEET_ROW}`,
       eligibleLabel: `Eligible at sheet row > ${NEEDS_RESEARCH_MIN_EXCLUSIVE_SHEET_ROW}`,
+      requireStatus: 'NEEDS_RESEARCH',
+      minSheetRow: NEEDS_RESEARCH_MIN_EXCLUSIVE_SHEET_ROW + 1,
     };
   }
   if (confirmation === BLANK_STATUS_CONFIRMATION) {
@@ -128,6 +134,8 @@ function modeForConfirmation(confirmation) {
       totalLabel: 'Total blank-status rows',
       excludedLabel: `Excluded at sheet row < ${MIN_INCLUSIVE_SHEET_ROW}`,
       eligibleLabel: `Eligible at sheet row >= ${MIN_INCLUSIVE_SHEET_ROW}`,
+      requireStatus: '',
+      minSheetRow: MIN_INCLUSIVE_SHEET_ROW,
     };
   }
   throw new Error(
@@ -210,23 +218,26 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
 
   for (const target of targets) {
     try {
-      // Re-check immediately before spending credits: fetch the backlog fresh
-      // and confirm the mode's status and physical-row predicate still hold.
-      const current = await fetchAgencySnapshot(cfg, dependencies);
-      const row = current.find((agency) => agency.agency_id === target.agency_id);
-      const freshStatus = row ? String(row.contact_resolution_status || '').trim() : '';
-      const freshSheetRow = Number(row?.sheet_row_number);
-      if (!row || !mode.isEligible(row)) {
-        skippedRace += 1;
-        console.log(`SKIP  ${target.agency_id}  recheck failed (status=${freshStatus || 'MISSING'}, sheet_row=${Number.isFinite(freshSheetRow) ? freshSheetRow : 'MISSING'})`);
-        continue;
-      }
-
+      // Re-check immediately before spending credits: the resolve endpoint
+      // rechecks the mode's status/physical-row predicate itself against the
+      // AGENCIES row it loads for the resolve, and returns 409 without
+      // touching Hunter when it no longer holds — no separate full-sheet
+      // read from here.
       const { response, result } = await requestJson(`${cfg.base}/api/novus/contacts/resolve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: cfg.auth },
-        body: JSON.stringify({ agency_id: target.agency_id, dry_run: false }),
+        body: JSON.stringify({
+          agency_id: target.agency_id,
+          dry_run: false,
+          require_status: mode.requireStatus,
+          min_sheet_row: mode.minSheetRow,
+        }),
       }, dependencies);
+      if (response.status === 409) {
+        skippedRace += 1;
+        console.log(`SKIP  ${target.agency_id}  recheck failed (status=${result.contact_resolution_status ?? 'MISSING'}, sheet_row=${result.sheet_row_number ?? 'MISSING'})`);
+        continue;
+      }
       if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
       processed += 1;
       console.log(`OK    ${target.agency_id}  ${target.agency_name}  -> ${result.contact_resolution_status}  (${result.selected_contact?.email || 'no email selected'})`);

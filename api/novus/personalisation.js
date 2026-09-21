@@ -159,16 +159,21 @@ async function handleContactResolution(req, res) {
   const agencyId = typeof req.body?.agency_id === 'string' ? req.body.agency_id.trim() : '';
   if (!agencyId) return res.status(400).json({ error: 'Missing agency_id' });
   const dryRun = req.body?.dry_run === true;
+  // Optional bulk-caller precondition, checked against the AGENCIES row this
+  // call already loads for itself — lets a bulk run recheck eligibility
+  // immediately before resolving without a separate full-sheet read.
+  const requireStatus = typeof req.body?.require_status === 'string' ? req.body.require_status : undefined;
+  const minSheetRow = req.body?.min_sheet_row === undefined ? undefined : Number(req.body.min_sheet_row);
 
   try {
-    const result = await resolveAgencyContact(getRepo(), agencyId, { dryRun });
+    const result = await resolveAgencyContact(getRepo(), agencyId, { dryRun, requireStatus, minSheetRow });
     return res.status(200).json(result);
   } catch (err) {
     if (err instanceof NeverBounceError) {
       return res.status(err.statusCode).json({ error: err.message, code: err.code });
     }
     if (err?.statusCode) {
-      return res.status(err.statusCode).json({ error: err.message });
+      return res.status(err.statusCode).json({ error: err.message, ...(err.details || {}) });
     }
     console.error('contacts/resolve error:', err);
     return res.status(500).json({ error: err.message || 'Unable to resolve contact' });
@@ -188,6 +193,7 @@ async function handleResolutionBacklog(req, res) {
     return res.status(200).json({ count: agencies.length, agencies });
   } catch (err) {
     console.error('contacts/resolution-backlog error:', err);
+    if (err?.statusCode) return res.status(err.statusCode).json({ error: err.message });
     return res.status(500).json({ error: err.message || 'Failed to list resolution backlog' });
   }
 }

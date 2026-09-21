@@ -1829,22 +1829,22 @@ await test('NEEDS_RESEARCH recheck mode remains limited to physical rows after 1
   assert.equal(isNeedsResearchEligible(rows[1]), true);
 });
 
-await test('blank-status recheck targets only blank statuses on physical rows from 247', () => {
+await test('blank-status recheck targets only blank statuses on physical rows from 759', () => {
   const rows = [
-    { sheet_row_number: 246, agency_id: 'ag_246', contact_resolution_status: '' },
-    { sheet_row_number: 247, agency_id: 'ag_247', contact_resolution_status: '' },
-    { sheet_row_number: 248, agency_id: 'ag_needs', contact_resolution_status: 'NEEDS_RESEARCH' },
-    { sheet_row_number: 249, agency_id: 'ag_direct', contact_resolution_status: 'RESOLVED_DIRECT' },
-    { sheet_row_number: 250, agency_id: 'ag_generic', contact_resolution_status: 'RESOLVED_GENERIC' },
-    { sheet_row_number: 251, agency_id: 'ag_blank', contact_resolution_status: '   ' },
-    { sheet_row_number: 252, agency_id: 'ag_other', contact_resolution_status: 'NO_VALID_EMAIL' },
+    { sheet_row_number: 758, agency_id: 'ag_758', contact_resolution_status: '' },
+    { sheet_row_number: 759, agency_id: 'ag_759', contact_resolution_status: '' },
+    { sheet_row_number: 760, agency_id: 'ag_needs', contact_resolution_status: 'NEEDS_RESEARCH' },
+    { sheet_row_number: 761, agency_id: 'ag_direct', contact_resolution_status: 'RESOLVED_DIRECT' },
+    { sheet_row_number: 762, agency_id: 'ag_generic', contact_resolution_status: 'RESOLVED_GENERIC' },
+    { sheet_row_number: 763, agency_id: 'ag_blank', contact_resolution_status: '   ' },
+    { sheet_row_number: 764, agency_id: 'ag_other', contact_resolution_status: 'NO_VALID_EMAIL' },
   ];
   const partitioned = partitionBlankStatus(rows);
-  assert.deepEqual(partitioned.blankStatus.map((row) => row.agency_id), ['ag_246', 'ag_247', 'ag_blank']);
-  assert.deepEqual(partitioned.excluded.map((row) => row.agency_id), ['ag_246']);
-  assert.deepEqual(partitioned.eligible.map((row) => row.agency_id), ['ag_247', 'ag_blank']);
-  assert.equal(isBlankStatusEligible(rows[0]), false, 'physical row 246 is excluded');
-  assert.equal(isBlankStatusEligible(rows[1]), true, 'physical row 247 is eligible');
+  assert.deepEqual(partitioned.blankStatus.map((row) => row.agency_id), ['ag_758', 'ag_759', 'ag_blank']);
+  assert.deepEqual(partitioned.excluded.map((row) => row.agency_id), ['ag_758']);
+  assert.deepEqual(partitioned.eligible.map((row) => row.agency_id), ['ag_759', 'ag_blank']);
+  assert.equal(isBlankStatusEligible(rows[0]), false, 'physical row 758 is excluded');
+  assert.equal(isBlankStatusEligible(rows[1]), true, 'physical row 759 is eligible');
 });
 
 await test('blank-status runner accepts both --limit 5 and --limit=5', () => {
@@ -1869,14 +1869,14 @@ await test('blank-status runner retries HTTP 429 with bounded exponential backof
   assert.deepEqual(delays, [1000, 2000]);
 });
 
-await test('blank-status runner rechecks physical row and status immediately before each resolve', async () => {
+await test('blank-status runner sends a resolve-time recheck instead of a per-agency backlog re-fetch', async () => {
   const initial = [
-    { sheet_row_number: 246, agency_id: 'ag_excluded', agency_name: 'Excluded', contact_resolution_status: '' },
-    { sheet_row_number: 247, agency_id: 'ag_moved', agency_name: 'Moved', contact_resolution_status: '' },
-    { sheet_row_number: 248, agency_id: 'ag_live', agency_name: 'Live', contact_resolution_status: '' },
-    { sheet_row_number: 249, agency_id: 'ag_needs', agency_name: 'Needs', contact_resolution_status: 'NEEDS_RESEARCH' },
+    { sheet_row_number: 758, agency_id: 'ag_excluded', agency_name: 'Excluded', contact_resolution_status: '' },
+    { sheet_row_number: 759, agency_id: 'ag_moved', agency_name: 'Moved', contact_resolution_status: '' },
+    { sheet_row_number: 760, agency_id: 'ag_live', agency_name: 'Live', contact_resolution_status: '' },
+    { sheet_row_number: 761, agency_id: 'ag_needs', agency_name: 'Needs', contact_resolution_status: 'NEEDS_RESEARCH' },
   ];
-  let getCount = 0;
+  let backlogGetCount = 0;
   const posted = [];
   const logs = [];
   const originalLog = console.log;
@@ -1890,24 +1890,32 @@ await test('blank-status runner rechecks physical row and status immediately bef
       sleepImpl: async () => {},
       fetchImpl: async (url, init = {}) => {
         if (String(url).includes('resolution-backlog')) {
-          getCount += 1;
-          const rows = getCount === 1
-            ? initial
-            : getCount === 2
-              ? initial.map((row) => row.agency_id === 'ag_moved' ? { ...row, sheet_row_number: 246 } : row)
-              : initial;
-          return { ok: true, status: 200, json: async () => ({ agencies: rows }) };
+          backlogGetCount += 1;
+          return { ok: true, status: 200, json: async () => ({ agencies: initial }) };
         }
-        posted.push(JSON.parse(init.body));
+        const body = JSON.parse(init.body);
+        posted.push(body);
+        // ag_moved raced onto a now-excluded row before the resolve endpoint
+        // rechecked it against the AGENCIES row it loads for itself.
+        if (body.agency_id === 'ag_moved') {
+          return { ok: false, status: 409, json: async () => ({ error: 'Agency no longer eligible for resolution', contact_resolution_status: '', sheet_row_number: 758 }) };
+        }
         return { ok: true, status: 200, json: async () => ({ contact_resolution_status: 'RESOLVED_GENERIC', selected_contact: { email: 'info@example.test' } }) };
       },
     });
-    assert.deepEqual(posted, [{ agency_id: 'ag_live', dry_run: false }]);
+    // Exactly one full-sheet backlog read for the whole run — no per-agency
+    // re-fetch, which is what was driving the Sheets 429s.
+    assert.equal(backlogGetCount, 1);
+    assert.deepEqual(posted, [
+      { agency_id: 'ag_moved', dry_run: false, require_status: '', min_sheet_row: 759 },
+      { agency_id: 'ag_live', dry_run: false, require_status: '', min_sheet_row: 759 },
+    ]);
     assert.deepEqual(summary, { processed: 1, skipped_recheck: 1, failed: 0, targeted: 2, eligible_at_start: 2 });
     assert.ok(logs.includes('Total blank-status rows: 3'));
-    assert.ok(logs.includes('Excluded at sheet row < 247: 1'));
-    assert.ok(logs.includes('Eligible at sheet row >= 247: 2'));
-    assert.ok(logs.some((line) => line.includes('row 247  ag_moved  Moved')));
+    assert.ok(logs.includes('Excluded at sheet row < 759: 1'));
+    assert.ok(logs.includes('Eligible at sheet row >= 759: 2'));
+    assert.ok(logs.some((line) => line.includes('row 759  ag_moved  Moved')));
+    assert.ok(logs.some((line) => line.includes('SKIP  ag_moved')));
   } finally {
     console.log = originalLog;
     console.error = originalError;
@@ -1932,11 +1940,35 @@ await test('NEEDS_RESEARCH confirmation remains accepted by the existing recheck
         return { ok: true, status: 200, json: async () => ({ contact_resolution_status: 'NEEDS_RESEARCH', selected_contact: null }) };
       },
     });
-    assert.deepEqual(posted, [{ agency_id: 'ag_needs', dry_run: false }]);
+    assert.deepEqual(posted, [{ agency_id: 'ag_needs', dry_run: false, require_status: 'NEEDS_RESEARCH', min_sheet_row: 181 }]);
     assert.equal(summary.processed, 1);
   } finally {
     console.log = originalLog;
   }
+});
+
+await test('resolveAgencyContact rejects a precondition mismatch before any Hunter call, without writing', async () => {
+  const { store, valuesApi } = makeFakeSheet();
+  seedAgency(store, { agency_id: 'ag_1', agency_name: 'Acme', contact_resolution_status: 'RESOLVED_DIRECT' });
+  const repo = createRepo(valuesApi);
+  let hunterCalls = 0;
+  await assert.rejects(
+    () => resolveAgencyContact(repo, 'ag_1', {
+      requireStatus: '',
+      minSheetRow: 3,
+      findDomainDecisionMakersImpl: async () => { hunterCalls += 1; return []; },
+      findEmailImpl: async () => { hunterCalls += 1; return null; },
+      findDomainGenericEmailsImpl: async () => { hunterCalls += 1; return []; },
+      hunterConfigured: () => true,
+    }),
+    (err) => {
+      assert.equal(err.statusCode, 409);
+      assert.deepEqual(err.details, { contact_resolution_status: 'RESOLVED_DIRECT', sheet_row_number: 3 });
+      return true;
+    },
+  );
+  assert.equal(hunterCalls, 0);
+  assert.equal(rowsAsObjects(store, 'CONTACTS', CONTACTS_HEADER).length, 0);
 });
 
 // ── Hard provider boundary ──────────────────────────────────────────────────
