@@ -1,0 +1,60 @@
+# .github/workflows/campaign-sync-poll.yml
+#
+# The ~10-15 minute Email/Campaigns sync poll (docs/EMAIL_CAMPAIGNS.md,
+# "## Polling"). Instantly's Growth plan has no webhooks, and this project's
+# Vercel plan only triggers vercel.json cron entries once a day, so this free
+# GitHub Actions schedule is what keeps campaign status, leads, sends,
+# replies, bounces and unsubscribes fresh in NOVUS in between manual "Sync
+# Now" clicks and the nightly full reconciliation.
+#
+# It makes exactly one authenticated POST per tick to the deployed app. It
+# never talks to Instantly directly and holds no Instantly credential — only
+# the same Basic Auth + a dedicated poller secret every other automated
+# writer in this app uses (see api/novus/_auth.mjs).
+#
+# Setup: GitHub repo → Settings → Secrets and variables → Actions → add
+#   NOVUS_BASE_URL              e.g. https://estate-agent-demo.vercel.app (no trailing slash)
+#   NOVUS_BASIC_AUTH_USER
+#   NOVUS_BASIC_AUTH_PASS
+#   NOVUS_CAMPAIGN_POLLER_SECRET   the exact same value set in Vercel
+#
+# Test it any time from the Actions tab: this workflow → "Run workflow".
+name: Campaign sync poll
+
+on:
+  schedule:
+    # Every 15 minutes. GitHub's own minimum granularity is 5 minutes, but
+    # schedules tighter than ~15 can be delayed under platform load, so this
+    # is the reliable choice for the documented "10-15 minutes" cadence.
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST campaign-sync-poll
+        env:
+          NOVUS_BASE_URL: ${{ secrets.NOVUS_BASE_URL }}
+          NOVUS_BASIC_AUTH_USER: ${{ secrets.NOVUS_BASIC_AUTH_USER }}
+          NOVUS_BASIC_AUTH_PASS: ${{ secrets.NOVUS_BASIC_AUTH_PASS }}
+          NOVUS_CAMPAIGN_POLLER_SECRET: ${{ secrets.NOVUS_CAMPAIGN_POLLER_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NOVUS_BASE_URL:-}" ] || [ -z "${NOVUS_CAMPAIGN_POLLER_SECRET:-}" ]; then
+            echo "::error::NOVUS_BASE_URL and/or NOVUS_CAMPAIGN_POLLER_SECRET repo secrets are not set. See docs/EMAIL_CAMPAIGNS.md ## Polling."
+            exit 1
+          fi
+          http_status=$(curl -sS -o response.json -w '%{http_code}' \
+            -X POST \
+            -u "${NOVUS_BASIC_AUTH_USER}:${NOVUS_BASIC_AUTH_PASS}" \
+            -H "X-Novus-Campaign-Poller-Secret: ${NOVUS_CAMPAIGN_POLLER_SECRET}" \
+            -H "Accept: application/json" \
+            "${NOVUS_BASE_URL%/}/api/novus/personalisation?novus_operation=campaign-sync-poll")
+          echo "HTTP ${http_status}"
+          cat response.json || true
+          echo
+          if [ "${http_status}" -lt 200 ] || [ "${http_status}" -ge 300 ]; then
+            echo "::error::campaign-sync-poll returned HTTP ${http_status}"
+            exit 1
+          fi
