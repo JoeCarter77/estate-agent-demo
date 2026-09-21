@@ -14,10 +14,11 @@ import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import { ACTIONS_HEADER } from '../lib/actions-store.mjs';
 import { CALLS_HEADER } from '../lib/calling-store.mjs';
-import { QUESTIONS, QUESTION_BY_ID, DIMENSIONS, isVisible, effectiveLevel, snapshotFor, QUESTIONS_VERSION } from '../lib/discovery-questions.mjs';
+import { QUESTIONS, QUESTION_BY_ID, DIMENSIONS, isVisible, effectiveLevel, snapshotFor, QUESTIONS_VERSION, evaluateCoverage, visibleQuestions, wordingFor, visibleOptions, COVERAGE_RULES } from '../lib/discovery-questions.mjs';
 import { RULES, RULE_BY_ID, DELIVERY_STATUSES, FOUNDING_OFFER } from '../lib/discovery-rules.mjs';
 import { diagnose, assessDimension, computeEconomics, SUITABILITY_POLICY } from '../lib/discovery-engine.mjs';
-import { buildPitchInput, templatePitch, validatePitch, generatePitch, pitchSpoken } from '../lib/discovery-pitch.mjs';
+import { templatePlan } from '../lib/discovery-pitch.mjs';
+import { buildPitchInput, templatePitch, validatePitch, generatePitch, pitchSpoken, rankThemes, wordCount, SPOKEN_WORD_CAP, PLAN_PHASES_COMPACT } from '../lib/discovery-pitch.mjs';
 import { DISCOVERY_SESSIONS_HEADER, DISCOVERY_PITCHES_HEADER, sessionView, pitchView } from '../lib/discovery-store.mjs';
 import {
   handleDiscoveryMeetings, handleDiscoverySession, handleDiscoverySetup, handleDiscoveryStart,
@@ -74,6 +75,20 @@ console.log('\n1. Question and rule registries');
   }
   ok(`${QUESTIONS.length} questions: unique ids, valid conditions, plain language, every dimension has primary/simpler/example/verify/cause/consequence`);
 
+  for (const rule of COVERAGE_RULES) {
+    assert.ok(QUESTION_BY_ID[rule.question], `coverage ${rule.id} names a real question`);
+    for (const c of rule.when) assert.ok(QUESTION_BY_ID[c.question], `coverage ${rule.id} condition names a real question`);
+    for (const b of rule.basis) assert.ok(QUESTION_BY_ID[b], `coverage ${rule.id} basis ${b} exists`);
+    const q = QUESTION_BY_ID[rule.question];
+    const allowed = new Set(q.options.map((o) => o.value));
+    if (rule.derive.value !== undefined) assert.ok(allowed.has(rule.derive.value), `coverage ${rule.id} derives a real option`);
+    if (rule.derive.values) for (const v of rule.derive.values) assert.ok(allowed.has(v), `coverage ${rule.id} derives real options`);
+    if (rule.derive.map) for (const v of Object.values(rule.derive.map)) assert.ok(allowed.has(v), `coverage ${rule.id} maps onto real options`);
+    assert.ok(rule.note, `coverage ${rule.id} explains itself`);
+  }
+  for (const q of QUESTIONS) for (const v of q.variants || []) assert.ok(QUESTION_BY_ID[v.when.question] && v.primary, `${q.id} variant is well-formed`);
+  ok(`${COVERAGE_RULES.length} coverage rules only ever derive real options from real earlier answers, and every contextual variant is well-formed`);
+
   assert.equal(RULES.length, 10);
   const required = ['rule_id', 'dimension', 'title', 'triggers', 'required_evidence', 'commercial_consequence', 'intervention', 'implementation_steps', 'required_data_access', 'agency_responsibilities', 'novus_responsibilities', 'dependencies', 'measurement', 'scope_limitations', 'pitch_explanation', 'delivery_status', 'delivery_status_note'];
   for (const r of RULES) {
@@ -122,6 +137,93 @@ console.log('\n2. Conditional exploration');
   ok('CONFIRMED needs a real cause and consequence; "don\'t know" stays provisional; a skipped question is UNKNOWN with its reason');
 }
 
+// ── 2b. shared discovery context ────────────────────────────────────────────
+console.log('\n2b. Shared discovery context (coverage, contextual wording, option hiding)');
+{
+  // Numbers: conversion is worked out, not asked, when both volumes are known.
+  let answers = { C8: a(20, { source: 'actual' }), C9: a(6, { source: 'actual' }) };
+  let cov = evaluateCoverage(answers);
+  assert.equal(cov.C11.derived.value, 30); assert.deepEqual(cov.C11.basis, ['C8', 'C9']);
+  assert.ok(!visibleQuestions(answers, 'value').some((q) => q.id === 'C11'));
+  assert.equal(computeEconomics(answers).baseline.conversion_pct.value, 30);
+  ok('C11 (conversion) is covered by C8 + C9 and never asked; the economics still carry it');
+
+  // "Nothing happens until they come back" answers accountability too.
+  answers = { F3: a('nothing'), F3_cause: m(['unclear_owner']), F3_consequence: m(['lost_valuations']) };
+  cov = evaluateCoverage(answers);
+  assert.equal(cov.F4.derived.value, 'nothing'); assert.deepEqual(cov.F4_cause.derived.values, ['ownership_unclear']); assert.deepEqual(cov.F4_consequence.derived.values, ['missed_sellers']);
+  const f4 = assessDimension('F4', answers);
+  assert.equal(f4.level, 'weak'); assert.equal(f4.evidence_status, 'CONFIRMED'); assert.deepEqual(f4.basis_dimensions, ['F3']); assert.match(f4.note, /Derived from F3/);
+  assert.ok(!visibleQuestions(answers, 'foundations').some((q) => q.dimension === 'F4' && q.role === 'primary'));
+  // …but only as far as F3 is itself confirmed.
+  const f4p = assessDimension('F4', { F3: a('nothing'), F3_consequence: m(['lost_valuations']), F4_cause: m(['no_overdue_view']) });
+  assert.equal(f4p.evidence_status, 'PROVISIONAL', 'F4 has a cause (asked) and a consequence (derived) but F3 itself is not confirmed'); assert.match(f4p.note, /not yet confirmed/);
+  // …and if F3 only says "no process", F4's cause is still asked.
+  answers = { F3: a('nothing'), F3_cause: m(['no_process']), F3_consequence: m(['lost_valuations']) };
+  assert.ok(visibleQuestions(answers, 'foundations').some((q) => q.id === 'F4_cause'));
+  assert.ok(!visibleQuestions(answers, 'foundations').some((q) => q.id === 'F4'));
+  ok('F4 is derived from an F3 "nothing happens" answer (cause and consequence mapped from the owner\'s words), capped at F3\'s own evidence, and only the genuinely missing follow-up is asked');
+
+  // Ask anyway: a reopened marker switches coverage off without inventing an answer.
+  answers = { F3: a('nothing'), F3_cause: m(['unclear_owner']), F3_consequence: m(['lost_valuations']), F4: { reopened: true } };
+  assert.equal(evaluateCoverage(answers).F4, undefined);
+  assert.ok(visibleQuestions(answers, 'foundations').some((q) => q.id === 'F4'));
+  assert.equal(assessDimension('F4', answers).evidence_status, 'UNKNOWN', 'reopened but unanswered is unknown, not derived');
+  answers.F4 = a('manager_asks');
+  assert.equal(assessDimension('F4', answers).level, 'partial', 'a real answer always beats coverage');
+  ok('"Ask anyway" reopens a covered question: nothing is derived until the owner answers, and a real answer always wins');
+
+  // Capture already weak with missed sellers → seller-signal recognition is established.
+  answers = { F1: a('patchy'), F1_cause: m(['time', 'crm_limits']), F1_consequence: m(['missed_sellers']) };
+  cov = evaluateCoverage(answers);
+  assert.equal(cov.I1.derived.value, 'ad_hoc'); assert.deepEqual(cov.I1_cause.derived.values, ['busy', 'nothing_reads']); assert.deepEqual(cov.I1_consequence.derived.values, ['lost_valuations']);
+  assert.equal(cov.I1_current, undefined, 'coverage never chains: I1_current reads the STORED I1_cause, which was not asked');
+  ok('I1 and its cause/consequence are carried from a weak F1 with missed sellers; the derived cause is a mapping of the real one');
+}
+{
+  // Strong context and system flags: matching and activity signals are not asked twice.
+  let answers = { ...strong('F2', 'yes_easily', 'yes'), ...strong('I2', 'flags_changes', 'yes') };
+  let cov = evaluateCoverage(answers);
+  assert.equal(cov.I2_matching.derived.value, 'yes'); assert.equal(cov.I4_signals.derived.value, 'yes');
+  answers = { F2: a('sometimes'), F2_cause: m(['duplicates']), F2_consequence: m(['missed_context']) };
+  assert.equal(evaluateCoverage(answers).I2_matching.derived.value, 'mostly');
+  // Systematic database work covers prioritisation (but verification still runs).
+  answers = { ...strong('I3', 'systematic', 'know_results') };
+  cov = evaluateCoverage(answers);
+  assert.equal(cov.I4.derived.value, 'scored');
+  assert.ok(visibleQuestions(answers, 'intelligence').some((q) => q.id === 'I4_verify'), 'the verification question is still asked');
+  assert.equal(assessDimension('I4', answers).evidence_status, 'EXISTING_STRENGTH');
+  // No way of knowing who to call → prioritisation weak, its cause carried, its consequence still asked.
+  answers = { I3: a('when_time'), I3_cause: m(['no_way_to_prioritise']), I3_consequence: m(['untouched_value']) };
+  cov = evaluateCoverage(answers);
+  assert.equal(cov.I4.derived.value, 'judgement'); assert.deepEqual(cov.I4_cause.derived.values, ['no_data']); assert.equal(cov.I4_consequence, undefined);
+  assert.ok(visibleQuestions(answers, 'intelligence').some((q) => q.id === 'I4_consequence'));
+  // No outcome tracking → learning's cause is known; the primary is still asked, reworded.
+  answers = { F5: a('none'), F5_cause: m(['no_stages']), F5_consequence: m(['cant_judge']) };
+  cov = evaluateCoverage(answers);
+  assert.deepEqual(cov.I5_cause.derived.values, ['no_outcomes']); assert.deepEqual(cov.I5_consequence.derived.values, ['cant_scale']); assert.equal(cov.I5, undefined);
+  assert.match(wordingFor(QUESTION_BY_ID.I5, answers).primary, /outcomes aren't really tracked/);
+  ok('context/system strengths cover matching and activity signals; database answers cover prioritisation; outcome tracking covers the cause of learning — related dimensions stay distinct');
+
+  // Contextual wording and hidden options.
+  answers = { F1: a('mostly'), F3: a('memory'), C2: m(['slipping_through', 'database']) };
+  assert.match(wordingFor(QUESTION_BY_ID.F4, answers).primary, /negotiator remembering/);
+  assert.match(wordingFor(QUESTION_BY_ID.F3, answers).primary, /slipping through the net/);
+  assert.match(wordingFor(QUESTION_BY_ID.F2, answers).primary, /For what does make it into the CRM/);
+  assert.match(wordingFor(QUESTION_BY_ID.I1, answers).primary, /mostly gets recorded/);
+  assert.match(wordingFor(QUESTION_BY_ID.I3, answers).primary, /can't get much out of the database/);
+  assert.equal(wordingFor(QUESTION_BY_ID.F5, answers).variant, '');
+  assert.ok(!visibleOptions(QUESTION_BY_ID.F2_cause, answers).some((o) => o.value === 'not_recorded'));
+  assert.ok(visibleOptions(QUESTION_BY_ID.F2_cause, {}).some((o) => o.value === 'not_recorded'));
+  // A blocked CRM opens the "what is the block" follow-up, and "nobody knows how" softens the block to an assessment.
+  answers = { ...ALL_WEAK, C7: a('blocked') };
+  assert.ok(visibleQuestions(answers, 'commercial').some((q) => q.id === 'C7_block'));
+  assert.equal(feas(diagnose({ answers }), 'I3').feasibility, 'INFEASIBLE');
+  assert.equal(feas(diagnose({ answers: { ...answers, C7_block: a('nobody_knows_how') } }), 'I3').feasibility, 'REQUIRES_ASSESSMENT');
+  assert.equal(feas(diagnose({ answers: { ...answers, C7_block: a('provider_policy') } }), 'I3').feasibility, 'INFEASIBLE');
+  ok('follow-ups build on the previous answer instead of restarting; redundant options are hidden; a blocked CRM is explored and a "not worked out" block becomes an assessment item');
+}
+
 // ── 3. the ten scenarios ───────────────────────────────────────────────────
 console.log('\n3. Scenarios');
 const scenarios = {};
@@ -130,6 +232,7 @@ const scenarios = {};
   let d = diagnose({ answers: ALL_WEAK }); scenarios.weakWeak = d;
   assert.equal(d.suitability.verdict, 'POTENTIAL_FIT');
   assert.equal(d.findings.confirmed.length, 10);
+  assert.deepEqual(d.assessments.I1.derived.map((x) => x.question), ['I1_current'], 'the I1 answers given explicitly win; only the unasked "what does the CRM do today" detail is carried from the stated cause');
   assert.deepEqual(d.proposed, ['F1', 'F2', 'F3', 'F4', 'F5', 'I1', 'I2', 'I3', 'I4', 'I5']);
   assert.equal(feas(d, 'I1').feasibility, 'FEASIBLE_WITH_FOUNDATION');
   assert.ok(feas(d, 'I1').dependencies.some((x) => x.dimension === 'F3' && x.resolution === 'provided'));
@@ -205,14 +308,15 @@ const scenarios = {};
 
   // 8. incomplete discovery
   d = diagnose({ answers: { C1: a('more_valuations'), F1: a('patchy'), F1_cause: m(['time']), F1_consequence: m(['missed_sellers']) } }); scenarios.incomplete = d;
-  assert.equal(d.findings.unknown.length, 9);
+  assert.equal(d.findings.unknown.length, 8, 'I1 is carried from the F1 answer; the other eight are unknown');
+  assert.equal(d.assessments.I1.evidence_status, 'CONFIRMED'); assert.deepEqual(d.assessments.I1.basis_dimensions, ['F1']);
   assert.equal(d.suitability.verdict, 'FURTHER_VALIDATION_REQUIRED');
   assert.ok(d.suitability.reasons.includes('ECONOMICS_UNKNOWN') || d.suitability.reasons.includes('INCOMPLETE_DISCOVERY'));
-  assert.ok(d.validation.length >= 9);
+  assert.ok(d.validation.length >= 8);
   assert.equal(d.economics.available, false); assert.deepEqual(d.economics.missing, ['average fee per instruction', 'valuation-to-instruction conversion', 'monthly valuations']);
   const empty = diagnose({ answers: {} });
   assert.equal(empty.suitability.verdict, 'FURTHER_VALIDATION_REQUIRED'); assert.ok(empty.suitability.reasons.includes('INCOMPLETE_DISCOVERY'));
-  ok('8. incomplete discovery → FURTHER_VALIDATION_REQUIRED; unknown dimensions listed for validation; economics unavailable with the missing figures named; an empty session is never a fit');
+  ok('8. incomplete discovery → FURTHER_VALIDATION_REQUIRED; unknown dimensions listed for validation (a dimension established by an earlier answer is not unknown); economics unavailable with the missing figures named; an empty session is never a fit');
 
   // 9. existing process should be preserved
   d = diagnose({ answers: { ...ALL_WEAK, ...strong('F3', 'task_every_time', 'yes') } }); scenarios.preserve = d;
@@ -273,50 +377,183 @@ console.log('\n4. Overrides, economics and dependencies');
 // ── 5. pitch generation and validation ─────────────────────────────────────
 console.log('\n5. Pitch');
 const session = { session_id: 'dsc_test', agency_id: 'ag_1', agency_name: 'Alpha Estates', contact_name: 'Jane Alpha' };
+const spokenOk = (spoken, input) => { const v = validatePitch({ spoken, plan: templatePitch(input).plan }, input); assert.ok(v.valid, v.issues.join('; ')); return v.words; };
 {
   const input = buildPitchInput(session, scenarios.weakWeak);
   assert.equal(input.mode, 'PILOT');
   assert.equal(input.interventions.length, 10);
   assert.ok(!JSON.stringify(input).includes('@') && !/0124\d+/.test(JSON.stringify(input)), 'no emails or phone numbers go to the model');
-  assert.ok(input.allowed_money_figures.includes(1500) && input.allowed_money_figures.includes(4200) && input.allowed_money_figures.includes(3500));
+  assert.ok(!input.allowed_money_figures.includes(1500), 'the price is not an allowed spoken figure');
+  assert.ok(input.allowed_money_figures.includes(4200) && input.allowed_money_figures.includes(3500));
+  assert.ok(input.focus.length >= 2 && input.focus.length <= 3, 'two or three themes in focus');
+  assert.equal(input.focus[0].id, 'opportunities', 'owner wants more valuations → the demand/database theme leads');
+  assert.ok(input.plan_skeleton.week1 && input.plan_skeleton.weeks5_8);
   const strongInput = buildPitchInput(session, scenarios.strongStrong);
   assert.equal(strongInput.mode, 'NO_PITCH'); assert.equal(strongInput.interventions.length, 0);
-  ok('pitch input carries only structured findings, selected rules and allowed figures; mode follows suitability');
+  ok('pitch input: structured findings, selected rules, two or three ranked themes, plan skeleton and allowed figures — no PII, no price; mode follows suitability');
 
-  const tpl = templatePitch(input);
-  const v = validatePitch(tpl, input);
-  assert.equal(v.valid, true, v.issues.join('; '));
-  for (const key of ['situation', 'gaps', 'interventions', 'preserved', 'together', 'plan_60_days', 'measurement', 'pilot_offer']) assert.ok(tpl.sections[key], `template has ${key}`);
-  assert.match(tpl.sections.pilot_offer, /£1,500 all-in for sixty days/);
-  assert.match(tpl.sections.measurement, /as an illustration, not a forecast/);
-  assert.match(tpl.sections.interventions, /read every enquiry that comes in/);
-  assert.ok(!/guarantee/i.test(pitchSpoken(tpl)));
-  const noPitch = templatePitch(strongInput);
-  assert.match(noPitch.sections.interventions, /I don't think we should run the pilot/);
-  assert.equal(noPitch.sections.pilot_offer, '');
-  assert.equal(validatePitch(noPitch, strongInput).valid, true);
+  const themes = rankThemes(scenarios.strongWeak);
+  assert.ok(themes.every((t) => t.rules.every((id) => /^I/.test(id))), 'strong foundations → only intelligence rules can be spoken about');
+  assert.equal(rankThemes(scenarios.preserve).find((t) => t.id === 'progress')?.rules.includes('F3'), false, 'a preserved strength is never presented as a change');
+  ok('themes only ever group SELECTED rules; preserved strengths are not themes');
+
+  // Template: the spoken pitch and the four-phase plan.
+  const tpl = templatePitch(input, scenarios.weakWeak);
+  const words = spokenOk(tpl.spoken, input);
+  assert.ok(words >= 150 && words <= 250, `template spoken pitch is ${words} words`);
+  assert.match(tpl.spoken, /Jane, from what you've told me, Alpha Estates runs 2 branches/);
+  assert.match(tpl.spoken, /The first thing I'd do is/); assert.match(tpl.spoken, /sixty-day pilot/); assert.match(tpl.spoken, /\?$/);
+  assert.ok(!/£/.test(tpl.spoken), 'no money in the spoken pitch by default'); assert.ok(!/1,?500/.test(tpl.spoken), 'no price');
+  assert.ok(!/F[1-5]\b|I[1-5]\b/.test(tpl.spoken), 'no rule ids spoken aloud');
+  assert.ok(!/guarantee/i.test(tpl.spoken));
+  for (const ph of PLAN_PHASES_COMPACT) { assert.ok(tpl.plan[ph.key]); assert.ok(tpl.plan[ph.key].split(/(?<=[.!?])\s+/).length <= 2, `${ph.key} ≤ 2 sentences`); }
+  assert.match(tpl.plan.week1, /record the baseline \(20 valuations and 8 instructions a month\)/);
+  assert.match(tpl.plan.week2, /Seller-signal recognition running on the incoming enquiry feed/);
+  assert.match(tpl.plan.weeks5_8, /day 45 and day 60/);
+  ok('template: 150–250-word spoken pitch in the agency\'s own numbers, three themes, sixty-day objective, closing question, no price, no rule ids; four plan phases of at most two sentences with the baseline and the first workflow');
+
+  // Preserved strengths and caveats.
   const preserveInput = buildPitchInput(session, scenarios.preserve);
-  assert.match(templatePitch(preserveInput).sections.preserved, /next actions — a follow-up gets set every time/i);
-  ok('template pitch: eight sections, the offer verbatim, illustration hedged, strengths preserved; no-pitch variant declines plainly with no price');
+  assert.match(templatePitch(preserveInput, scenarios.preserve).spoken, /What you've already got around next actions works, and we'd plug into it/);
+  const assessInput = buildPitchInput(session, diagnose({ answers: { ...ALL_WEAK, C7: a('unsure') } }));
+  assert.match(templatePitch(assessInput).spoken, /depends on what Reapit will let us see/);
+  assert.match(templatePlan(diagnose({ answers: { ...ALL_WEAK, C7: a('unsure') } })).weeks3_4, /joins? only if the week-1 check passes/);
+  ok('the spoken pitch keeps existing strengths and CRM-access caveats; the plan keeps feasibility limits');
 
-  const bad = { ...tpl, sections: { ...tpl.sections, measurement: 'We guarantee at least ten extra valuations, worth £40,000 a month.', interventions: `${tpl.sections.interventions} Also we would establish usable customer context.` } };
-  const badInput = buildPitchInput(session, scenarios.blockedCrm);
-  const bv = validatePitch(bad, badInput);
-  assert.equal(bv.valid, false);
-  assert.ok(bv.issues.some((i) => /guarantee/.test(i)));
-  assert.ok(bv.issues.some((i) => /£40,000/.test(i)));
-  assert.ok(bv.issues.some((i) => /not proposed: F2/.test(i)));
-  ok('validation rejects guarantees, money figures not from discovery, and interventions that were not proposed');
+  // No-pitch and validation variants.
+  const noPitch = templatePitch(strongInput);
+  assert.match(noPitch.spoken, /I don't think a pilot is the right thing right now/); assert.equal(noPitch.plan, null);
+  assert.ok(validatePitch(noPitch, strongInput).valid, validatePitch(noPitch, strongInput).issues.join('; '));
+  const valInput = buildPitchInput(session, scenarios.multi);
+  const val = templatePitch(valInput);
+  assert.match(val.spoken, /I'm not going to put a pilot to you today/); assert.ok(validatePitch(val, valInput).valid);
+  ok('no-pitch and validation variants decline plainly, without a plan or a price, and still end with a question');
 
-  // AI paths through generatePitch with a fake caller
-  const good = async ({ tool }) => Object.fromEntries(tool.input_schema.required.map((k) => [k, k === 'pilot_offer' ? 'The founding pilot is £1,500 all-in for sixty days.' : `Spoken ${k}.`]));
+  // Validation catches what the brief forbids.
+  const long = `${tpl.spoken} ${tpl.spoken}`;
+  assert.ok(validatePitch({ spoken: long, plan: tpl.plan }, input).issues.some((i) => /cap 250/.test(i)), 'hard 250-word cap');
+  const bad = { spoken: tpl.spoken.replace(/\?$/, '. We guarantee ten extra valuations, worth £40,000, for £1,500. Also we would establish usable customer context.'), plan: tpl.plan };
+  const bv = validatePitch(bad, buildPitchInput(session, scenarios.blockedCrm));
+  assert.ok(bv.issues.some((i) => /guarantee/.test(i)) && bv.issues.some((i) => /£40,000/.test(i)) && bv.issues.some((i) => /price/.test(i)) && bv.issues.some((i) => /not proposed: F2/.test(i)) && bv.issues.some((i) => /end with a question/.test(i)));
+  const badPlan = validatePitch({ spoken: tpl.spoken, plan: { ...tpl.plan, week2: 'One. Two. Three sentences here.' } }, input);
+  assert.ok(badPlan.issues.some((i) => /more than two sentences/.test(i)));
+  assert.ok(validatePitch({ spoken: '- first\n- second?', plan: tpl.plan }, input).issues.some((i) => /bullet/.test(i)));
+  ok('validation rejects the word cap, guarantees, invented money, the price, unproposed rules, a missing closing question, bullets and long plan phases');
+
+  // Model paths through generatePitch.
+  const good = async () => ({ spoken: `${tpl.spoken.slice(0, -1)} — shall we?`, week1: 'Confirm the findings and set up capture.', week2: 'Switch on seller-signal recognition.', weeks3_4: 'Add the database list.', weeks5_8: 'Run it and count the valuations.' });
   let out = await generatePitch({ session, diagnosis: scenarios.weakWeak, call: good });
-  assert.equal(out.source, 'AI'); assert.equal(out.validation.valid, true); assert.equal(out.pitch.sections.gaps, 'Spoken gaps.');
+  assert.equal(out.source, 'AI'); assert.deepEqual(out.sources, { spoken: 'AI', plan: 'AI' }); assert.equal(out.validation.valid, true); assert.match(out.pitch.spoken, /shall we\?$/);
   out = await generatePitch({ session, diagnosis: scenarios.weakWeak, call: async () => { throw new Error('simulated outage'); } });
-  assert.equal(out.source, 'TEMPLATE'); assert.match(out.error, /simulated outage/); assert.equal(out.validation.valid, true);
-  out = await generatePitch({ session, diagnosis: scenarios.weakWeak, call: async ({ tool }) => Object.fromEntries(tool.input_schema.required.map((k) => [k, 'We guarantee £9,999 a month.'])) });
-  assert.equal(out.source, 'TEMPLATE'); assert.equal(out.validation.ai_rejected, true); assert.ok(out.validation.ai_issues.some((i) => /guarantee/.test(i)));
-  ok('generatePitch: a valid model result is used; an outage and an invalid result both fall back to the template with the reason recorded — discovery data untouched');
+  assert.equal(out.source, 'TEMPLATE'); assert.deepEqual(out.sources, { spoken: 'TEMPLATE', plan: 'TEMPLATE' }); assert.match(out.error, /simulated outage/); assert.equal(out.validation.valid, true);
+  out = await generatePitch({ session, diagnosis: scenarios.weakWeak, call: async () => ({ spoken: 'We guarantee £9,999 a month for £1,500. Interested?', week1: 'a', week2: 'b', weeks3_4: 'c', weeks5_8: 'd' }) });
+  assert.equal(out.sources.spoken, 'TEMPLATE'); assert.equal(out.sources.plan, 'AI'); assert.equal(out.validation.ai_rejected, true); assert.ok(out.validation.ai_issues.some((i) => /guarantee/.test(i)));
+  out = await generatePitch({ session, diagnosis: scenarios.weakWeak, call: async () => ({ spoken: `${tpl.spoken.slice(0, -1)} — shall we?`, week1: 'One. Two. Three.', week2: 'b', weeks3_4: 'c', weeks5_8: 'd' }) });
+  assert.deepEqual(out.sources, { spoken: 'AI', plan: 'TEMPLATE' }); assert.equal(out.source, 'AI');
+  out = await generatePitch({ session, diagnosis: scenarios.weakWeak, call: async () => ({ spoken: long, week1: 'a', week2: 'b', weeks3_4: 'c', weeks5_8: 'd' }) });
+  assert.equal(out.sources.spoken, 'TEMPLATE'); assert.ok(out.validation.ai_issues.some((i) => /cap 250/.test(i)));
+  ok('generatePitch: a valid model result is used; outage, an invalid spoken pitch, an over-long spoken pitch or a long plan each fall back part-by-part to the template with the reason recorded');
+}
+
+// ── 5b. the revised flow on realistic owners ───────────────────────────────
+console.log('\n5b. Realistic owners');
+const flowIds = (answers) => visibleQuestions(answers).map((q) => q.id);
+{
+  // Louis (the live session's real answers, questions v1): three branches, Reapit,
+  // 250 enquiries, 5,000 contacts, mostly-captured but fragmented context,
+  // limited database and cross-interaction work, some processes fine.
+  const LOUIS = { C1: a('more_valuations'), C2: m(['not_enough_opportunities', 'losing_to_competitors', 'team_time']), C3: a(3), C4: a(250), C5: a(5000), C6: a('reapit'), C7: a('export'), C8: a(20), C9: a(6), C10: a(4500),
+    F1: a('mostly'), F1_cause: m(['no_process', 'crm_limits']), F1_crm_limit: a('no_fields'), F1_consequence: m(['repeated_questions', 'missed_sellers']),
+    F2: a('sometimes'), F2_cause: m(['scattered']), F2_consequence: m(['repeated_questions', 'missed_context']), F2_frequency: a('daily'),
+    F3: a('sometimes_task'), F3_cause: m(['no_process']), F3_consequence: m(['unknown']), F4: a('unknown'),
+    F5: a('none'), F5_cause: m(['not_recorded']), F5_consequence: m(['unknown']), F5_tried: m(['crm_change']),
+    I1: a('process_manual'), I1_current: a('nothing'), I1_consequence: m(['unknown']),
+    I2: a('no'), I2_cause: m(['never_looked']), I2_matching: a('unknown'), I2_consequence: m(['missed_sellers', 'missed_reactivation', 'repeated_questions']),
+    I3: a('when_time'), I3_cause: m(['no_time', 'not_priority']), I3_history: a('partly'), I3_quality: a('ok'), I3_consequence: m(['unknown_value']),
+    I4: a('judgement'), I4_cause: m(['never_needed']), I4_signals: a('some'), I4_consequence: m(['unknown']),
+    I5: a('informal'), I5_cause: m(['no_outcomes', 'no_time']), I5_consequence: m(['keep_failing', 'drop_working']) };
+  // What the ORIGINAL flow asked Louis that the revised flow would not:
+  const before = { ...LOUIS, C11: a(30) };
+  const cov = evaluateCoverage(Object.fromEntries(Object.entries(before).filter(([k]) => !['C11', 'I5_cause'].includes(k))));
+  assert.equal(cov.C11.derived.value, 30, 'C11 was asked (Louis said 30%) although C8/C9 already gave 30%');
+  assert.deepEqual(cov.I5_cause.derived.values, ['no_outcomes'], 'I5_cause was asked although F5 = "none" already established no outcomes');
+  assert.ok(!visibleOptions(QUESTION_BY_ID.F2_cause, before).some((o) => o.value === 'not_recorded'), 'F2 offered "not much gets recorded" after F1 had covered capture');
+  assert.match(wordingFor(QUESTION_BY_ID.F4, before).primary, /For the ones that do get a task set/, 'F4 was asked cold after F3 said "sometimes a task"');
+  assert.match(wordingFor(QUESTION_BY_ID.I1, before).primary, /mostly gets recorded/);
+  assert.match(wordingFor(QUESTION_BY_ID.I5, before).primary, /outcomes aren't really tracked/);
+  const d = diagnose({ answers: LOUIS });
+  assert.equal(d.suitability.verdict, 'POTENTIAL_FIT');
+  assert.equal(d.economics.baseline.conversion_pct.value, 30); assert.equal(d.economics.baseline.conversion_pct.source, 'derived');
+  assert.deepEqual(d.assessments.I5.derived.map((x) => x.question), []);
+  assert.ok(d.proposed.includes('I1') && d.proposed.includes('I3') && d.proposed.includes('F1') && d.proposed.includes('F2'));
+  const input = buildPitchInput({ agency_name: 'TEST - Louis', contact_name: 'Louis' }, d);
+  const tpl = templatePitch(input, d);
+  const words = spokenOk(tpl.spoken, input);
+  assert.ok(words >= 150 && words <= 250, `Louis template pitch is ${words} words`);
+  assert.equal(input.focus[0].id, 'opportunities'); assert.equal(input.focus[1].id, 'capture');
+  assert.match(tpl.spoken, /read every incoming enquiry for buyers who've also got somewhere to sell/);
+  assert.match(tpl.spoken, /Louis, from what you've told me, TEST - Louis runs 3 branches doing about 20 valuations a month/);
+  assert.match(tpl.plan.week1, /20 valuations and 6 instructions a month/);
+  const ai = await generatePitch({ session: { agency_name: 'TEST - Louis', contact_name: 'Louis' }, diagnosis: d, call: async ({ prompt }) => { const inp = JSON.parse(prompt.slice(prompt.indexOf('\n\n') + 2)); return { spoken: `Louis, you want more valuations, and with two hundred and fifty enquiries a month across three branches the demand is already there; the gap is what happens to the sellers you hear about. ${inp.focus.slice(0, 2).map((t) => `We'd ${inp.interventions.find((r) => r.rule_id === t.spoken_rules[0]).what_we_would_change}, and ${inp.interventions.find((r) => r.rule_id === (t.spoken_rules[1] || t.spoken_rules[0])).what_we_would_change}.`).join(' ')} Put together, that means more of the sellers already talking to you, and the ones sitting in Reapit, turn into valuation appointments without your team working a different system. The sixty days are for setting it up in the first fortnight, running it, and counting the valuations and instructions it produced against your twenty a month. Does that sound like the right place to start?`, ...inp.plan_skeleton }; } });
+  assert.equal(ai.source, 'AI', JSON.stringify(ai.validation.ai_issues)); assert.ok(wordCount(ai.pitch.spoken) <= SPOKEN_WORD_CAP); assert.ok(ai.validation.valid);
+  console.log(`\n     Louis (template, ${words} words):\n     ${tpl.spoken.replace(/\n/g, ' ')}\n`);
+  ok('Louis: the revised flow drops C11 and I5_cause (already established), hides the redundant F2 option, rewords F4/I1/I5 on his earlier answers; diagnosis unchanged; both template and model pitches are under 250 words and lead with incoming demand + capture');
+
+  // An owner who explains several related problems in one answer: capture patchy
+  // because they're busy, sellers lost daily, tried training. Recorded in one go —
+  // nothing further is asked for F1, and I1 is established from it.
+  let answers = { ...COMMERCIAL, F1: a('patchy'), F1_cause: m(['time']), F1_consequence: m(['missed_sellers']), F1_frequency: a('daily'), F1_tried: m(['training']) };
+  assert.equal(assessDimension('F1', answers).evidence_status, 'CONFIRMED');
+  let ids = flowIds(answers);
+  assert.ok(!ids.includes('I1') && !ids.includes('I1_cause') && !ids.includes('I1_consequence'), 'I1 is not re-explored');
+  assert.ok(ids.includes('I1_volume'), 'but the one thing F1 did not tell us — how many buyers mention selling — is still asked');
+  assert.equal(diagnose({ answers }).assessments.I1.evidence_status, 'CONFIRMED');
+  ok('one rich answer: F1 confirmed in one go, I1 carried from it with only the volume question left');
+
+  // Foundations already strong: one verification each, no exploration, and the
+  // intelligence questions still run in full.
+  answers = { ...COMMERCIAL, ...ALL_STRONG_F };
+  ids = flowIds(answers);
+  assert.deepEqual(ids.filter((id) => /^F/.test(id)), ['F1', 'F1_verify', 'F2', 'F2_verify', 'F3', 'F3_verify', 'F4', 'F4_verify', 'F5', 'F5_verify']);
+  assert.ok(ids.includes('I1') && ids.includes('I3') && !ids.includes('I2_matching'), 'matching is covered by the verified context answer');
+  ok('strong foundations: exactly one verification per dimension, nothing challenged twice, intelligence still explored');
+
+  // Repeatedly relevant answers: F3 "nothing" + F5 "none" + I3 "no way to prioritise".
+  answers = { ...COMMERCIAL, F3: a('nothing'), F3_cause: m(['unclear_owner', 'too_busy']), F3_consequence: m(['lost_valuations']), F5: a('none'), F5_cause: m(['no_stages']), F5_consequence: m(['cant_judge']), I3: a('not_used'), I3_cause: m(['no_way_to_prioritise']), I3_consequence: m(['untouched_value']), I3_history: a('all_in_crm'), I3_quality: a('ok') };
+  ids = flowIds(answers);
+  for (const id of ['F4', 'F4_cause', 'F4_consequence', 'I5_cause', 'I5_consequence', 'I4', 'I4_cause']) assert.ok(!ids.includes(id), `${id} not asked`);
+  for (const id of ['I5', 'I4_consequence', 'I4_signals']) assert.ok(ids.includes(id), `${id} still asked`);
+  const dd = diagnose({ answers });
+  assert.equal(dd.assessments.F4.evidence_status, 'CONFIRMED'); assert.equal(dd.assessments.I4.evidence_status, 'PROVISIONAL', 'consequence still needed');
+  assert.ok(dd.proposed.includes('F4') && dd.proposed.includes('I4'));
+  ok('an owner whose answers keep covering later ground: seven questions are skipped as covered, the diagnosis still selects F4 and I4, and only the genuinely missing pieces remain');
+
+  // A clear accountability problem: follow-ups are set but ignored.
+  answers = { ...COMMERCIAL, F3: a('task_every_time'), F3_verify: a('yes'), F4: a('tracked_not_reviewed'), F4_cause: m(['tasks_ignored', 'no_overdue_view']), F4_consequence: m(['missed_sellers']) };
+  const dacc = diagnose({ answers });
+  assert.equal(dacc.assessments.F3.evidence_status, 'EXISTING_STRENGTH'); assert.equal(dacc.assessments.F4.evidence_status, 'CONFIRMED');
+  assert.ok(dacc.proposed.includes('F4') && !dacc.proposed.includes('F3'));
+  assert.ok(feas(dacc, 'F4').dependencies.some((x) => x.dimension === 'F3' && x.resolution === 'existing'));
+  assert.match(wordingFor(QUESTION_BY_ID.F4, { F3: a('task_every_time') }).primary, /^How do you make sure those follow-ups actually happen\?/);
+  ok('clear accountability problem: F3 preserved, F4 confirmed and proposed on top of it');
+
+  // A sophisticated CRM: flags seller signals and changes, prioritises, but the
+  // owner cannot say what it produces.
+  answers = { ...COMMERCIAL, ...ALL_STRONG_F, ...strong('I1', 'system_flags', 'identifies_routes'), ...strong('I2', 'flags_changes', 'yes'), ...strong('I3', 'systematic', 'not_measured'), ...strong('I4', 'scored', 'circumstances'), I5: a('informal'), I5_cause: m(['no_time']), I5_consequence: m(['cant_scale']) };
+  ids = flowIds(answers);
+  assert.ok(!ids.includes('I2_matching') && !ids.includes('I4_signals'), 'matching and activity signals are not asked when the system already flags changes');
+  const dcrm = diagnose({ answers });
+  assert.equal(dcrm.assessments.I3.evidence_status, 'PROVISIONAL', 'reported systematic database work that is not measured is not taken as a strength');
+  assert.equal(dcrm.assessments.I4.evidence_status, 'EXISTING_STRENGTH');
+  assert.deepEqual(dcrm.proposed, ['I3', 'I5']);
+  ok('sophisticated CRM: verified strengths preserved, unverified claims downgraded and explored, nothing re-investigated');
+
+  // Vague or incomplete answers: "don't know" everywhere stays unknown, never derived.
+  answers = { F1: a('unknown'), F3: a('unknown'), F5: a('unknown'), I3: a('unknown') };
+  assert.deepEqual(Object.keys(evaluateCoverage(answers)), []);
+  const dv = diagnose({ answers });
+  assert.equal(dv.findings.unknown.length, 10); assert.equal(dv.suitability.verdict, 'FURTHER_VALIDATION_REQUIRED');
+  ok('vague answers: nothing is derived from "don\'t know", every dimension stays unknown, verdict is further validation');
 }
 
 // ── 6. handlers end to end against an in-memory workbook ──────────────────
@@ -358,7 +595,8 @@ const workbook = () => ({
 {
   const { store, repo } = makeStore(workbook());
   __setRepoForTests(repo);
-  __setAiCallerForTests(async ({ tool }) => Object.fromEntries(tool.input_schema.required.map((k) => [k, k === 'pilot_offer' ? 'The founding pilot is £1,500 all-in for sixty days.' : `Spoken ${k}.`])));
+  const fakeModel = async ({ prompt }) => { const inp = JSON.parse(prompt.slice(prompt.indexOf('\n\n') + 2)); const t = templatePitch(inp); return { spoken: `${t.spoken.slice(0, -1)} — shall we?`, ...(inp.plan_skeleton || { week1: 'n/a', week2: 'n/a', weeks3_4: 'n/a', weeks5_8: 'n/a' }) }; };
+  __setAiCallerForTests(fakeModel);
 
   // context: prepopulated from records, nothing invented
   const tables = Object.fromEntries(await Promise.all(Object.keys(store).map(async (t) => [t, await repo.getTable(t)])));
@@ -430,7 +668,7 @@ const workbook = () => ({
   assert.equal(r.body.pitch.version, 2); assert.equal(r.body.pitch.source, 'TEMPLATE'); assert.match(r.body.ai_error, /simulated outage/);
   assert.equal(store.DISCOVERY_PITCHES.length, 4, 'two immutable pitch rows');
   const p1 = pitchView(Object.fromEntries(DISCOVERY_PITCHES_HEADER.map((k, i) => [k, store.DISCOVERY_PITCHES[2][i]])));
-  assert.equal(p1.version, 1); assert.equal(p1.pitch.sections.gaps, 'Spoken gaps.');
+  assert.equal(p1.version, 1); assert.match(p1.pitch.spoken, /shall we\?$/); assert.deepEqual(p1.pitch.sources, { spoken: 'AI', plan: 'AI' }); assert.ok(p1.pitch.word_count <= SPOKEN_WORD_CAP);
   row = sessionView(Object.fromEntries(DISCOVERY_SESSIONS_HEADER.map((k, i) => [k, store.DISCOVERY_SESSIONS[2][i]])));
   assert.equal(row.pitch_count, 2); assert.equal(row.stage, 'pitch'); assert.deepEqual(Object.keys(row.answers).length, Object.keys(ALL_WEAK).length, 'answers untouched by pitch generation');
   r = res(); await handleDiscoverySession(req('GET', { session_id: sessionId }), r);

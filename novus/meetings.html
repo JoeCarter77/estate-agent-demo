@@ -48,6 +48,7 @@
     .rail-q .dot{flex:none;width:7px;height:7px;border-radius:50%;margin-top:4px;background:rgba(var(--ink-rgb),.14);}
     .rail-q.answered .dot{background:var(--blue);}
     .rail-q.skipped .dot{background:transparent;box-shadow:inset 0 0 0 1.5px var(--ink-4);}
+    .rail-q.covered{color:var(--ink-4);font-style:italic;} .rail-q.covered .dot{background:var(--blue-dim,var(--blue));opacity:.5;}
     .rail-q.optional{opacity:.75;}
     .rail-q .lbl{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
     .qcard{border:1px solid var(--hair);border-radius:var(--r-lg);background:var(--bg-2);padding:26px 28px 22px;min-height:420px;display:flex;flex-direction:column;}
@@ -451,25 +452,79 @@ const A = () => S.session.answers;
 function optLevel(q, value){ return (q.options||[]).find((o) => o.value === value)?.level || 'unknown'; }
 function answerValues(a){ if(!a || a.skipped) return []; if(Array.isArray(a.values)) return a.values; return a.value !== undefined && a.value !== '' && a.value !== null ? [String(a.value)] : []; }
 function levelOf(q, a){ if(!a || a.skipped) return 'unknown'; return optLevel(q, String(a.value)); }
-function effectiveLevel(dim){
-  const q = QBY(dim); const lv = levelOf(q, A()[dim]); if(lv !== 'strong') return lv;
-  const v = A()[`${dim}_verify`]; if(!v || v.skipped) return lv;
+/* ── shared discovery context (mirrors lib/discovery-questions.mjs) ──────
+   Coverage rules come from the server registry (data, not code) and are
+   evaluated here identically so the flow reacts before the autosave returns.
+   A covered question is not asked; its derived answer is a MAPPING of an
+   earlier real answer, and "Ask anyway" (a stored {reopened:true} marker)
+   always wins. */
+const hasVal = (a) => Boolean(a) && (Array.isArray(a.values) ? a.values.length > 0 : (a.value !== undefined && a.value !== '' && a.value !== null));
+const storedA = (id) => { const a = A()[id]; return a && !a.skipped && !a.reopened ? a : null; };
+function effectiveLevelIn(dim, answers){
+  const q = QBY(dim); const lv = levelOf(q, answers[dim]); if(lv !== 'strong') return lv;
+  const v = answers[`${dim}_verify`]; if(!v || v.skipped) return lv;
   const opt = (QBY(`${dim}_verify`)?.options||[]).find((o) => o.value === v.value);
   return opt?.verdict === 'downgrade' ? 'partial' : lv;
 }
+function effectiveLevel(dim){ return effectiveLevelIn(dim, EFF().answers); }
+function condHolds(c, answers){
+  const a = answers[c.question]; if(!a || a.skipped || a.reopened && !hasVal(a)) return false;
+  if(c.number) return a.value !== '' && a.value !== null && a.value !== undefined && Number.isFinite(Number(a.value));
+  if(c.answered) return answerValues(a).some((v) => v !== 'unknown') || (!Array.isArray(a.values) && hasVal(a) && a.value !== 'unknown');
+  if(c.any) return answerValues(a).some((v) => c.any.includes(v));
+  if(c.levels) return c.levels.includes(effectiveLevelIn(c.question, answers));
+  return true;
+}
+function deriveFor(rule, answers){
+  const d = rule.derive; const q = QBY(rule.question);
+  if(d.compute === 'conversion'){ const v = Number(answers.C8?.value), i = Number(answers.C9?.value); if(!v || !Number.isFinite(i)) return null; return { value: Math.round((i / v) * 1000) / 10, source:'derived' }; }
+  if(d.map_from){ const m = [...new Set(answerValues(answers[d.map_from]).map((v) => d.map[v]).filter(Boolean))]; if(!m.length) return null; return q.multi ? { values: m } : { value: m[0] }; }
+  if(d.values) return { values: [...d.values] };
+  return { value: d.value };
+}
+let EFF_CACHE = null;
+function EFF(){
+  if(EFF_CACHE && EFF_CACHE.src === A()) return EFF_CACHE;
+  const stored = A(); const coverage = {}; const stripped = {};
+  for(const [id, a] of Object.entries(stored)){ if(a && !a.reopened) stripped[id] = a; else if(a && a.reopened && hasVal(a)) stripped[id] = a; }
+  for(const rule of (S.registry.coverage_rules||[])){
+    if(coverage[rule.question]) continue;
+    const own = stored[rule.question]; if(own && (own.reopened || own.skipped || hasVal(own))) continue;
+    if(!rule.when.every((c) => condHolds(c, stripped))) continue;
+    const derived = deriveFor(rule, stripped); if(!derived) continue;
+    coverage[rule.question] = { rule_id: rule.id, basis: rule.basis, note: rule.note, derived: { ...derived, derived:true } };
+  }
+  const answers = { ...stored }; for(const [id, c] of Object.entries(coverage)) answers[id] = c.derived;
+  EFF_CACHE = { src: stored, answers, coverage }; return EFF_CACHE;
+}
+function invalidateEff(){ EFF_CACHE = null; }
+function isCovered(id){ return Boolean(EFF().coverage[id]); }
 function isVisible(q){
+  const eff = EFF(); if(eff.coverage[q.id]) return false;
   const r = q.show_when; if(!r) return true;
-  const ref = QBY(r.question); const a = A()[r.question]; if(!ref || !a || a.skipped) return false;
-  if(r.levels) return r.levels.includes(ref.role === 'primary' ? effectiveLevel(ref.id) : levelOf(ref, a));
+  const ref = QBY(r.question); const a = eff.answers[r.question]; if(!ref || !a || a.skipped || (a.reopened && !hasVal(a))) return false;
+  if(r.levels) return r.levels.includes(ref.role === 'primary' ? effectiveLevelIn(ref.id, eff.answers) : levelOf(ref, a));
   if(r.any) return answerValues(a).some((v) => r.any.includes(v));
   return true;
 }
+function wordingFor(q){ const eff = EFF(); for(const [i, v] of (q.variants||[]).entries()){ if(condHolds(v.when, eff.answers)) return { primary: v.primary, variant: v.id || `v${i+1}` }; } return { primary: q.primary, variant:'' }; }
+function visibleOptions(q){ const eff = EFF(); return (q.options||[]).filter((o) => !o.hide_when || !condHolds(o.hide_when, eff.answers)); }
 function isAnswered(a){ if(!a || a.skipped) return false; if(Array.isArray(a.values)) return a.values.length > 0; return a.value !== undefined && a.value !== '' && a.value !== null; }
-function visible(section){ return Q().filter((q) => q.section === section && isVisible(q)); }
-function nextUnanswered(section){ const vs = visible(section); return vs.find((q) => !isAnswered(A()[q.id]) && !A()[q.id]?.skipped) || vs[vs.length-1] || null; }
+const SECTIONS_OF = (stage) => (S.registry.stage_sections||{})[stage] || [stage];
+function visible(stage){ const secs = SECTIONS_OF(stage); return Q().filter((q) => secs.includes(q.section) && isVisible(q)); }
+/* Covered questions belonging to a stage — listed in the rail, never asked unless reopened. */
+function coveredIn(stage){ const secs = SECTIONS_OF(stage); const eff = EFF(); return Q().filter((q) => secs.includes(q.section) && eff.coverage[q.id]); }
+/* Once a dimension has its cause and consequence, the optional detail is
+   reachable from the rail but "Next" does not walk through it. */
+function explorationComplete(dim){
+  const eff = EFF(); const need = ['cause','consequence'].map((role) => Q().find((q) => q.dimension === dim && q.role === role)).filter(Boolean);
+  return need.every((q) => { const a = eff.answers[q.id]; return a && !a.skipped && answerValues(a).some((v) => v !== 'unknown'); });
+}
+function skippable(q){ return Boolean(q.optional) && q.dimension && explorationComplete(q.dimension) && !isAnswered(A()[q.id]); }
+function nextUnanswered(stage){ const vs = visible(stage); return vs.find((q) => !isAnswered(A()[q.id]) && !A()[q.id]?.skipped && !skippable(q)) || vs[vs.length-1] || null; }
 
 /* ═══ DISCOVERY: SAVE ═══════════════════════════════════════════════════ */
-function markDirty(){ SAVE.dirty = true; renderSaveState(); if(SAVE.timer) clearTimeout(SAVE.timer); SAVE.timer = setTimeout(flush, 800); }
+function markDirty(){ invalidateEff(); SAVE.dirty = true; renderSaveState(); if(SAVE.timer) clearTimeout(SAVE.timer); SAVE.timer = setTimeout(flush, 800); }
 function renderSaveState(){
   const el = $('save-state');
   if(!S){ el.textContent = ''; el.className = 'save-state'; return; }
@@ -547,19 +602,28 @@ function goQuestion(id){ CUR = id; renderRail(); renderCentre(); }
 /* Left rail: the section navigator. */
 function renderRail(){
   const rail = $('d-rail');
-  if(!['commercial','foundations','intelligence'].includes(STAGE)){
-    rail.innerHTML = `<div class="rail-h">Sections</div>${S.registry.sections.map((sec) => { const vs = visible(sec.id); const done = vs.filter((q) => isAnswered(A()[q.id]) || A()[q.id]?.skipped).length; return `<button class="rail-q" data-go-stage="${sec.id}"><span class="dot${done === vs.length && vs.length ? ' answered' : ''}"></span><span class="lbl">${esc(sec.label)} <span class="muted">${done}/${vs.length}</span></span></button>`; }).join('')}`;
+  const qStages = ['commercial','foundations','intelligence'];
+  if(!qStages.includes(STAGE)){
+    rail.innerHTML = `<div class="rail-h">Sections</div>${qStages.map((st) => { const vs = visible(st); const done = vs.filter((q) => isAnswered(A()[q.id]) || A()[q.id]?.skipped).length; const cov = coveredIn(st).length; return `<button class="rail-q" data-go-stage="${st}"><span class="dot${done === vs.length && vs.length ? ' answered' : ''}"></span><span class="lbl">${esc(STAGES.find((x) => x[0] === st)[1])} <span class="muted">${done}/${vs.length}${cov ? ` · ${cov} covered` : ''}</span></span></button>`; }).join('')}`;
     return;
   }
   const vs = visible(STAGE);
-  const dims = S.registry.dimensions.filter((d) => d.section === STAGE);
-  const item = (q) => { const a = A()[q.id]; const st = a?.skipped ? 'skipped' : isAnswered(a) ? 'answered' : ''; return `<button class="rail-q ${st}${CUR === q.id ? ' on' : ''}${q.optional ? ' optional' : ''}" data-go-q="${esc(q.id)}"><span class="dot"></span><span class="lbl">${esc(q.role === 'primary' || q.role === 'context' || q.role === 'detail' && STAGE === 'commercial' ? q.primary : `${ROLE_LABEL[q.role] || q.role}${q.optional ? ' (optional)' : ''}`)}</span></button>`; };
-  let html = `<div class="rail-h">${esc(S.registry.sections.find((x) => x.id === STAGE)?.label || STAGE)}</div>`;
-  if(!dims.length) html += vs.map(item).join('');
-  else for(const d of dims){
-    const mine = vs.filter((q) => q.dimension === d.id);
-    const as = S.diagnosis?.assessments?.[d.id];
-    html += `<div class="rail-dim"><span>${esc(d.id)} · ${esc(d.label)}</span>${as ? pill(as.level === 'unknown' ? '?' : as.level, as.level === 'weak' ? 't-red' : as.level === 'partial' ? 't-amber' : as.level === 'strong' ? 't-green' : 't-grey', true) : ''}</div>` + mine.map(item).join('');
+  const covered = coveredIn(STAGE);
+  const item = (q) => { const a = A()[q.id]; const st = a?.skipped ? 'skipped' : isAnswered(a) ? 'answered' : ''; const opt = q.optional && !isAnswered(a) ? (skippable(q) ? ' optional' : '') : ''; return `<button class="rail-q ${st}${CUR === q.id ? ' on' : ''}${opt}" data-go-q="${esc(q.id)}"><span class="dot"></span><span class="lbl">${esc(q.role === 'primary' || q.role === 'context' || (q.role === 'detail' && !q.dimension) ? wordingFor(q).primary : `${ROLE_LABEL[q.role] || q.role}${q.optional ? ' (optional)' : ''}`)}</span></button>`; };
+  const coveredItem = (q) => { const c = EFF().coverage[q.id]; return `<button class="rail-q covered${CUR === q.id ? ' on' : ''}" data-go-q="${esc(q.id)}" title="${esc(c.note)}"><span class="dot"></span><span class="lbl">Already covered — ${esc(q.role === 'primary' || q.role === 'context' ? q.purpose.replace(/\.$/, '') : (ROLE_LABEL[q.role] || q.role).toLowerCase())} <span class="muted">(from ${esc(c.basis.join(', '))})</span></span></button>`; };
+  let html = '';
+  for(const secId of SECTIONS_OF(STAGE)){
+    const sec = S.registry.sections.find((x) => x.id === secId);
+    html += `<div class="rail-h">${esc(sec?.label || secId)}</div>`;
+    const dims = S.registry.dimensions.filter((d) => d.section === secId);
+    const inSec = (q) => q.section === secId;
+    if(!dims.length){ html += vs.filter(inSec).map(item).join('') + covered.filter(inSec).map(coveredItem).join(''); continue; }
+    for(const d of dims){
+      const mine = vs.filter((q) => q.dimension === d.id);
+      const cov = covered.filter((q) => q.dimension === d.id);
+      const as = S.diagnosis?.assessments?.[d.id];
+      html += `<div class="rail-dim"><span>${esc(d.id)} · ${esc(d.label)}</span>${as ? pill(as.level === 'unknown' ? '?' : as.level, as.level === 'weak' ? 't-red' : as.level === 'partial' ? 't-amber' : as.level === 'strong' ? 't-green' : 't-grey', true) : ''}</div>` + mine.map(item).join('') + cov.map(coveredItem).join('');
+    }
   }
   html += `<div class="btnrow" style="margin-top:14px;padding:0 8px"><button class="btn btn-secondary btn-sm" data-go-stage="${STAGES[STAGES.findIndex((x) => x[0] === STAGE)+1][0]}" type="button">Next section &rarr;</button></div>`;
   rail.innerHTML = html;
@@ -572,6 +636,8 @@ function renderCentre(){
   if(STAGE === 'pitch') return renderPitch(el);
   if(STAGE === 'outcome') return renderOutcome(el);
   const vs = visible(STAGE);
+  /* A covered question opened from the rail: show what covered it, offer to ask anyway. */
+  if(CUR && isCovered(CUR) && SECTIONS_OF(STAGE).includes(QBY(CUR)?.section)){ renderCoveredCard(el, QBY(CUR)); return; }
   if(!CUR || !vs.some((q) => q.id === CUR)) CUR = nextUnanswered(STAGE)?.id || vs[0]?.id || '';
   const q = QBY(CUR);
   if(!q){ el.innerHTML = `<div class="qcard">${emptyState('Nothing to ask here', 'Move to the next section.')}</div>`; return; }
@@ -580,9 +646,10 @@ function renderCentre(){
   const dim = q.dimension ? S.registry.dimensions.find((d) => d.id === q.dimension) : null;
   const alt = ALT[q.id] || '';
   const snap = S.session.question_snapshot?.[q.id];
-  const primaryText = q.primary;
+  const wording = wordingFor(q);
+  const primaryText = wording.primary;
   const values = answerValues(a);
-  const opts = (q.options||[]);
+  const opts = visibleOptions(q);
   const optHtml = (q.type === 'single' || q.type === 'multi') ? `<div class="opts${opts.length > 6 ? ' two' : ''}">${opts.map((o, i) => `<button class="opt${values.includes(o.value) ? ' on' : ''}" data-opt="${esc(o.value)}" type="button"><span class="key">${i+1 <= 9 ? i+1 : ''}</span><span>${esc(o.label)}</span>${o.level && o.level !== 'unknown' ? `<span class="lv">${esc(o.level)}</span>` : ''}${o.verdict ? `<span class="lv">${o.verdict === 'confirm' ? 'confirms' : 'gap'}</span>` : ''}</button>`).join('')}</div>` : '';
   const numHtml = q.type === 'number' ? `<div class="numrow"><input class="input" id="q-num" type="number" inputmode="decimal" value="${a.value ?? ''}" placeholder="—" /><span class="unit">${esc(q.unit||'')}</span>${q.source_toggle ? `<span class="seg"><button type="button" data-src="actual" class="${a.source === 'actual' ? 'on' : ''}">Actual figure</button><button type="button" data-src="owner_estimate" class="${!a.source || a.source === 'owner_estimate' ? 'on' : ''}">Owner estimate</button></span>` : ''}${q.id === 'C11' && S.diagnosis?.economics?.baseline?.conversion_pct?.source === 'derived' ? `<span class="mini">derived: ${esc(S.diagnosis.economics.baseline.conversion_pct.value)}% (${esc(S.diagnosis.economics.baseline.conversion_pct.detail)})</span>` : ''}</div>` : '';
   const textHtml = q.type === 'text' ? `<div class="q-notes"><textarea class="input block" id="q-text" placeholder="In their words…">${esc(a.value||'')}</textarea></div>` : '';
@@ -596,6 +663,8 @@ function renderCentre(){
     ${alt === 'example' && q.example ? `<div class="q-alt"><span class="k">Example</span>${esc(q.example)}</div>` : ''}
     <div class="q-tools">${q.simpler ? `<button class="btn btn-quiet btn-sm${alt === 'simpler' ? ' on' : ''}" data-alt="simpler" type="button">Make simpler <kbd class="k">S</kbd></button>` : ''}${q.example ? `<button class="btn btn-quiet btn-sm${alt === 'example' ? ' on' : ''}" data-alt="example" type="button">Give an example <kbd class="k">E</kbd></button>` : ''}</div>
     ${a.prefilled ? `<div class="prefill">Prefilled from the agency record${a.source ? ` (${esc(a.source)})` : ''} — confirm or change</div>` : ''}
+    ${a.reopened && !isAnswered(a) ? `<div class="note">Asked anyway — an earlier answer had covered this. Answer it, or leave it and the earlier answer stands.</div>` : ''}
+    ${wording.variant ? `<div class="mini" style="margin-top:8px">Builds on an earlier answer · <span class="muted">original: “${esc(q.primary)}”</span></div>` : ''}
     ${snap && snap.primary !== q.primary ? `<div class="note">Wording when answered: “${esc(snap.primary)}”</div>` : ''}
     ${optHtml}${numHtml}${textHtml}
     ${q.allow_notes && q.type !== 'text' ? `<div class="q-notes"><textarea class="input block" id="q-note" placeholder="Owner's words / notes (optional)">${esc(a.note||'')}</textarea></div>` : ''}
@@ -611,21 +680,42 @@ function renderCentre(){
   </div>`;
   if(q.type === 'number') $('q-num')?.focus();
 }
+function renderCoveredCard(el, q){
+  const c = EFF().coverage[q.id]; const d = c.derived;
+  const label = (v) => (q.options||[]).find((o) => o.value === v)?.label || v;
+  const shown = Array.isArray(d.values) ? d.values.map(label).join(', ') : (q.type === 'number' ? `${d.value}${q.unit ? ` ${q.unit}` : ''}` : label(String(d.value)));
+  const basis = c.basis.map((id) => { const bq = QBY(id); const ba = A()[id]; const bl = bq ? (bq.multi ? answerValues(ba).map((v) => (bq.options||[]).find((o) => o.value === v)?.label || v).join(', ') : ((bq.options||[]).find((o) => o.value === String(ba?.value))?.label || ba?.value)) : ''; return `<div class="w">${esc(bq?.primary || id)}<br><b>${esc(bl || '—')}</b></div>`; }).join('');
+  const dim = q.dimension ? S.registry.dimensions.find((x) => x.id === q.dimension) : null;
+  el.innerHTML = `<div class="qcard">
+    <div class="q-eyebrow"><span>${esc(S.registry.sections.find((x) => x.id === q.section)?.label || q.section)}</span>${dim ? `<span>· ${esc(dim.id)} ${esc(dim.label)}</span>` : ''}<span class="role">· ${esc(ROLE_LABEL[q.role] || q.role)} · already covered</span></div>
+    <div class="q-purpose">${esc(q.purpose||'')}</div>
+    <div class="q-text" style="color:var(--ink-3)">${esc(q.primary)}</div>
+    <div class="q-alt"><span class="k">Already covered</span>${esc(c.note)}<div class="mini" style="margin-top:6px">Recorded as: <b>${esc(shown)}</b> — a mapping of the earlier answer, not a new one. The diagnosis treats it as coming from ${esc(c.basis.join(' / '))}.</div></div>
+    <div class="find" style="margin-top:14px"><div class="h">What covered it</div>${basis}</div>
+    <div class="q-foot"><div class="l"><button class="btn btn-quiet btn-sm" data-nav="back" type="button">&larr; Back</button></div><div class="r"><button class="btn btn-secondary btn-sm" data-reopen-q="${esc(q.id)}" type="button">Ask anyway</button><button class="btn btn-primary btn-sm" data-nav="next" type="button">Continue &rarr;</button></div></div>
+  </div>`;
+}
 function setAnswer(q, patch){
   const cur = A()[q.id] || {};
   const next = { ...cur, ...patch, answered_at: new Date().toISOString() };
   delete next.skipped; delete next.skip_reason; delete next.prefilled;
   if(patch.keep_prefill){ delete next.keep_prefill; }
+  const w = wordingFor(q); if(w.variant) next.asked_as = w.primary; else delete next.asked_as;
   A()[q.id] = next;
   markDirty();
 }
 function currentQuestionNav(dir){
   const vs = visible(STAGE); const i = vs.findIndex((q) => q.id === CUR);
-  if(dir === 'back'){ if(i > 0) goQuestion(vs[i-1].id); return; }
+  if(dir === 'back'){ if(i > 0) goQuestion(vs[i-1].id); else if(i < 0 && vs.length) goQuestion(vs[vs.length-1].id); return; }
   /* Visibility can change with the answer just given (a weak answer opens
-     the exploration), so recompute before moving on. */
-  const after = visible(STAGE); const j = after.findIndex((q) => q.id === CUR);
-  if(j < after.length-1) goQuestion(after[j+1].id);
+     the exploration, an answer can cover a later question), so recompute
+     before moving on — and step over optional detail once the dimension
+     already has what the diagnosis needs. */
+  const after = visible(STAGE); let j = after.findIndex((q) => q.id === CUR);
+  if(j < 0){ const nx = nextUnanswered(STAGE); if(nx){ goQuestion(nx.id); return; } }
+  let k = j + 1;
+  while(k < after.length && skippable(after[k])) k += 1;
+  if(k < after.length) goQuestion(after[k].id);
   else { const n = STAGES[STAGES.findIndex((x) => x[0] === STAGE)+1]; if(n) goStage(n[0]); }
 }
 
@@ -679,7 +769,7 @@ function findingHtml(a){
     </div>
   </div>`;
 }
-function renderDiagnosis(el){
+function renderDiagnosis(el, { embedded = false } = {}){
   const d = S.diagnosis; const su = d.suitability; const ec = d.economics;
   const group = (title, items, blurb) => items.length ? `<div class="panel"><div class="panel-t">${esc(title)} <span class="muted" style="font-size:12px">${items.length}</span></div>${blurb ? `<div class="note" style="margin:-6px 0 12px">${esc(blurb)}</div>` : ''}${items.map(findingHtml).join('')}</div>` : '';
   const ruleRow = (i) => {
@@ -709,6 +799,7 @@ function renderDiagnosis(el){
     ${group('Existing strengths', d.findings.strengths, 'These are preserved and reused. Unverified ones are checked in days 1–3.')}
     ${group('Outside scope', d.findings.outside_scope, 'Real problems NOVUS does not solve through the pilot.')}
     ${group('Unknown', d.findings.unknown, 'Not established. Not treated as problems, not treated as strengths.')}
+    ${Object.keys(d.coverage||{}).length ? `<div class="panel"><div class="panel-t">Already covered by earlier answers <span class="muted" style="font-size:12px">${Object.keys(d.coverage).length}</span></div><div class="note" style="margin:-6px 0 10px">Questions the conversation did not need to ask again. Each records which answer covered it; the derived value is a mapping of that answer, never a new one.</div>${Object.entries(d.coverage).map(([id, c]) => `<div class="find"><div class="h"><span class="mono">${esc(id)}</span> ${esc(QBY(id)?.purpose || id)}</div><div class="n">${esc(c.note)} · from ${esc(c.basis.join(', '))}</div></div>`).join('')}</div>` : ''}
     <div class="panel"><div class="panel-t">NOVUS interventions</div>
       <div class="note" style="margin:-6px 0 12px">Selected deterministically from the findings and the deployment rules (v${esc(d.versions.rules)}). Exclude anything you don't want in this pilot, or include one with a reason — the pitch only ever describes what is selected here.</div>
       ${d.interventions.map(ruleRow).join('')}
@@ -727,10 +818,10 @@ function renderDiagnosis(el){
       <div class="note">${esc(ec.disclaimer)}</div>
     </div>
     <div class="panel"><div class="panel-t">Diagnosis notes</div><textarea class="input block" id="d-notes" style="min-height:70px" placeholder="Corrections, context, anything to carry into the pitch…">${esc(S.session.notes?.diagnosis||'')}</textarea></div>
-    <div class="btnrow split">
+    ${embedded ? planHtml(d.plan) : `<div class="btnrow split">
       <button class="btn btn-secondary" data-go-stage="intelligence" type="button">&larr; Back to questions</button>
       <button class="btn btn-primary" data-gen-pitch type="button">${su.pitch_pilot ? 'Generate personalised pitch' : su.verdict === 'FURTHER_VALIDATION_REQUIRED' ? 'Generate validation summary' : 'Generate no-pitch recommendation'} &rarr;</button>
-    </div>`;
+    </div>`}`;
 }
 
 /* ═══ STAGE 5: PITCH + 60-DAY PLAN ══════════════════════════════════════ */
@@ -741,7 +832,7 @@ async function generatePitch(){
   try{
     const out = await post(OP('discovery-pitch'), { session_id: S.session.session_id, confirm:'GENERATE_PITCH' });
     S.pitches.unshift(out.pitch); S.session.pitch_count = out.pitch.version; S.session.latest_pitch_id = out.pitch.pitch_id; S.diagnosis = out.diagnosis; PITCH_VIEW = 0;
-    notice(out.pitch.source === 'TEMPLATE' ? `<b>Template pitch stored</b> — the AI wording ${out.ai_error ? `was not used: ${esc(out.ai_error)}` : 'was unavailable'}. The discovery data is intact; regenerate when ready.` : '', 'warn');
+    notice(out.pitch.source === 'TEMPLATE' ? `<b>Deterministic template stored</b> — the model's wording ${out.ai_error ? `was not used: ${esc(out.ai_error)}` : 'was unavailable'}. The discovery data is intact; regenerate when ready.` : (out.ai_error ? `<b>Model output partly replaced by the template:</b> ${esc(out.ai_error)}` : ''), 'warn');
     STAGE = 'pitch'; renderStages(); renderRail(); renderCentre(); renderSide();
   }catch(err){ notice(`<b>Pitch not generated.</b> ${esc(err.message)} — nothing was lost; the diagnosis is saved.`, 'err'); }
   finally{ GEN = false; }
@@ -757,32 +848,46 @@ function planHtml(plan){
     <div class="find" style="margin-top:12px"><div class="h">Founding pilot · ${gbp(plan.offer.price_gbp)} all-in · ${plan.offer.duration_days} days · setup target ~${plan.offer.setup_target_days} days</div><div class="n">${esc(plan.offer.commitment)} ${esc(plan.offer.scope)} ${esc(plan.offer.success_criteria)} ${esc(plan.offer.extension)} ${esc(plan.offer.continuation)} ${esc(plan.offer.never.join(' '))}</div></div>
   </div>`;
 }
+function pitchText(p){ return p?.pitch?.spoken || Object.values(p?.pitch?.sections||{}).filter(Boolean).join('\n\n'); }
 function renderPitch(el){
   const d = S.diagnosis; const su = d.suitability;
   const p = S.pitches[PITCH_VIEW] || null;
+  const internal = `<details class="panel" style="padding:0"><summary style="padding:16px 24px;cursor:pointer;font-family:var(--serif);font-size:17px">Internal diagnosis — findings, evidence, interventions, dependencies, economics, measurement</summary><div id="int-diag" style="padding:0 24px 12px"></div></details>`;
   if(!p){
     el.innerHTML = `<div class="panel"><div class="panel-t">No pitch yet</div><div class="suit ${SUIT_CLASS[su.verdict]}"><div class="v">${esc(SUIT_LABEL[su.verdict])}</div><div class="r">${esc(su.recommendation)}</div></div>
-      <div class="note">The pitch is generated from the diagnosis on the previous stage — findings, selected interventions, the plan and the founding offer. It is validated before it is stored (no invented figures, no guarantees, only selected interventions) and every version is kept.</div>
-      <div class="btnrow"><button class="btn btn-secondary" data-go-stage="diagnosis" type="button">&larr; Review diagnosis</button><button class="btn btn-primary" data-gen-pitch type="button">${su.pitch_pilot ? 'Generate personalised pitch' : 'Generate recommendation'}</button></div></div>${planHtml(d.plan)}`;
+      <div class="note">The spoken pitch (under ${S.registry.spoken_word_cap} words) and the four-phase plan are generated from the diagnosis — the top two or three commercial themes, what NOVUS would change, and the sixty-day objective. Every version is validated (no invented figures, no price in the spoken script, only selected interventions) and kept.</div>
+      <div class="btnrow"><button class="btn btn-secondary" data-go-stage="diagnosis" type="button">&larr; Review diagnosis</button><button class="btn btn-primary" data-gen-pitch type="button">${su.pitch_pilot ? 'Generate personalised pitch' : 'Generate recommendation'}</button></div></div>${internal}`;
+    renderDiagnosis($('int-diag'), { embedded:true });
     return;
   }
-  const secs = S.registry.pitch_sections;
-  const stale = S.session.pitch_count && p.version === S.session.pitch_count && JSON.stringify(p.diagnosis_snapshot?.proposed||[]) !== JSON.stringify(d.proposed) ;
+  const pk = p.pitch || {};
+  const legacy = !pk.spoken && pk.sections;
+  const words = pk.word_count || (pk.spoken ? pk.spoken.trim().split(/\s+/).length : 0);
+  const srcSpoken = pk.sources?.spoken || p.source; const srcPlan = pk.sources?.plan || p.source;
+  const stale = S.session.pitch_count && p.version === S.session.pitch_count && JSON.stringify(p.diagnosis_snapshot?.proposed||[]) !== JSON.stringify(d.proposed);
+  const modeKey = pk.mode === 'PILOT' ? 'POTENTIAL_FIT' : pk.mode === 'VALIDATION' ? 'FURTHER_VALIDATION_REQUIRED' : 'NOT_CURRENTLY_SUITABLE';
+  const [lo, hi] = S.registry.spoken_word_target || [150, 220];
   el.innerHTML = `
     <div class="panel">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-        <div><span class="panel-t" style="margin:0">Personalised pitch</span> ${pill(`v${p.version}`, 't-blue', true)} ${pill(p.source === 'AI' ? `AI · ${p.model || 'default model'}` : 'template', p.source === 'AI' ? 't-green' : 't-amber', true)} ${pill(p.pitch?.mode === 'PILOT' ? 'pilot' : p.pitch?.mode === 'VALIDATION' ? 'validation' : 'no pitch', SUIT_TONE[p.pitch?.mode === 'PILOT' ? 'POTENTIAL_FIT' : p.pitch?.mode === 'VALIDATION' ? 'FURTHER_VALIDATION_REQUIRED' : 'NOT_CURRENTLY_SUITABLE'], true)} <span class="mini">${esc(when(p.created_at))}</span></div>
-        <div class="btnrow" style="margin:0">${S.pitches.length > 1 ? `<select class="input" id="pitch-ver">${S.pitches.map((x, i) => `<option value="${i}" ${i === PITCH_VIEW ? 'selected' : ''}>v${x.version} · ${x.source} · ${when(x.created_at)}</option>`).join('')}</select>` : ''}<button class="btn btn-quiet btn-sm" data-copy-pitch type="button">Copy</button><button class="btn btn-secondary btn-sm" data-gen-pitch type="button">Regenerate</button></div>
+        <div><span class="panel-t" style="margin:0">Spoken pitch</span> ${pill(`v${p.version}`, 't-blue', true)} ${pill(srcSpoken === 'AI' ? `written by the model${p.model ? ` · ${p.model}` : ''}` : 'deterministic template', srcSpoken === 'AI' ? 't-green' : 't-amber', true)} ${pill(pk.mode === 'PILOT' ? 'pilot' : pk.mode === 'VALIDATION' ? 'validation' : 'no pitch', SUIT_TONE[modeKey], true)} ${words ? pill(`${words} words`, words > (S.registry.spoken_word_cap||250) ? 't-red' : words >= lo && words <= hi ? 't-green' : 't-grey', true) : ''} <span class="mini">${esc(when(p.created_at))}</span></div>
+        <div class="btnrow" style="margin:0">${S.pitches.length > 1 ? `<select class="input" id="pitch-ver">${S.pitches.map((x, i) => `<option value="${i}" ${i === PITCH_VIEW ? 'selected' : ''}>v${x.version} · ${x.pitch?.sources?.spoken || x.source} · ${when(x.created_at)}</option>`).join('')}</select>` : ''}<button class="btn btn-quiet btn-sm" data-copy-pitch type="button">Copy</button><button class="btn btn-secondary btn-sm" data-gen-pitch type="button">Regenerate</button></div>
       </div>
       ${stale ? `<div class="banner warn" style="margin-bottom:12px"><div><b>The diagnosis has changed since this pitch was generated</b> (proposed: ${esc(d.proposed.join(', '))} vs ${esc((p.diagnosis_snapshot?.proposed||[]).join(', '))}). Regenerate before using it.</div></div>` : ''}
       ${p.validation && !p.validation.valid ? `<div class="banner err" style="margin-bottom:12px"><div><b>Validation issues:</b> ${esc(p.validation.issues.join('; '))}</div></div>` : ''}
-      ${p.validation?.ai_rejected ? `<div class="banner warn" style="margin-bottom:12px"><div><b>The AI wording was rejected and the template used instead:</b> ${esc((p.validation.ai_issues||[]).join('; '))}</div></div>` : ''}
+      ${p.validation?.ai_rejected ? `<div class="banner warn" style="margin-bottom:12px"><div><b>Part of the model's output was rejected and the template used for it:</b> ${esc((p.validation.ai_issues||[]).join('; '))}</div></div>` : ''}
       ${p.error && !p.validation?.ai_rejected ? `<div class="banner warn" style="margin-bottom:12px"><div>${esc(p.error)}</div></div>` : ''}
-      ${p.pitch?.confidence_note ? `<div class="note" style="margin:0 0 12px">${esc(p.pitch.confidence_note)}</div>` : ''}
-      <div id="pitch-body">${secs.map((s) => p.pitch?.sections?.[s.key] ? `<div class="pitch-sec"><div class="t">${esc(s.title)}</div><div class="b">${esc(p.pitch.sections[s.key])}</div></div>` : '').join('')}</div>
+      ${legacy ? `<div class="note" style="margin:0 0 10px">Older format (eight sections) — regenerate for the spoken pitch and four-phase plan.</div>${Object.entries(pk.sections).filter(([, v]) => v).map(([k, v]) => `<div class="pitch-sec"><div class="t">${esc(k.replace(/_/g,' '))}</div><div class="b">${esc(v)}</div></div>`).join('')}`
+        : `<div class="pitch-sec"><div class="b" style="font-size:16px;line-height:1.7">${esc(pk.spoken)}</div></div>
+           ${pk.themes?.length ? `<div class="mini">Themes: ${pk.themes.map((t) => `${esc(t.title)} <span class="mono">(${esc(t.rules.join(', '))})</span>`).join(' · ')}${pk.preserved?.length ? ` · preserved: ${esc(pk.preserved.join(', '))}` : ''}</div>` : ''}
+           ${pk.confidence_note ? `<div class="note">${esc(pk.confidence_note)}</div>` : ''}`}
     </div>
-    ${planHtml(p.plan || d.plan)}
+    ${!legacy && pk.plan ? `<div class="panel"><div class="panel-t">Personalised sixty-day plan ${pill(srcPlan === 'AI' ? 'model' : 'template', srcPlan === 'AI' ? 't-green' : 't-amber', true)}</div>
+      ${(S.registry.plan_phases_compact||[]).map((ph) => `<div class="phase"><div class="ph"><span class="days">${esc(ph.title)}</span><span class="pt">${esc(ph.blurb)}</span></div><div style="font-size:13px;line-height:1.6;margin-top:6px;color:var(--ink-2)">${esc(pk.plan[ph.key]||'')}</div></div>`).join('')}
+      <div class="note">Dependencies and feasibility limits are preserved from the diagnosis; the full phase-by-phase plan is in the internal diagnosis below.</div></div>` : ''}
+    ${internal}
     <div class="btnrow split"><button class="btn btn-secondary" data-go-stage="diagnosis" type="button">&larr; Diagnosis</button><button class="btn btn-primary" data-go-stage="outcome" type="button">Pilot proposal &amp; outcome &rarr;</button></div>`;
+  renderDiagnosis($('int-diag'), { embedded:true });
 }
 
 /* ═══ STAGE 6: OUTCOME ══════════════════════════════════════════════════ */
@@ -847,6 +952,7 @@ document.addEventListener('click', async (e) => {
   const sb = t.closest('[data-stage]'); if(sb){ goStage(sb.dataset.stage); return; }
   const gs = t.closest('[data-go-stage]'); if(gs){ goStage(gs.dataset.goStage, gs.dataset.q || ''); return; }
   const gq = t.closest('[data-go-q]'); if(gq){ goQuestion(gq.dataset.goQ); return; }
+  const rq = t.closest('[data-reopen-q]'); if(rq){ const id = rq.dataset.reopenQ; A()[id] = { ...(A()[id]||{}), reopened:true, answered_at:new Date().toISOString() }; markDirty(); goQuestion(id); renderSide(); return; }
   const dm = t.closest('[data-dim]'); if(dm){ goStage(S.registry.dimensions.find((x) => x.id === dm.dataset.dim)?.section, dm.dataset.dim); return; }
   const alt = t.closest('[data-alt]'); if(alt){ ALT[CUR] = ALT[CUR] === alt.dataset.alt ? '' : alt.dataset.alt; renderCentre(); return; }
   const q = QBY(CUR);
@@ -875,7 +981,7 @@ document.addEventListener('click', async (e) => {
   const rs = t.closest('[data-rov-save]'); if(rs){ const reason = $('rov-reason').value.trim(); if(!reason){ $('rov-reason').focus(); return; } S.session.overrides = S.session.overrides || {}; S.session.overrides.rules = S.session.overrides.rules || {}; S.session.overrides.rules[rs.dataset.rovSave] = { include: rs.dataset.include === 'true', reason, at:new Date().toISOString() }; OVR_OPEN = ''; markDirty(); await flush(); renderCentre(); return; }
   const rc = t.closest('[data-rov-clear]'); if(rc){ delete S.session.overrides.rules[rc.dataset.rovClear]; OVR_OPEN = ''; markDirty(); await flush(); renderCentre(); return; }
   if(t.closest('[data-gen-pitch]')){ generatePitch(); return; }
-  if(t.closest('[data-copy-pitch]')){ const p = S.pitches[PITCH_VIEW]; const txt = S.registry.pitch_sections.map((s) => p?.pitch?.sections?.[s.key]).filter(Boolean).join('\n\n'); try{ await navigator.clipboard.writeText(txt); notice('Pitch copied.', 'info'); }catch{ notice('Copy failed — select the text manually.', 'warn'); } return; }
+  if(t.closest('[data-copy-pitch]')){ const txt = pitchText(S.pitches[PITCH_VIEW]); try{ await navigator.clipboard.writeText(txt); notice('Pitch copied.', 'info'); }catch{ notice('Copy failed — select the text manually.', 'warn'); } return; }
   const oc2 = t.closest('[data-outcome]'); if(oc2){ OUT.outcome = oc2.dataset.outcome; OUT.notes = $('o-notes')?.value || OUT.notes; OUT.follow_up = $('o-follow')?.value || OUT.follow_up; renderCentre(); return; }
   if(t.closest('[data-record-outcome]')){ OUT.notes = $('o-notes')?.value || ''; OUT.follow_up = $('o-follow')?.value || ''; recordOutcome(); return; }
   if(t.closest('[data-reopen]')){ S.session.status = 'IN_PROGRESS'; markDirty(); await flush(); OUT = { outcome:'', notes:'', follow_up:'', scope:null }; goStage('diagnosis'); return; }
@@ -903,7 +1009,7 @@ document.addEventListener('keydown', (e) => {
   const q = QBY(CUR); if(!q) return;
   if(e.key === 'Enter' && !e.shiftKey && (!inField || document.activeElement.id === 'q-num')){ e.preventDefault(); document.querySelector('[data-nav="next"]')?.click(); return; }
   if(inField) return;
-  if(/^[1-9]$/.test(e.key) && (q.type === 'single' || q.type === 'multi')){ const o = q.options[Number(e.key)-1]; if(o){ document.querySelector(`[data-opt="${CSS.escape(o.value)}"]`)?.click(); } return; }
+  if(/^[1-9]$/.test(e.key) && (q.type === 'single' || q.type === 'multi')){ const o = visibleOptions(q)[Number(e.key)-1]; if(o){ document.querySelector(`[data-opt="${CSS.escape(o.value)}"]`)?.click(); } return; }
   if(e.key === 's' || e.key === 'S'){ document.querySelector('[data-alt="simpler"]')?.click(); return; }
   if(e.key === 'e' || e.key === 'E'){ document.querySelector('[data-alt="example"]')?.click(); return; }
   if(e.key === 'ArrowLeft'){ currentQuestionNav('back'); return; }

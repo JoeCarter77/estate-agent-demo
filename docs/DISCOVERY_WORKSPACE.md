@@ -21,6 +21,24 @@ picker (any agency — the ⌘K `lead-search` operation).
 | `lib/discovery-store.mjs` | tabs `DISCOVERY_SESSIONS` (one row per session, patched in place) and `DISCOVERY_PITCHES` (one immutable row per pitch version). |
 | `lib/discovery-handlers.mjs` | `discovery-meetings`, `discovery-session` (GET); `discovery-setup`, `discovery-start`, `discovery-save`, `discovery-pitch`, `discovery-outcome` (POST, Basic Auth + confirm tokens). |
 
+## Shared discovery context (questions v2)
+
+The flow is a conversation, not a checklist. Three mechanisms in `lib/discovery-questions.mjs` (mirrored
+in the page) keep it that way:
+
+| mechanism | what it does |
+|---|---|
+| **Coverage rules** (`COVERAGE_RULES`, data-driven) | When a stored earlier answer already establishes what a question was designed to collect, the question is suppressed and shown as *"Already covered — …"* with the basis. Its derived answer is a **mapping of the owner's real answer** (e.g. F3 "nothing happens" → F4 "nothing"; F1 patchy + missed sellers → I1 ad hoc; C8/C9 → C11), never invented, never chained through other derived answers. A finding derived this way can only be `CONFIRMED` when the dimension it came from is `CONFIRMED`; `assessments[dim].derived` and `diagnosis.coverage` record the basis. **Ask anyway** stores `{reopened:true}` and switches the rule off; a real answer always wins. |
+| **Contextual wording** (`variants`) | A question carries alternative primary wording keyed to earlier answers ("You said it's mostly down to the negotiator remembering — if one gets forgotten, does anything pick it up?"). The wording used is saved as `asked_as` for the snapshot. |
+| **Option hiding** (`hide_when`) | An option an earlier answer has made redundant is not offered again (F2's "not much gets recorded" once F1 is weak/partial). |
+
+Other flow changes: the commercial-value numbers (C8–C11) are asked last (section `value`, stage 3) so the
+conversation runs priorities → operation → gaps → intelligence → value; "Next" steps over optional detail
+once a dimension has its cause and consequence; a blocked CRM opens `C7_block`, and "nobody's worked out
+how" turns the F2/I2/I3 block into an assessment item. Related dimensions stay distinct: F2 (can a person read
+the history) is never skipped because F1 (is it captured) was assessed; I2 (does the system connect events) is
+never skipped because F2 was strong — only the *matching* detail is carried.
+
 ## Evidence statuses (never upgraded by anything but a recorded override)
 
 | status | rule |
@@ -54,13 +72,25 @@ assessed separately (`STRONG_FOUNDATIONS_INTELLIGENCE_GAP`).
 
 ## Pitch
 
-The model receives the diagnosis (findings with the owner's words, selected rules in their own wording, plan,
-economics with sources, offer, `allowed_money_figures`) and returns eight spoken sections through a forced
-tool. `validatePitch` rejects: a £ figure not supplied, "guarantee"/AI marketing/jargon, any rule not proposed,
-a missing section, the price in a non-pilot outcome. A rejected or failed generation stores the **template**
-pitch (built from `pitch_explanation`) with the reason; every version is an immutable `DISCOVERY_PITCHES` row and
-the page shows when the diagnosis has moved on since a pitch was generated. Modes: `PILOT`, `VALIDATION`,
-`NO_PITCH`.
+Three views from one diagnosis (`lib/discovery-pitch.mjs`):
+
+* **Spoken pitch** — 150–220 words, hard cap 250, one flowing passage, no price, ends with a question. The
+  ten rules are grouped into four commercial **themes** (making customer information usable F1+F2; making sure
+  opportunities progress F3+F4; finding more opportunities in existing demand I1–I4; measuring and improving
+  F5+I5), ranked by the owner's priority and obstacles, evidence quality, feasibility and incremental value
+  beyond existing strengths; the pitch speaks about the top two or three, using each rule's `spoken_change`.
+* **Personalised 60-day plan** — four phases (week 1, week 2, weeks 3–4, weeks 5–8), at most two sentences
+  each, built from the selected rules' `plan_phrase`, the baseline and every feasibility caveat.
+* **Internal diagnosis** — the full engine output, in an expandable section on the pitch stage.
+
+The model receives the structured findings, selected rules, ranked themes, plan skeleton, baseline with sources
+and `allowed_money_figures` (never PII, never the price) and returns `spoken` + four plan fields through a
+forced tool. `validateSpoken` / `validatePlan` reject: over 250 words, bullets/headings, the price, invented £
+figures, guarantees/marketing/jargon, any unproposed rule, no closing question, plan phases over two sentences.
+Spoken and plan are validated separately; each part that fails is replaced by the deterministic template
+(`templateSpoken` / `templatePlan`) and the source of each part (`AI` / `TEMPLATE`) is stored on the pitch
+and shown in the UI. Modes: `PILOT`, `VALIDATION`, `NO_PITCH`. Every version is an immutable
+`DISCOVERY_PITCHES` row; pitches stored in the older eight-section format still render.
 
 ## Plan and outcome
 
