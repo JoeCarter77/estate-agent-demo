@@ -143,6 +143,114 @@
     .agency-results button:hover{background:rgba(var(--brand-rgb),.08);color:var(--ink);}
     .mini{font-size:11px;color:var(--ink-4);}
     kbd.k{font-family:var(--mono);font-size:10px;padding:1px 5px;border:1px solid var(--hair-2);border-radius:4px;color:var(--ink-4);}
+
+    /* ── the meeting conclusion (stage 5) ─────────────────────────────── */
+    .c-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:var(--s-4);}
+    .c-steps{display:flex;gap:2px;border:1px solid var(--hair);border-radius:var(--r-md);overflow:auto hidden;background:rgba(var(--ink-rgb),.02);flex:1;min-width:min(100%,420px);}
+    .c-step{flex:1 0 auto;font-family:inherit;font-size:11px;font-weight:600;color:var(--ink-4);background:none;border:none;padding:9px 6px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;position:relative;white-space:nowrap;}
+    .c-step .n{font-family:var(--mono);font-size:10px;width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:rgba(var(--ink-rgb),.06);color:var(--ink-3);}
+    .c-step.on{color:var(--ink);background:rgba(var(--brand-rgb),.06);} .c-step.on::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--blue);}
+    .c-step.done .n{background:var(--blue-tint);color:var(--blue);}
+    .btn-present{background:linear-gradient(180deg,var(--blue-vivid),var(--blue-deep));color:#fff;border:none;font-weight:600;padding:10px 16px;box-shadow:0 0 0 1px var(--blue-line),0 8px 24px -10px var(--blue-glow);}
+    .btn-present:hover{filter:brightness(1.08);}
+    .say{font-family:var(--serif);font-size:20px;line-height:1.4;letter-spacing:-.012em;color:var(--ink);padding:14px 18px;border-left:2px solid var(--blue);background:rgba(var(--brand-rgb),.05);border-radius:0 var(--r-md) var(--r-md) 0;margin-bottom:14px;}
+    .say.q{font-size:17px;}
+    .facts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}
+    .facts .f{border:1px solid var(--hair);border-radius:var(--r-md);padding:10px 12px;}
+    .facts .f .l{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);}
+    .facts .f .v{font-family:var(--serif);font-size:20px;margin-top:4px;} .facts .f .v.unk{color:var(--ink-5);font-size:14px;}
+    .fnd{border:1px solid var(--hair);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:10px;background:rgba(var(--ink-rgb),.02);}
+    .fnd.agreed{border-color:var(--blue-line);} .fnd.rejected{opacity:.65;border-style:dashed;} .fnd.corrected{border-color:var(--amber-line);}
+    .fnd .ft{font-family:var(--serif);font-size:18px;letter-spacing:-.012em;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+    .fnd .fs{font-size:14px;line-height:1.6;color:var(--ink-2);margin-top:8px;}
+    .fnd .fw{font-size:12.5px;color:var(--ink-3);font-style:italic;border-left:2px solid var(--hair-2);padding-left:10px;margin-top:8px;}
+    .fnd .fa{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:12px;}
+    .fnd .fa .btn.on{background:var(--blue-tint);color:var(--blue);border-color:var(--blue-line);}
+    .fnd .fa .btn.on.rej{background:var(--red-tint);color:var(--red);border-color:var(--red-line);}
+    .fnd .fa .btn.on.cor{background:var(--amber-tint);color:var(--amber);border-color:var(--amber-line);}
+    .corr{margin-top:10px;padding:12px;border:1px solid var(--amber-line);border-radius:var(--r-md);background:var(--amber-tint);}
+    .corr label{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;padding:3px 0;}
+    .calc{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0;}
+    .calc .btn.on{background:var(--blue);color:var(--on-brand);border-color:var(--blue);}
+    .big2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .big2 .b{border:1px solid var(--blue-line);border-radius:var(--r-md);padding:14px 16px;background:var(--blue-tint);}
+    .big2 .b .l{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);}
+    .big2 .b .v{font-family:var(--serif);font-size:30px;margin-top:4px;letter-spacing:-.02em;}
+    .chg{border:1px solid var(--hair);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:10px;}
+    .chg .ct{font-family:var(--serif);font-size:18px;letter-spacing:-.012em;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    .chg .row{display:grid;grid-template-columns:120px 1fr;gap:8px 14px;font-size:13px;line-height:1.55;color:var(--ink-2);margin-top:8px;}
+    .chg .row .k{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);padding-top:3px;}
+    .chg .cond{color:var(--amber);} .chg .blocked{color:var(--red);}
+    .dep{border:1px solid var(--hair);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;}
+    .dep .dh{display:flex;align-items:baseline;gap:10px;} .dep .dh .w{font-family:var(--mono);font-size:11px;color:var(--blue);} .dep .dh .t{font-weight:600;font-size:13.5px;}
+    .dep .ds{font-size:13.5px;line-height:1.6;color:var(--ink-2);margin-top:6px;}
+    .dep details{margin-top:8px;} .dep summary{font-size:11.5px;color:var(--ink-4);cursor:pointer;}
+    .dep ul{margin:6px 0 0;padding-left:16px;font-size:12px;line-height:1.55;color:var(--ink-2);}
+    .price{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
+    .price .p{font-family:var(--serif);font-size:38px;letter-spacing:-.025em;} .price .d{font-size:14px;color:var(--ink-3);}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;} @media (max-width:820px){.two,.big2{grid-template-columns:1fr;} .facts{grid-template-columns:1fr 1fr;}}
+    .two ul{margin:0;padding-left:16px;font-size:12.5px;line-height:1.6;color:var(--ink-2);}
+    .two .k{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);margin-bottom:6px;}
+    .scope-ck{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;padding:4px 0;}
+
+    /* ── presentation mode ─────────────────────────────────────────────── */
+    #present{position:fixed;inset:0;z-index:1000;background:#05070D;display:none;align-items:center;justify-content:center;color:#F1EDE6;font-family:var(--sans);}
+    #present.on{display:flex;}
+    body.presenting{overflow:hidden;} body.present-only .app{display:none;}
+    .pres-stage{position:relative;width:min(100vw,calc(100vh * 16 / 9));height:min(100vh,calc(100vw * 9 / 16));container-type:size;background:radial-gradient(120% 90% at 85% -10%,rgba(78,155,255,.16),transparent 55%),radial-gradient(90% 80% at -10% 110%,rgba(11,78,214,.22),transparent 55%),linear-gradient(160deg,#0B1B42 0%,#07101F 55%,#05070D 100%);overflow:hidden;user-select:none;}
+    .pres-stage::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");opacity:.035;mix-blend-mode:overlay;pointer-events:none;}
+    .pres-brand{position:absolute;top:3.2cqh;left:4cqw;display:flex;align-items:center;gap:1.1cqw;z-index:2;}
+    .pres-brand img{width:2.6cqw;height:2.6cqw;} .pres-brand span{font-size:1.15cqw;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:rgba(241,237,230,.75);}
+    .pres-agency{position:absolute;top:3.4cqh;right:4cqw;font-size:1.05cqw;letter-spacing:.06em;color:rgba(241,237,230,.5);z-index:2;}
+    .pres-slide{position:absolute;inset:0;padding:11cqh 4cqw 9cqh;display:none;flex-direction:column;}
+    .pres-slide.on{display:flex;animation:pres-in .38s var(--ease);}
+    @keyframes pres-in{from{opacity:0;transform:translateY(1.2cqh);}to{opacity:1;transform:none;}}
+    .pres-eyebrow{font-size:1cqw;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:#93C4FF;opacity:.9;}
+    .pres-title{font-family:var(--serif);font-weight:400;font-size:4.2cqw;letter-spacing:-.025em;line-height:1.05;margin:.6cqh 0 0;color:#fff;}
+    .pres-sub{font-size:1.5cqw;color:rgba(241,237,230,.62);margin-top:1.2cqh;max-width:70cqw;line-height:1.35;}
+    .pres-body{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;margin-top:2.5cqh;}
+    .pres-body.top{justify-content:flex-start;overflow:hidden;}
+    .pres-cols.dense .pres-card ul{font-size:1.05cqw;} .pres-cols.dense .pres-card{padding:1.8cqh 1.5cqw;}
+    .pres-price{margin-top:.5cqh;}
+    .pres-facts{display:grid;grid-template-columns:repeat(3,1fr);gap:1.4cqw;}
+    .pres-fact{border:1px solid rgba(241,237,230,.12);border-radius:1cqw;padding:2.2cqh 1.6cqw;background:rgba(241,237,230,.035);}
+    .pres-fact .l{font-size:.95cqw;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:rgba(241,237,230,.5);}
+    .pres-fact .v{font-family:var(--serif);font-size:3cqw;letter-spacing:-.02em;margin-top:.8cqh;color:#fff;line-height:1.05;}
+    .pres-obj{margin-top:3cqh;font-size:1.7cqw;color:rgba(241,237,230,.85);line-height:1.4;} .pres-obj b{color:#fff;font-weight:600;}
+    .pres-chips{display:flex;gap:.8cqw;flex-wrap:wrap;margin-top:1.4cqh;} .pres-chip{font-size:1.1cqw;padding:.7cqh 1.1cqw;border-radius:100px;border:1px solid rgba(147,196,255,.35);color:#93C4FF;background:rgba(78,155,255,.08);}
+    .pres-cols{display:grid;grid-template-columns:repeat(var(--n,3),1fr);gap:1.6cqw;align-items:stretch;}
+    .pres-card{border:1px solid rgba(241,237,230,.12);border-radius:1.1cqw;padding:2.4cqh 1.8cqw;background:linear-gradient(180deg,rgba(241,237,230,.05),rgba(241,237,230,.02));display:flex;flex-direction:column;gap:1.2cqh;min-height:0;}
+    .pres-card .num{font-family:var(--serif);font-size:2.2cqw;color:#93C4FF;line-height:1;}
+    .pres-card .h{font-family:var(--serif);font-size:1.9cqw;letter-spacing:-.015em;line-height:1.2;color:#fff;}
+    .pres-card .hedge{font-size:1cqw;letter-spacing:.14em;text-transform:uppercase;color:#D6A76B;}
+    .pres-card ul{margin:0;padding-left:1.4cqw;font-size:1.2cqw;line-height:1.45;color:rgba(241,237,230,.85);} .pres-card li{margin-bottom:.5cqh;}
+    .pres-card .k{font-size:.9cqw;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:rgba(147,196,255,.85);margin-top:.4cqh;}
+    .pres-card p{margin:0;font-size:1.15cqw;line-height:1.45;color:rgba(241,237,230,.85);}
+    .pres-card .quote{font-style:italic;color:rgba(241,237,230,.6);font-size:1.1cqw;border-left:.15cqw solid rgba(241,237,230,.25);padding-left:.9cqw;}
+    .pres-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1.4cqw;}
+    .pres-stat{text-align:center;padding:2cqh 1cqw;border:1px solid rgba(241,237,230,.12);border-radius:1cqw;background:rgba(241,237,230,.035);}
+    .pres-stat .v{font-family:var(--serif);font-size:3.4cqw;letter-spacing:-.02em;color:#fff;line-height:1;} .pres-stat .l{font-size:.95cqw;letter-spacing:.18em;text-transform:uppercase;color:rgba(241,237,230,.5);margin-top:1cqh;}
+    .pres-stat .f{font-size:1cqw;color:rgba(241,237,230,.45);margin-top:.6cqh;}
+    .pres-calc{display:flex;align-items:center;justify-content:space-between;gap:2cqw;margin-top:3cqh;padding:2.4cqh 2.2cqw;border-radius:1.2cqw;border:1px solid rgba(147,196,255,.35);background:linear-gradient(135deg,rgba(78,155,255,.16),rgba(11,78,214,.10));}
+    .pres-calc .sel{display:flex;flex-direction:column;gap:1cqh;} .pres-calc .sel .l{font-size:1.15cqw;color:rgba(241,237,230,.75);}
+    .pres-calc .btns{display:flex;gap:.6cqw;} .pres-calc .btns button{font-family:var(--serif);font-size:1.8cqw;width:3.6cqw;height:3.6cqw;border-radius:.7cqw;border:1px solid rgba(241,237,230,.2);background:rgba(241,237,230,.05);color:#fff;cursor:pointer;}
+    .pres-calc .btns button.on{background:#4E9BFF;border-color:#4E9BFF;color:#fff;box-shadow:0 0 2cqw rgba(78,155,255,.45);}
+    .pres-calc .out{display:flex;gap:2.4cqw;} .pres-calc .out .o .v{font-family:var(--serif);font-size:3.6cqw;letter-spacing:-.025em;color:#fff;line-height:1;} .pres-calc .out .o .l{font-size:.95cqw;letter-spacing:.18em;text-transform:uppercase;color:rgba(241,237,230,.55);margin-top:1cqh;}
+    .pres-note{font-size:1.05cqw;color:rgba(241,237,230,.5);margin-top:2cqh;line-height:1.4;}
+    .pres-timeline{display:grid;grid-template-columns:repeat(4,1fr);gap:1.2cqw;position:relative;}
+    .pres-timeline::before{content:'';position:absolute;left:1cqw;right:1cqw;top:1.05cqw;height:.14cqw;background:linear-gradient(90deg,#4E9BFF,rgba(78,155,255,.15));}
+    .pres-phase{padding-top:3cqh;position:relative;}
+    .pres-phase::before{content:'';position:absolute;top:.35cqw;left:0;width:1.5cqw;height:1.5cqw;border-radius:50%;background:#4E9BFF;box-shadow:0 0 1.6cqw rgba(78,155,255,.6);}
+    .pres-phase .w{font-size:1cqw;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#93C4FF;} .pres-phase .h{font-family:var(--serif);font-size:1.8cqw;line-height:1.2;color:#fff;margin:.8cqh 0 1.2cqh;letter-spacing:-.012em;}
+    .pres-phase p{margin:0;font-size:1.15cqw;line-height:1.5;color:rgba(241,237,230,.8);}
+    .pres-price{display:flex;align-items:baseline;gap:1.6cqw;} .pres-price .p{font-family:var(--serif);font-size:6.4cqw;letter-spacing:-.03em;color:#fff;line-height:1;} .pres-price .d{font-size:1.8cqw;color:rgba(241,237,230,.7);}
+    .pres-foot{position:absolute;left:4cqw;right:4cqw;bottom:3.2cqh;display:flex;align-items:center;justify-content:space-between;z-index:2;}
+    .pres-dots{display:flex;gap:.6cqw;} .pres-dots i{width:.55cqw;height:.55cqw;border-radius:50%;background:rgba(241,237,230,.22);display:block;} .pres-dots i.on{background:#4E9BFF;box-shadow:0 0 1cqw rgba(78,155,255,.7);}
+    .pres-foot .st{font-size:.95cqw;letter-spacing:.14em;text-transform:uppercase;color:rgba(241,237,230,.35);}
+    .pres-ctl{position:absolute;top:2.6cqh;left:50%;transform:translateX(-50%);display:flex;gap:.5cqw;opacity:0;transition:opacity .2s;z-index:3;} .pres-stage:hover .pres-ctl{opacity:1;}
+    .pres-ctl button{font-family:var(--sans);font-size:.95cqw;padding:.6cqh .9cqw;border-radius:.5cqw;border:1px solid rgba(241,237,230,.18);background:rgba(5,7,13,.6);color:rgba(241,237,230,.8);cursor:pointer;}
+    .pres-nav{position:absolute;top:0;bottom:0;width:12cqw;cursor:pointer;z-index:1;} .pres-nav.l{left:0;} .pres-nav.r{right:0;}
+    .pres-next{font-size:1.6cqw;line-height:1.5;color:rgba(241,237,230,.85);max-width:78cqw;}
   </style>
 </head>
 <body>
@@ -290,6 +398,20 @@
   </main>
 </div>
 
+<!-- ── PRESENTATION MODE: the client-facing conclusion, six screens, nothing
+     internal. Rendered from the server's presentation payload; also the whole
+     page when opened in its own window (#present?id=…). ── -->
+<div id="present" role="dialog" aria-label="Presentation">
+  <div class="pres-stage" id="pres-stage">
+    <div class="pres-brand"><img src="/novus/assets/novus-mark-128.png" alt="" /><span>NOVUS</span></div>
+    <div class="pres-agency" id="pres-agency"></div>
+    <div class="pres-ctl"><button type="button" data-pres-full title="Fullscreen (F)">Fullscreen</button><button type="button" data-pres-exit title="Exit (Esc)">Exit</button></div>
+    <div id="pres-slides"></div>
+    <div class="pres-nav l" data-pres-nav="-1" title="Previous"></div><div class="pres-nav r" data-pres-nav="1" title="Next"></div>
+    <div class="pres-foot"><div class="pres-dots" id="pres-dots"></div><div class="st" id="pres-st"></div></div>
+  </div>
+</div>
+
 <script>
 /* ═══ HELPERS ═══════════════════════════════════════════════════════════ */
 const $ = (id) => document.getElementById(id);
@@ -320,7 +442,9 @@ const FEAS_LABEL = { FEASIBLE:'Feasible', FEASIBLE_WITH_FOUNDATION:'Feasible wit
 const DS_TONE = { IMPLEMENTED:'t-green', SUPPORTED_CONFIGURATION:'t-blue', REQUIRES_ASSESSMENT:'t-amber', PROPOSED:'t-grey', OUTSIDE_PILOT:'t-red' };
 const OUTCOME_TONE = { PILOT_AGREED:'t-green', PROPOSAL_REQUESTED:'t-blue', FOLLOW_UP_REQUIRED:'t-amber', TECHNICAL_ASSESSMENT_REQUIRED:'t-amber', FURTHER_DISCOVERY_REQUIRED:'t-amber', NOT_SUITABLE:'t-grey', NOT_INTERESTED:'t-red' };
 const ROLE_LABEL = { primary:'Primary question', verify:'Verification', cause:'Why is it happening', consequence:'What it costs', frequency:'How often', tried:'What they have tried', example:'A real example', detail:'Detail', context:'Commercial situation' };
-const STAGES = [ ['commercial','Situation'], ['foundations','Foundations'], ['intelligence','Intelligence'], ['diagnosis','Diagnosis'], ['pitch','Pitch'], ['outcome','Pilot & outcome'] ];
+const STAGES = [ ['commercial','Situation'], ['foundations','Foundations'], ['intelligence','Intelligence'], ['diagnosis','Diagnosis'], ['conclusion','Conclusion'], ['outcome','Decision'] ];
+/* Sessions stored before the conclusion existed carry stage 'pitch'. */
+const stageKey = (id) => (id === 'pitch' ? 'conclusion' : id);
 
 /* ═══ STATE + ROUTING ═══════════════════════════════════════════════════ */
 let LIST = null, VIEW = 'meetings';
@@ -334,12 +458,19 @@ let OVR_OPEN = '';       // dimension/rule whose override form is open
 let SAVE = { timer:null, dirty:false, inflight:false, failed:false, retry:null };
 let PITCH_VIEW = 0;      // index into S.pitches (0 = latest)
 let GEN = false;
+/* The meeting conclusion (stage 5): current step, open correction form, save state. */
+let CSTEP = 'understanding';
+let CORR = '';           // finding id whose correction form is open
+let CSAVE = { inflight:false };
+/* Presentation mode. `only` = this window IS the presentation (#present?id=…). */
+let PRES = { open:false, slide:0, only:false, channel:null };
 
 function routeFromHash(){
   const raw = String(location.hash||'').replace(/^#\/?/,'');
   const [path, query] = raw.split('?');
   const params = new URLSearchParams(query||'');
   if(path === 'discovery' && params.get('id')) return { view:'discovery', id: params.get('id'), stage: params.get('stage') || '' };
+  if(path === 'present' && params.get('id')) return { view:'present', id: params.get('id') };
   if(path === 'start' && params.get('agency')) return { view:'start', agency: params.get('agency'), call: params.get('call') || '' };
   return { view:'meetings' };
 }
@@ -433,8 +564,9 @@ async function openSession(sessionId, stage){
   $('d-title').textContent = 'Loading…'; $('d-meta').innerHTML = ''; $('d-centre').innerHTML = ''; $('d-rail').innerHTML = ''; $('d-side').innerHTML = '';
   try{
     S = await get(`${OP('discovery-session')}&session_id=${encodeURIComponent(sessionId)}`);
-    STAGE = stage || S.session.stage || 'commercial';
+    STAGE = stageKey(stage || S.session.stage || 'commercial');
     if(S.session.status === 'COMPLETED' && !stage) STAGE = 'outcome';
+    CSTEP = 'understanding'; CORR = '';
     CUR = '';
     PITCH_VIEW = 0;
     if(S.registry_drift?.questions || S.registry_drift?.rules) notice(`<b>This session was answered against an older question/rule set</b> (questions v${esc(S.session.questions_version)}, rules v${esc(S.session.rules_version)}; current v${esc(S.registry.questions_version)}/v${esc(S.registry.rules_version)}). Stored labels are shown from the session's snapshot where they differ.`, 'warn');
@@ -542,10 +674,11 @@ async function flush(){
   try{
     const out = await post(OP('discovery-save'), body);
     S.diagnosis = out.diagnosis; S.session.updated_at = out.saved_at; S.session.stage = out.stage;
+    if(out.conclusion){ S.conclusion = out.conclusion; S.presentation = out.presentation; presBroadcast(); }
     if(body.reopen){ S.session.status = 'IN_PROGRESS'; }
     SAVE.failed = false;
     try{ localStorage.removeItem(`novus.discovery.${S.session.session_id}`); }catch{}
-    renderSide(); if(STAGE === 'diagnosis') renderCentre();
+    renderSide(); if(STAGE === 'diagnosis' || STAGE === 'conclusion') renderCentre(); if(PRES.open) renderPresentation();
   }catch(err){
     SAVE.failed = true; SAVE.dirty = true;
     try{ localStorage.setItem(`novus.discovery.${S.session.session_id}`, JSON.stringify({ at: Date.now(), answers: S.session.answers, notes: S.session.notes, overrides: S.session.overrides })); }catch{}
@@ -581,8 +714,8 @@ function renderWorkspace(){
 function stageDone(id){
   const d = S.diagnosis; if(!d) return false;
   if(['commercial','foundations','intelligence'].includes(id)){ const vs = visible(id); return vs.length > 0 && vs.every((q) => isAnswered(A()[q.id]) || A()[q.id]?.skipped); }
-  if(id === 'diagnosis') return Boolean(S.session.pitch_count);
-  if(id === 'pitch') return Boolean(S.session.pitch_count);
+  if(id === 'diagnosis') return Boolean(S.conclusion?.understanding?.agreed || S.session.pitch_count);
+  if(id === 'conclusion') return Boolean(S.conclusion?.understanding?.agreed);
   if(id === 'outcome') return S.session.status === 'COMPLETED';
   return false;
 }
@@ -590,7 +723,7 @@ function renderStages(){
   $('d-stages').innerHTML = STAGES.map(([id, label], i) => `<button class="stage-btn${STAGE === id ? ' on' : ''}${stageDone(id) ? ' done' : ''}" data-stage="${id}" type="button"><span class="n">${i+1}</span>${esc(label)}</button>`).join('');
 }
 function goStage(id, qid){
-  STAGE = id; CUR = qid || '';
+  STAGE = stageKey(id); CUR = qid || '';
   if(['commercial','foundations','intelligence'].includes(id) && !CUR) CUR = nextUnanswered(id)?.id || '';
   S.session.stage = id; markDirty();
   history.replaceState(null, '', `#discovery?id=${encodeURIComponent(S.session.session_id)}&stage=${id}`);
@@ -633,7 +766,7 @@ function renderRail(){
 function renderCentre(){
   const el = $('d-centre');
   if(STAGE === 'diagnosis') return renderDiagnosis(el);
-  if(STAGE === 'pitch') return renderPitch(el);
+  if(STAGE === 'conclusion') return renderConclusion(el);
   if(STAGE === 'outcome') return renderOutcome(el);
   const vs = visible(STAGE);
   /* A covered question opened from the rail: show what covered it, offer to ask anyway. */
@@ -762,6 +895,7 @@ function findingHtml(a){
     ${a.summary ? `<div class="s">${esc(a.summary)}</div>` : ''}
     <div class="n">${esc(a.note)}${a.frequency ? ` · ${esc(a.frequency)}` : ''}${a.tried.length ? ` · tried: ${esc(a.tried.join(', '))}` : ''}${Object.keys(a.details).length ? ` · ${esc(Object.entries(a.details).map(([k, v]) => `${k.replace(`${a.dimension}_`,'')}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' · '))}` : ''}</div>
     ${a.example ? `<div class="w">“${esc(a.example)}”</div>` : ''}${a.owner_notes.map((n) => `<div class="w">${esc(n)}</div>`).join('')}
+    ${a.override?.source === 'OWNER_CONCLUSION' ? `<div class="n" style="color:var(--amber)">${esc(a.override.reason)} — originally ${esc(EVID_LABEL[a.override.original.evidence_status])}. Set in the Conclusion stage; change it there.</div>` : ''}
     <div class="ovr">
       ${a.evidence_status !== 'UNKNOWN' ? `<button class="btn btn-quiet btn-sm" data-go-stage="${esc(S.registry.dimensions.find((x) => x.id === a.dimension)?.section)}" data-q="${esc(a.dimension)}" type="button">Revisit questions</button>` : `<button class="btn btn-secondary btn-sm" data-go-stage="${esc(S.registry.dimensions.find((x) => x.id === a.dimension)?.section)}" data-q="${esc(a.dimension)}" type="button">Ask now</button>`}
       ${open ? `<select class="input" id="ov-ev"><option value="">status: keep</option>${Object.keys(EVID_LABEL).map((k) => `<option value="${k}" ${ov?.evidence_status === k ? 'selected' : ''}>${esc(EVID_LABEL[k])}</option>`).join('')}</select><select class="input" id="ov-lv"><option value="">level: keep</option>${['weak','partial','strong','unknown'].map((k) => `<option value="${k}" ${ov?.level === k ? 'selected' : ''}>${k}</option>`).join('')}</select><input class="input" id="ov-reason" placeholder="Reason (required)" value="${esc(ov?.reason||'')}" style="min-width:220px" /><button class="btn btn-primary btn-sm" data-ov-save="${esc(a.dimension)}" type="button">Save override</button>${ov ? `<button class="btn btn-danger btn-sm" data-ov-clear="${esc(a.dimension)}" type="button">Remove</button>` : ''}<button class="btn btn-quiet btn-sm" data-ov-cancel type="button">Cancel</button>`
@@ -820,7 +954,7 @@ function renderDiagnosis(el, { embedded = false } = {}){
     <div class="panel"><div class="panel-t">Diagnosis notes</div><textarea class="input block" id="d-notes" style="min-height:70px" placeholder="Corrections, context, anything to carry into the pitch…">${esc(S.session.notes?.diagnosis||'')}</textarea></div>
     ${embedded ? planHtml(d.plan) : `<div class="btnrow split">
       <button class="btn btn-secondary" data-go-stage="intelligence" type="button">&larr; Back to questions</button>
-      <button class="btn btn-primary" data-gen-pitch type="button">${su.pitch_pilot ? 'Generate personalised pitch' : su.verdict === 'FURTHER_VALIDATION_REQUIRED' ? 'Generate validation summary' : 'Generate no-pitch recommendation'} &rarr;</button>
+      <button class="btn btn-primary" data-go-stage="conclusion" type="button">${su.pitch_pilot ? 'Meeting conclusion' : su.verdict === 'FURTHER_VALIDATION_REQUIRED' ? 'Conclusion — what to confirm' : 'Conclusion — not proposing a pilot'} &rarr;</button>
     </div>`}`;
 }
 
@@ -833,8 +967,19 @@ async function generatePitch(){
     const out = await post(OP('discovery-pitch'), { session_id: S.session.session_id, confirm:'GENERATE_PITCH' });
     S.pitches.unshift(out.pitch); S.session.pitch_count = out.pitch.version; S.session.latest_pitch_id = out.pitch.pitch_id; S.diagnosis = out.diagnosis; PITCH_VIEW = 0;
     notice(out.pitch.source === 'TEMPLATE' ? `<b>Deterministic template stored</b> — the model's wording ${out.ai_error ? `was not used: ${esc(out.ai_error)}` : 'was unavailable'}. The discovery data is intact; regenerate when ready.` : (out.ai_error ? `<b>Model output partly replaced by the template:</b> ${esc(out.ai_error)}` : ''), 'warn');
-    STAGE = 'pitch'; renderStages(); renderRail(); renderCentre(); renderSide();
+    STAGE = 'conclusion'; renderStages(); renderRail(); renderCentre(); renderSide();
   }catch(err){ notice(`<b>Pitch not generated.</b> ${esc(err.message)} — nothing was lost; the diagnosis is saved.`, 'err'); }
+  finally{ GEN = false; }
+}
+async function polishConclusion(){
+  if(GEN || !S) return;
+  GEN = true; notice('<span class="spin"></span> Polishing the wording — findings, scope and price are not touched…', 'info');
+  try{
+    const out = await post(OP('discovery-conclusion-polish'), { session_id: S.session.session_id, confirm:'POLISH_CONCLUSION' });
+    S.conclusion = out.conclusion; S.presentation = out.presentation; presBroadcast();
+    notice(out.accepted ? `<b>${out.accepted} sentence${out.accepted === 1 ? '' : 's'} polished.</b>${out.ai_error ? ` ${esc(out.ai_error)}` : ''}` : `<b>Plain wording kept.</b> ${esc(out.ai_error || 'The model returned nothing usable.')}`, out.accepted ? 'info' : 'warn');
+    renderCentre(); if(PRES.open) renderPresentation();
+  }catch(err){ notice(`<b>Not polished.</b> ${esc(err.message)} — the plain wording stands.`, 'err'); }
   finally{ GEN = false; }
 }
 function planHtml(plan){
@@ -885,10 +1030,282 @@ function renderPitch(el){
     ${!legacy && pk.plan ? `<div class="panel"><div class="panel-t">Personalised sixty-day plan ${pill(srcPlan === 'AI' ? 'model' : 'template', srcPlan === 'AI' ? 't-green' : 't-amber', true)}</div>
       ${(S.registry.plan_phases_compact||[]).map((ph) => `<div class="phase"><div class="ph"><span class="days">${esc(ph.title)}</span><span class="pt">${esc(ph.blurb)}</span></div><div style="font-size:13px;line-height:1.6;margin-top:6px;color:var(--ink-2)">${esc(pk.plan[ph.key]||'')}</div></div>`).join('')}
       <div class="note">Dependencies and feasibility limits are preserved from the diagnosis; the full phase-by-phase plan is in the internal diagnosis below.</div></div>` : ''}
-    ${internal}
-    <div class="btnrow split"><button class="btn btn-secondary" data-go-stage="diagnosis" type="button">&larr; Diagnosis</button><button class="btn btn-primary" data-go-stage="outcome" type="button">Pilot proposal &amp; outcome &rarr;</button></div>`;
+    ${internal}`;
   renderDiagnosis($('int-diag'), { embedded:true });
 }
+
+/* ═══ STAGE 5: MEETING CONCLUSION ═══════════════════════════════════════
+   Discovery → confirm understanding → commercial opportunity → what NOVUS
+   would change → 60-day deployment → founding pilot → decision. Everything
+   here is rendered from S.conclusion, which the server builds
+   deterministically (lib/discovery-conclusion.mjs); no model is involved
+   unless "Polish wording" is pressed, and even then only sentences are
+   reworded. The owner's agreement, corrections, the chosen illustration and
+   the ticked scope are saved through discovery-conclusion and recompute the
+   interventions server-side — the discovery answers are never rewritten. */
+const CSTEPS = () => S.registry.conclusion_steps || [];
+const C = () => S.conclusion;
+const AGREE_LABEL = { AGREED:'Agreed', CORRECTED:'Corrected', REJECTED:'Not a problem' };
+const AGREE_TONE = { AGREED:'t-green', CORRECTED:'t-amber', REJECTED:'t-red' };
+async function saveConclusion(patch){
+  if(!S || CSAVE.inflight) return;
+  if(S.session.status === 'COMPLETED'){ notice('This session is completed — reopen it (Decision stage) to change the conclusion.', 'warn'); return; }
+  if(SAVE.dirty){ if(SAVE.timer) clearTimeout(SAVE.timer); await flush(); }
+  CSAVE.inflight = true; $('save-state').textContent = 'Saving…';
+  try{
+    const out = await post(OP('discovery-conclusion'), { session_id: S.session.session_id, ...patch });
+    S.conclusion = out.conclusion; S.presentation = out.presentation; S.diagnosis = out.diagnosis; S.session.updated_at = out.saved_at; S.session.stage = out.stage;
+    S.session.conclusion = { ...(S.session.conclusion||{}), ...out.conclusion.state };
+    presBroadcast();
+    renderStages(); renderCentre(); renderSide(); if(PRES.open) renderPresentation();
+  }catch(err){ notice(`<b>Conclusion not saved.</b> ${esc(err.message)}`, 'err'); }
+  finally{ CSAVE.inflight = false; renderSaveState(); }
+}
+function agreementPayload(){ const out = {}; for(const f of C().understanding.findings){ if(f.agreement) out[f.id] = { status: f.agreement.status, note: f.agreement.note, dropped: f.agreement.dropped, present: f.present, at: f.agreement.at }; } return out; }
+function setAgreement(id, patch){
+  const ag = agreementPayload(); const cur = ag[id] || { status:'', note:'', dropped:[], present:true };
+  ag[id] = { ...cur, ...patch, at: new Date().toISOString() };
+  if(!ag[id].status) delete ag[id];
+  saveConclusion({ agreement: ag });
+}
+function goCStep(id){ CSTEP = id; CORR = ''; renderCentre(); window.scrollTo({ top:0, behavior:'smooth' }); }
+
+function renderConclusion(el){
+  const c = C();
+  if(!c){ el.innerHTML = `<div class="panel">${emptyState('No conclusion yet', 'Answer the discovery questions first — the conclusion is built from them.')}</div>`; return; }
+  const steps = CSTEPS(); const i = Math.max(0, steps.findIndex((x) => x.id === CSTEP));
+  const doneStep = (id) => id === 'understanding' ? c.understanding.agreed : false;
+  const modeNote = c.mode === 'PILOT' ? '' : `<div class="suit ${SUIT_CLASS[c.suitability.verdict]}"><div class="v">${esc(SUIT_LABEL[c.suitability.verdict])} — ${c.mode === 'VALIDATION' ? 'not proposing the pilot today' : 'not proposing a pilot'}</div><div class="r">${esc(c.suitability.recommendation)}</div></div>`;
+  const body = { understanding: cStepUnderstanding, opportunity: cStepOpportunity, changes: cStepChanges, deployment: cStepDeployment, pilot: cStepPilot }[CSTEP] || cStepUnderstanding;
+  const prev = steps[i-1]; const next = steps[i+1];
+  el.innerHTML = `
+    <div class="c-head">
+      <div class="c-steps">${steps.map((st, k) => `<button class="c-step${CSTEP === st.id ? ' on' : ''}${doneStep(st.id) ? ' done' : ''}" data-cstep="${esc(st.id)}" type="button" title="${esc(st.blurb)}"><span class="n">${k+1}</span>${esc(st.nav || st.title)}</button>`).join('')}</div>
+      <div class="btnrow" style="margin:0;flex:none">
+        <button class="btn btn-quiet btn-sm" data-pres-window type="button" title="Open the presentation in its own window, so you can share just that window">New window &#8599;</button>
+        <button class="btn btn-present" data-present type="button">Present to client</button>
+      </div>
+    </div>
+    ${modeNote}
+    ${body(c)}
+    <div class="btnrow split" style="margin-top:14px">
+      ${prev ? `<button class="btn btn-secondary" data-cstep="${esc(prev.id)}" type="button">&larr; ${esc(prev.title)}</button>` : `<button class="btn btn-secondary" data-go-stage="diagnosis" type="button">&larr; Diagnosis</button>`}
+      ${next ? `<button class="btn btn-primary" data-cstep="${esc(next.id)}" type="button">${esc(next.title)} &rarr;</button>` : `<button class="btn btn-primary" data-go-stage="outcome" type="button">Record the decision &rarr;</button>`}
+    </div>
+    <details class="panel" style="padding:0;margin-top:14px"><summary style="padding:14px 24px;cursor:pointer;font-size:13px;color:var(--ink-3)">Spoken pitch archive — ${S.pitches.length} version${S.pitches.length === 1 ? '' : 's'} <span class="mini">(previous approach; kept, optional)</span></summary><div id="pitch-archive" style="padding:0 24px 14px"></div></details>`;
+  renderPitch($('pitch-archive'));
+}
+
+/* 1. Confirm understanding */
+function cStepUnderstanding(c){
+  const u = c.understanding; const s = u.situation;
+  const fact = (l, e, hint) => `<div class="f"><div class="l">${esc(l)}</div><div class="v${e.known ? '' : ' unk'}">${e.known ? esc(e.display) : 'not established'}</div>${e.known && e.source ? `<div class="mini">${esc(e.source.replace(/_/g,' '))}</div>` : (hint ? `<div class="mini">${hint}</div>` : '')}</div>`;
+  const revisit = (q) => `<button class="btn btn-quiet btn-sm" data-go-stage="${esc(QBY(q)?.section === 'value' ? 'intelligence' : 'commercial')}" data-q="${esc(q)}" type="button">ask</button>`;
+  const findingHtml = (f) => {
+    const a = f.agreement; const st = a?.status || '';
+    const open = CORR === f.id;
+    return `<div class="fnd ${st.toLowerCase()}">
+      <div class="ft">${esc(f.title)} ${pill(f.evidence === 'CONFIRMED' ? 'established' : 'provisional — hedge it', f.evidence === 'CONFIRMED' ? 't-blue' : 't-amber', true)}${st ? pill(AGREE_LABEL[st], AGREE_TONE[st]) : ''}${st && st !== 'REJECTED' ? pill(f.present ? 'presented' : 'not presented', f.present ? 't-green' : 't-grey', true) : ''}</div>
+      <div class="fs">${esc(f.statement_polished || f.statement)}</div>
+      ${f.statement_polished ? `<div class="mini" style="margin-top:4px">Polished wording · original: “${esc(f.statement)}”</div>` : ''}
+      ${f.owner_words.map((w) => `<div class="fw">“${esc(w)}”</div>`).join('')}
+      ${a?.note ? `<div class="fw" style="color:var(--amber)">Owner: “${esc(a.note)}”${a.dropped?.length ? ` · not a problem: ${esc(a.dropped.map((d) => f.dimensions.find((x) => x.dimension === d)?.label || d).join(', '))}` : ''}</div>` : ''}
+      <div class="fa">
+        <button class="btn btn-secondary btn-sm${st === 'AGREED' ? ' on' : ''}" data-agree="${esc(f.id)}" type="button">Agree</button>
+        <button class="btn btn-secondary btn-sm${st === 'CORRECTED' ? ' on cor' : ''}" data-correct="${esc(f.id)}" type="button">Correct…</button>
+        <button class="btn btn-secondary btn-sm${st === 'REJECTED' ? ' on rej' : ''}" data-reject="${esc(f.id)}" type="button">Not a problem</button>
+        ${st && st !== 'REJECTED' ? `<label class="mini" style="display:flex;gap:6px;align-items:center;margin-left:auto"><input type="checkbox" data-present-ck="${esc(f.id)}" ${f.present ? 'checked' : ''} /> Show in presentation</label>` : ''}
+      </div>
+      ${open ? `<div class="corr"><div class="mini" style="margin-bottom:6px"><b>What did they correct?</b> Untick any part that isn't actually a problem — that part is treated as working (and checked in the first days); the rest stands. The original answers are not changed.</div>
+        ${f.dimensions.map((x) => `<label><input type="checkbox" data-corr-dim="${esc(x.dimension)}" ${a?.dropped?.includes(x.dimension) ? '' : 'checked'} /> <span>${esc(x.label)} — ${esc(x.gap)}</span></label>`).join('')}
+        <textarea class="input block" id="corr-note" style="min-height:56px;margin-top:8px;font-size:12.5px" placeholder="In their words — what's different?">${esc(a?.note||'')}</textarea>
+        <div class="btnrow" style="margin-top:8px"><button class="btn btn-primary btn-sm" data-corr-save="${esc(f.id)}" type="button">Save correction</button><button class="btn btn-quiet btn-sm" data-corr-cancel type="button">Cancel</button></div></div>` : ''}
+    </div>`;
+  };
+  return `<div class="panel">
+    <div class="say">${esc(u.opening)}</div>
+    <div class="facts">
+      ${fact('Branches', s.branches)}${fact('CRM', s.crm)}${fact('Enquiries', s.enquiries_per_month, revisit('C4'))}${fact('Database', s.database_size, revisit('C5'))}
+      ${fact('Valuations', s.valuations_per_month, revisit('C8'))}${fact('Instructions', s.instructions_per_month, revisit('C9'))}${fact('Average fee', s.fee_per_instruction, revisit('C10'))}${fact('Conversion', s.conversion_pct, revisit('C11'))}
+    </div>
+    <div class="kv" style="margin-bottom:14px"><div class="k">Objective</div><div>${dash(s.objective.priority_label)}${s.objective.obstacles.length ? ` · in the way: ${esc(s.objective.obstacles.join(', ').toLowerCase())}` : ''}</div></div>
+    <div class="panel-t" style="font-size:15px">${u.findings.length === 0 ? 'No problem established' : u.findings.length === 1 ? 'The problem that matters' : `The ${u.findings.length} problems that matter`} <span class="mini">grouped, ranked by evidence and their priority — not every dimension</span></div>
+    ${u.findings.length ? u.findings.map(findingHtml).join('') : `<div class="note">No weak or partial dimension with a cause and consequence yet — nothing to reflect back. ${c.mode !== 'PILOT' ? 'Say so plainly.' : ''}</div>`}
+    ${u.outside_scope.length ? `<div class="note">Also heard, but not something NOVUS fixes: ${esc(u.outside_scope.map((x) => `${x.label} — ${x.note}`).join(' '))}</div>` : ''}
+    ${u.unknown.length ? `<div class="mini" style="margin-top:8px">Not established: ${esc(u.unknown.join(', '))}</div>` : ''}
+    <div class="say q" style="margin-top:14px">${esc(u.closing)}</div>
+    <div class="btnrow" style="margin:0">
+      ${u.findings.length && !u.agreed ? `<button class="btn btn-secondary btn-sm" data-agree-all type="button">They agreed with all of it</button>` : ''}
+      <button class="btn btn-quiet btn-sm" data-polish type="button" title="Optional: the model rewords these sentences only; validated, never changes findings, scope or price">${c.polish ? `Polished ${c.polish.applied}${c.polish.stale ? ` (${c.polish.stale} stale)` : ''} · re-polish` : 'Polish wording (optional, AI)'}</button>
+      ${c.polish ? `<button class="btn btn-quiet btn-sm" data-unpolish type="button">Use plain wording</button>` : ''}
+    </div>
+    ${c.polish?.issues?.length ? `<div class="mini" style="margin-top:6px">Rejected polish: ${esc(c.polish.issues.join('; '))}</div>` : ''}
+  </div>`;
+}
+
+/* 2. Commercial opportunity */
+function cStepOpportunity(c){
+  const o = c.opportunity;
+  if(!o.available) return `<div class="panel"><div class="panel-t">Commercial opportunity</div><div class="note">Their economics aren't established: ${esc(o.missing.join(', '))}. Ask for the figures, or present without a number.</div>
+    <div class="btnrow"><button class="btn btn-secondary btn-sm" data-go-stage="intelligence" data-q="C10" type="button">Ask the average fee</button><button class="btn btn-secondary btn-sm" data-go-stage="intelligence" data-q="C8" type="button">Ask valuations / instructions</button></div></div>`;
+  const sel = o.selected;
+  return `<div class="panel">
+    <div class="panel-t">Commercial opportunity <span class="mini">their actual economics</span></div>
+    <div class="facts" style="grid-template-columns:repeat(3,1fr)">
+      <div class="f"><div class="l">Average fee</div><div class="v">${gbp(o.fee_per_instruction.value)}</div><div class="mini">${esc(o.fee_per_instruction.source.replace(/_/g,' '))}</div></div>
+      <div class="f"><div class="l">Valuation → instruction</div><div class="v">${esc(o.conversion_pct.value)}%</div><div class="mini">${esc(o.conversion_pct.detail || o.conversion_pct.source)}</div></div>
+      <div class="f"><div class="l">Expected gross fee income per additional valuation</div><div class="v">${gbp(o.expected_fee_income_per_valuation_gbp)}</div><div class="mini">${gbp(o.fee_per_instruction.value)} × ${esc(o.conversion_pct.value)}%</div></div>
+    </div>
+    <div class="say">If we found you <b>${sel.additional_valuations_per_month}</b> additional valuation${sel.additional_valuations_per_month === 1 ? '' : 's'} a month, at your fee and your conversion, that's about <b>${gbp(sel.monthly_gbp)}</b> a month — <b>${gbp(sel.annual_gbp)}</b> a year if sustained. As an illustration, not a forecast.</div>
+    <div class="calc"><span class="mini">Additional valuations a month:</span>${o.rows.map((r) => `<button class="btn btn-secondary btn-sm${r.additional_valuations_per_month === o.selected_additional_valuations ? ' on' : ''}" data-calc="${r.additional_valuations_per_month}" type="button">${r.additional_valuations_per_month}</button>`).join('')}</div>
+    <div class="big2"><div class="b"><div class="l">Per month · illustration</div><div class="v">${gbp(sel.monthly_gbp)}</div></div><div class="b"><div class="l">Per year if sustained · illustration</div><div class="v">${gbp(sel.annual_gbp)}</div></div></div>
+    <div class="tablewrap" style="margin-top:12px"><table class="itab"><thead><tr><th>Additional valuations / mo</th><th>Instructions / mo</th><th>Gross fee income / mo</th><th>12 months</th></tr></thead><tbody>${o.rows.map((r) => `<tr${r.additional_valuations_per_month === o.selected_additional_valuations ? ' style="background:var(--blue-tint)"' : ''}><td>+${r.additional_valuations_per_month}</td><td>${r.additional_instructions_per_month}</td><td>${gbp(r.monthly_gbp)}</td><td>${gbp(r.annual_gbp)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="note">${esc(o.disclaimer)}</div>
+  </div>`;
+}
+
+/* 3. What NOVUS would change */
+function cStepChanges(c){
+  const ch = c.changes;
+  const group = (g) => `<div class="chg">
+    <div class="ct">${esc(g.title)} ${pill(g.status === 'FEASIBLE' ? 'feasible' : g.status === 'PARTLY_SUBJECT_TO_ASSESSMENT' ? 'partly subject to assessment' : 'subject to assessment', g.status === 'FEASIBLE' ? 't-green' : 't-amber', true)} <span class="mono mini">${esc(g.rules.map((r) => r.rule_id).join(' '))}</span></div>
+    <div class="row"><div class="k">The problem</div><div>${esc(g.problem)}${g.owner_note ? ` <span class="muted">(owner: “${esc(g.owner_note)}”)</span>` : ''}</div>
+      <div class="k">Proposed change</div><div>${esc(g.change_polished || g.change)}<div class="mini" style="margin-top:4px">${g.rules.map((r) => `<div><b class="mono">${esc(r.rule_id)}</b> ${esc(r.change)} ${pill(r.delivery_status_label, DS_TONE[r.delivery_status], true)}${r.added_for_dependency ? pill('needed by the intelligence work', 't-blue', true) : ''}</div>`).join('')}</div></div>
+      <div class="k">Commercial effect</div><div>${esc(g.effect)}${g.measured_by.length ? `<div class="mini">Measured by: ${esc(g.measured_by.join(' · '))}</div>` : ''}</div>
+      <div class="k">Preserved</div><div>${g.preserve.length ? esc(g.preserve.join(', ')) + ' — reused, not rebuilt' : '<span class="muted">nothing in this area to preserve</span>'}</div>
+      <div class="k">Has to be true</div><div>${g.conditions.length ? g.conditions.map((x) => `<div class="${x.kind === 'blocked' ? 'blocked' : x.kind === 'delivery' ? '' : 'cond'}">${esc(x.text)}</div>`).join('') : 'Nothing outstanding'}</div>
+    </div>
+  </div>`;
+  return `<div class="panel">
+    <div class="panel-t">What NOVUS would change <span class="mini">from the agreed findings and the deployment rules — recomputed when a finding is corrected</span></div>
+    ${ch.groups.length ? ch.groups.map(group).join('') : `<div class="note">${c.mode === 'PILOT' ? 'No intervention selected.' : esc(c.next_step)}</div>`}
+    ${ch.other_groups.length ? `<details><summary class="mini" style="cursor:pointer">Also in the plan (not led with): ${esc(ch.other_groups.map((g) => g.title).join('; '))}</summary>${ch.other_groups.map(group).join('')}</details>` : ''}
+    ${ch.foundations_note ? `<div class="note">${esc(ch.foundations_note)}${ch.preserved.length ? ` Preserved: ${esc(ch.preserved.map((p) => p.label + (p.verified === false ? ' (checked early)' : '')).join(', '))}.` : ''}</div>` : ''}
+    ${c.mode !== 'PILOT' && ch.groups.length ? `<div class="note">${esc(c.next_step)}</div>` : ''}
+  </div>`;
+}
+
+/* 4. Personalised deployment */
+function cStepDeployment(c){
+  const d = c.deployment;
+  const li = (items) => items.length ? `<ul>${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
+  return `<div class="panel">
+    <div class="panel-t">Your 60-day deployment <span class="mini">${d.rules.length ? `built from ${esc(d.rules.join(', '))}` : 'no interventions selected'}${d.first_workflow ? ` · first workflow ${esc(d.first_workflow)}` : ''}</span></div>
+    ${c.mode !== 'PILOT' ? `<div class="note">${esc(c.next_step)}</div>` : ''}
+    ${d.phases.map((p) => `<div class="dep"><div class="dh"><span class="w">${esc(p.title)}</span><span class="t">${esc(p.heading)}</span></div>
+      ${p.summary ? `<div class="ds">${esc(p.summary)}</div>` : ''}
+      <details><summary>Implementation detail — NOVUS does ${p.novus_does.length}, the agency does ${p.agency_does.length}</summary>
+        <div class="two" style="margin-top:8px"><div><div class="k">NOVUS does</div>${li(p.novus_does) || '<div class="muted mini">—</div>'}</div><div><div class="k">The agency does</div>${li(p.agency_does) || '<div class="muted mini">—</div>'}</div><div><div class="k">The owner sees</div>${li(p.owner_sees) || '<div class="muted mini">—</div>'}</div><div><div class="k">Measured</div>${li(p.measures) || '<div class="muted mini">—</div>'}</div></div>
+      </details></div>`).join('')}
+    ${d.required_access.length ? `<div class="mini" style="margin-top:6px">Needs from the agency: ${esc(d.required_access.join(' · '))}</div>` : ''}
+    <div class="note">${esc(d.caveat)}</div>
+  </div>`;
+}
+
+/* 5. Founding pilot */
+function cStepPilot(c){
+  const p = c.pilot; const d = S.diagnosis;
+  const scope = new Set(p.scope_rule_ids);
+  return `<div class="panel">
+    <div class="price"><span class="p">${gbp(p.price_gbp)}</span><span class="d">all-in · ${p.duration_days} days · setup target ~${p.setup_target_days} days</span>${p.proposed ? pill('propose it', 't-green') : pill('not today', 't-grey')}</div>
+    ${p.proposed ? `<div class="say">${esc(p.pricing_script)}</div>` : `<div class="say">${esc(c.next_step)}</div>`}
+    <div class="two">
+      <div><div class="k">Agreed scope <span class="muted" style="text-transform:none;letter-spacing:0">tick what's in</span></div>
+        ${d.interventions.filter((i) => i.selected).map((i) => `<label class="scope-ck"><input type="checkbox" data-cscope="${esc(i.rule_id)}" ${scope.has(i.rule_id) ? 'checked' : ''} /> <span><b class="mono">${esc(i.rule_id)}</b> ${esc(i.title)} ${pill(FEAS_LABEL[i.feasibility], FEAS_TONE[i.feasibility], true)}</span></label>`).join('') || '<div class="muted mini">No interventions selected.</div>'}
+        <div class="k" style="margin-top:12px">Included</div><ul>${p.includes.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+      <div><div class="k">Success criteria</div><ul>${p.success_criteria.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+        <div class="k" style="margin-top:12px">End of pilot</div><ul><li>${esc(p.review)}</li><li>${esc(p.commitment)} ${esc(p.continuation)}</li><li>${esc(p.extension)}</li><li>${esc(p.never.join(' '))}</li></ul></div>
+    </div>
+  </div>`;
+}
+
+/* ═══ PRESENTATION MODE ═════════════════════════════════════════════════
+   Six client-facing screens from S.presentation (the server strips every
+   internal id, code, note and control). Arrow keys / click edges to move,
+   Esc to exit, F for the Fullscreen API (edge-to-edge fallback if it is
+   unavailable). The slide index survives switching between the internal
+   workspace and the presentation, and a second window (#present?id=…)
+   stays in step over a BroadcastChannel. */
+const presKey = () => `novus.present.${S?.session?.session_id||''}`;
+function presBroadcast(){ try{ PRES.channel?.postMessage({ type:'state', conclusion: S.conclusion, presentation: S.presentation, diagnosis: S.diagnosis }); }catch{} }
+function presChannel(){
+  if(PRES.channel || !S || !('BroadcastChannel' in window)) return;
+  PRES.channel = new BroadcastChannel(presKey());
+  PRES.channel.onmessage = (e) => {
+    const m = e.data || {};
+    if(m.type === 'slide' && typeof m.slide === 'number'){ PRES.slide = m.slide; if(PRES.open) renderPresentation(); }
+    if(m.type === 'state' && m.presentation){ S.presentation = m.presentation; S.conclusion = m.conclusion || S.conclusion; if(m.diagnosis) S.diagnosis = m.diagnosis; if(PRES.open) renderPresentation(); if(STAGE === 'conclusion' && !PRES.only) renderCentre(); }
+  };
+}
+function openPresentation({ fullscreen = true } = {}){
+  if(!S?.presentation) return;
+  presChannel();
+  try{ const saved = Number(sessionStorage.getItem(presKey())); if(Number.isFinite(saved) && saved >= 0) PRES.slide = saved; }catch{}
+  PRES.open = true; $('present').classList.add('on'); document.body.classList.add('presenting');
+  renderPresentation();
+  if(fullscreen) presFullscreen();
+}
+function presFullscreen(){
+  const el = $('present');
+  try{ if(el.requestFullscreen && !document.fullscreenElement){ el.requestFullscreen().catch(() => {}); } }catch{}
+  /* No Fullscreen API (or refused): the overlay is already edge-to-edge. */
+}
+function closePresentation(){
+  PRES.open = false; $('present').classList.remove('on'); document.body.classList.remove('presenting');
+  try{ if(document.fullscreenElement) document.exitFullscreen().catch(() => {}); }catch{}
+  if(PRES.only){ try{ window.close(); }catch{} }
+}
+function presGo(delta){ const n = S.presentation.screens.length; PRES.slide = Math.min(n-1, Math.max(0, PRES.slide + delta)); renderPresentation(); try{ PRES.channel?.postMessage({ type:'slide', slide: PRES.slide }); }catch{} }
+function presSlideHtml(sc, i){
+  const eyebrow = `<div class="pres-eyebrow">${i+1} / ${S.presentation.screens.length}</div>`;
+  const head = (sub) => `${eyebrow}<h1 class="pres-title">${esc(sc.title)}</h1>${sub ? `<div class="pres-sub">${esc(sub)}</div>` : ''}`;
+  if(sc.id === 'today') return `${head(sc.subtitle)}<div class="pres-body">
+      <div class="pres-facts">${sc.facts.map((f) => `<div class="pres-fact"><div class="l">${esc(f.label)}</div><div class="v">${esc(f.value)}</div></div>`).join('')}</div>
+      ${sc.objective ? `<div class="pres-obj"><b>${esc(sc.objective)}</b></div>` : ''}${sc.obstacles.length ? `<div class="pres-chips">${sc.obstacles.map((o) => `<span class="pres-chip">${esc(o)}</span>`).join('')}</div>` : ''}</div>`;
+  if(sc.id === 'established') return `${head(sc.subtitle)}<div class="pres-body"><div class="pres-cols" style="--n:${Math.max(1, sc.findings.length)}">${sc.findings.map((f, k) => `<div class="pres-card"><div class="num">0${k+1}</div><div class="h">${esc(f.title)}</div>${f.hedged ? `<div class="hedge">To confirm together</div>` : ''}<ul>${f.points.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>${f.corrected ? `<div class="quote">“${esc(f.corrected)}”</div>` : ''}</div>`).join('') || `<div class="pres-next">Nothing agreed for presentation yet.</div>`}</div></div>`;
+  if(sc.id === 'opportunity'){
+    if(!sc.available) return `${head(sc.subtitle)}<div class="pres-body"><div class="pres-next">We haven't put your numbers on it yet — the average fee and the valuation-to-instruction conversion would turn this into a figure.</div></div>`;
+    const row = sc.rows.find((r) => r.n === sc.selected) || sc.rows[0];
+    return `${head(sc.subtitle)}<div class="pres-body">
+      <div class="pres-stats"><div class="pres-stat"><div class="v">${esc(sc.fee)}</div><div class="l">Your average fee</div></div><div class="pres-stat"><div class="v">${esc(sc.conversion)}</div><div class="l">Valuation to instruction</div></div><div class="pres-stat"><div class="v">${esc(sc.per_valuation)}</div><div class="l">Per additional valuation</div><div class="f">expected gross fee income</div></div></div>
+      <div class="pres-calc"><div class="sel"><div class="l">Additional valuations a month</div><div class="btns">${sc.rows.map((r) => `<button type="button" data-pres-calc="${r.n}" class="${r.n === sc.selected ? 'on' : ''}">${r.n}</button>`).join('')}</div></div>
+        <div class="out"><div class="o"><div class="v">${esc(row.monthly)}</div><div class="l">a month</div></div><div class="o"><div class="v">${esc(row.annual)}</div><div class="l">a year, if sustained</div></div></div></div>
+      <div class="pres-note">${esc(sc.label)}. ${esc(sc.footnote)}</div></div>`;
+  }
+  if(sc.id === 'help') return `${head(sc.subtitle)}<div class="pres-body top">${sc.groups.length ? `<div class="pres-cols" style="--n:${sc.groups.length}">${sc.groups.map((g) => `<div class="pres-card"><div class="h">${esc(g.title)}</div><div class="k">Today</div><ul>${g.problem_points.map((x) => `<li>${esc(x)}</li>`).join('')}</ul><div class="k">What changes</div><ul>${g.change_points.map((x) => `<li>${esc(x)}</li>`).join('')}</ul><div class="k">What that means</div><p>${esc(g.effect)}</p>${g.preserve.length ? `<div class="k">Stays as it is</div><p>${esc(g.preserve.join(', '))}</p>` : ''}${g.subject_to.length ? `<div class="k">To confirm first</div><p>${esc(g.subject_to.join('. '))}</p>` : ''}</div>`).join('')}</div>` : `<div class="pres-next">${esc(sc.next_step)}</div>`}
+      ${sc.preserved.length || sc.foundations_note ? `<div class="pres-note">${esc(sc.foundations_note)}${sc.preserved.length ? ` What already works stays as it is: ${esc(sc.preserved.join(', ').toLowerCase())}.` : ''}</div>` : ''}</div>`;
+  if(sc.id === 'deployment') return `${head(sc.subtitle)}<div class="pres-body">${sc.proposed ? `<div class="pres-timeline">${sc.phases.map((p) => `<div class="pres-phase"><div class="w">${esc(p.title)}</div><div class="h">${esc(p.heading)}</div><p>${esc(p.summary)}</p></div>`).join('')}</div><div class="pres-note">${esc(sc.caveat)}</div>` : `<div class="pres-next">${esc(S.presentation.screens.find((x) => x.id === 'pilot')?.next_step || '')}</div>`}</div>`;
+  if(sc.id === 'pilot') return `${head('')}<div class="pres-body top">${sc.proposed ? `<div class="pres-price"><span class="p">${esc(sc.price)}</span><span class="d">all-in · ${esc(sc.duration)} · no long-term commitment</span></div>
+      <div class="pres-cols dense" style="--n:${sc.scope.length ? 3 : 2};margin-top:2.4cqh"><div class="pres-card"><div class="k">What's included</div><ul>${sc.includes.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>${sc.scope.length ? `<div class="pres-card"><div class="k">Scope</div><ul>${sc.scope.slice(0, 5).map((x) => `<li>${esc(x)}</li>`).join('')}${sc.scope.length > 5 ? `<li>and ${sc.scope.length - 5} more</li>` : ''}</ul></div>` : ''}<div class="pres-card"><div class="k">How we'll judge it</div><ul>${sc.success_criteria.slice(0, 4).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div></div>
+      <div class="pres-note">${esc(sc.commitment)}</div>` : `<div class="pres-next">${esc(sc.next_step)}</div>`}</div>`;
+  return head('');
+}
+function renderPresentation(){
+  const p = S?.presentation; if(!p) return;
+  const n = p.screens.length; PRES.slide = Math.min(n-1, Math.max(0, PRES.slide));
+  try{ sessionStorage.setItem(presKey(), String(PRES.slide)); }catch{}
+  $('pres-agency').textContent = p.agency_name;
+  $('pres-slides').innerHTML = p.screens.map((sc, i) => `<section class="pres-slide${i === PRES.slide ? ' on' : ''}" data-slide="${i}">${presSlideHtml(sc, i)}</section>`).join('');
+  $('pres-dots').innerHTML = p.screens.map((_, i) => `<i class="${i === PRES.slide ? 'on' : ''}" data-pres-dot="${i}"></i>`).join('');
+  $('pres-st').textContent = p.screens[PRES.slide]?.title || '';
+}
+function presOpenWindow(){
+  if(!S) return;
+  const url = `${location.pathname}#present?id=${encodeURIComponent(S.session.session_id)}`;
+  const w = window.open(url, `novus-present-${S.session.session_id}`, 'popup=yes,width=1280,height=720');
+  if(!w){ notice('The browser blocked the new window — allow pop-ups for this site, or present in this window.', 'warn'); return; }
+  presChannel();
+  notice('Presentation opened in its own window — share <b>that</b> window on the call. It follows the slide and the calculator from here.', 'info');
+}
+async function presentOnly(sessionId){
+  PRES.only = true; document.body.classList.add('present-only');
+  try{
+    S = await get(`${OP('discovery-session')}&session_id=${encodeURIComponent(sessionId)}`);
+    STAGE = 'conclusion';
+    openPresentation({ fullscreen:false });
+  }catch(err){ document.body.innerHTML = `<div style="padding:40px;font-family:sans-serif;color:#fff;background:#05070D;height:100vh">Could not open the presentation: ${esc(err.message)}</div>`; }
+}
+document.addEventListener('fullscreenchange', () => { if(!document.fullscreenElement && PRES.open && !PRES.only) closePresentation(); });
 
 /* ═══ STAGE 6: OUTCOME ══════════════════════════════════════════════════ */
 let OUT = { outcome:'', notes:'', follow_up:'', scope:null };
@@ -899,11 +1316,11 @@ function renderOutcome(el){
     el.innerHTML = `<div class="panel"><div class="panel-t">Outcome recorded</div>
       <div class="kv"><div class="k">Outcome</div><div>${pill(outcomes[s.outcome]||s.outcome, OUTCOME_TONE[s.outcome])}</div><div class="k">Recorded</div><div>${esc(when(s.completed_at))}</div>${s.follow_up_at ? `<div class="k">Follow-up</div><div>${esc(when(s.follow_up_at))} (MEETING_FOLLOW_UP action)</div>` : ''}<div class="k">Notes</div><div>${dash(s.outcome_notes)}</div><div class="k">Suitability</div><div>${pill(SUIT_LABEL[d.suitability.verdict], SUIT_TONE[d.suitability.verdict])}</div><div class="k">Pitch versions</div><div>${s.pitch_count||0}</div></div>
       ${sc ? `<div class="panel-t" style="margin-top:18px">Agreed scope · ${esc(sc.rule_ids.join(', '))}</div><div class="note" style="margin:-6px 0 10px">Agreed ${esc(when(sc.agreed_at))}. This is the onboarding and delivery checklist.</div><div class="tablewrap"><table class="itab"><thead><tr><th>Phase</th><th>Owner</th><th>Item</th></tr></thead><tbody>${sc.checklist.map((c) => `<tr><td class="mono">${esc(c.phase)}</td><td>${esc(c.owner)}</td><td>${c.rule_id ? `<b class="mono">${esc(c.rule_id)}</b> ` : ''}${esc(c.item)}</td></tr>`).join('')}</tbody></table></div>` : ''}
-      <div class="btnrow"><button class="btn btn-secondary btn-sm" data-reopen type="button">Reopen session</button><a class="btn btn-quiet btn-sm" href="#meetings">Back to meetings</a></div>
+      <div class="btnrow"><button class="btn btn-secondary btn-sm" data-reopen type="button">Reopen session</button><button class="btn btn-quiet btn-sm" data-go-stage="conclusion" type="button">View conclusion</button><a class="btn btn-quiet btn-sm" href="#meetings">Back to meetings</a></div>
     </div>${sc ? '' : planHtml(d.plan)}`;
     return;
   }
-  if(!OUT.scope) OUT.scope = new Set(d.proposed);
+  if(!OUT.scope) OUT.scope = new Set(S.conclusion?.pilot?.scope_rule_ids || d.proposed);
   const su = d.suitability;
   el.innerHTML = `
     <div class="panel"><div class="panel-t">Founding pilot proposal</div>
@@ -917,7 +1334,7 @@ function renderOutcome(el){
       <div class="outcomes">${Object.entries(outcomes).map(([k, v]) => `<button class="opt${OUT.outcome === k ? ' on' : ''}" data-outcome="${k}" type="button"><span>${esc(v)}</span></button>`).join('')}</div>
       <div class="field"><label class="field-l" for="o-notes">Outcome notes</label><textarea class="input block" id="o-notes" style="min-height:80px" placeholder="What was agreed, objections, next step…">${esc(OUT.notes)}</textarea></div>
       <div class="field"><label class="field-l" for="o-follow">Follow-up date / time (optional — creates a MEETING_FOLLOW_UP action)</label><input class="input" id="o-follow" type="datetime-local" value="${esc(OUT.follow_up)}" /></div>
-      <div class="btnrow split"><button class="btn btn-secondary" data-go-stage="pitch" type="button">&larr; Pitch</button><button class="btn btn-primary" data-record-outcome type="button" ${OUT.outcome ? '' : 'disabled'}>Record outcome</button></div>
+      <div class="btnrow split"><button class="btn btn-secondary" data-go-stage="conclusion" type="button">&larr; Conclusion</button><button class="btn btn-primary" data-record-outcome type="button" ${OUT.outcome ? '' : 'disabled'}>Record outcome</button></div>
     </div>`;
 }
 async function recordOutcome(){
@@ -935,6 +1352,8 @@ async function recordOutcome(){
 /* ═══ WIRING ════════════════════════════════════════════════════════════ */
 async function route(){
   const r = routeFromHash();
+  if(PRES.only) return;
+  if(r.view === 'present'){ await presentOnly(r.id); return; }
   if(r.view === 'start'){ showView('discovery'); await startSession(r.agency, r.call); return; }
   if(r.view === 'discovery'){ if(S?.session?.session_id === r.id && !r.stage){ showView('discovery'); return; } await openSession(r.id, r.stage); return; }
   /* Always re-read: a session opened or completed since the list was last
@@ -945,6 +1364,15 @@ window.addEventListener('popstate', route);
 window.addEventListener('beforeunload', (e) => { if(SAVE.dirty){ flush(); e.preventDefault(); e.returnValue = ''; } });
 document.addEventListener('click', async (e) => {
   const t = e.target;
+  /* presentation mode */
+  if(PRES.open){
+    const pc = t.closest('[data-pres-calc]'); if(pc){ const n = Number(pc.dataset.presCalc); if(S.session.status === 'COMPLETED'){ S.presentation.screens.find((x) => x.id === 'opportunity').selected = n; renderPresentation(); } else saveConclusion({ additional_valuations: n }); return; }
+    const pn = t.closest('[data-pres-nav]'); if(pn){ presGo(Number(pn.dataset.presNav)); return; }
+    const pd = t.closest('[data-pres-dot]'); if(pd){ PRES.slide = Number(pd.dataset.presDot); renderPresentation(); return; }
+    if(t.closest('[data-pres-full]')){ presFullscreen(); return; }
+    if(t.closest('[data-pres-exit]')){ closePresentation(); return; }
+    return;
+  }
   const nav = t.closest('.nav-item[data-view]'); if(nav){ setHash('#meetings'); route(); return; }
   if(t.id === 'setup-btn'){ t.disabled = true; try{ await post(OP('discovery-setup'), { confirm:'SETUP_DISCOVERY' }); await loadList(); }catch(err){ showErr(err.message); } return; }
   const st = t.closest('[data-start]'); if(st){ $('a-results').classList.add('hidden'); $('a-search').value = ''; setHash(`#start?agency=${encodeURIComponent(st.dataset.start)}`); route(); return; }
@@ -981,6 +1409,19 @@ document.addEventListener('click', async (e) => {
   const rs = t.closest('[data-rov-save]'); if(rs){ const reason = $('rov-reason').value.trim(); if(!reason){ $('rov-reason').focus(); return; } S.session.overrides = S.session.overrides || {}; S.session.overrides.rules = S.session.overrides.rules || {}; S.session.overrides.rules[rs.dataset.rovSave] = { include: rs.dataset.include === 'true', reason, at:new Date().toISOString() }; OVR_OPEN = ''; markDirty(); await flush(); renderCentre(); return; }
   const rc = t.closest('[data-rov-clear]'); if(rc){ delete S.session.overrides.rules[rc.dataset.rovClear]; OVR_OPEN = ''; markDirty(); await flush(); renderCentre(); return; }
   if(t.closest('[data-gen-pitch]')){ generatePitch(); return; }
+  /* meeting conclusion */
+  const cs = t.closest('[data-cstep]'); if(cs){ goCStep(cs.dataset.cstep); return; }
+  if(t.closest('[data-present]')){ openPresentation(); return; }
+  if(t.closest('[data-pres-window]')){ presOpenWindow(); return; }
+  const ag = t.closest('[data-agree]'); if(ag){ CORR = ''; setAgreement(ag.dataset.agree, { status:'AGREED', dropped:[] }); return; }
+  const rj = t.closest('[data-reject]'); if(rj){ CORR = ''; setAgreement(rj.dataset.reject, { status:'REJECTED', dropped:[], present:false }); return; }
+  const co = t.closest('[data-correct]'); if(co){ CORR = CORR === co.dataset.correct ? '' : co.dataset.correct; renderCentre(); return; }
+  if(t.closest('[data-corr-cancel]')){ CORR = ''; renderCentre(); return; }
+  const csv = t.closest('[data-corr-save]'); if(csv){ const dropped = [...document.querySelectorAll('[data-corr-dim]')].filter((x) => !x.checked).map((x) => x.dataset.corrDim); const note = $('corr-note')?.value.trim() || ''; CORR = ''; setAgreement(csv.dataset.corrSave, { status:'CORRECTED', dropped, note, present:true }); return; }
+  if(t.closest('[data-agree-all]')){ const ag2 = agreementPayload(); for(const f of C().understanding.findings) if(!ag2[f.id]) ag2[f.id] = { status:'AGREED', note:'', dropped:[], present:true, at:new Date().toISOString() }; saveConclusion({ agreement: ag2 }); return; }
+  const cc = t.closest('[data-calc]'); if(cc){ saveConclusion({ additional_valuations: Number(cc.dataset.calc) }); return; }
+  if(t.closest('[data-polish]')){ polishConclusion(); return; }
+  if(t.closest('[data-unpolish]')){ saveConclusion({ clear_polish:true }); return; }
   if(t.closest('[data-copy-pitch]')){ const txt = pitchText(S.pitches[PITCH_VIEW]); try{ await navigator.clipboard.writeText(txt); notice('Pitch copied.', 'info'); }catch{ notice('Copy failed — select the text manually.', 'warn'); } return; }
   const oc2 = t.closest('[data-outcome]'); if(oc2){ OUT.outcome = oc2.dataset.outcome; OUT.notes = $('o-notes')?.value || OUT.notes; OUT.follow_up = $('o-follow')?.value || OUT.follow_up; renderCentre(); return; }
   if(t.closest('[data-record-outcome]')){ OUT.notes = $('o-notes')?.value || ''; OUT.follow_up = $('o-follow')?.value || ''; recordOutcome(); return; }
@@ -996,6 +1437,8 @@ document.addEventListener('input', (e) => {
   if(t.id === 'q-text' && q){ const a = A()[q.id] || {}; A()[q.id] = { ...a, value: t.value, answered_at:new Date().toISOString() }; delete A()[q.id].skipped; markDirty(); return; }
   if(t.id === 'm-notes'){ S.session.notes = S.session.notes || {}; S.session.notes.meeting = t.value; markDirty(); return; }
   if(t.id === 'd-notes'){ S.session.notes = S.session.notes || {}; S.session.notes.diagnosis = t.value; markDirty(); return; }
+  const pk = t.closest('[data-present-ck]'); if(pk){ setAgreement(pk.dataset.presentCk, { present: pk.checked }); return; }
+  const csc = t.closest('[data-cscope]'); if(csc){ const ids = [...document.querySelectorAll('[data-cscope]')].filter((x) => x.checked).map((x) => x.dataset.cscope); OUT.scope = null; saveConclusion({ scope_rule_ids: ids }); return; }
   if(t.id === 'o-notes'){ OUT.notes = t.value; return; }
   if(t.id === 'o-follow'){ OUT.follow_up = t.value; return; }
   const sc = t.closest('[data-scope]'); if(sc){ if(sc.checked) OUT.scope.add(sc.dataset.scope); else OUT.scope.delete(sc.dataset.scope); return; }
@@ -1004,6 +1447,15 @@ document.addEventListener('change', (e) => {
   if(e.target.id === 'pitch-ver'){ PITCH_VIEW = Number(e.target.value); renderCentre(); }
 });
 document.addEventListener('keydown', (e) => {
+  if(PRES.open){
+    if(e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' '){ e.preventDefault(); presGo(1); return; }
+    if(e.key === 'ArrowLeft' || e.key === 'PageUp'){ e.preventDefault(); presGo(-1); return; }
+    if(e.key === 'Escape'){ e.preventDefault(); closePresentation(); return; }
+    if(e.key === 'f' || e.key === 'F'){ presFullscreen(); return; }
+    if(e.key === 'Home'){ PRES.slide = 0; renderPresentation(); return; }
+    if(e.key === 'End'){ PRES.slide = 99; renderPresentation(); return; }
+    return;
+  }
   if(!S || VIEW !== 'discovery' || !['commercial','foundations','intelligence'].includes(STAGE)) return;
   const inField = ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName);
   const q = QBY(CUR); if(!q) return;

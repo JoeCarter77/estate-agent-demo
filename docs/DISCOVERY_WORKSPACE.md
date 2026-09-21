@@ -5,7 +5,8 @@
 out a new API file). Test: `npm run novus:discovery-selftest` (in-memory workbook + fake model).
 
 Workflow: booked meeting → **Open discovery** → Situation → Foundations → Intelligence → Diagnosis →
-Pitch → Pilot & outcome. Entry points: the Meetings page (every `CALLS` row with `outcome=BOOKED_MEETING`,
+**Conclusion** (confirm understanding → commercial opportunity → what NOVUS would change → 60-day
+deployment → founding pilot, with **Present to client**) → Decision. Entry points: the Meetings page (every `CALLS` row with `outcome=BOOKED_MEETING`,
 active `PREPARE_MEETING` action, `DEMOS.meeting_booked_at`, `AGENCIES.current_pipeline_status=MEETING_BOOKED`,
 plus every session), the lead drawer ("Open discovery workspace" / "Start discovery"), and the agency
 picker (any agency — the ⌘K `lead-search` operation).
@@ -18,8 +19,9 @@ picker (any agency — the ⌘K `lead-search` operation).
 | `lib/discovery-rules.mjs` | the **versioned deployment rule registry** (`RULES_VERSION`): ten rules with triggers, required evidence, consequence, intervention, steps, data/access, responsibilities, dependencies, measurement, scope limits, pitch explanation and a maintained `delivery_status`; the founding offer; the five plan phases. |
 | `lib/discovery-engine.mjs` | the **deterministic diagnosis**: `assessDimensions` → evidence status, `evaluateInterventions` → feasibility + dependency resolution, `computeEconomics`, `decideSuitability`, `buildPlan`, `diagnose`. No I/O, no model. |
 | `lib/discovery-pitch.mjs` | pitch input (structured, no customer PII), the deterministic template pitch, `validatePitch`, `generatePitch` (model via `lib/ai-client.mjs`, validated, template fallback). |
-| `lib/discovery-store.mjs` | tabs `DISCOVERY_SESSIONS` (one row per session, patched in place) and `DISCOVERY_PITCHES` (one immutable row per pitch version). |
-| `lib/discovery-handlers.mjs` | `discovery-meetings`, `discovery-session` (GET); `discovery-setup`, `discovery-start`, `discovery-save`, `discovery-pitch`, `discovery-outcome` (POST, Basic Auth + confirm tokens). |
+| `lib/discovery-conclusion.mjs` | the **meeting conclusion**: grouped findings in the owner's words, the owner's agreement → recorded overrides, economics illustration (1–5 additional valuations), intervention groups, the four-phase deployment, the founding pilot, the six client-facing screens (`presentationPayload`), and the optional validated AI polish. Deterministic; no model needed. |
+| `lib/discovery-store.mjs` | tabs `DISCOVERY_SESSIONS` (one row per session, patched in place; `conclusion_json` added later — an older header is extended in place) and `DISCOVERY_PITCHES` (one immutable row per pitch version). |
+| `lib/discovery-handlers.mjs` | `discovery-meetings`, `discovery-session` (GET); `discovery-setup`, `discovery-start`, `discovery-save`, `discovery-pitch`, `discovery-conclusion`, `discovery-conclusion-polish`, `discovery-outcome` (POST, Basic Auth + confirm tokens). |
 
 ## Shared discovery context (questions v2)
 
@@ -92,9 +94,51 @@ Spoken and plan are validated separately; each part that fails is replaced by th
 and shown in the UI. Modes: `PILOT`, `VALIDATION`, `NO_PITCH`. Every version is an immutable
 `DISCOVERY_PITCHES` row; pitches stored in the older eight-section format still render.
 
+## Meeting conclusion (stage 5) and presentation
+
+The conclusion replaces the AI-generated speech as what happens after discovery. Everything is built by
+`lib/discovery-conclusion.mjs` from the stored answers and the engine; the model is never needed and can
+only reword sentences (see *Polish*). Two diagnoses back it: **base** (answers + operator overrides) and
+**agreed** (the same, with the owner's corrections applied as recorded `EXISTING_STRENGTH` overrides,
+`source: OWNER_CONCLUSION`, unverified → checked in days 1–3). Findings are reflected from *base* so a
+rejected finding still shows as rejected; interventions, deployment and scope come from *agreed*. The
+session row stores *agreed* in `diagnosis_json`; the answers and the operator's own overrides are never
+rewritten, and an operator override always wins over the owner's remark.
+
+| step | what it shows | controls |
+|---|---|---|
+| **Confirm understanding** | "Right {name}, correct me if I'm wrong…", the situation in their numbers (branches, CRM, enquiries, database, valuations, instructions, fee, conversion — unknown stays unknown), the two or three problems grouped by theme (capture F1+F2 · progress F3+F4 · opportunities I1–I4 · measure F5+I5), ranked by evidence, commercial consequence and the owner's priority, each in the owner's own answers ("mostly, but some gets missed"), hedged with "I think" when provisional; "Is that a fair reflection…?" | **Agree** · **Correct…** (untick the parts that are not a problem + their words) · **Not a problem** · *Show in presentation* · *They agreed with all of it* |
+| **Commercial opportunity** | fee × conversion = expected gross fee income per additional valuation; selector 1–5 with monthly and annual figures, labelled *Illustration, not a forecast* (Louis: £4,500 × 30% = £1,350; 2/month = £2,700 / £32,400) | the selector (persisted) |
+| **What NOVUS would change** | 2–3 groups from the agreed findings and the selected rules: problem · proposed change · commercial effect (+ how measured) · preserved · has to be true (assessment items, unknown dependencies, blockers, delivery caveats). Weak foundations appear only where the intelligence work needs them; strong ones are listed as reused | — (recomputed on every correction) |
+| **60-day deployment** | Week 1 / Week 2 / Weeks 3–4 / Weeks 5–8, headings adapted (reuse vs foundations, first workflow), one-paragraph summary from `templatePlan` with rule ids replaced by plain names, implementation detail expandable | — |
+| **Founding pilot** | £1,500 all-in · 60 days · scope ticks (default = everything proposed) · included · success criteria from the scope's measurements · day-45/60 review · no long-term commitment · a short pricing script | scope ticks (persisted; the Decision stage defaults to them) |
+
+`discovery-conclusion` (POST `{session_id, agreement?, additional_valuations?, scope_rule_ids?, clear_polish?}`)
+cleans the agreement against today's findings, stores `conclusion_json`, recomputes and stores the agreed
+diagnosis. `discovery-outcome` with `PILOT_AGREED` freezes the exact findings, agreement, illustration,
+pilot headline and owner overrides inside `agreed_scope_json.conclusion`, next to the checklist.
+
+**Polish** (`discovery-conclusion-polish`, optional): the model receives only the finding statements and the
+change sentences and returns rewordings; each is validated (no longer than the original plus a little, no
+guarantees/marketing/jargon, no figures, no rule ids, no bullets) and stored with its original — a polished
+sentence is applied only while its deterministic original is unchanged, so a correction drops stale polish.
+Failure or rejection leaves the plain wording.
+
+**Present to client** opens a full-screen, 16:9, NOVUS-branded presentation of six screens rendered from
+`presentationPayload` (server-built; no rule ids, evidence codes, notes, scripts or controls; only findings
+approved for presentation): *Your agency today · What we've established · Commercial opportunity (live
+1–5 calculator) · How NOVUS would help · Your 60-day deployment · Founding pilot* (non-fit sessions show
+the owner-facing next step instead of a price). ←/→/space, Home/End, Esc exits (also leaves fullscreen), F
+or the hover button uses the Fullscreen API with the edge-to-edge overlay as the fallback. The slide index
+is kept per session (`sessionStorage`) so switching between the workspace and the presentation resumes
+where it was. **New window ↗** opens `#present?id=<session>` — the same page in presentation-only mode
+(the app shell hidden), so that window alone can be shared on Google Meet; a `BroadcastChannel` keeps
+slide, calculator and every correction in step between the windows. The spoken pitch of the previous
+approach stays as a read-only archive at the bottom of the stage; its versions are preserved.
+
 ## Plan and outcome
 
-`buildPlan` fills the five phases from the selected rules (days 4–7 = selected foundations or "reuse",
+The Decision stage's scope ticks default to the conclusion's agreed scope. `buildPlan` fills the five phases from the selected rules (days 4–7 = selected foundations or "reuse",
 days 8–14 = the first feasible intelligence workflow in priority order I1, I3, I2, I4, I5 — or the first
 foundation when none is feasible; 15–30 = the rest and anything pending assessment; 31–60 = progression,
 review, evaluation, extension clause). `discovery-outcome` completes the session, freezes

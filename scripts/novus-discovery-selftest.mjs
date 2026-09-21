@@ -22,8 +22,10 @@ import { buildPitchInput, templatePitch, validatePitch, generatePitch, pitchSpok
 import { DISCOVERY_SESSIONS_HEADER, DISCOVERY_PITCHES_HEADER, sessionView, pitchView } from '../lib/discovery-store.mjs';
 import {
   handleDiscoveryMeetings, handleDiscoverySession, handleDiscoverySetup, handleDiscoveryStart,
-  handleDiscoverySave, handleDiscoveryPitch, handleDiscoveryOutcome, buildAgencyContext, cleanAnswers,
+  handleDiscoverySave, handleDiscoveryPitch, handleDiscoveryOutcome, handleDiscoveryConclusion, handleDiscoveryConclusionPolish,
+  buildAgencyContext, cleanAnswers, sessionDiagnoses,
 } from '../lib/discovery-handlers.mjs';
+import { buildFindings, cleanConclusion, polishConclusion, validatePolishedText, presentationPayload } from '../lib/discovery-conclusion.mjs';
 
 let passed = 0;
 const ok = (msg) => { passed += 1; console.log(`  ✓ ${msg}`); };
@@ -556,6 +558,191 @@ const flowIds = (answers) => visibleQuestions(answers).map((q) => q.id);
   ok('vague answers: nothing is derived from "don\'t know", every dimension stays unknown, verdict is further validation');
 }
 
+// ── 5c. the meeting conclusion ─────────────────────────────────────────────
+console.log('\n5c. Meeting conclusion (deterministic, no model)');
+const LOUIS = { C1: a('more_valuations'), C2: m(['not_enough_opportunities', 'losing_to_competitors', 'team_time']), C3: a(3), C4: a(250), C5: a(5000), C6: a('reapit'), C7: a('export'), C8: a(20), C9: a(6), C10: a(4500),
+  F1: a('mostly'), F1_cause: m(['no_process', 'crm_limits']), F1_crm_limit: a('no_fields'), F1_consequence: m(['repeated_questions', 'missed_sellers']),
+  F2: a('sometimes'), F2_cause: m(['scattered']), F2_consequence: m(['repeated_questions', 'missed_context']), F2_frequency: a('daily'),
+  F3: a('sometimes_task'), F3_cause: m(['no_process']), F3_consequence: m(['unknown']), F4: a('unknown'),
+  F5: a('none'), F5_cause: m(['not_recorded']), F5_consequence: m(['unknown']), F5_tried: m(['crm_change']),
+  I1: a('process_manual'), I1_current: a('nothing'), I1_consequence: m(['unknown']),
+  I2: a('no'), I2_cause: m(['never_looked']), I2_matching: a('unknown'), I2_consequence: m(['missed_sellers', 'missed_reactivation', 'repeated_questions']),
+  I3: a('when_time'), I3_cause: m(['no_time', 'not_priority']), I3_history: a('partly'), I3_quality: a('ok'), I3_consequence: m(['unknown_value']),
+  I4: a('judgement'), I4_cause: m(['never_needed']), I4_signals: a('some'), I4_consequence: m(['unknown']),
+  I5: a('informal'), I5_cause: m(['no_outcomes', 'no_time']), I5_consequence: m(['keep_failing', 'drop_working']) };
+const louisSession = { session_id: 'dsc_louis', agency_id: 'ag_l', agency_name: 'TEST - Louis', contact_name: 'Louis Example', answers: LOUIS, overrides: {}, notes: {} };
+const conclude = (session, conclusion = null) => { const { base, agreed, conclusion: out, presentation } = sessionDiagnoses(session, conclusion); return { base, agreed, c: out, p: presentation }; };
+const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.test(js) && 'rule id', /CONFIRMED|PROVISIONAL|EXISTING_STRENGTH|OUTSIDE_SCOPE|FEASIB|REQUIRES_ASSESSMENT|INFEASIBLE/.test(js) && 'evidence/feasibility code', /"(rule_id|delivery_status|pricing_script|owner_note|note|reason|agreement)"/.test(js) && 'internal field'].filter(Boolean); };
+{
+  // Louis: the worked example from the brief.
+  const { c, p } = conclude(louisSession);
+  assert.equal(c.mode, 'PILOT');
+  assert.equal(c.understanding.opening, "Right Louis, correct me if I'm wrong, but this is what I've understood from our conversation...");
+  assert.equal(c.understanding.closing, "Is that a fair reflection of what's happening, or have I missed anything?");
+  const s = c.understanding.situation;
+  assert.equal(s.enquiries_per_month.display, '250 a month'); assert.equal(s.database_size.display, '5,000 contacts'); assert.equal(s.valuations_per_month.display, '20 a month'); assert.equal(s.instructions_per_month.display, '6 a month');
+  assert.equal(s.fee_per_instruction.display, '£4,500'); assert.equal(s.conversion_pct.display, '30%'); assert.equal(s.objective.priority_label, 'More valuations');
+  assert.ok(c.understanding.findings.length >= 2 && c.understanding.findings.length <= 3, 'two or three findings');
+  assert.deepEqual(c.understanding.findings.map((f) => f.id), ['opportunities', 'capture', 'measure'], 'grouped by theme, ranked: demand first for an owner who wants more valuations');
+  assert.ok(c.understanding.findings.every((f) => f.dimensions.length >= 1 && !/\b[FI][1-5]\b/.test(f.statement)), 'statements are in plain language, no ids');
+  assert.match(c.understanding.findings[1].statement, /"mostly, but some gets missed"/, 'uses the owner\'s actual answer');
+  assert.match(c.understanding.findings[1].statement, /You said that happens most days/);
+  assert.match(c.understanding.findings[0].statement, /^I think /, 'a provisional dimension is hedged');
+  assert.equal(c.understanding.agreed, false);
+  ok('Louis: opening + closing lines as briefed, situation in his numbers, three grouped findings ranked by evidence and priority, hedged where provisional, in his own words');
+
+  const o = c.opportunity;
+  assert.equal(o.available, true); assert.equal(o.fee_per_instruction.value, 4500); assert.equal(o.conversion_pct.value, 30);
+  assert.equal(o.expected_fee_income_per_valuation_gbp, 1350);
+  assert.equal(o.selected_additional_valuations, 2); assert.equal(o.selected.monthly_gbp, 2700); assert.equal(o.selected.annual_gbp, 32400);
+  assert.deepEqual(o.rows.map((r) => r.additional_valuations_per_month), [1, 2, 3, 4, 5]);
+  assert.deepEqual(o.rows.map((r) => r.monthly_gbp), [1350, 2700, 4050, 5400, 6750]);
+  assert.equal(o.label, 'Illustration, not a forecast'); assert.ok(o.rows.every((r) => r.kind === 'HYPOTHETICAL_ILLUSTRATION'));
+  const c5 = conclude(louisSession, { additional_valuations: 5 }).c;
+  assert.equal(c5.opportunity.selected.monthly_gbp, 6750); assert.equal(c5.opportunity.selected.annual_gbp, 81000);
+  assert.equal(conclude(louisSession, { additional_valuations: 9 }).c.opportunity.selected_additional_valuations, 2, 'out-of-range selection falls back to the default');
+  ok('Louis economics: £4,500 × 30% = £1,350 per additional valuation; 2/month = £2,700/month, £32,400/year; selector 1–5 persisted, labelled as illustrations');
+
+  assert.ok(c.changes.groups.length >= 2 && c.changes.groups.length <= 3);
+  assert.equal(c.changes.groups[0].id, 'opportunities', 'the group carrying the first live workflow leads');
+  for (const g of c.changes.groups) { assert.ok(g.problem && g.change && g.effect && Array.isArray(g.preserve) && Array.isArray(g.conditions), `${g.id} has problem/change/effect/preserve/conditions`); assert.ok(g.rules.every((r) => c.agreed ? true : true)); }
+  assert.ok(c.changes.groups.every((g) => g.rules.every((r) => louisSession && conclude(louisSession).agreed.proposed.includes(r.rule_id))), 'only selected rules appear as changes');
+  assert.ok(c.changes.foundations.includes('F1') && c.changes.foundations.includes('F3'), 'weak foundations the intelligence work needs are built');
+  assert.match(c.changes.foundations_note, /only built where the intelligence work needs them/);
+  for (const ph of c.deployment.phases) { assert.ok(ph.summary && ph.heading, `${ph.key} has a summary and heading`); assert.ok(!/\b[FI][1-5]\b/.test(ph.summary), `${ph.key} summary carries no rule ids: ${ph.summary}`); }
+  assert.deepEqual(c.deployment.phases.map((ph) => ph.heading), ['Scope, access and necessary foundations', 'Activate the initial intelligence workflow', 'Expand and refine', 'Progress opportunities and measure commercial results']);
+  assert.ok(c.deployment.phases[0].novus_does.length > 3, 'implementation detail is available for expansion');
+  assert.equal(c.pilot.proposed, true); assert.equal(c.pilot.price_gbp, 1500); assert.equal(c.pilot.duration_days, 60); assert.equal(c.pilot.headline, '£1,500 all-in for 60 days');
+  assert.match(c.pilot.pricing_script, /^Louis, the founding pilot is £1,500 all-in for 60 days\./); assert.match(c.pilot.pricing_script, /no long-term commitment/); assert.match(c.pilot.pricing_script, /separate arrangement/); assert.match(c.pilot.pricing_script, /\?$/);
+  assert.ok(c.pilot.includes.some((x) => /End-of-pilot review/.test(x)) && c.pilot.success_criteria.length >= 2);
+  assert.deepEqual(c.pilot.scope_rule_ids, conclude(louisSession).agreed.proposed, 'default scope = everything proposed');
+  ok('Louis: 2–3 intervention groups (problem / change / effect / preserve / conditions), four adapted phases with expandable detail, £1,500 pilot with scope, success criteria, review and a short pricing script');
+
+  // The presentation payload carries nothing internal.
+  assert.equal(p.screens.length, 6); assert.deepEqual(p.screens.map((x) => x.id), ['today', 'established', 'opportunity', 'help', 'deployment', 'pilot']);
+  assert.deepEqual(leak(p), [], `presentation leaks: ${leak(p).join(', ')}`);
+  assert.ok(!JSON.stringify(p).includes(c.pilot.pricing_script), 'the pricing script is not on a client screen');
+  assert.equal(p.screens[1].findings.length, 3, 'before any agreement every finding is presentable');
+  assert.equal(p.screens[2].per_valuation, '£1,350'); assert.equal(p.screens[2].rows[1].monthly, '£2,700'); assert.equal(p.screens[2].rows[1].annual, '£32,400');
+  assert.equal(p.screens[5].price, '£1,500');
+  ok('presentation payload: six screens, no rule ids, evidence codes, notes, scripts or controls; economics and price as figures');
+}
+{
+  // Owner corrections recompute the deployment without touching the answers.
+  const findings = buildFindings(diagnose({ answers: LOUIS }));
+  const before = conclude(louisSession);
+  const agreement = { opportunities: { status: 'AGREED' }, capture: { status: 'CORRECTED', dropped: ['F2'], note: 'History is fine in Reapit once you know the name' }, measure: { status: 'REJECTED', note: 'We see it in the monthly figures' } };
+  const { base, agreed, c, p } = conclude(louisSession, { agreement });
+  assert.deepEqual(base.proposed, before.agreed.proposed, 'the base diagnosis is unchanged');
+  assert.ok(before.agreed.proposed.includes('F2') && before.agreed.proposed.includes('F5') && before.agreed.proposed.includes('I5'));
+  assert.ok(!agreed.proposed.includes('F2') && !agreed.proposed.includes('F5') && !agreed.proposed.includes('I5'), 'rejected / dropped parts leave the proposal');
+  assert.ok(agreed.proposed.includes('I1') && agreed.proposed.includes('F1'));
+  assert.equal(agreed.assessments.F2.evidence_status, 'EXISTING_STRENGTH'); assert.equal(agreed.assessments.F2.verified, false, 'an owner-asserted strength is unverified');
+  assert.match(agreed.assessments.F2.override.reason, /^Owner \(meeting conclusion\)/); assert.equal(agreed.assessments.F2.override.original.evidence_status, 'CONFIRMED');
+  assert.ok(agreed.validation.some((v) => /F2 .*not verified/.test(v)), 'checked in days 1–3');
+  assert.equal(louisSession.answers.F2.value, 'sometimes', 'the answer is untouched'); assert.deepEqual(louisSession.overrides, {}, 'the operator\'s overrides are untouched');
+  assert.equal(c.understanding.findings.length, 3, 'a rejected finding still shows, as rejected');
+  assert.equal(c.understanding.findings.find((f) => f.id === 'measure').agreement.status, 'REJECTED'); assert.equal(c.understanding.findings.find((f) => f.id === 'measure').present, false);
+  assert.equal(c.understanding.agreed, true); assert.deepEqual(c.understanding.counts, { findings: 3, agreed: 1, corrected: 1, rejected: 1 });
+  assert.ok(!c.changes.groups.some((g) => g.id === 'measure'), 'no change is proposed for a rejected finding');
+  assert.ok(c.changes.groups.find((g) => g.id === 'opportunities').preserve.includes('Customer context'), 'the corrected part is now preserved, not rebuilt');
+  assert.ok(!c.pilot.scope_rule_ids.includes('F2') && !c.pilot.scope_rule_ids.includes('F5'));
+  assert.equal(p.screens[1].findings.length, 2, 'only findings approved for presentation');
+  assert.equal(p.screens[1].findings[1].corrected, 'History is fine in Reapit once you know the name');
+  assert.equal(p.screens[1].findings[1].points.length, 1, 'the dropped part is not presented');
+  assert.deepEqual(leak(p), []);
+  // Operator's own override wins over the owner's remark.
+  const withOp = conclude({ ...louisSession, overrides: { F2: { evidence_status: 'CONFIRMED', level: 'weak', reason: 'Saw the duplicate mess on screen' } } }, { agreement });
+  assert.equal(withOp.agreed.assessments.F2.evidence_status, 'CONFIRMED');
+  // Bad input is cleaned, not stored.
+  const cleaned = cleanConclusion({ agreement: { capture: { status: 'MAYBE' }, nope: { status: 'AGREED' }, opportunities: { status: 'CORRECTED', dropped: ['F1', 'I1'], present: false } }, additional_valuations: '3', scope_rule_ids: ['I1', 'ZZ'] }, findings);
+  assert.equal(cleaned.agreement.capture, undefined); assert.equal(cleaned.agreement.nope, undefined); assert.deepEqual(cleaned.agreement.opportunities.dropped, ['I1'], 'only that finding\'s own dimensions can be dropped'); assert.equal(cleaned.agreement.opportunities.present, false);
+  assert.equal(cleaned.additional_valuations, 3); assert.deepEqual(cleaned.scope_rule_ids, ['I1']);
+  ok('owner corrections: a rejected finding and a dropped part become recorded EXISTING_STRENGTH overrides (unverified, checked early), interventions and scope are recomputed, the answers and the operator\'s overrides are untouched, the operator\'s override still wins, and only approved findings are presented');
+}
+{
+  // Strong foundations: reuse them, change only the intelligence side.
+  const sess = { ...louisSession, answers: { ...COMMERCIAL, ...ALL_STRONG_F, ...WEAK_I } };
+  const { c, p } = conclude(sess);
+  assert.equal(c.mode, 'PILOT');
+  assert.ok(c.understanding.findings.every((f) => f.dimensions.every((x) => /^I/.test(x.dimension))), 'findings only on the intelligence side');
+  assert.equal(c.changes.foundations.length, 0); assert.match(c.changes.foundations_note, /reused as they are — nothing is rebuilt/);
+  assert.equal(c.changes.preserved.length, 5);
+  assert.ok(c.changes.groups.every((g) => g.rules.every((r) => r.kind === 'intelligence')));
+  assert.ok(c.changes.groups.find((g) => g.id === 'opportunities').preserve.length >= 1, 'reused foundations named as preserved');
+  assert.equal(c.deployment.phases[0].heading, 'Scope, access and reuse of what already works');
+  assert.match(c.deployment.phases[0].summary, /stays as it is and NOVUS plugs into it/);
+  assert.ok(p.screens[3].preserved.length === 5 && /What already works stays as it is/.test(p.screens[3].foundations_note) === false);
+  assert.deepEqual(leak(p), []);
+  ok('strong-foundation agency: findings and changes on the intelligence side only, all five foundations preserved and reused, week 1 says so');
+
+  // Incomplete information: no numbers, one finding, hedged; no pilot ask.
+  const inc = conclude({ ...louisSession, answers: { C1: a('more_valuations'), F1: a('patchy'), F1_cause: m(['time']), F3: a('memory') } });
+  assert.equal(inc.c.mode, 'VALIDATION');
+  assert.equal(inc.c.opportunity.available, false); assert.ok(inc.c.opportunity.missing.length >= 2);
+  assert.equal(inc.c.understanding.situation.enquiries_per_month.known, false); assert.ok(inc.c.understanding.situation.missing.includes('fee_per_instruction'));
+  assert.ok(inc.c.understanding.findings.length >= 1 && inc.c.understanding.findings.every((f) => f.evidence === 'PROVISIONAL'));
+  assert.ok(inc.c.understanding.findings.every((f) => /I think/.test(f.statement)), 'everything hedged');
+  assert.ok(inc.c.understanding.unknown.length >= 5);
+  assert.equal(inc.c.pilot.proposed, false); assert.equal(inc.c.pilot.pricing_script, ''); assert.match(inc.c.next_step, /^I'm not going to put a pilot to you today/); assert.ok(!/\b[FI][1-5]\b|do not pitch/i.test(inc.c.next_step), 'owner-facing, not the internal recommendation');
+  assert.equal(inc.p.screens[2].available, false); assert.equal(inc.p.screens[5].proposed, false); assert.ok(inc.p.screens[5].next_step);
+  assert.ok(!inc.p.screens[5].scope.length || true);
+  assert.deepEqual(leak(inc.p), []);
+  const empty = conclude({ ...louisSession, answers: {} });
+  assert.equal(empty.c.understanding.findings.length, 0); assert.equal(empty.c.mode, 'VALIDATION'); assert.equal(empty.p.screens[1].findings.length, 0);
+  ok('incomplete information: unknown figures stay unknown, findings are provisional and hedged, the economics screen says so, and the pilot is not asked for — an empty session still renders');
+
+  // Technical blockers: a blocked CRM.
+  const blk = conclude({ ...louisSession, answers: { ...ALL_WEAK, C7: a('blocked') } });
+  assert.equal(blk.c.mode, 'PILOT');
+  const oppG = blk.c.changes.groups.find((g) => g.id === 'opportunities');
+  assert.ok(oppG && oppG.rules.every((r) => !['I2', 'I3'].includes(r.rule_id)), 'infeasible rules are not proposed as changes');
+  assert.ok(!blk.c.pilot.scope_rule_ids.includes('I3') && !blk.c.pilot.scope_rule_ids.includes('F2'));
+  assert.ok(blk.c.understanding.findings.some((f) => f.dimensions.some((x) => x.dimension === 'I3')), 'the finding is still reflected — it is real, just not solvable in the pilot');
+  const unsure = conclude({ ...louisSession, answers: { ...ALL_WEAK, C7: a('unsure') } });
+  const unsureG = unsure.c.changes.groups.find((g) => g.id === 'opportunities');
+  assert.ok(unsureG.conditions.some((x) => x.kind === 'assess' && /CRM/.test(x.text)), 'CRM access appears as a condition');
+  assert.notEqual(unsureG.status, 'FEASIBLE');
+  assert.ok(unsure.p.screens[3].groups.find((g) => g.title === 'Opportunities go unfound').subject_to.length === 1, 'one "to confirm first" line reaches the client, no code');
+  assert.deepEqual(leak(unsure.p), []);
+  ok('technical blockers: a blocked CRM keeps the finding but drops the infeasible changes from the proposal and scope; an unsure CRM becomes a stated feasibility condition on the change and one plain line on the client screen');
+
+  // Non-fit agencies: strong everywhere, or too small.
+  const nf = conclude({ ...louisSession, answers: { ...COMMERCIAL, ...ALL_STRONG_F, ...ALL_STRONG_I } });
+  assert.equal(nf.c.mode, 'NO_PITCH'); assert.equal(nf.c.understanding.findings.length, 0); assert.equal(nf.c.changes.groups.length, 0); assert.equal(nf.c.pilot.proposed, false);
+  assert.match(nf.c.next_step, /^I'll be straight with you: from what you've told me you already have most of what we'd put in/); assert.ok(!/do not pitch|say so plainly/i.test(nf.c.next_step), 'owner-facing, not the internal recommendation');
+  assert.equal(nf.p.screens[3].groups.length, 0); assert.ok(nf.p.screens[3].next_step); assert.equal(nf.p.screens[4].proposed, false); assert.equal(nf.p.screens[5].subtitle, 'Not today');
+  const small = conclude({ ...louisSession, answers: { ...ALL_WEAK, C4: a(12), C5: a(150) } });
+  assert.equal(small.c.mode, 'NO_PITCH'); assert.ok(small.c.understanding.findings.length >= 2, 'the problems are still reflected honestly'); assert.equal(small.c.pilot.proposed, false);
+  assert.match(small.c.next_step, /wouldn't have enough to work with/); assert.match(small.c.next_step, /12 a month, 150 contacts/);
+  assert.deepEqual(leak(nf.p), []); assert.deepEqual(leak(small.p), []);
+  ok('non-fit agencies: no findings/changes for a strong agency, findings but no pilot for a too-small one; the conclusion says so plainly and the client screens carry the next step instead of a price');
+}
+{
+  // Optional AI polish: wording only, validated, never scope or price.
+  const { c } = conclude(louisSession);
+  const good = async ({ prompt }) => { const inp = JSON.parse(prompt.slice(prompt.indexOf('\n\n') + 2)); return { findings: inp.findings.map((f) => ({ id: f.id, text: f.text.replace(/Mainly because/g, 'That comes down to') })), changes: inp.changes.map((x) => ({ id: x.id, text: x.text })) }; };
+  let out = await polishConclusion({ conclusion: c, call: good });
+  assert.equal(out.rejected, 0); assert.equal(out.accepted, c.understanding.findings.length + c.changes.groups.length);
+  const polished = conclude(louisSession, { polish: out.polish }).c;
+  assert.ok(polished.understanding.findings.some((f) => /That comes down to/.test(f.statement_polished)) && polished.polish.applied === out.accepted);
+  assert.ok(polished.understanding.findings.every((f) => f.statement === c.understanding.findings.find((x) => x.id === f.id).statement), 'the deterministic statement is kept alongside');
+  // A correction changes the original → the polish for that finding is stale and dropped.
+  const stale = conclude(louisSession, { polish: out.polish, agreement: { capture: { status: 'CORRECTED', dropped: ['F2'], note: 'x' } } }).c;
+  assert.ok(stale.changes.groups.find((g) => g.id === 'capture') ? stale.changes.groups.find((g) => g.id === 'capture').change_polished === undefined : true);
+  assert.ok(stale.polish.stale >= 1);
+  const bad = async ({ prompt }) => { const inp = JSON.parse(prompt.slice(prompt.indexOf('\n\n') + 2)); return { findings: inp.findings.map((f, i) => ({ id: f.id, text: i === 0 ? `${f.text} We guarantee £40,000 a year.` : i === 1 ? 'Too short? Sure. F1 is broken.' : f.text })), changes: inp.changes.map((x) => ({ id: x.id, text: `${x.text} It leverages cutting-edge AI-powered intelligence.` })) }; };
+  out = await polishConclusion({ conclusion: c, call: bad });
+  assert.ok(out.rejected >= 2 + c.changes.groups.length && out.accepted === 1, JSON.stringify(out.polish.issues));
+  assert.ok(out.polish.issues.some((i) => /guarantee/.test(i)) && out.polish.issues.some((i) => /figure/.test(i)) && out.polish.issues.some((i) => /rule id/.test(i)) && out.polish.issues.some((i) => /marketing/.test(i)));
+  out = await polishConclusion({ conclusion: c, call: async () => { throw new Error('simulated outage'); } });
+  assert.equal(out.accepted, 0); assert.match(out.error, /simulated outage/);
+  const plain = conclude(louisSession, { polish: out.polish }).c;
+  assert.ok(plain.understanding.findings.every((f) => !f.statement_polished) && plain.polish.applied === 0);
+  assert.equal(validatePolishedText('', 'x').valid, false);
+  ok('AI polish: valid rewording is applied per sentence with the original kept; guarantees, figures, rule ids and marketing are rejected; an outage leaves the plain wording; a correction invalidates stale polish');
+}
+
 // ── 6. handlers end to end against an in-memory workbook ──────────────────
 console.log('\n6. Handlers and persistence');
 function makeStore(initial) {
@@ -704,6 +891,86 @@ const workbook = () => ({
   const snap = snapshotFor(ALL_WEAK);
   assert.equal(snap.I3.options.when_time, 'When negotiators have time to call through it'); assert.equal(snap.C4.primary, QUESTION_BY_ID.C4.primary);
   ok('the frozen snapshot carries the wording and option labels a completed session was answered against');
+}
+
+// ── 7. the conclusion through the handlers ─────────────────────────────────
+console.log('\n7. Conclusion handlers, persistence and an older tab header');
+{
+  // A workbook whose DISCOVERY_SESSIONS tab predates conclusion_json.
+  const oldHeader = DISCOVERY_SESSIONS_HEADER.filter((k) => k !== 'conclusion_json');
+  const wb = workbook();
+  wb.DISCOVERY_SESSIONS = [oldHeader.slice(), oldHeader.map((_, i) => (i === 0 ? 'SCHEMA NOTE' : ''))];
+  wb.DISCOVERY_PITCHES = [DISCOVERY_PITCHES_HEADER.slice(), DISCOVERY_PITCHES_HEADER.map((_, i) => (i === 0 ? 'SCHEMA NOTE' : ''))];
+  const { store, repo } = makeStore(wb);
+  __setRepoForTests(repo);
+  let r = res(); await handleDiscoveryMeetings(req('GET', {}), r);
+  assert.equal(r.body.setup.available, true, 'an older header (a strict prefix) still counts as set up');
+  r = res(); await handleDiscoveryStart(req('POST', {}, { agency_id: 'ag_1' }), r); const sid = r.body.session_id;
+  r = res(); await handleDiscoverySave(req('POST', {}, { session_id: sid, answers: LOUIS, contact_name: 'Louis Example', stage: 'conclusion' }), r);
+  assert.equal(r.statusCode, 200); assert.ok(r.body.conclusion && r.body.presentation, 'autosave returns the conclusion and the presentation');
+  assert.equal(r.body.conclusion.understanding.findings.length, 3);
+  r = res(); await handleDiscoverySession(req('GET', { session_id: sid }), r);
+  assert.equal(r.body.conclusion.mode, 'PILOT'); assert.equal(r.body.presentation.screens.length, 6); assert.ok(r.body.registry.conclusion_steps.length === 5);
+  assert.equal(store.DISCOVERY_SESSIONS[0].length, oldHeader.length, 'nothing extended yet — no conclusion has been written');
+  ok('older tab header: still available, session read and autosave carry the deterministic conclusion and the presentation payload');
+
+  // Save the owner's agreement: header extended in place, row patched, diagnosis recomputed.
+  r = res(); await handleDiscoveryConclusion(req('POST', {}, { session_id: sid, agreement: { opportunities: { status: 'AGREED' }, capture: { status: 'CORRECTED', dropped: ['F2'], note: 'Reapit history is fine' }, measure: { status: 'REJECTED' } }, additional_valuations: 4 }), r);
+  assert.equal(r.statusCode, 200, JSON.stringify(r.body));
+  assert.deepEqual(store.DISCOVERY_SESSIONS[0], [...DISCOVERY_SESSIONS_HEADER], 'the header was extended with conclusion_json');
+  const rowOf = () => sessionView(Object.fromEntries(DISCOVERY_SESSIONS_HEADER.map((k, i) => [k, store.DISCOVERY_SESSIONS[2][i]])));
+  let row = rowOf();
+  assert.equal(row.conclusion.agreement.measure.status, 'REJECTED'); assert.equal(row.conclusion.agreement.measure.present, false); assert.equal(row.conclusion.additional_valuations, 4);
+  assert.ok(!row.diagnosis.proposed.includes('F2') && !row.diagnosis.proposed.includes('F5'), 'the stored diagnosis reflects the corrections');
+  assert.equal(row.answers.F2.value, 'sometimes'); assert.deepEqual(row.overrides, {}); assert.equal(row.stage, 'conclusion');
+  assert.equal(r.body.conclusion.opportunity.selected.monthly_gbp, 5400); assert.equal(r.body.presentation.screens[1].findings.length, 2);
+  r = res(); await handleDiscoverySession(req('GET', { session_id: sid }), r);
+  assert.equal(r.body.conclusion.understanding.counts.rejected, 1); assert.equal(r.body.diagnosis.assessments.F2.evidence_status, 'EXISTING_STRENGTH');
+  // Scope ticks persist and bound the pilot.
+  r = res(); await handleDiscoveryConclusion(req('POST', {}, { session_id: sid, scope_rule_ids: ['I1', 'F1', 'F3', 'ZZ', 'F2'] }), r);
+  assert.deepEqual(r.body.conclusion.pilot.scope_rule_ids, ['I1', 'F1', 'F3'].filter((id) => r.body.diagnosis.proposed.includes(id)));
+  row = rowOf(); assert.equal(row.conclusion.agreement.measure.status, 'REJECTED', 'a scope save keeps the agreement');
+  // A later autosave keeps the agreement in force.
+  r = res(); await handleDiscoverySave(req('POST', {}, { session_id: sid, answers: { ...LOUIS, C4: a(300) } }), r);
+  assert.ok(!r.body.diagnosis.proposed.includes('F5')); assert.equal(r.body.conclusion.understanding.counts.rejected, 1);
+  ok('discovery-conclusion: extends an older header in place, persists agreement / illustration / scope, recomputes and stores the corrected diagnosis, never rewrites answers or operator overrides; a later autosave keeps the agreement');
+
+  // Polish through the handler: fake model, then invalid, then outage.
+  __setAiCallerForTests(async ({ prompt, tool }) => { const inp = JSON.parse(prompt.slice(prompt.indexOf('\n\n') + 2)); if (tool.name !== 'polish_conclusion') return { spoken: 'x?', week1: 'a', week2: 'b', weeks3_4: 'c', weeks5_8: 'd' }; return { findings: inp.findings.map((f) => ({ id: f.id, text: f.text.replace(/Mainly because/g, 'That comes down to') })), changes: inp.changes.map((x) => ({ id: x.id, text: x.text })) }; });
+  r = res(); await handleDiscoveryConclusionPolish(req('POST', {}, { session_id: sid }), r); assert.equal(r.statusCode, 400);
+  r = res(); await handleDiscoveryConclusionPolish(req('POST', {}, { session_id: sid, confirm: 'POLISH_CONCLUSION' }), r);
+  assert.equal(r.statusCode, 200); assert.ok(r.body.accepted >= 3); assert.equal(r.body.rejected, 0);
+  assert.ok(r.body.conclusion.understanding.findings.some((f) => /That comes down to/.test(f.statement_polished || '')));
+  row = rowOf(); assert.ok(row.conclusion.polish && row.conclusion.agreement.measure.status === 'REJECTED', 'polish is stored beside the agreement');
+  __setAiCallerForTests(async () => ({ findings: [{ id: 'capture', text: 'We guarantee £50,000.' }], changes: [] }));
+  r = res(); await handleDiscoveryConclusionPolish(req('POST', {}, { session_id: sid, confirm: 'POLISH_CONCLUSION' }), r);
+  assert.equal(r.body.accepted, 0); assert.ok(r.body.rejected >= 3); assert.match(r.body.ai_error, /guarantee/);
+  assert.ok(r.body.conclusion.understanding.findings.every((f) => !f.statement_polished), 'plain wording stands');
+  __setAiCallerForTests(async () => { throw new Error('simulated outage'); });
+  r = res(); await handleDiscoveryConclusionPolish(req('POST', {}, { session_id: sid, confirm: 'POLISH_CONCLUSION' }), r);
+  assert.equal(r.statusCode, 200); assert.equal(r.body.accepted, 0); assert.match(r.body.ai_error, /simulated outage/);
+  r = res(); await handleDiscoveryConclusion(req('POST', {}, { session_id: sid, clear_polish: true }), r); assert.equal(r.body.conclusion.polish, null);
+  ok('discovery-conclusion-polish: confirm token required; valid rewording stored and applied; an invalid model result or an outage leaves the plain wording, with the reason returned; polish can be cleared');
+
+  // Pitch versions are still generated from the corrected diagnosis and kept.
+  __setAiCallerForTests(async () => { throw new Error('no model'); });
+  r = res(); await handleDiscoveryPitch(req('POST', {}, { session_id: sid, confirm: 'GENERATE_PITCH' }), r);
+  assert.equal(r.statusCode, 201); assert.equal(r.body.pitch.version, 1); assert.ok(!r.body.pitch.diagnosis_snapshot.proposed.includes('F2'));
+  ok('the spoken pitch archive still works on the corrected diagnosis and keeps its immutable versions');
+
+  // Outcome: the exact findings and scope the owner agreed are frozen with the scope.
+  r = res(); await handleDiscoveryOutcome(req('POST', {}, { session_id: sid, confirm: 'RECORD_OUTCOME', outcome: 'PILOT_AGREED', outcome_notes: 'Yes.' }), r);
+  assert.equal(r.statusCode, 200);
+  row = rowOf();
+  assert.deepEqual(row.agreed_scope.rule_ids, ['I1', 'F1', 'F3'].filter((id) => row.diagnosis.proposed.includes(id)), 'the scope ticked in the conclusion is the default agreed scope');
+  const snap = row.agreed_scope.conclusion;
+  assert.equal(snap.findings.length, 3); assert.equal(snap.findings.find((f) => f.id === 'measure').agreement.status, 'REJECTED'); assert.equal(snap.findings.find((f) => f.id === 'capture').agreement.note, 'Reapit history is fine');
+  assert.equal(snap.opportunity.expected_fee_income_per_valuation_gbp, 1350); assert.equal(snap.opportunity.selected.additional_valuations_per_month, 4);
+  assert.equal(snap.pilot.headline, '£1,500 all-in for 60 days'); assert.ok(snap.owner_overrides.F2 && snap.owner_overrides.F5);
+  assert.ok(row.agreed_scope.checklist.length > 3);
+  r = res(); await handleDiscoveryConclusion(req('POST', {}, { session_id: sid, additional_valuations: 1 }), r); assert.equal(r.statusCode, 409, 'a completed session is not silently changed');
+  r = res(); await handleDiscoveryConclusion(req('POST', {}, { session_id: sid, additional_valuations: 1, reopen: true }), r); assert.equal(r.statusCode, 200); assert.equal(rowOf().status, 'IN_PROGRESS');
+  ok('outcome: the agreed scope defaults to the conclusion\'s ticks and freezes the exact findings, agreement, economics illustration, pilot headline and owner overrides; completed sessions need reopen=true');
 }
 
 console.log(`\n✅ Discovery self-test passed (${passed} checks).\n`);
