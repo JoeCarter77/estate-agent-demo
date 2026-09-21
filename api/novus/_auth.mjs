@@ -11,8 +11,9 @@
 //
 // Env: NOVUS_BASIC_AUTH_USER, NOVUS_BASIC_AUTH_PASS
 //
-// requireReplyPollerSecret below is a SECOND, dedicated guard layered on top of
-// Basic Auth for the one operation that writes REPLY_EVENTS. See its comment.
+// requireReplyPollerSecret and requireCampaignPollerSecret below are SECOND,
+// dedicated guards layered on top of Basic Auth, one per automated writer
+// (REPLY_EVENTS; the campaign sync poller). See their comments.
 
 import crypto from 'node:crypto';
 
@@ -89,5 +90,40 @@ export function requireReplyPollerSecret(req, res) {
   if (typeof provided === 'string' && provided && safeEqual(provided, secret)) return true;
 
   res.status(403).json({ success: false, error: 'Reply poller secret missing or invalid' });
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Dedicated guard for the automated CAMPAIGN sync poller
+// (?novus_operation=campaign-sync-poll). Same shape and the same reasoning as
+// requireReplyPollerSecret above: layered on top of Basic Auth, fails closed
+// before getRepo() or any Instantly call, never echoes the secret.
+//
+// Instantly's Growth plan does not include webhooks (Hyper Growth only), so
+// this operation — driven by an external scheduler roughly every 10-15
+// minutes, e.g. a free GitHub Actions cron (see docs/EMAIL_CAMPAIGNS.md) — is
+// the PRIMARY way campaign/lead/reply/bounce/unsubscribe state reaches NOVUS.
+// The Instantly webhook endpoint (requireInstantlyWebhookSecret in
+// lib/campaign-handlers.mjs) remains for a future Hyper Growth upgrade but is
+// entirely optional: nothing here requires INSTANTLY_WEBHOOK_SECRET to be set.
+export const CAMPAIGN_POLLER_SECRET_HEADER = 'x-novus-campaign-poller-secret';
+
+export function requireCampaignPollerSecret(req, res) {
+  const secret = process.env.NOVUS_CAMPAIGN_POLLER_SECRET;
+  if (!secret) {
+    res.status(500).json({
+      success: false,
+      error: 'NOVUS_CAMPAIGN_POLLER_SECRET is not set in this environment; the automated campaign sync poll is disabled. Manual Sync Now and the nightly reconciliation still work.',
+    });
+    return false;
+  }
+
+  const provided = req.headers?.[CAMPAIGN_POLLER_SECRET_HEADER]
+    ?? req.headers?.['X-NOVUS-CAMPAIGN-POLLER-SECRET']
+    ?? '';
+
+  if (typeof provided === 'string' && provided && safeEqual(provided, secret)) return true;
+
+  res.status(403).json({ success: false, error: 'Campaign poller secret missing or invalid' });
   return false;
 }

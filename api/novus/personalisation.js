@@ -31,7 +31,7 @@
 import { getRepo } from '../../lib/sheets.mjs';
 import { NeverBounceError, verifyEmail } from '../../lib/neverbounce.mjs';
 import { resolveAgencyContact, listResolutionBacklog } from '../../lib/contact-resolution.mjs';
-import { requireAuth, requireReplyPollerSecret } from './_auth.mjs';
+import { requireAuth, requireReplyPollerSecret, requireCampaignPollerSecret } from './_auth.mjs';
 import { pollInstantlyReplies } from '../../lib/instantly-reply-poll.mjs';
 import {
   evaluateSendDemoDryRun,
@@ -94,6 +94,20 @@ import {
   executeManualReply,
   MANUAL_REPLY_LIVE_CONFIRMATION,
 } from '../../lib/manual-reply-execution.mjs';
+// EMAIL / CAMPAIGNS (novus/campaigns.html) + the Instantly webhook
+// (lib/campaign-handlers.mjs). Same ceiling: the webhook is a vercel.json
+// rewrite from /api/novus/webhooks/instantly onto this function and verifies
+// its own shared-secret header; every other campaign operation sits behind
+// Basic Auth. Nothing here activates a campaign without its confirm token.
+// campaign-sync-poll is the Growth-plan (no-webhooks) primary sync path — an
+// external ~10-15 minute scheduler, not Vercel Cron (Hobby is daily-only) —
+// and carries its own second secret exactly like instantly-reply-poll below.
+import {
+  handleCampaignsList, handleCampaignDetail, handleCampaignAccounts, handleLeadTimeline,
+  handleCampaignSetup, handleCampaignAudience, handleCampaignCreate, handleCampaignUpdate, handleCampaignPush,
+  handleCampaignLaunch, handleCampaignPause, handleCampaignResume, handleCampaignSync, handleCampaignSyncPoll, handleInstantlyWebhook,
+  handleCampaignDiscover, handleCampaignLink, handleCampaignImportActivity, handleCampaignReconciliation,
+} from '../../lib/campaign-handlers.mjs';
 
 // Contact resolution can run Hunter Domain Search, Finder and several Verifier
 // checks in one invocation; 20s was sized for the read-only
@@ -1678,6 +1692,63 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (TWILIO_WEBHOOK_OPERATIONS[req.query?.novus_operation]) {
     return TWILIO_WEBHOOK_OPERATIONS[req.query.novus_operation](req, res);
+  }
+  if (req.query?.novus_operation === 'instantly-webhook') {
+    // /api/novus/webhooks/instantly — Instantly event delivery. Verified by
+    // INSTANTLY_WEBHOOK_SECRET inside the handler, never by Basic Auth.
+    return handleInstantlyWebhook(req, res);
+  }
+  // ── Email / Campaigns ────────────────────────────────────────────────
+  const CAMPAIGN_READ_OPERATIONS = {
+    'campaigns-list': handleCampaignsList,
+    'campaign-detail': handleCampaignDetail,
+    'campaign-accounts': handleCampaignAccounts,
+    'campaign-discover': handleCampaignDiscover,         // Instantly campaigns not yet linked (read-scoped GET)
+    'campaign-reconciliation': handleCampaignReconciliation,
+    'lead-timeline': handleLeadTimeline,
+  };
+  if (req.method === 'GET' && CAMPAIGN_READ_OPERATIONS[req.query?.novus_operation]) {
+    // READ-ONLY by construction: Sheets reads, at most a read-scoped Instantly
+    // GET when ?live=1 is asked for, no writer reachable.
+    if (!requireAuth(req, res)) return;
+    return CAMPAIGN_READ_OPERATIONS[req.query.novus_operation](req, res);
+  }
+  const CAMPAIGN_WRITE_OPERATIONS = {
+    'campaign-audience': handleCampaignAudience, // POST because filters are structured; writes nothing
+    'campaign-setup': handleCampaignSetup,
+    'campaign-create': handleCampaignCreate,
+    'campaign-update': handleCampaignUpdate,
+    'campaign-push': handleCampaignPush,
+    'campaign-launch': handleCampaignLaunch,
+    'campaign-pause': handleCampaignPause,
+    'campaign-resume': handleCampaignResume,
+    'campaign-sync': handleCampaignSync,
+    'campaign-link': handleCampaignLink,                 // link an EXISTING Instantly campaign; dry_run by default; never activates
+    'campaign-import-activity': handleCampaignImportActivity,
+  };
+  if (req.method === 'POST' && req.query?.novus_operation === 'campaign-sync-poll') {
+    // TWO layers, in order, both before any Instantly or Sheets access: the
+    // shared human Basic Auth, then the dedicated campaign poller secret —
+    // same pattern as instantly-reply-poll below. This is the operation the
+    // external ~10-15 minute scheduler calls; it never activates, pauses or
+    // adds leads, so it still invalidates the same caches as a manual sync.
+    if (!requireAuth(req, res)) return;
+    if (!requireCampaignPollerSecret(req, res)) return;
+    const out = await handleCampaignSyncPoll(req, res);
+    invalidateOperatorCaches();
+    invalidateLeadIndex();
+    return out;
+  }
+  if (req.method === 'POST' && CAMPAIGN_WRITE_OPERATIONS[req.query?.novus_operation]) {
+    // Deliberate human actions from the Basic-Auth-protected campaigns page.
+    // push/launch/pause/resume each check their own confirm token inside.
+    if (!requireAuth(req, res)) return;
+    const out = await CAMPAIGN_WRITE_OPERATIONS[req.query.novus_operation](req, res);
+    // Campaign membership and events feed the Command Centre's outreach
+    // context and the lead-search index's "last activity".
+    invalidateOperatorCaches();
+    invalidateLeadIndex();
+    return out;
   }
   if (req.query?.novus_operation === 'operator-manual-reply' && req.method !== 'POST') {
     if (!requireAuth(req, res)) return;

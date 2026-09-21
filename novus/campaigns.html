@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NOVUS — Campaigns</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/novus/assets/novus-mark-32.png" />
+  <link rel="apple-touch-icon" href="/novus/assets/novus-mark-128.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <meta name="theme-color" content="#0A0B0E" />
+  <meta name="color-scheme" content="dark" />
+  <!-- THEME, BEFORE FIRST PAINT — see the same snippet in operator.html. -->
+  <script data-theme-boot>
+    (function(){var t='dark';try{var v=localStorage.getItem('novus.theme');if(v==='light'||v==='dark')t=v;}catch(e){}
+    document.documentElement.setAttribute('data-theme',t);})();
+  </script>
+  <!-- Same product, same stylesheet as the Command Centre, the Prober and Calling. -->
+  <link rel="stylesheet" href="/novus/novus-ui.css" />
+  <link rel="stylesheet" href="/novus/novus-shell.css" />
+  <script src="/novus/novus-ui.js" defer></script>
+  <script src="/novus/vendor/twilio-voice-sdk-2.18.5.min.js" defer></script>
+  <script src="/novus/novus-search.js" defer></script>
+  <script src="/novus/novus-inbound.js" defer></script>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── SIDEBAR — the operator.html rail (source of truth: novus/operator.html).
+       This page's own two tabs are buttons; everything else links back. Keep in
+       lockstep with operator.html's <nav> — scripts/novus-sidebar-parity-selftest.mjs
+       asserts all three pages match. ── -->
+  <nav class="nav">
+    <div class="nav-brand">
+      <img class="nav-mark" src="/novus/assets/novus-mark-512.png" width="34" height="34" alt="NOVUS" />
+      <div><div class="nav-name">NOVUS</div><div class="nav-sub">Acquisition</div></div>
+    </div>
+
+    <div class="nav-group">
+      <a class="nav-item" href="/novus/operator.html#overview">
+        <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Overview</span></a>
+      <a class="nav-item" href="/novus/operator.html#actions">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg>
+        <span>Actions</span><span class="nav-badge zero" id="b-actions">0</span></a>
+      <a class="nav-item" href="/novus/operator.html#future">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/></svg>
+        <span>Future</span><span class="nav-badge zero" id="b-future">0</span></a>
+      <a class="nav-item" href="/novus/operator.html#pipeline">
+        <svg viewBox="0 0 24 24"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg><span>Pipeline</span></a>
+      <a class="nav-item" href="/novus/operator.html#prober">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <span>Prober</span><span class="nav-badge zero" id="b-prober">0</span></a>
+      <a class="nav-item" href="/novus/operator.html#leads">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg>
+        <span>Leads</span><span class="nav-badge zero" id="b-leads">0</span></a>
+      <a class="nav-item" href="/novus/operator.html#analytics">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Analytics</span></a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Email</div>
+      <button class="nav-item" data-view="campaigns" type="button">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg><span>Campaigns</span></button>
+      <button class="nav-item" data-view="new-campaign" type="button">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span>New Campaign</span></button>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Calling</div>
+      <a class="nav-item" href="/novus/calling.html#calling">
+        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span></a>
+      <a class="nav-item" href="/novus/calling.html#call-actions">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/></svg><span>Call Actions</span></a>
+      <a class="nav-item" href="/novus/calling.html#scripts">
+        <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg><span>Scripts</span></a>
+      <a class="nav-item" href="/novus/calling.html#calling-analytics">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Calling Analytics</span></a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">System</div>
+      <a class="nav-item" href="/novus/operator.html#exceptions">
+        <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+        <span>Exceptions</span><span class="nav-badge zero" id="b-exceptions">0</span></a>
+      <a class="nav-item" href="/novus/communications.html">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 4l8 8 8-8"/></svg>
+        <span>Communications</span></a>
+    </div>
+
+    <div class="nav-foot"><div class="nav-stamp" id="stamp"><span class="spin"></span>Loading</div></div>
+  </nav>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="crumb">NOVUS <span class="muted">/</span> <b id="crumb">Campaigns</b></div>
+      <div class="topbar-right">
+        <button class="gsearch" type="button" data-global-search title="Search leads (⌘K / Ctrl+K)" aria-label="Search leads">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <span>Search leads, agencies, numbers, properties…</span><kbd>⌘K</kbd></button>
+        <button class="btn btn-quiet btn-sm" id="sync-all" type="button" title="Reconcile every pushed campaign with Instantly">
+          <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/></svg>Sync Instantly</button>
+        <button class="btn btn-secondary btn-sm" id="refresh" type="button">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 019-9 9 9 0 016.7 3M21 12a9 9 0 01-9 9 9 9 0 01-6.7-3"/><path d="M21 3v6h-6M3 21v-6h6"/></svg>Refresh</button>
+        <button class="btn btn-quiet btn-sm themebtn" data-theme-toggle type="button" title="Switch to light theme" aria-label="Switch to light theme" aria-pressed="false">
+          <svg class="ic-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+          <svg class="ic-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1111.2 3a6.6 6.6 0 009.8 9.8z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="page">
+      <div id="load-err" class="banner err hidden"></div>
+      <div id="setup-box" class="banner warn hidden"></div>
+      <div id="notice" class="banner info hidden"></div>
+
+      <!-- ══ CAMPAIGNS LIST ═══════════════════════════════════════════════ -->
+      <section class="view" id="v-campaigns">
+        <div class="cmp-head">
+          <div class="page-head">
+            <h1 class="page-title">Campaigns</h1>
+            <p class="page-sub">Every email campaign NOVUS runs through Instantly. NOVUS decides who is contacted and why; Instantly sends.
+              Figures come from Instantly's own counters after a sync, and from NOVUS's event ledger between syncs.</p>
+          </div>
+          <div class="btnrow"><button class="btn btn-primary" id="new-btn" type="button">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>New campaign</button></div>
+        </div>
+        <div class="kpis five" id="c-kpis"></div>
+        <div class="card"><div class="tablewrap"><table>
+          <thead><tr><th>Campaign</th><th>Status</th><th class="n">Leads</th><th class="col-md">Started</th><th class="n">Sent</th><th class="n">Replies</th><th class="n">Positive</th><th class="n">Meetings</th><th class="n">Bounces</th><th class="col-lg">Synced</th><th></th></tr></thead>
+          <tbody id="c-rows"></tbody></table></div>
+          <div id="c-empty"></div>
+        </div>
+        <!-- Campaigns that already exist in Instantly (before NOVUS owned
+             campaigns). Linking reads Instantly only: status is mirrored,
+             leads become members matched to the master data, history comes
+             from /emails. It never activates, resumes or adds leads. -->
+        <div class="section" style="margin-top:var(--s-6)">
+          <div class="section-head"><div class="section-title">Instantly workspace</div>
+            <div class="section-note">Campaigns that exist in Instantly. Link one to bring its leads and history under NOVUS without recreating or touching it.</div>
+            <button class="section-link" id="discover-btn" type="button">Check Instantly</button></div>
+          <div class="card"><div class="tablewrap"><table>
+            <thead><tr><th>Instantly campaign</th><th>Instantly status</th><th class="col-md">Created</th><th class="col-lg">Accounts</th><th>NOVUS</th><th></th></tr></thead>
+            <tbody id="disc-rows"></tbody></table></div>
+            <div id="disc-empty" class="note" style="padding:0 18px 14px">Click <b>Check Instantly</b> to list the workspace's campaigns.</div>
+          </div>
+          <div id="link-gate"></div>
+        </div>
+      </section>
+
+      <!-- ══ NEW CAMPAIGN (builder) ═══════════════════════════════════════
+           database intelligence → audience → sequence → sending → review.
+           Creating writes a DRAFT to NOVUS only. Push and Launch live on the
+           campaign page and each need their own explicit confirmation. ═══ -->
+      <section class="view" id="v-new-campaign">
+        <div class="cmp-head">
+          <div class="page-head">
+            <h1 class="page-title">New campaign</h1>
+            <p class="page-sub">Start from the NOVUS database, not a CSV. The audience is rebuilt server-side from the filters when you create the draft;
+              every lead carries the reason it is ready, warned or blocked.</p>
+          </div>
+        </div>
+        <div class="wiz">
+          <div class="wiz-rail" id="wiz-rail">
+            <button class="wiz-step on" data-step="audience" type="button"><span class="n">1</span><span><span class="t">Audience</span><span class="s" id="ws-audience">Filters + eligibility</span></span></button>
+            <button class="wiz-step" data-step="sequence" type="button"><span class="n">2</span><span><span class="t">Sequence</span><span class="s" id="ws-sequence">Emails + delays</span></span></button>
+            <button class="wiz-step" data-step="sending" type="button"><span class="n">3</span><span><span class="t">Sending</span><span class="s" id="ws-sending">Accounts + schedule</span></span></button>
+            <button class="wiz-step" data-step="review" type="button"><span class="n">4</span><span><span class="t">Review</span><span class="s" id="ws-review">Create the draft</span></span></button>
+          </div>
+          <div>
+            <!-- 1 · AUDIENCE -->
+            <div class="wiz-pane on" id="wp-audience">
+              <div class="aud">
+                <div class="aud-filters" id="aud-filters">
+                  <div class="fl">Campaign</div>
+                  <input class="input" id="f-name" type="text" placeholder="Campaign name, e.g. Enquiry → Quick Call V1" />
+                  <select class="input" id="f-type">
+                    <option value="ENQUIRY_FOLLOWUP">Enquiry follow-up (copy refers to the probe)</option>
+                    <option value="GENERAL">General (no probe required)</option>
+                  </select>
+                  <div class="fl">Contact</div>
+                  <label class="ck"><input type="checkbox" id="f-email_exists" checked /> Email exists</label>
+                  <label class="ck"><input type="checkbox" id="f-valid" checked /> VALID email</label>
+                  <label class="ck"><input type="checkbox" id="f-include_risky" /> Include RISKY</label>
+                  <div class="tri"><span>Inbox</span><select class="input" id="f-contact_kind"><option value="">any</option><option value="direct">direct only</option><option value="generic">generic only</option></select></div>
+                  <div class="tri"><span>Owner / director identified</span><select class="input" id="f-owner_identified"><option value="">any</option><option value="true">yes</option><option value="false">no</option></select></div>
+                  <input class="input" id="f-contact_name" type="text" placeholder="Contact name contains…" />
+                  <input class="input" id="f-contact_role" type="text" placeholder="Contact role contains…" />
+                  <div class="fl">Probe</div>
+                  <div class="tri"><span>Probe sent</span><select class="input" id="f-probe_sent"><option value="">any</option><option value="true">yes</option><option value="false">no</option></select></div>
+                  <div class="tri"><span>Probe completed (closed)</span><select class="input" id="f-probe_completed"><option value="">any</option><option value="true">yes</option><option value="false">no</option></select></div>
+                  <label class="ck"><input type="checkbox" id="f-probe_not_compromised" checked /> Exclude compromised probes</label>
+                  <div class="fl">Outreach history</div>
+                  <div class="tri"><span>Never emailed</span><select class="input" id="f-never_emailed"><option value="">any</option><option value="true">only</option><option value="false">exclude</option></select></div>
+                  <input class="input" id="f-max_prior_emails" type="number" min="0" placeholder="Max previous emails" />
+                  <span class="small-note">Last emailed before</span><input class="input" id="f-last_emailed_before" type="date" />
+                  <div class="tri"><span>Replied before</span><select class="input" id="f-replied_before"><option value="">any</option><option value="true">yes</option><option value="false">no</option></select></div>
+                  <div class="tri"><span>Positive reply</span><select class="input" id="f-positive_reply"><option value="">any</option><option value="true">yes</option><option value="false">no</option></select></div>
+                  <div class="tri"><span>Negative reply</span><select class="input" id="f-negative_reply"><option value="">any</option><option value="true">yes</option><option value="false">no</option></select></div>
+                  <div class="tri"><span>Owner spoken to</span><select class="input" id="f-spoken_to"><option value="">any</option><option value="true">yes</option><option value="false">no</option></select></div>
+                  <div class="tri"><span>In another active campaign</span><select class="input" id="f-in_active_campaign"><option value="">any</option><option value="false">exclude</option><option value="true">only</option></select></div>
+                  <label class="ck"><input type="checkbox" id="f-include_opted_out" /> Include opted out (always blocked)</label>
+                  <label class="ck"><input type="checkbox" id="f-include_bounced" /> Include bounced (always blocked)</label>
+                  <div class="fl">Agency</div>
+                  <input class="input" id="f-agency_name" type="text" placeholder="Agency name contains…" />
+                  <input class="input" id="f-location" type="text" list="dl-locations" placeholder="Location contains…" /><datalist id="dl-locations"></datalist>
+                  <input class="input" id="f-crm" type="text" list="dl-crms" placeholder="CRM contains…" /><datalist id="dl-crms"></datalist>
+                  <div class="row2"><input class="input" id="f-branch_count_min" type="number" min="0" placeholder="Branches ≥" /><input class="input" id="f-branch_count_max" type="number" min="0" placeholder="Branches ≤" /></div>
+                  <div class="fl">Eligibility policy</div>
+                  <div class="tri"><span>Cooling period (days)</span><input class="input" id="p-cooling_days" type="number" min="0" value="14" style="width:64px;margin:0" /></div>
+                  <label class="ck"><input type="checkbox" id="p-allow_risky_email" /> Allow RISKY (as warning)</label>
+                  <label class="ck"><input type="checkbox" id="p-allow_generic_email" checked /> Allow generic inbox (as warning)</label>
+                  <label class="ck"><input type="checkbox" id="p-require_owner_contact" /> Require owner/director</label>
+                  <label class="ck"><input type="checkbox" id="p-block_active_campaign" checked /> Block if in another active campaign</label>
+                  <label class="ck"><input type="checkbox" id="p-block_prior_negative" checked /> Block prior "not interested"</label>
+                  <label class="ck"><input type="checkbox" id="p-block_active_conversation" checked /> Block active conversations</label>
+                  <label class="ck"><input type="checkbox" id="p-block_active_followup" checked /> Block active follow-ups</label>
+                  <label class="ck"><input type="checkbox" id="p-block_meeting_booked" checked /> Block meeting booked</label>
+                  <div class="btnrow"><button class="btn btn-quiet btn-sm" id="f-reset" type="button">Reset filters</button></div>
+                </div>
+                <div>
+                  <div class="aud-counts">
+                    <div class="aud-big">
+                      <div class="l">Selected</div>
+                      <div class="n"><span id="a-selected">—</span> <span class="muted" style="font-size:18px">agencies</span></div>
+                      <div class="c" id="a-line">Adjust the filters; counts update as you go.</div>
+                    </div>
+                    <div class="aud-reasons" id="a-reasons"><div class="aud-empty">No preview yet.</div></div>
+                  </div>
+                  <div class="card"><div class="card-head"><div class="card-title">Audience preview</div><div class="card-note" id="a-note"></div></div>
+                    <div class="tablewrap"><table>
+                      <thead><tr><th>Agency</th><th>Contact</th><th class="col-md">Probe</th><th class="col-md">Prior outreach</th><th>Eligibility</th><th></th></tr></thead>
+                      <tbody id="a-rows"></tbody></table></div>
+                    <div id="a-empty"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="wiz-foot"><span class="hint">Blocked leads can never be pushed. Warnings need an explicit acknowledgement before push.</span><span class="spacer"></span>
+                <button class="btn btn-primary" data-next="sequence" type="button">Next: sequence →</button></div>
+            </div>
+
+            <!-- 2 · SEQUENCE -->
+            <div class="wiz-pane" id="wp-sequence">
+              <div class="section-head"><div class="section-title">Sequence</div>
+                <div class="section-note">Plain text; line breaks are preserved. Instantly merge fields and NOVUS variables are inserted with the chips.</div>
+                <button class="section-link" id="seq-add" type="button">+ Add follow-up</button></div>
+              <div class="seq" id="seq"></div>
+              <div class="wiz-foot"><button class="btn btn-quiet" data-next="audience" type="button">← Audience</button><span class="spacer"></span>
+                <button class="btn btn-primary" data-next="sending" type="button">Next: sending →</button></div>
+            </div>
+
+            <!-- 3 · SENDING -->
+            <div class="wiz-pane" id="wp-sending">
+              <div class="an-grid">
+                <div class="card"><div class="card-head"><div class="card-title">Sending accounts</div><div class="card-note" id="acct-note"></div></div>
+                  <div class="card-body" id="accts"></div></div>
+                <div>
+                  <div class="card"><div class="card-head"><div class="card-title">Schedule</div><div class="card-note">UK time</div></div>
+                    <div class="card-body">
+                      <div class="days" id="days"></div>
+                      <div class="opts" style="margin-top:14px">
+                        <label>From <input class="input" id="s-from" type="time" value="09:00" /></label>
+                        <label>To <input class="input" id="s-to" type="time" value="17:00" /></label>
+                        <label>Start date <input class="input" id="s-start" type="date" style="width:140px" /></label>
+                      </div>
+                    </div></div>
+                  <div class="card" style="margin-top:var(--s-4)"><div class="card-head"><div class="card-title">Limits and tracking</div></div>
+                    <div class="card-body"><div class="opts">
+                      <label>Daily sending limit <input class="input" id="s-daily_limit" type="number" min="1" value="50" /></label>
+                      <label>New leads per day (0 = no cap) <input class="input" id="s-daily_max_leads" type="number" min="0" value="0" /></label>
+                      <label><input type="checkbox" id="s-stop_on_reply" checked /> Stop sequence on reply</label>
+                      <label><input type="checkbox" id="s-stop_on_auto_reply" /> Stop on auto-reply</label>
+                      <label><input type="checkbox" id="s-open_tracking" checked /> Open tracking</label>
+                      <label><input type="checkbox" id="s-link_tracking" /> Link tracking</label>
+                      <label><input type="checkbox" id="s-text_only" /> Text-only emails</label>
+                    </div></div></div>
+                </div>
+              </div>
+              <div class="wiz-foot"><button class="btn btn-quiet" data-next="sequence" type="button">← Sequence</button><span class="spacer"></span>
+                <button class="btn btn-primary" data-next="review" type="button">Next: review →</button></div>
+            </div>
+
+            <!-- 4 · REVIEW -->
+            <div class="wiz-pane" id="wp-review">
+              <div class="ledger" id="review"></div>
+              <div class="gate blue">
+                <div class="t">Create the draft in NOVUS</div>
+                <div class="s">Nothing is sent and nothing reaches Instantly yet. The audience is rebuilt server-side and stored with each lead's eligibility decision.
+                  Push and Launch are separate, confirmed steps on the campaign page.</div>
+                <div class="btnrow"><button class="btn btn-primary" id="create-btn" type="button">Create draft campaign</button><span class="hint" id="create-err" style="color:var(--red)"></span></div>
+              </div>
+              <div class="wiz-foot"><button class="btn btn-quiet" data-next="sending" type="button">← Sending</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ CAMPAIGN DETAIL ══════════════════════════════════════════════ -->
+      <section class="view" id="v-campaign">
+        <div id="d-root"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ═══ HELPERS ═══════════════════════════════════════════════════════════ */
+const $ = (id) => document.getElementById(id);
+const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const dash = (v) => (v === null || v === undefined || v === '' ? '&mdash;' : esc(v));
+const fmtDT = new Intl.DateTimeFormat('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Europe/London' });
+const fmtD = new Intl.DateTimeFormat('en-GB', { day:'numeric', month:'short', year:'numeric', timeZone:'Europe/London' });
+function when(v){ const ms = Date.parse(String(v||'')); return Number.isFinite(ms) ? fmtDT.format(new Date(ms)) : ''; }
+function day(v){ const ms = Date.parse(String(v||'')); return Number.isFinite(ms) ? fmtD.format(new Date(ms)) : ''; }
+function pill(label, tone, bare){ return `<span class="pill ${tone||'t-grey'}${bare?' bare':''}">${esc(label)}</span>`; }
+/* Sync staleness. Growth-plan campaigns have no webhook push, so freshness
+   depends entirely on the ~10-15 minute external poll (or a manual Sync Now)
+   actually running — this is how that becomes visible rather than silently
+   trusted. Only ACTIVE campaigns are judged harshly: a paused/draft/completed
+   campaign isn't sending, so a few stale hours there is not an incident. */
+function syncFreshness(c){
+  if(!c.instantly_campaign_id) return { text:'—', tone:null };
+  if(!c.last_synced_at) return { text:'never', tone: c.status === 'ACTIVE' ? 't-red' : null, suffix:'never synced' };
+  const ageMin = (Date.now() - Date.parse(c.last_synced_at)) / 60000;
+  const rel = when(c.last_synced_at);
+  if(c.status !== 'ACTIVE') return { text: rel, tone:null };
+  if(!Number.isFinite(ageMin) || ageMin < 20) return { text: rel, tone:null };
+  if(ageMin < 90) return { text: rel, tone:'t-amber', suffix:'stale' };
+  return { text: rel, tone:'t-red', suffix:'very stale' };
+}
+function syncFreshnessHtml(c){
+  const f = syncFreshness(c);
+  if(!f.tone) return `<span class="muted">${esc(f.text)}</span>`;
+  return `<span class="muted">${esc(f.text)}</span> ${pill(f.suffix || f.text, f.tone, true)}`;
+}
+const OP = (name) => `/api/novus/personalisation?novus_operation=${name}`;
+async function get(url){ const res = await fetch(url, { headers:{ Accept:'application/json' } }); const data = await res.json().catch(() => ({})); if(!res.ok || data.success === false){ const e = new Error(data.error || `Request failed (${res.status})`); e.data = data; throw e; } return data; }
+async function post(url, body){ const res = await fetch(url, { method:'POST', headers:{ Accept:'application/json', 'Content-Type':'application/json' }, body: JSON.stringify(body||{}) }); const data = await res.json().catch(() => ({})); if(!res.ok){ const e = new Error(data.error || `Request failed (${res.status})`); e.data = data; throw e; } return data; }
+function showErr(msg){ $('load-err').innerHTML = `<div>${esc(msg)}</div>`; $('load-err').classList.remove('hidden'); }
+function hideErr(){ $('load-err').classList.add('hidden'); }
+function notice(html, kind){ const el = $('notice'); if(!html){ el.classList.add('hidden'); return; } el.className = `banner ${kind||'info'}`; el.innerHTML = `<div>${html}</div>`; el.classList.remove('hidden'); }
+function emptyState(t, s){ return `<div class="empty"><div class="empty-ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg></div><div class="empty-t">${esc(t)}</div><div class="empty-s">${esc(s)}</div></div>`; }
+const STATUS_TONE = { DRAFT:'t-grey', ACTIVE:'t-green', PAUSED:'t-amber', COMPLETED:'t-blue', ERROR:'t-red' };
+const ELIG_CLASS = { READY:'e-ready', WARNING:'e-warning', BLOCKED:'e-blocked' };
+const MEMBER_TONE = { SELECTED:'t-grey', PUSHED:'t-blue', SKIPPED:'t-amber', PUSH_FAILED:'t-red', EXCLUDED:'t-grey' };
+const agencyLink = (id) => `/novus/operator.html#leads?agency=${encodeURIComponent(id)}`;
+function reasonsHtml(row, labels){
+  const w = (row.warnings||[]).filter((c) => labels[c]).map((c) => `<span class="w">${esc(labels[c])}</span>`);
+  const b = (row.blocks||[]).filter((c) => labels[c]).map((c) => `<span class="b">${esc(labels[c])}</span>`);
+  const detail = (row.warnings||[]).find((c) => /^LAST_EMAIL_\d+_DAYS_AGO$/.test(c));
+  const extra = detail ? ` <span class="muted">(${esc(detail.replace(/_/g,' ').toLowerCase())})</span>` : '';
+  const good = (row.reasons||[]).filter((c) => labels[c] && !w.length && !b.length).map((c) => esc(labels[c]));
+  return `<div class="reasons">${[...b, ...w].join(' · ')}${extra}${!b.length && !w.length ? good.join(' · ') : ''}</div>`;
+}
+
+/* ═══ STATE + ROUTING ═══════════════════════════════════════════════════ */
+let LIST = null, DETAIL = null, ACCOUNTS = null, VIEW = 'campaigns', DETAIL_TAB = 'overview', DETAIL_ID = '';
+const VIEWS = ['campaigns','new-campaign','campaign'];
+const VIEW_TITLE = { 'campaigns':'Campaigns', 'new-campaign':'New campaign', 'campaign':'Campaign' };
+function routeFromHash(){
+  const raw = String(location.hash||'').replace(/^#\/?/,'');
+  const [path, query] = raw.split('?');
+  const params = new URLSearchParams(query||'');
+  if(path === 'campaign' && params.get('id')) return { view:'campaign', id: params.get('id'), tab: params.get('tab') || '' };
+  if(path === 'new' || path === 'new-campaign') return { view:'new-campaign' };
+  return { view:'campaigns' };
+}
+function showView(name, { push = true, id = '', tab = '' } = {}){
+  VIEW = VIEWS.includes(name) ? name : 'campaigns';
+  VIEWS.forEach((v) => $('v-'+v).classList.toggle('on', v === VIEW));
+  document.querySelectorAll('.nav-item[data-view]').forEach((el) => el.classList.toggle('on', el.dataset.view === VIEW || (VIEW === 'campaign' && el.dataset.view === 'campaigns')));
+  $('crumb').textContent = VIEW_TITLE[VIEW]; document.title = `NOVUS — ${VIEW_TITLE[VIEW]}`;
+  notice('');
+  if(VIEW === 'campaign'){ DETAIL_ID = id || DETAIL_ID; if(tab) DETAIL_TAB = tab; }
+  const wanted = VIEW === 'campaign' ? `#campaign?id=${encodeURIComponent(DETAIL_ID)}${DETAIL_TAB && DETAIL_TAB !== 'overview' ? `&tab=${DETAIL_TAB}` : ''}` : VIEW === 'new-campaign' ? '#new' : '#campaigns';
+  if(push && location.hash !== wanted) history.pushState(null, '', wanted);
+  renderView();
+}
+function renderView(){
+  if(VIEW === 'campaigns') renderList();
+  if(VIEW === 'new-campaign'){ if(!WIZ.booted) bootWizard(); }
+  if(VIEW === 'campaign') loadDetail(DETAIL_ID, false);
+}
+
+/* ═══ LIST ══════════════════════════════════════════════════════════════ */
+async function loadList(force){
+  $('refresh').disabled = true; $('stamp').innerHTML = '<span class="spin"></span>Loading'; hideErr();
+  try{
+    LIST = await get(OP('campaigns-list') + (force ? '&refresh=1' : ''));
+    renderSetup();
+    if(VIEW === 'campaigns') renderList();
+    $('stamp').innerHTML = `<span class="nav-dot${LIST.cached?' stale':''}"></span>${esc(when(LIST.generated_at))}${LIST.cached?` · cached ${Math.round((LIST.cache_age_ms||0)/1000)}s`:''}`;
+  }catch(err){ showErr(`Campaigns could not load. ${err.message||''}`); $('stamp').innerHTML = '<span class="nav-dot bad"></span>Load failed'; }
+  finally{ $('refresh').disabled = false; }
+}
+function renderSetup(){
+  const box = $('setup-box'); const s = LIST?.setup; const c = LIST?.config || {};
+  const items = [];
+  if(s && !s.available){
+    items.push(`<b>Campaign tabs are not set up.</b> Missing: ${esc((s.missing||[]).join(', ') || 'none')}${s.header_mismatch?.length ? ` · header mismatch: ${esc(s.header_mismatch.join(', '))}` : ''}. <button class="btn btn-secondary btn-sm" id="setup-btn" type="button" style="margin-left:8px">Create the tabs</button>`);
+  }
+  if(!c.instantly_write_configured) items.push(`<b>INSTANTLY_API_KEY is not set</b> — campaigns can be drafted, but push/launch/pause are unavailable.`);
+  if(!c.campaign_poller_configured) items.push(`<b>Automatic sync isn't set up.</b> Instantly's Growth plan has no webhooks, so NOVUS relies on a scheduler polling every ~10-15 minutes for status/leads/replies/bounces. Until <span class="mono">NOVUS_CAMPAIGN_POLLER_SECRET</span> is set and the poller is wired up (a free GitHub Actions workflow — see docs/EMAIL_CAMPAIGNS.md), campaigns update only on <b>Sync Now</b> and the nightly reconciliation.`);
+  if(!c.webhook_secret_configured) items.push(`Instantly webhooks are optional and need the Hyper Growth plan — not required. Polling above is the primary sync path either way.`);
+  if(!items.length){ box.classList.add('hidden'); return; }
+  box.innerHTML = `<div>${items.map((i) => `<div>${i}</div>`).join('')}</div>`; box.classList.remove('hidden');
+}
+function renderList(){
+  if(!LIST) return;
+  const cs = LIST.campaigns || [];
+  const by = LIST.counts?.by_status || {};
+  const sum = (k) => cs.reduce((n, c) => n + (Number(c.metrics?.[k]) || 0), 0);
+  $('c-kpis').innerHTML = [
+    ['Campaigns', cs.length, `${by.ACTIVE||0} active · ${by.PAUSED||0} paused · ${by.DRAFT||0} draft`, ''],
+    ['Leads in campaigns', sum('leads'), `${sum('pushed')} handed to Instantly`, 'brand'],
+    ['Emails sent', sum('emails_sent'), 'Instantly counters after sync', ''],
+    ['Replies', sum('replies'), `${sum('positive')} positive · ${sum('negative')} negative`, sum('replies') ? 'good' : ''],
+    ['Meetings', sum('meetings'), `${sum('bounces')} bounces · ${sum('unsubscribes')} unsubscribes`, sum('meetings') ? 'good' : ''],
+  ].map(([l, n, f, cls]) => `<div class="kpi ${cls}"><div class="kpi-l">${esc(l)}</div><div class="kpi-n">${esc(n)}</div><div class="kpi-f">${esc(f)}</div></div>`).join('');
+  const num = (v, cls) => `<td class="n"><span class="${v ? (cls||'') : 'dim'}">${esc(v ?? 0)}</span></td>`;
+  $('c-rows').innerHTML = cs.map((c) => `<tr class="cmp-row" data-id="${esc(c.campaign_id)}">
+    <td><div class="t-name">${esc(c.name)}</div><div class="t-sub">${esc(c.campaign_type === 'GENERAL' ? 'General' : 'Enquiry follow-up')} · ${c.sequence?.step_count||0} step${c.sequence?.step_count===1?'':'s'}${c.instantly_campaign_id ? ` · <span class="mono">${esc(c.instantly_campaign_id.slice(0,8))}…</span>` : ' · not pushed'}${c.last_error ? ` · <span style="color:var(--red)">error</span>` : ''}</div></td>
+    <td>${pill(c.status.toLowerCase(), STATUS_TONE[c.status])}${c.status === 'DRAFT' && c.pushed_at ? `<div class="t-sub">pushed, not launched</div>` : ''}</td>
+    ${num(c.metrics.leads)}
+    <td class="col-md">${dash(day(c.launched_at))}${!c.launched_at ? `<div class="t-sub">created ${esc(day(c.created_at))}</div>` : ''}</td>
+    ${num(c.metrics.emails_sent)}${num(c.metrics.replies, 'hot')}${num(c.metrics.positive, 'hot')}${num(c.metrics.meetings, 'hot')}${num(c.metrics.bounces, 'bad')}
+    <td class="col-lg">${syncFreshnessHtml(c)}</td>
+    <td class="nowrap">${c.status === 'ACTIVE' ? `<button class="btn btn-quiet btn-sm act" data-act="pause" data-id="${esc(c.campaign_id)}" type="button">Pause</button>` : ''}${c.status === 'PAUSED' ? `<button class="btn btn-quiet btn-sm act" data-act="resume" data-id="${esc(c.campaign_id)}" type="button">Resume</button>` : ''}</td>
+  </tr>`).join('');
+  $('c-empty').innerHTML = cs.length ? '' : emptyState('No campaigns yet', LIST.setup?.available ? 'Create the first one from the NOVUS database: audience → sequence → sending → review.' : 'Create the campaign tabs first (banner above).');
+}
+
+/* ═══ WIZARD ════════════════════════════════════════════════════════════ */
+const WIZ = { booted:false, step:'audience', audience:null, excluded:new Set(), timer:null, seq:0, steps:[], name:'' };
+const FILTER_IDS = ['email_exists','include_risky','contact_kind','owner_identified','contact_name','contact_role','probe_sent','probe_completed','probe_not_compromised','never_emailed','max_prior_emails','last_emailed_before','replied_before','positive_reply','negative_reply','spoken_to','in_active_campaign','include_opted_out','include_bounced','agency_name','location','crm','branch_count_min','branch_count_max'];
+const POLICY_IDS = ['cooling_days','allow_risky_email','allow_generic_email','require_owner_contact','block_active_campaign','block_prior_negative','block_active_conversation','block_active_followup','block_meeting_booked'];
+const VARS = ['{{firstName}}','{{companyName}}','{{property_street}}','{{probe_date}}','{{probe_time}}','{{email_observation}}','{{email_commercial_hook}}','{{demo_url}}'];
+function readFilters(){
+  const f = {};
+  for(const id of FILTER_IDS){ const el = $('f-'+id); if(!el) continue; f[id] = el.type === 'checkbox' ? el.checked : el.value; }
+  f.verification = $('f-valid').checked ? ['VALID'] : ['VALID','RISKY','UNKNOWN','INVALID','ACCEPT_ALL',''];
+  if(!$('f-valid').checked) f.email_exists = $('f-email_exists').checked;
+  f.exclude_agency_ids = [...WIZ.excluded];
+  return f;
+}
+function readPolicy(){
+  const p = {};
+  for(const id of POLICY_IDS){ const el = $('p-'+id); p[id] = el.type === 'checkbox' ? el.checked : el.value; }
+  p.requires_probe = $('f-type').value === 'ENQUIRY_FOLLOWUP';
+  return p;
+}
+function scheduleAudience(){ if(WIZ.timer) clearTimeout(WIZ.timer); WIZ.timer = setTimeout(previewAudience, 250); }
+async function previewAudience(){
+  const seq = ++WIZ.seq;
+  $('a-note').textContent = 'Updating…';
+  try{
+    const data = await post(OP('campaign-audience'), { campaign_type: $('f-type').value, filters: readFilters(), policy: readPolicy(), limit: 400 });
+    if(seq !== WIZ.seq) return;
+    WIZ.audience = data; renderAudience();
+  }catch(err){ if(seq === WIZ.seq) $('a-note').textContent = `Preview failed: ${err.message}`; }
+}
+function renderAudience(){
+  const a = WIZ.audience; if(!a) return;
+  const s = a.summary; const labels = LIST?.enums?.reason_labels || {};
+  $('a-selected').innerHTML = `${esc(a.selected)}`;
+  $('a-line').innerHTML = `<b style="color:var(--blue-hi)">${esc(s.READY)} ready</b> · <span style="color:var(--amber)">${esc(s.WARNING)} warning</span> · <span style="color:var(--red)">${esc(s.BLOCKED)} blocked</span> · of ${esc(a.total_agencies)} agencies`;
+  $('a-reasons').innerHTML = s.reason_breakdown.length
+    ? s.reason_breakdown.map((r) => `<div class="aud-reason ${r.severity === 'BLOCK' ? 'block' : 'warn'}"><span class="ic">${r.severity === 'BLOCK' ? '⛔' : '⚠️'}</span><span>${esc(r.label)}</span><span class="cnt">${esc(r.count)}</span></div>`).join('') + `<div class="aud-reason ok"><span class="ic">✅</span><span>Eligible to add</span><span class="cnt">${esc(s.READY)}</span></div>`
+    : `<div class="aud-reason ok"><span class="ic">✅</span><span>Eligible to add</span><span class="cnt">${esc(s.READY)}</span></div>`;
+  $('a-note').textContent = a.truncated ? `Showing the first ${a.rows.length} of ${a.selected}` : `${a.rows.length} shown`;
+  $('a-rows').innerHTML = a.rows.map((r) => `<tr>
+    <td><a class="t-name" href="${agencyLink(r.agency_id)}" target="_blank" rel="noopener" style="text-decoration:none">${esc(r.agency_name)}</a><div class="t-sub">${esc([r.location, r.crm, String(r.stage||'').replace(/_/g,' ').toLowerCase()].filter(Boolean).join(' · '))}</div></td>
+    <td><span class="nowrap">${dash(r.contact.name)}</span>${r.contact.role ? `<span class="muted"> · ${esc(r.contact.role)}</span>` : ''}<div class="t-sub"><span class="mono">${dash(r.contact.email)}</span> · ${esc(r.contact.verification_status||'unverified')}</div></td>
+    <td class="col-md">${r.probe ? `<span class="nowrap">${esc(r.probe.reference || r.probe.status)}</span><div class="t-sub">${esc(r.probe.property)} · ${esc(r.probe.status)}</div>` : '<span class="muted">none</span>'}</td>
+    <td class="col-md">${r.prior.email_count ? `<span class="nowrap">${esc(r.prior.email_count)} email${r.prior.email_count===1?'':'s'}</span><div class="t-sub">last ${esc(day(r.prior.last_emailed_at))}${r.prior.replied ? ' · replied' : ''}</div>` : '<span class="muted">never</span>'}${r.campaigns.length ? `<div class="t-sub">${esc(r.campaigns.map((c) => `${c.name} (${String(c.status||'').toLowerCase()})`).join(', '))}</div>` : ''}</td>
+    <td>${pill(r.eligibility.status.toLowerCase(), ELIG_CLASS[r.eligibility.status])}${reasonsHtml(r.eligibility, labels)}</td>
+    <td><button class="x-btn" data-exclude="${esc(r.agency_id)}" title="Remove from this campaign" type="button">✕</button></td>
+  </tr>`).join('');
+  $('a-empty').innerHTML = a.rows.length ? '' : emptyState('No agencies match', 'Loosen the filters — or check that contacts have been resolved and verified.');
+  const dl = (id, values) => { $(id).innerHTML = (values||[]).map((v) => `<option value="${esc(v)}"></option>`).join(''); };
+  dl('dl-locations', a.options?.locations); dl('dl-crms', a.options?.crms);
+  $('ws-audience').textContent = `${a.selected} selected · ${s.READY} ready`;
+}
+function defaultSteps(){
+  return [
+    { subject: 'Your enquiry on {{property_street}}', body: 'Hi {{firstName}},\n\nI sent an enquiry to {{companyName}} about {{property_street}} on {{probe_date}} at {{probe_time}}.\n\n{{email_observation}}\n\n{{email_commercial_hook}}\n\nI put what I found into a two-minute demo for you: {{demo_url}}\n\nWorth a quick call?\n\nJoe', delay_days: 0 },
+    { subject: 'Re: Your enquiry on {{property_street}}', body: 'Hi {{firstName}},\n\nJust making sure this reached you — the demo is here: {{demo_url}}\n\nJoe', delay_days: 3 },
+  ];
+}
+function renderSequence(){
+  $('seq').innerHTML = WIZ.steps.map((s, i) => `<div class="seq-step" data-i="${i}">
+    <div class="seq-head"><span class="t">${i === 0 ? 'Email 1' : `Follow-up ${i}`}</span>
+      ${i > 0 ? `<span class="delay">wait <input class="input" type="number" min="1" value="${esc(s.delay_days)}" data-delay="${i}" /> days after the previous email</span>` : '<span class="delay">sent first</span>'}
+      ${i > 0 ? `<button class="x-btn" data-remove="${i}" type="button" title="Remove step">✕</button>` : ''}</div>
+    <div class="seq-body">
+      <input class="input" type="text" placeholder="Subject" value="${esc(s.subject)}" data-subject="${i}" />
+      <textarea class="input" placeholder="Body" data-body="${i}">${esc(s.body)}</textarea>
+      <div class="seq-vars">${VARS.map((v) => `<button type="button" data-var="${esc(v)}" data-for="${i}">${esc(v)}</button>`).join('')}</div>
+    </div></div>`).join('');
+  $('ws-sequence').textContent = `${WIZ.steps.length} email${WIZ.steps.length===1?'':'s'}`;
+}
+function readSequence(){ return { steps: WIZ.steps.map((s) => ({ subject: s.subject, body: s.body, delay_days: s.delay_days })) }; }
+async function loadAccounts(){
+  try{ ACCOUNTS = await get(OP('campaign-accounts')); }catch(err){ ACCOUNTS = { available:false, accounts:[], suggested:[], error: err.message }; }
+  renderAccounts();
+}
+function renderAccounts(){
+  const a = ACCOUNTS; if(!a) return;
+  const chosen = new Set(WIZ.emailList || []);
+  const rows = a.available ? a.accounts : (a.suggested||[]).map((e) => ({ email:e, status_label:'from NOVUS_SENDING_MAILBOXES', daily_limit:null }));
+  $('acct-note').textContent = a.available ? `${a.accounts.length} in the Instantly workspace` : `Instantly accounts unavailable${a.error ? ` (${typeof a.error === 'string' ? a.error : a.error.message})` : ''} — showing configured mailboxes`;
+  $('accts').innerHTML = rows.length ? rows.map((r) => `<label class="acct"><input type="checkbox" data-acct="${esc(r.email)}" ${chosen.has(r.email) ? 'checked' : ''} /><span class="e">${esc(r.email)}</span><span class="s">${esc(r.status_label||'')}${r.warmup_score != null ? ` · warmup ${esc(r.warmup_score)}` : ''}</span><span class="s">${r.daily_limit != null ? `${esc(r.daily_limit)}/day` : ''}</span></label>`).join('') : '<div class="note">No sending accounts found. Add inboxes in Instantly, or set NOVUS_SENDING_MAILBOXES.</div>';
+  $('ws-sending').textContent = `${chosen.size} account${chosen.size===1?'':'s'} · ${$('s-daily_limit').value}/day`;
+}
+function readSchedule(){
+  const days = {}; document.querySelectorAll('#days input').forEach((el) => { days[el.dataset.day] = el.checked; });
+  return { name:'NOVUS working hours', from: $('s-from').value, to: $('s-to').value, timezone:'Europe/Isle_of_Man', days, start_date: $('s-start').value };
+}
+function readSending(){
+  return { email_list: [...WIZ.emailList], daily_limit: Number($('s-daily_limit').value)||50, daily_max_leads: Number($('s-daily_max_leads').value)||0,
+    stop_on_reply: $('s-stop_on_reply').checked, stop_on_auto_reply: $('s-stop_on_auto_reply').checked, open_tracking: $('s-open_tracking').checked, link_tracking: $('s-link_tracking').checked, text_only: $('s-text_only').checked };
+}
+function renderReview(){
+  const a = WIZ.audience; const s = a?.summary; const sch = readSchedule(); const snd = readSending(); const labels = LIST?.enums?.reason_labels || {};
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const rows = [
+    ['Campaign', `<b>${esc($('f-name').value || '(unnamed)')}</b> <span class="muted">· ${esc($('f-type').value === 'GENERAL' ? 'General' : 'Enquiry follow-up')}</span>`],
+    ['Sequence', WIZ.steps.map((st, i) => `${i === 0 ? 'Email 1' : `+${st.delay_days}d follow-up ${i}`}: <span class="muted">${esc(st.subject)}</span>`).join('<br/>')],
+    ['Sending accounts', snd.email_list.length ? snd.email_list.map((e) => `<span class="mono">${esc(e)}</span>`).join(', ') : '<span style="color:var(--red)">none selected</span>'],
+    ['Schedule', `${esc(Object.entries(sch.days).filter(([,v]) => v).map(([d]) => dayNames[d]).join(' '))} · ${esc(sch.from)}–${esc(sch.to)} UK${sch.start_date ? ` · from ${esc(sch.start_date)}` : ''} · ${esc(snd.daily_limit)}/day${snd.stop_on_reply ? ' · stops on reply' : ''}`],
+    ['Total selected', a ? `<b>${esc(a.selected)}</b> agencies` : '<span class="muted">no preview</span>'],
+    ['Eligible', a ? `<b style="color:var(--blue-hi)">${esc(s.READY)} READY</b> <span class="muted">— only these are pushed by default</span>` : ''],
+    ['Warnings', a ? `<span style="color:var(--amber)">${esc(s.WARNING)}</span> <span class="muted">— pushed only after explicit acknowledgement on the campaign page</span>` : ''],
+    ['Blocked', a ? `<span style="color:var(--red)">${esc(s.BLOCKED)}</span> <span class="muted">— never pushed</span>` : ''],
+    ['Reason breakdown', a && s.reason_breakdown.length ? s.reason_breakdown.map((r) => `${esc(r.count)} ${esc(r.code)} <span class="muted">${esc(labels[r.code]||'')}</span>`).join('<br/>') : '<span class="muted">none</span>'],
+  ];
+  $('review').innerHTML = rows.map(([k, v]) => `<div class="ledger-row"><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`).join('');
+  $('ws-review').textContent = a ? `${s.READY} will be pushed` : 'Create the draft';
+}
+function wizStep(step){
+  WIZ.step = step;
+  document.querySelectorAll('.wiz-step').forEach((el) => { el.classList.toggle('on', el.dataset.step === step); });
+  ['audience','sequence','sending','review'].forEach((s) => $('wp-'+s).classList.toggle('on', s === step));
+  if(step === 'sending' && !ACCOUNTS) loadAccounts();
+  if(step === 'review') renderReview();
+  window.scrollTo(0, 0);
+}
+function bootWizard(){
+  WIZ.booted = true; WIZ.steps = defaultSteps(); WIZ.emailList = new Set();
+  $('days').innerHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => `<label class="${i >= 1 && i <= 5 ? 'on' : ''}"><input type="checkbox" data-day="${i}" ${i >= 1 && i <= 5 ? 'checked' : ''} />${d}</label>`).join('');
+  renderSequence(); previewAudience(); wizStep('audience');
+}
+async function createCampaign(){
+  const btn = $('create-btn'); const err = $('create-err'); err.textContent = '';
+  if(!$('f-name').value.trim()){ err.textContent = 'Give the campaign a name (Audience step).'; return; }
+  if(!readSending().email_list.length){ err.textContent = 'Choose at least one sending account.'; return; }
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try{
+    const data = await post(OP('campaign-create'), { confirm:'CREATE_CAMPAIGN', name: $('f-name').value.trim(), campaign_type: $('f-type').value, sequence: readSequence(), schedule: readSchedule(), sending: readSending(), filters: readFilters(), policy: readPolicy() });
+    WIZ.booted = false; WIZ.excluded = new Set(); WIZ.audience = null; $('f-name').value = '';
+    await loadList(true);
+    showView('campaign', { id: data.campaign_id });
+    notice(`<b>Draft created.</b> ${esc(data.summary.READY)} ready, ${esc(data.summary.WARNING)} warning, ${esc(data.summary.BLOCKED)} blocked. Nothing has been sent to Instantly yet — review, then <b>Push to Instantly</b>.`, 'info');
+  }catch(e){ err.textContent = e.message; }
+  finally{ btn.disabled = false; btn.textContent = 'Create draft campaign'; }
+}
+
+/* ═══ DETAIL ════════════════════════════════════════════════════════════ */
+let DETAIL_TOKEN = 0, GATE = null, MEMBER_FILTER = '';
+async function loadDetail(id, live){
+  const token = ++DETAIL_TOKEN;
+  if(!DETAIL || DETAIL.campaign.campaign_id !== id) $('d-root').innerHTML = '<div class="note">Loading campaign…</div>';
+  try{
+    const data = await get(OP('campaign-detail') + `&campaign_id=${encodeURIComponent(id)}${live ? '&live=1' : ''}`);
+    if(token !== DETAIL_TOKEN) return;
+    DETAIL = data; renderDetail();
+  }catch(err){ if(token === DETAIL_TOKEN) $('d-root').innerHTML = `<div class="banner err"><div>${esc(err.message)}</div></div>`; }
+}
+function metricKpis(c){
+  const m = c.metrics;
+  return [
+    ['Leads', m.leads, `${m.pushed} in Instantly · ${m.selected} not pushed${m.excluded ? ` · ${m.excluded} excluded` : ''}`, 'brand'],
+    ['Emails sent', m.emails_sent, `${m.contacted} leads contacted`, ''],
+    ['Replies', m.replies, `${m.positive} positive · ${m.negative} negative`, m.replies ? 'good' : ''],
+    ['Meetings', m.meetings, `${m.opens} unique opens`, m.meetings ? 'good' : ''],
+    ['Bounce rate', c.bounce_rate == null ? '—' : `${c.bounce_rate}%`, `${m.bounces} bounces · ${m.unsubscribes} unsubscribes`, m.bounces ? 'alert' : ''],
+  ].map(([l, n, f, cls]) => `<div class="kpi ${cls}"><div class="kpi-l">${esc(l)}</div><div class="kpi-n">${esc(n)}</div><div class="kpi-f">${esc(f)}</div></div>`).join('');
+}
+function actionButtons(c){
+  const cfg = DETAIL.config || {}; const m = c.metrics; const b = [];
+  const canWrite = cfg.instantly_write_configured;
+  if(c.source !== 'IMPORTED' && c.status !== 'COMPLETED' && (m.selected || m.push_failed)) b.push(`<button class="btn btn-secondary" data-gate="push" type="button" ${canWrite ? '' : 'disabled title="INSTANTLY_API_KEY not set"'}>Push to Instantly${m.selected + m.push_failed ? ` (${m.selected + m.push_failed})` : ''}</button>`);
+  if(c.status === 'DRAFT' || c.status === 'ERROR') b.push(`<button class="btn btn-primary" data-gate="launch" type="button" ${canWrite && m.pushed ? '' : 'disabled title="Push leads first"'}>Launch…</button>`);
+  if(c.status === 'ACTIVE') b.push(`<button class="btn btn-secondary" data-gate="pause" type="button" ${canWrite ? '' : 'disabled'}>Pause</button>`);
+  if(c.status === 'PAUSED') b.push(`<button class="btn btn-primary" data-gate="resume" type="button" ${canWrite ? '' : 'disabled'}>Resume…</button>`);
+  if(c.instantly_campaign_id) b.push(`<button class="btn btn-quiet" id="d-sync" type="button" title="Reconcile this campaign with Instantly right now">Sync Now</button><button class="btn btn-quiet" id="d-live" type="button">Live status</button>`);
+  return b.join('');
+}
+function gateHtml(c){
+  if(!GATE) return '';
+  const m = c.metrics;
+  if(GATE === 'push'){
+    return `<div class="gate blue"><div class="t">Push ${m.selected + m.push_failed} lead${m.selected + m.push_failed === 1 ? '' : 's'} to Instantly</div>
+      <div class="s">${c.instantly_campaign_id ? 'The Instantly campaign already exists; only leads not yet handed over are added.' : 'This creates the Instantly campaign in its <b>Draft</b> state (nothing sends) and adds the leads.'}
+        Eligibility is re-checked against the live database first. <b>${esc(m.ready)}</b> READY are pushed. <b>${esc(m.warning)}</b> WARNING lead${m.warning===1?'':'s'} are held unless included below. BLOCKED leads are never pushed.</div>
+      ${m.warning ? `<label class="ck"><input type="checkbox" id="g-warn" /> Include the ${esc(m.warning)} WARNING lead${m.warning===1?'':'s'} — I have reviewed the reasons on the Audience tab and accept them.</label>` : ''}
+      <div class="btnrow"><button class="btn btn-primary" id="g-go" data-go="push" type="button">Push to Instantly</button><button class="btn btn-quiet" data-gate="" type="button">Cancel</button><span class="hint" id="g-err" style="color:var(--red)"></span></div></div>`;
+  }
+  if(GATE === 'launch' || GATE === 'resume'){
+    const label = GATE === 'launch' ? 'Launch' : 'Resume';
+    return `<div class="gate"><div class="t">${label} "${esc(c.name)}" — Instantly starts sending</div>
+      <div class="s">Real emails go to <b>${esc(m.pushed)}</b> lead${m.pushed===1?'':'s'} from ${c.sending.email_list.map((e) => `<span class="mono">${esc(e)}</span>`).join(', ') || '<span style="color:var(--red)">no accounts</span>'},
+        ${esc(c.sequence.steps.length)} email${c.sequence.steps.length===1?'':'s'} per lead, ${esc(c.sending.daily_limit)}/day. ${m.warning_unacknowledged ? `<b style="color:var(--amber)">${esc(m.warning_unacknowledged)} warning lead${m.warning_unacknowledged===1?'':'s'} were not pushed and stay out.</b>` : ''}</div>
+      <div class="ledger" style="margin-top:12px">
+        <div class="ledger-row"><div class="k">Eligible · pushed</div><div class="v">${esc(m.pushed)} in Instantly${m.skipped ? ` · ${esc(m.skipped)} skipped by Instantly` : ''}${m.push_failed ? ` · <span style="color:var(--red)">${esc(m.push_failed)} failed to push</span>` : ''}</div></div>
+        <div class="ledger-row"><div class="k">Warnings</div><div class="v">${esc(m.warning)} <span class="muted">(${esc(m.warning - m.warning_unacknowledged)} acknowledged)</span></div></div>
+        <div class="ledger-row"><div class="k">Blocked</div><div class="v">${esc(m.blocked)} <span class="muted">never sent</span></div></div>
+      </div>
+      <label class="ck"><input type="checkbox" id="g-ack" /> I have reviewed the sequence, the audience and the sending accounts. ${label} this campaign now.</label>
+      <div class="btnrow"><button class="btn btn-primary" id="g-go" data-go="${GATE}" type="button" disabled>${label} campaign</button><button class="btn btn-quiet" data-gate="" type="button">Cancel</button><span class="hint" id="g-err" style="color:var(--red)"></span></div></div>`;
+  }
+  if(GATE === 'pause'){
+    return `<div class="gate"><div class="t">Pause "${esc(c.name)}"</div><div class="s">Instantly stops sending immediately. Leads keep their place in the sequence and resume where they left off.</div>
+      <div class="btnrow"><button class="btn btn-primary" id="g-go" data-go="pause" type="button">Pause campaign</button><button class="btn btn-quiet" data-gate="" type="button">Cancel</button><span class="hint" id="g-err" style="color:var(--red)"></span></div></div>`;
+  }
+  return '';
+}
+function renderDetail(){
+  const c = DETAIL.campaign; const m = c.metrics;
+  const tabs = [['overview','Overview',''],['sequence','Sequence',c.sequence.steps.length],['audience','Audience',DETAIL.members.length],['sending','Sending',''],['analytics','Analytics',''],['activity','Activity',DETAIL.events.length],['reconciliation','Reconciliation','']];
+  $('d-root').innerHTML = `
+    <div class="cmp-head">
+      <div class="page-head">
+        <div class="cmp-title"><h1 class="page-title">${esc(c.name)}</h1>${pill(c.status.toLowerCase(), STATUS_TONE[c.status])}${c.status === 'DRAFT' && c.pushed_at ? pill('pushed · not launched', 't-blue', true) : ''}${c.source === 'IMPORTED' ? pill('linked from Instantly', 't-violet', true) : ''}</div>
+        <div class="cmp-meta">
+          <span>${esc(c.campaign_type === 'GENERAL' ? 'General' : 'Enquiry follow-up')}</span>
+          <span>created <b>${esc(day(c.created_at))}</b></span>
+          ${c.launched_at ? `<span>launched <b>${esc(when(c.launched_at))}</b></span>` : ''}
+          ${c.paused_at && c.status === 'PAUSED' ? `<span>paused <b>${esc(when(c.paused_at))}</b></span>` : ''}
+          <span>Instantly <span class="mono">${c.instantly_campaign_id ? esc(c.instantly_campaign_id) : 'not pushed'}</span>${c.instantly_status_label ? ` · ${esc(c.instantly_status_label)}` : ''}</span>
+          <span>synced ${syncFreshnessHtml(c)}</span>
+        </div>
+      </div>
+      <div class="btnrow" id="d-actions">${actionButtons(c)}</div>
+    </div>
+    ${c.last_error ? `<div class="banner err"><div><b>Last error:</b> ${esc(c.last_error)}</div></div>` : ''}
+    ${DETAIL.instantly?.live ? `<div class="banner info"><div><b>Instantly live:</b> ${DETAIL.instantly.campaign ? `${esc(DETAIL.instantly.campaign.status_label)}${DETAIL.instantly.campaign.not_sending_status ? ` · not-sending code ${esc(DETAIL.instantly.campaign.not_sending_status)}` : ''} · accounts ${esc((DETAIL.instantly.campaign.email_list||[]).join(', ') || 'none')} · ${esc(DETAIL.instantly.campaign.daily_limit ?? '?')}/day` : `unavailable (${esc(DETAIL.instantly.campaign_error?.message||'')})`}</div></div>` : ''}
+    <div id="d-gate">${gateHtml(c)}</div>
+    <div class="kpis five" style="margin-top:var(--s-4)">${metricKpis(c)}</div>
+    <div class="tabs">${tabs.map(([k, l, n]) => `<button class="tab ${DETAIL_TAB === k ? 'on' : ''}" data-tab="${k}" type="button">${esc(l)}${n !== '' ? `<span class="tab-n">${esc(n)}</span>` : ''}</button>`).join('')}</div>
+    <div id="d-pane">${paneHtml(c)}</div>`;
+  const ack = $('g-ack'); if(ack) ack.addEventListener('change', () => { $('g-go').disabled = !ack.checked; });
+}
+function paneHtml(c){
+  const m = c.metrics; const labels = DETAIL.reason_labels || {};
+  if(DETAIL_TAB === 'overview'){
+    return `<div class="an-grid">
+      <div class="card"><div class="card-head"><div class="card-title">Handoff</div></div><div class="card-body"><dl class="kv">
+        <dt>Pushed to Instantly</dt><dd>${esc(m.pushed)} <span class="sub">${c.pushed_at ? `first push ${esc(when(c.pushed_at))}` : 'not yet'}</span></dd>
+        <dt>Waiting to push</dt><dd>${esc(m.selected)}${m.warning_unacknowledged ? ` <span class="sub" style="color:var(--amber)">${esc(m.warning_unacknowledged)} with unacknowledged warnings</span>` : ''}</dd>
+        <dt>Skipped by Instantly</dt><dd>${esc(m.skipped)}</dd>
+        <dt>Failed to push</dt><dd>${m.push_failed ? `<span style="color:var(--red)">${esc(m.push_failed)}</span> <span class="sub">retry with Push</span>` : '0'}</dd>
+        <dt>Excluded (blocked)</dt><dd>${esc(m.excluded)}</dd>
+      </dl></div></div>
+      <div class="card"><div class="card-head"><div class="card-title">Outcomes</div><div class="card-note">${c.analytics ? 'Instantly counters' : 'NOVUS ledger — sync for Instantly counters'}</div></div><div class="card-body"><dl class="kv">
+        <dt>Emails sent</dt><dd>${esc(m.emails_sent)}</dd>
+        <dt>Contacted</dt><dd>${esc(m.contacted)}</dd>
+        <dt>Unique opens</dt><dd>${esc(m.opens)}</dd>
+        <dt>Replies</dt><dd>${esc(m.replies)}</dd>
+        <dt>Positive / negative</dt><dd>${esc(m.positive)} / ${esc(m.negative)}</dd>
+        <dt>Meetings</dt><dd>${esc(m.meetings)}</dd>
+        <dt>Bounces</dt><dd>${esc(m.bounces)}${c.bounce_rate != null ? ` <span class="sub">${esc(c.bounce_rate)}% of pushed</span>` : ''}</dd>
+        <dt>Unsubscribes</dt><dd>${esc(m.unsubscribes)}</dd>
+        <dt>Sequence completed</dt><dd>${esc(m.completed)}</dd>
+      </dl></div></div></div>`;
+  }
+  if(DETAIL_TAB === 'sequence'){
+    return `<div class="seq-view">${c.sequence.steps.map((s, i) => `<div class="seq-step"><div class="seq-head"><span class="t">${i === 0 ? 'Email 1' : `Follow-up ${i}`}</span><span class="delay">${i === 0 ? 'sent first' : `${esc(s.delay_days)} day${s.delay_days===1?'':'s'} after the previous email`}</span></div>
+      ${s.variants.map((v, vi) => `<div class="seq-body">${s.variants.length > 1 ? `<div class="small-note">Variant ${vi+1}${v.disabled ? ' (disabled)' : ''}</div>` : ''}<div class="subj">${esc(v.subject)}</div>${esc(v.body)}</div>`).join('')}</div>`).join('')}</div>
+      ${['DRAFT','PAUSED'].includes(c.status) ? '<div class="note">Editing the sequence after creation is done by creating a new campaign in V1; the stored copy above is exactly what Instantly received.</div>' : ''}`;
+  }
+  if(DETAIL_TAB === 'audience'){
+    const members = DETAIL.members.filter((x) => !MEMBER_FILTER || x.eligibility_status === MEMBER_FILTER || x.member_status === MEMBER_FILTER);
+    const chips = [['', 'All', DETAIL.members.length], ['READY','Ready',m.ready], ['WARNING','Warning',m.warning], ['BLOCKED','Blocked',m.blocked], ['PUSHED','In Instantly',m.pushed], ['PUSH_FAILED','Failed',m.push_failed]];
+    return `<div class="filters">${chips.map(([k, l, n]) => `<button class="btn btn-sm ${MEMBER_FILTER === k ? 'btn-secondary' : 'btn-quiet'}" data-mfilter="${k}" type="button">${esc(l)} <span class="tab-n">${esc(n)}</span></button>`).join('')}
+      ${m.warning_unacknowledged && c.status !== 'COMPLETED' ? `<button class="btn btn-secondary btn-sm" id="ack-all" type="button" style="margin-left:auto">Acknowledge ${esc(m.warning_unacknowledged)} warning${m.warning_unacknowledged===1?'':'s'}</button>` : ''}</div>
+      <div class="card"><div class="tablewrap"><table>
+        <thead><tr><th>Agency</th><th>Contact</th><th>Email</th><th class="col-md">Probe</th><th>Eligibility</th><th>Handoff</th><th class="col-md">Instantly</th><th class="col-lg">Last event</th><th></th></tr></thead>
+        <tbody>${members.map((x) => `<tr>
+          <td><a class="t-name" href="${agencyLink(x.agency_id)}" style="text-decoration:none">${esc(x.company_name)}</a><div class="t-sub mono">${esc(x.agency_id)}</div></td>
+          <td>${dash(x.contact_name)}</td>
+          <td><span class="mono">${esc(x.email)}</span></td>
+          <td class="col-md">${dash(x.custom_variables?.property_street)}${x.custom_variables?.probe_date ? `<div class="t-sub">${esc(x.custom_variables.probe_date)}</div>` : ''}</td>
+          <td>${pill(x.eligibility_status.toLowerCase(), ELIG_CLASS[x.eligibility_status])}${x.warnings_acknowledged ? ' <span class="small-note">ack</span>' : ''}<div class="reasons">${esc(x.eligibility_reasons.filter((r) => labels[r]).map((r) => labels[r]).join(' · '))}</div></td>
+          <td>${pill(x.member_status.replace(/_/g,' ').toLowerCase(), MEMBER_TONE[x.member_status], true)}${x.last_error ? `<div class="t-sub" style="color:var(--red)">${esc(x.last_error)}</div>` : ''}</td>
+          <td class="col-md">${x.instantly_lead_status ? pill(x.instantly_lead_status.toLowerCase(), x.instantly_lead_status === 'BOUNCED' || x.instantly_lead_status === 'UNSUBSCRIBED' ? 't-red' : 't-grey', true) : '<span class="muted">—</span>'}${x.interest_status ? `<div class="t-sub">${esc(x.interest_status.replace(/_/g,' ').toLowerCase())}</div>` : ''}<div class="t-sub">${x.emails_sent_count ? `${esc(x.emails_sent_count)} sent` : ''}${x.replied_at ? ' · replied' : ''}</div></td>
+          <td class="col-lg">${x.last_event_type ? `${esc(x.last_event_type.replace(/_/g,' ').toLowerCase())}<div class="t-sub">${esc(when(x.last_event_at))}</div>` : '<span class="muted">—</span>'}</td>
+          <td>${x.member_status === 'SELECTED' && c.status !== 'COMPLETED' ? `<button class="x-btn" data-remove-member="${esc(x.agency_id)}" title="Remove before push" type="button">✕</button>` : ''}</td>
+        </tr>`).join('')}</tbody></table></div>${members.length ? '' : emptyState('No members match', 'Try another filter.')}</div>`;
+  }
+  if(DETAIL_TAB === 'sending'){
+    const acc = DETAIL.instantly?.accounts || null; const chosen = new Set(c.sending.email_list);
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    return `<div class="an-grid">
+      <div class="card"><div class="card-head"><div class="card-title">Sending accounts</div><div class="card-note">${acc ? 'live from Instantly' : 'stored configuration — click Live status for limits'}</div></div><div class="card-body">
+        ${c.sending.email_list.map((e) => { const a = acc?.find((r) => r.email === e); return `<div class="acct"><span></span><span class="e">${esc(e)}</span><span class="s">${a ? esc(a.status_label) : ''}${a?.warmup_score != null ? ` · warmup ${esc(a.warmup_score)}` : ''}</span><span class="s">${a?.daily_limit != null ? `${esc(a.daily_limit)}/day` : ''}</span></div>`; }).join('') || '<div class="note">No sending accounts on this campaign.</div>'}
+        ${acc ? `<div class="note">Other workspace accounts: ${esc(acc.filter((r) => !chosen.has(r.email)).map((r) => r.email).join(', ') || 'none')}</div>` : ''}
+      </div></div>
+      <div class="card"><div class="card-head"><div class="card-title">Schedule and limits</div></div><div class="card-body"><dl class="kv">
+        <dt>Days</dt><dd>${esc(Object.entries(c.schedule.days||{}).filter(([,v]) => v).map(([d]) => dayNames[d]).join(' '))}</dd>
+        <dt>Hours</dt><dd>${esc(c.schedule.from)}–${esc(c.schedule.to)} <span class="sub">${esc(c.schedule.timezone)} (UK)</span></dd>
+        ${c.schedule.start_date ? `<dt>Start date</dt><dd>${esc(c.schedule.start_date)}</dd>` : ''}
+        <dt>Daily limit</dt><dd>${esc(c.sending.daily_limit)} emails/day${c.sending.daily_max_leads ? ` · ${esc(c.sending.daily_max_leads)} new leads/day` : ''}</dd>
+        <dt>Stop on reply</dt><dd>${c.sending.stop_on_reply ? 'yes' : 'no'}${c.sending.stop_on_auto_reply ? ' · also on auto-reply' : ''}</dd>
+        <dt>Tracking</dt><dd>${c.sending.open_tracking ? 'opens' : ''}${c.sending.link_tracking ? ' · links' : ''}${!c.sending.open_tracking && !c.sending.link_tracking ? 'none' : ''}${c.sending.text_only ? ' · text-only' : ''}</dd>
+        <dt>Campaign status</dt><dd>${pill(c.status.toLowerCase(), STATUS_TONE[c.status])}${c.instantly_status_label ? ` <span class="sub">Instantly: ${esc(c.instantly_status_label)}</span>` : ''}</dd>
+      </dl></div></div></div>`;
+  }
+  if(DETAIL_TAB === 'analytics'){
+    const a = c.analytics; const steps = c.step_analytics || [];
+    const rate = (n, d) => (d ? `${Math.round((n / d) * 1000) / 10}%` : '—');
+    return `${a ? '' : '<div class="banner info"><div>No Instantly analytics yet — click <b>Sync</b> once the campaign has been pushed. Figures below are from the NOVUS event ledger.</div></div>'}
+      <div class="funnel" style="margin-bottom:var(--s-5)">
+        ${[['Pushed', m.pushed, ''], ['Contacted', m.contacted, rate(m.contacted, m.pushed)], ['Opened', m.opens, rate(m.opens, m.contacted)], ['Replied', m.replies, rate(m.replies, m.contacted)], ['Positive', m.positive, rate(m.positive, m.replies)], ['Meetings', m.meetings, rate(m.meetings, m.contacted)]].map(([l, n, r]) => `<div class="fstep" style="cursor:default"><div class="fstep-l">${esc(l)}</div><div class="fstep-n">${esc(n)}</div><div class="fstep-r">${esc(r)}</div></div>`).join('')}
+      </div>
+      <div class="an-grid">
+        <div class="card"><div class="card-head"><div class="card-title">Totals</div><div class="card-note">${a ? `Instantly · synced ${esc(when(c.last_synced_at))}` : 'NOVUS ledger'}</div></div><div class="card-body"><dl class="kv">
+          <dt>Emails sent</dt><dd>${esc(m.emails_sent)}</dd><dt>Unique opens</dt><dd>${esc(m.opens)}${a && a.open_count != null ? ` <span class="sub">${esc(a.open_count)} total</span>` : ''}</dd>
+          <dt>Replies</dt><dd>${esc(m.replies)}${a && a.reply_count_automatic != null ? ` <span class="sub">${esc(a.reply_count_automatic)} automatic</span>` : ''}</dd>
+          <dt>Positive replies</dt><dd>${esc(m.positive)}</dd><dt>Negative replies</dt><dd>${esc(m.negative)}</dd>
+          <dt>Bounces</dt><dd>${esc(m.bounces)}</dd><dt>Unsubscribes</dt><dd>${esc(m.unsubscribes)}</dd><dt>Meetings</dt><dd>${esc(m.meetings)}</dd>
+          ${a && a.link_click_count_unique != null ? `<dt>Unique clicks</dt><dd>${esc(a.link_click_count_unique)}</dd>` : ''}
+        </dl></div></div>
+        <div class="card"><div class="card-head"><div class="card-title">By sequence step</div><div class="card-note">${steps.length ? 'Instantly' : 'sync to load'}</div></div><div class="card-body">
+          ${steps.length ? `<div class="steps-an">${steps.map((s) => `<div class="st"><div class="l">Step ${esc(s.step)}${s.variant != null && s.variant !== 1 ? ` · v${esc(s.variant)}` : ''}</div>
+            <div class="row"><span>Sent</span><b>${esc(s.sent ?? 0)}</b></div><div class="row"><span>Opened</span><b>${esc(s.unique_opened ?? s.opened ?? 0)}</b></div><div class="row"><span>Replies</span><b>${esc(s.unique_replies ?? s.replies ?? 0)}</b></div><div class="row"><span>Reply rate</span><b>${esc(rate(s.unique_replies ?? s.replies ?? 0, s.sent ?? 0))}</b></div>${s.meetings_booked != null ? `<div class="row"><span>Meetings</span><b>${esc(s.meetings_booked)}</b></div>` : ''}</div>`).join('')}</div>` : '<div class="note">Per-step figures appear after a sync.</div>'}
+        </div></div>
+      </div>`;
+  }
+  if(DETAIL_TAB === 'reconciliation'){
+    if(!RECON || RECON.campaign_id !== c.campaign_id){ loadReconciliation(c.campaign_id); return '<div class="note">Building the reconciliation report…</div>'; }
+    const s = RECON.summary; const rows = RECON.rows.filter((r) => !RECON_FILTER || (RECON_FILTER === 'review' ? (r.match_status !== 'MATCHED' || r.match_method === 'DOMAIN') : RECON_FILTER === 'replied' ? r.replies > 0 : RECON_FILTER === 'never' ? r.emails_sent === 0 : RECON_FILTER === 'flagged' ? (r.bounced || r.unsubscribed || r.negative || r.positive || r.meeting || r.manual_conversation) : true));
+    const yn = (v, tone) => v ? `<span class="pill ${tone||'t-blue'} bare" style="padding:1px 6px">yes</span>` : '<span class="muted">—</span>';
+    return `<div class="recon-grid">
+      <div class="card"><div class="card-head"><div class="card-title">Instantly history · ${esc(s.members)} leads</div><div class="card-note">actual send records only</div></div><div class="card-body"><dl class="kv">
+        <dt>Emails actually sent</dt><dd>${esc(s.emails_sent_total)} <span class="sub">${esc(s.sent_one)} leads got 1 · ${esc(s.sent_many)} got several · ${esc(s.never_sent)} never sent</span></dd>
+        <dt>By last step</dt><dd>${esc(Object.entries(s.by_steps).sort((a,b)=>Number(a[0])-Number(b[0])).map(([k,v]) => `step ${k}: ${v}`).join(' · '))}</dd>
+        <dt>Send window</dt><dd>${esc(day(s.first_send_at))} → ${esc(day(s.last_send_at))}</dd>
+        <dt>Replied / auto</dt><dd>${esc(s.replied)} / ${esc(s.auto_replied)}</dd>
+        <dt>Positive / negative</dt><dd>${esc(s.positive)} / ${esc(s.negative)}</dd>
+        <dt>Bounced / unsubscribed</dt><dd>${esc(s.bounced)} / ${esc(s.unsubscribed)}</dd>
+        <dt>Meetings · manual threads</dt><dd>${esc(s.meetings)} · ${esc(s.manual_conversation)}</dd>
+        <dt>Sequence completed · still active</dt><dd>${esc(s.sequence_completed)} · ${esc(s.still_active)}</dd>
+      </dl></div></div>
+      <div class="card"><div class="card-head"><div class="card-title">Match to NOVUS master data</div><div class="card-note">by reliable identifier</div></div><div class="card-body"><dl class="kv">
+        <dt>Matched</dt><dd>${esc(s.matched)} <span class="sub">${esc(s.matched_by_domain_only)} by domain only (review)</span></dd>
+        <dt>Ambiguous</dt><dd>${esc(s.ambiguous)} <span class="sub">several agencies share the identifier</span></dd>
+        <dt>Unmatched</dt><dd>${esc(s.unmatched)} <span class="sub">no NOVUS record — kept for suppression</span></dd>
+      </dl>
+      <div class="field" style="margin-top:14px"><label class="field-l">Import Instantly exports (history the API does not expose)</label>
+        <div class="opts"><label>Activity CSV <input type="file" id="imp-activity" accept=".csv,text/csv" /></label><label>Leads CSV <input type="file" id="imp-leads" accept=".csv,text/csv" /></label></div>
+        <div class="btnrow"><button class="btn btn-secondary btn-sm" id="imp-dry" type="button">Preview import</button><button class="btn btn-primary btn-sm" id="imp-go" type="button" disabled>Import</button><span class="hint" id="imp-note"></span></div>
+        <div class="field-note">Preview shows what would be added and what is already on the ledger. Real timestamps are kept; the same moment from the API, a webhook and the export counts once.</div></div>
+      </div></div></div>
+      <div class="filters">${[['', 'All', RECON.rows.length], ['flagged','Flagged',RECON.rows.filter((r) => r.bounced || r.unsubscribed || r.negative || r.positive || r.meeting || r.manual_conversation).length], ['replied','Replied',s.replied], ['never','Never sent',s.never_sent], ['review','Needs review',RECON.review.length]].map(([k, l, n]) => `<button class="btn btn-sm ${RECON_FILTER === k ? 'btn-secondary' : 'btn-quiet'}" data-rfilter="${k}" type="button">${esc(l)} <span class="tab-n">${esc(n)}</span></button>`).join('')}</div>
+      <div class="card"><div class="tablewrap"><table>
+        <thead><tr><th>Agency</th><th>Email</th><th>Match</th><th class="n">Sent</th><th class="col-md">Steps</th><th class="col-md">First → last send</th><th class="n">Replies</th><th>Positive</th><th>Negative</th><th>Bounce</th><th>Unsub</th><th>Meeting</th><th>Instantly</th><th class="col-lg">NOVUS stage</th></tr></thead>
+        <tbody>${rows.map((r) => `<tr>
+          <td>${r.agency_id ? `<a class="t-name" href="${agencyLink(r.agency_id)}" style="text-decoration:none">${esc(r.agency_name || r.agency_id)}</a>` : `<span class="t-name muted">${esc(r.agency_name || '(no agency)')}</span>`}<div class="t-sub">${esc(r.contact_name)}</div></td>
+          <td><span class="mono">${esc(r.email)}</span></td>
+          <td>${pill(r.match_status.toLowerCase(), r.match_status === 'MATCHED' ? (r.match_method === 'DOMAIN' ? 't-amber' : 't-blue') : r.match_status === 'AMBIGUOUS' ? 't-amber' : 't-red', true)}<div class="t-sub">${esc(r.match_method.toLowerCase().replace(/_/g,' '))}${r.match_note ? ` · ${esc(r.match_note)}` : ''}</div></td>
+          <td class="n">${esc(r.emails_sent)}</td><td class="col-md">${esc(r.steps_sent.join(', ') || '—')}</td>
+          <td class="col-md">${r.first_send_at ? `${esc(day(r.first_send_at))}${r.last_send_at !== r.first_send_at ? ` → ${esc(day(r.last_send_at))}` : ''}` : '<span class="muted">never</span>'}</td>
+          <td class="n">${esc(r.replies)}${r.auto_replies ? `<span class="muted"> +${esc(r.auto_replies)} auto</span>` : ''}${r.manual_replies_sent ? `<div class="t-sub">${esc(r.manual_replies_sent)} sent by NOVUS</div>` : ''}</td>
+          <td>${yn(r.positive, 't-green')}</td><td>${yn(r.negative, 't-red')}</td><td>${yn(r.bounced, 't-red')}</td><td>${yn(r.unsubscribed, 't-red')}</td><td>${yn(r.meeting, 't-green')}</td>
+          <td>${r.instantly_lead_status ? pill(r.instantly_lead_status.toLowerCase(), 't-grey', true) : '—'}${r.interest_status ? `<div class="t-sub">${esc(r.interest_status.replace(/_/g,' ').toLowerCase())}</div>` : ''}</td>
+          <td class="col-lg">${r.novus_stage ? pill(r.novus_stage.replace(/_/g,' ').toLowerCase(), r.manual_conversation ? 't-amber' : 't-grey', true) : '<span class="muted">—</span>'}</td>
+        </tr>`).join('')}</tbody></table></div>${rows.length ? '' : emptyState('Nothing here', 'Try another filter.')}</div>`;
+  }
+  if(DETAIL_TAB === 'activity'){
+    return `<div class="card"><div class="card-body">${timelineHtml(DETAIL.events.map((e) => ({ at: e.occurred_at, tone: TL_TONE[e.event_type] || 'blue', title: EVENT_TITLE[e.event_type] || e.event_type, source: e.source, detail: [e.lead_email, e.step ? `email ${e.step}` : '', e.subject || e.snippet].filter(Boolean).join(' · '), agency_id: e.agency_id })), { newestFirst:true })}</div></div>`;
+  }
+  return '';
+}
+const EVENT_TITLE = { CAMPAIGN_CREATED:'Campaign created', LEAD_ADDED:'Lead added', LEAD_PUSHED:'Pushed to Instantly', LEAD_PUSH_FAILED:'Push failed', LEAD_SKIPPED:'Skipped by Instantly', CAMPAIGN_PUSHED:'Instantly campaign created', CAMPAIGN_LAUNCHED:'Launched', CAMPAIGN_PAUSED:'Paused', CAMPAIGN_RESUMED:'Resumed', EMAIL_SENT:'Email sent', EMAIL_OPENED:'Email opened', LINK_CLICKED:'Link clicked', REPLY_RECEIVED:'Reply received', AUTO_REPLY_RECEIVED:'Auto-reply', EMAIL_BOUNCED:'Bounced', LEAD_UNSUBSCRIBED:'Unsubscribed', LEAD_INTERESTED:'Interested', LEAD_NOT_INTERESTED:'Not interested', LEAD_NEUTRAL:'Neutral', LEAD_MEETING_BOOKED:'Meeting booked', LEAD_MEETING_COMPLETED:'Meeting completed', LEAD_CLOSED:'Closed', LEAD_OUT_OF_OFFICE:'Out of office', LEAD_WRONG_PERSON:'Wrong person', LEAD_NO_SHOW:'No show', CAMPAIGN_COMPLETED:'Campaign completed', ACCOUNT_ERROR:'Account error', OTHER:'Instantly event', MANUAL_REPLY_SENT:'Reply sent from inbox', LEAD_IMPORTED:'Imported from Instantly', CAMPAIGN_LINKED:'Linked to Instantly campaign' };
+const TL_TONE = { EMAIL_SENT:'blue', EMAIL_OPENED:'blue', LINK_CLICKED:'blue', REPLY_RECEIVED:'green', LEAD_INTERESTED:'green', LEAD_MEETING_BOOKED:'green', LEAD_MEETING_COMPLETED:'green', EMAIL_BOUNCED:'red', LEAD_UNSUBSCRIBED:'red', LEAD_NOT_INTERESTED:'red', LEAD_PUSH_FAILED:'red', LEAD_SKIPPED:'amber', LEAD_WRONG_PERSON:'amber', AUTO_REPLY_RECEIVED:'grey', LEAD_OUT_OF_OFFICE:'grey', LEAD_ADDED:'grey', CAMPAIGN_CREATED:'grey', CAMPAIGN_PAUSED:'amber', CAMPAIGN_LAUNCHED:'green', CAMPAIGN_RESUMED:'green', ACCOUNT_ERROR:'red', MANUAL_REPLY_SENT:'blue', LEAD_IMPORTED:'grey', CAMPAIGN_LINKED:'grey' };
+/* Shared timeline renderer: same markup the operator drawer's History tab uses. */
+function timelineHtml(entries, { newestFirst = false } = {}){
+  const rows = [...entries]; if(newestFirst) rows.sort((a, b) => (Date.parse(b.at)||0) - (Date.parse(a.at)||0));
+  if(!rows.length) return '<div class="tl-empty">Nothing recorded yet.</div>';
+  let lastDay = ''; const out = [];
+  for(const e of rows){
+    const d = day(e.at) || (e.future ? 'Upcoming' : 'Undated');
+    if(d !== lastDay){ out.push(`<div class="tl-day">${esc(d)}</div>`); lastDay = d; }
+    const ms = Date.parse(e.at||''); const t = Number.isFinite(ms) ? new Intl.DateTimeFormat('en-GB', { hour:'2-digit', minute:'2-digit', timeZone:'Europe/London' }).format(new Date(ms)) : '';
+    out.push(`<div class="tl-e ${esc(e.tone||'grey')}${e.future ? ' future' : ''}${e.overdue ? ' overdue' : ''}"><span class="w">${esc(t)}</span><span><span class="t">${esc(e.title)}${e.source && e.source !== 'NOVUS' ? `<span class="src">${esc(e.source)}</span>` : ''}</span>${e.detail ? `<span class="d">${e.agency_id ? `<a href="${agencyLink(e.agency_id)}" style="color:inherit">${esc(e.detail)}</a>` : esc(e.detail)}</span>` : ''}</span></div>`);
+  }
+  return `<div class="tl">${out.join('')}</div>`;
+}
+
+/* ═══ LINK AN EXISTING INSTANTLY CAMPAIGN ══════════════════════════════ */
+let DISCOVER = null, LINK = null;
+async function discover(){
+  $('discover-btn').disabled = true; $('disc-empty').textContent = 'Asking Instantly…';
+  try{
+    DISCOVER = await get(OP('campaign-discover'));
+    if(!DISCOVER.available){ $('disc-empty').textContent = `Instantly unavailable: ${typeof DISCOVER.error === 'string' ? DISCOVER.error : DISCOVER.error?.message || ''}`; $('disc-rows').innerHTML = ''; return; }
+    $('disc-rows').innerHTML = DISCOVER.campaigns.map((c) => `<tr>
+      <td><div class="t-name">${esc(c.name)}</div><div class="t-sub mono">${esc(c.instantly_campaign_id)}</div></td>
+      <td>${pill(c.status_label.toLowerCase(), { Active:'t-green', Paused:'t-amber', Completed:'t-blue', Draft:'t-grey' }[c.status_label] || 't-red')}</td>
+      <td class="col-md">${dash(day(c.timestamp_created))}</td>
+      <td class="col-lg"><span class="mono">${esc(c.email_list.join(', '))}</span>${c.daily_limit != null ? `<div class="t-sub">${esc(c.daily_limit)}/day</div>` : ''}</td>
+      <td>${c.linked ? `${pill('linked', 't-blue', true)} <a href="#campaign?id=${encodeURIComponent(c.campaign_id)}" style="color:var(--blue);font-size:11.5px">open ↗</a>` : '<span class="muted">not linked</span>'}</td>
+      <td class="nowrap">${c.linked ? `<button class="btn btn-quiet btn-sm" data-link="${esc(c.instantly_campaign_id)}" type="button">Re-sync link</button>` : `<button class="btn btn-secondary btn-sm" data-link="${esc(c.instantly_campaign_id)}" type="button">Link…</button>`}</td></tr>`).join('');
+    $('disc-empty').textContent = DISCOVER.campaigns.length ? '' : 'No campaigns in the Instantly workspace.';
+  }catch(err){ $('disc-empty').textContent = err.message; }
+  finally{ $('discover-btn').disabled = false; }
+}
+async function linkPreview(instantlyId){
+  const c = DISCOVER?.campaigns.find((x) => x.instantly_campaign_id === instantlyId);
+  $('link-gate').innerHTML = `<div class="gate blue"><div class="t">Link "${esc(c?.name || instantlyId)}"</div><div class="s">Reading Instantly…</div></div>`;
+  try{
+    LINK = await post(OP('campaign-link'), { instantly_campaign_id: instantlyId, dry_run: true });
+    const m = LINK.matches;
+    $('link-gate').innerHTML = `<div class="gate blue"><div class="t">Link "${esc(LINK.name)}" — ${LINK.already_linked ? 're-sync' : 'read-only import'}</div>
+      <div class="s">Instantly status <b>${esc(LINK.instantly_status_label)}</b> is mirrored as NOVUS <b>${esc(LINK.novus_status)}</b>. ${esc(LINK.leads_in_instantly)} leads in Instantly${LINK.leads_truncated ? ' (listing truncated)' : ''}: <b>${esc(LINK.members_to_add)}</b> would be added as members, ${esc(LINK.members_to_patch)} updated.
+        Match: <b>${esc(m.MATCHED)}</b> matched (${esc(m.DOMAIN)} by domain only), <span style="color:var(--amber)">${esc(m.AMBIGUOUS)} ambiguous</span>, <span style="color:var(--red)">${esc(m.UNMATCHED)} unmatched</span>. Sends and replies are then read from Instantly's email records.
+        <b>Nothing in Instantly changes</b>: no activation, no resume, no leads added, no schedule edits.</div>
+      ${LINK.review.length ? `<div class="ledger" style="margin-top:12px;max-height:220px;overflow:auto">${LINK.review.slice(0, 50).map((r) => `<div class="ledger-row"><div class="k">${esc(r.match_status.toLowerCase())}</div><div class="v"><span class="mono">${esc(r.email)}</span> <span class="muted">${esc(r.company_name)} · ${esc(r.match_note)}${r.candidates?.length ? ` · candidates: ${esc(r.candidates.map((x) => x.agency_name || x.agency_id).join(', '))}` : ''}</span></div></div>`).join('')}${LINK.review.length > 50 ? `<div class="ledger-row"><div class="k"></div><div class="v muted">…and ${LINK.review.length - 50} more (full list on the Reconciliation tab)</div></div>` : ''}</div>` : ''}
+      <div class="btnrow"><button class="btn btn-primary" id="link-go" data-link-go="${esc(instantlyId)}" type="button">${LINK.already_linked ? 'Re-sync now' : 'Link and import history'}</button><button class="btn btn-quiet" id="link-cancel" type="button">Cancel</button><span class="hint" id="link-err" style="color:var(--red)"></span></div></div>`;
+  }catch(err){ $('link-gate').innerHTML = `<div class="banner err"><div>${esc(err.message)}</div></div>`; }
+}
+async function linkGo(instantlyId){
+  const btn = $('link-go'); btn.disabled = true; btn.textContent = 'Importing…';
+  try{
+    const data = await post(OP('campaign-link'), { instantly_campaign_id: instantlyId, dry_run: false, confirm: 'LINK_INSTANTLY_CAMPAIGN' });
+    $('link-gate').innerHTML = '';
+    await loadList(true); await discover();
+    DETAIL_TAB = 'reconciliation'; RECON = null; showView('campaign', { id: data.campaign_id });
+    notice(`<b>Linked.</b> ${esc(data.members_to_add)} members added, ${esc(data.members_to_patch)} updated; history sync appended ${esc(data.sync?.events_appended ?? 0)} events${data.sync?.errors?.length ? ` — ${esc(data.sync.errors.map((e) => `${e.stage}: ${e.detail || e.message}`).join('; '))}` : ''}.`, data.sync?.errors?.length ? 'warn' : 'info');
+  }catch(err){ $('link-err').textContent = err.message; btn.disabled = false; btn.textContent = 'Retry'; }
+}
+
+/* ═══ RECONCILIATION ════════════════════════════════════════════════════ */
+let RECON = null, RECON_FILTER = '';
+async function loadReconciliation(id){
+  try{ RECON = await get(OP('campaign-reconciliation') + `&campaign_id=${encodeURIComponent(id)}`); }
+  catch(err){ RECON = { campaign_id: id, summary: {}, rows: [], review: [], error: err.message }; }
+  if(DETAIL && DETAIL.campaign.campaign_id === id && DETAIL_TAB === 'reconciliation') renderDetail();
+}
+async function readFile(input){ const f = input?.files?.[0]; if(!f) return ''; return f.text(); }
+async function importCsv(dryRun){
+  const note = $('imp-note'); note.textContent = 'Reading files…';
+  const activity = await readFile($('imp-activity')); const leads = await readFile($('imp-leads'));
+  if(!activity && !leads){ note.textContent = 'Choose at least one export.'; return; }
+  try{
+    const data = await post(OP('campaign-import-activity'), { campaign_id: DETAIL.campaign.campaign_id, activity_csv: activity, leads_csv: leads, dry_run: dryRun, ...(dryRun ? {} : { confirm: 'IMPORT_CAMPAIGN_ACTIVITY' }) });
+    const types = Object.entries(data.by_type || {}).map(([k, v]) => `${v} ${k.toLowerCase().replace(/_/g, ' ')}`).join(', ');
+    note.innerHTML = `${dryRun ? 'Preview' : 'Imported'}: ${esc(data.activity_rows)} activity rows${data.leads_rows ? `, ${esc(data.leads_rows)} leads` : ''} → <b>${esc(data.events_to_append)}</b> ${dryRun ? 'would be added' : 'added'}, ${esc(data.events_duplicate)} already on the ledger${data.members_to_add ? `; ${esc(data.members_to_add)} members ${dryRun ? 'would be' : ''} added` : ''}${data.unknown_recipients?.length ? `; <span style="color:var(--amber)">${esc(data.unknown_recipients.length)} recipients not in this campaign</span>` : ''}${types ? ` <span class="muted">(${esc(types)})</span>` : ''}`;
+    $('imp-go').disabled = !dryRun ? true : !(data.events_to_append || data.members_to_add || data.members_to_patch);
+    if(!dryRun){ RECON = null; await loadList(true); await loadDetail(DETAIL.campaign.campaign_id, false); }
+  }catch(err){ note.textContent = err.message; }
+}
+
+/* ═══ DETAIL ACTIONS ════════════════════════════════════════════════════ */
+async function runGate(kind){
+  const btn = $('g-go'); const err = $('g-err'); err.textContent = ''; btn.disabled = true; btn.textContent = 'Working…';
+  const id = DETAIL.campaign.campaign_id;
+  try{
+    if(kind === 'push'){
+      const data = await post(OP('campaign-push'), { confirm:'PUSH_TO_INSTANTLY', campaign_id: id, include_warnings: Boolean($('g-warn')?.checked) });
+      const bits = [`${data.pushed} pushed`, data.skipped ? `${data.skipped} skipped by Instantly` : '', data.warnings_held ? `${data.warnings_held} warnings held` : '', data.blocked_at_push ? `${data.blocked_at_push} newly blocked` : '', data.failed ? `${data.failed} failed` : ''].filter(Boolean).join(' · ');
+      notice(`<b>${data.created_instantly_campaign ? 'Instantly campaign created (draft). ' : ''}${esc(bits)}.</b> ${data.errors?.length ? esc(data.errors.map((e) => e.detail || e.message).join('; ')) : 'Nothing is sending until you launch.'}`, data.errors?.length ? 'warn' : 'info');
+    } else if(kind === 'launch'){
+      await post(OP('campaign-launch'), { confirm:'LAUNCH_CAMPAIGN', campaign_id: id, acknowledge: true, launch_without_warnings: true });
+      notice('<b>Launched.</b> Instantly is now sending inside the schedule. Events arrive via the webhook; use Sync as a safety net.', 'info');
+    } else if(kind === 'resume'){
+      await post(OP('campaign-resume'), { confirm:'RESUME_CAMPAIGN', campaign_id: id });
+      notice('<b>Resumed.</b>', 'info');
+    } else if(kind === 'pause'){
+      await post(OP('campaign-pause'), { confirm:'PAUSE_CAMPAIGN', campaign_id: id });
+      notice('<b>Paused.</b> Instantly has stopped sending.', 'info');
+    }
+    GATE = null; await loadList(true); await loadDetail(id, false);
+  }catch(e){ err.textContent = e.message; btn.disabled = false; btn.textContent = 'Retry'; }
+}
+async function syncCampaign(id){
+  notice('Syncing with Instantly…', 'info');
+  try{
+    const data = await post(OP('campaign-sync'), id ? { campaign_id: id } : {});
+    const r = data.results || [];
+    const errs = r.flatMap((x) => (x.errors||[]).map((e) => `${x.campaign_id}: ${e.stage} ${e.detail || e.message}`));
+    notice(`<b>Synced ${esc(data.synced)} campaign${data.synced===1?'':'s'}.</b> ${esc(r.map((x) => `${x.events_appended} new events, ${x.members_updated} member cells updated`).join(' · '))}${errs.length ? `<br/>${esc(errs.join('; '))}` : ''}`, errs.length ? 'warn' : 'info');
+    RECON = null;
+    await loadList(true); if(VIEW === 'campaign' && DETAIL_ID) await loadDetail(DETAIL_ID, false);
+  }catch(e){ notice(`<b>Sync failed.</b> ${esc(e.message)}`, 'err'); }
+}
+
+/* ═══ WIRING ════════════════════════════════════════════════════════════ */
+window.addEventListener('popstate', () => { const r = routeFromHash(); showView(r.view, { push:false, id:r.id, tab:r.tab }); });
+document.addEventListener('click', async (e) => {
+  const nav = e.target.closest('.nav-item[data-view]'); if(nav){ showView(nav.dataset.view); return; }
+  if(e.target.id === 'new-btn'){ showView('new-campaign'); return; }
+  if(e.target.id === 'setup-btn'){ e.target.disabled = true; try{ await post(OP('campaign-setup'), { confirm:'SETUP_CAMPAIGN_TABS' }); await loadList(true); }catch(err){ showErr(err.message); } return; }
+  if(e.target.id === 'sync-all'){ syncCampaign(''); return; }
+  if(e.target.id === 'discover-btn'){ discover(); return; }
+  const lk = e.target.closest('[data-link]'); if(lk){ linkPreview(lk.dataset.link); return; }
+  const lg = e.target.closest('[data-link-go]'); if(lg){ linkGo(lg.dataset.linkGo); return; }
+  if(e.target.id === 'link-cancel'){ $('link-gate').innerHTML = ''; return; }
+  const rf = e.target.closest('[data-rfilter]'); if(rf){ RECON_FILTER = rf.dataset.rfilter; renderDetail(); return; }
+  if(e.target.id === 'imp-dry'){ importCsv(true); return; }
+  if(e.target.id === 'imp-go'){ importCsv(false); return; }
+  if(e.target.id === 'd-sync'){ syncCampaign(DETAIL.campaign.campaign_id); return; }
+  if(e.target.id === 'd-live'){ loadDetail(DETAIL.campaign.campaign_id, true); return; }
+  const act = e.target.closest('button.act'); if(act){ e.stopPropagation(); DETAIL_TAB = 'overview'; GATE = act.dataset.act; showView('campaign', { id: act.dataset.id }); return; }
+  const gate = e.target.closest('[data-gate]'); if(gate){ GATE = gate.dataset.gate || null; renderDetail(); return; }
+  if(e.target.id === 'g-go'){ runGate(e.target.dataset.go); return; }
+  const tab = e.target.closest('.tab[data-tab]'); if(tab){ DETAIL_TAB = tab.dataset.tab; history.replaceState(null, '', `#campaign?id=${encodeURIComponent(DETAIL_ID)}${DETAIL_TAB !== 'overview' ? `&tab=${DETAIL_TAB}` : ''}`); renderDetail(); return; }
+  const mf = e.target.closest('[data-mfilter]'); if(mf){ MEMBER_FILTER = mf.dataset.mfilter; renderDetail(); return; }
+  if(e.target.id === 'ack-all'){ e.target.disabled = true; try{ await post(OP('campaign-update'), { campaign_id: DETAIL.campaign.campaign_id, acknowledge_warnings: true }); await loadDetail(DETAIL.campaign.campaign_id, false); }catch(err){ notice(esc(err.message), 'err'); } return; }
+  const rm = e.target.closest('[data-remove-member]'); if(rm){ try{ await post(OP('campaign-update'), { campaign_id: DETAIL.campaign.campaign_id, remove_agency_ids: [rm.dataset.removeMember] }); await loadDetail(DETAIL.campaign.campaign_id, false); }catch(err){ notice(esc(err.message), 'err'); } return; }
+  const ws = e.target.closest('.wiz-step'); if(ws){ wizStep(ws.dataset.step); return; }
+  const nx = e.target.closest('[data-next]'); if(nx){ wizStep(nx.dataset.next); return; }
+  const ex = e.target.closest('[data-exclude]'); if(ex){ WIZ.excluded.add(ex.dataset.exclude); previewAudience(); return; }
+  if(e.target.id === 'f-reset'){ WIZ.excluded = new Set(); document.querySelectorAll('#aud-filters input, #aud-filters select').forEach((el) => { if(el.id === 'f-name' || el.id === 'f-type') return; if(el.type === 'checkbox') el.checked = ['f-email_exists','f-valid','f-probe_not_compromised','p-allow_generic_email','p-block_active_campaign','p-block_prior_negative','p-block_active_conversation','p-block_active_followup','p-block_meeting_booked'].includes(el.id); else if(el.id === 'p-cooling_days') el.value = '14'; else el.value = ''; }); previewAudience(); return; }
+  if(e.target.id === 'seq-add'){ WIZ.steps.push({ subject: `Re: ${WIZ.steps[0]?.subject || ''}`, body: '', delay_days: 3 }); renderSequence(); return; }
+  const rs = e.target.closest('[data-remove]'); if(rs){ WIZ.steps.splice(Number(rs.dataset.remove), 1); renderSequence(); return; }
+  const vb = e.target.closest('[data-var]'); if(vb){ const ta = document.querySelector(`textarea[data-body="${vb.dataset.for}"]`); const i = Number(vb.dataset.for); const at = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, at) + vb.dataset.var + ta.value.slice(at); WIZ.steps[i].body = ta.value; ta.focus(); return; }
+  if(e.target.id === 'create-btn'){ createCampaign(); return; }
+  const dayLabel = e.target.closest('#days label'); if(dayLabel){ setTimeout(() => { dayLabel.classList.toggle('on', dayLabel.querySelector('input').checked); }, 0); return; }
+  const row = e.target.closest('.cmp-row'); if(row && !e.target.closest('button')){ DETAIL_TAB = 'overview'; GATE = null; showView('campaign', { id: row.dataset.id }); }
+});
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if(t.closest('#aud-filters') && t.id !== 'f-name'){ scheduleAudience(); return; }
+  if(t.dataset.subject !== undefined){ WIZ.steps[Number(t.dataset.subject)].subject = t.value; return; }
+  if(t.dataset.body !== undefined){ WIZ.steps[Number(t.dataset.body)].body = t.value; return; }
+  if(t.dataset.delay !== undefined){ WIZ.steps[Number(t.dataset.delay)].delay_days = Math.max(1, Number(t.value)||1); return; }
+  if(t.dataset.acct !== undefined){ if(t.checked) WIZ.emailList.add(t.dataset.acct); else WIZ.emailList.delete(t.dataset.acct); $('ws-sending').textContent = `${WIZ.emailList.size} account${WIZ.emailList.size===1?'':'s'} · ${$('s-daily_limit').value}/day`; return; }
+  if(t.id === 's-daily_limit'){ $('ws-sending').textContent = `${WIZ.emailList.size} account${WIZ.emailList.size===1?'':'s'} · ${t.value}/day`; }
+});
+document.addEventListener('change', (e) => { if(e.target.closest('#aud-filters') && e.target.id !== 'f-name') scheduleAudience(); });
+$('refresh').addEventListener('click', () => { loadList(true); if(VIEW === 'campaign' && DETAIL_ID) loadDetail(DETAIL_ID, false); });
+
+const first = routeFromHash();
+showView(first.view, { push:false, id:first.id, tab:first.tab });
+loadList(false);
+</script>
+</body>
+</html>

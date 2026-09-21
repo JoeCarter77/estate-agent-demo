@@ -71,6 +71,12 @@ import { getRepo } from '../../../lib/sheets.mjs';
 import { createSnapshotRepo } from '../../../lib/pipeline-snapshot.mjs';
 import { runRebuildPass } from '../../../lib/rebuild-pass.mjs';
 import { uploadEligibleOutboundLeads } from '../../../lib/instantly-outbound.mjs';
+// F. Campaign reconciliation (novus/campaigns.html). Read-only against
+// Instantly, writes only the CAMPAIGNS/CAMPAIGN_MEMBERS/CAMPAIGN_EVENTS
+// ledgers, and never activates or pauses anything. This is the scheduled
+// safety net behind the webhook; the same code runs from the Sync button.
+import { syncCampaigns } from '../../../lib/campaign-handlers.mjs';
+import { clientFor } from '../../../lib/instantly-client.mjs';
 import { reconcileActionEngine } from '../../../lib/action-engine.mjs';
 
 export const maxDuration = 60;
@@ -103,6 +109,7 @@ export async function runNightlyFinalizer(repo, {
   rebuild = runRebuildPass,
   handoff = uploadEligibleOutboundLeads,
   reconcile = reconcileActionEngine,
+  campaignSync = defaultCampaignSync,
   instantlyOptions = {},
 } = {}) {
   const summary = await rebuild(repo, {
@@ -131,17 +138,35 @@ export async function runNightlyFinalizer(repo, {
     actions = { available: false, error: err?.message || 'action reconciliation failed' };
   }
 
+  // F. Failure-isolated like E. Reconciles every open campaign with
+  // Instantly (status, leads, sends, replies, analytics). Skipped, and said
+  // so, when no Instantly read key is configured or the tabs do not exist.
+  let campaigns;
+  try {
+    campaigns = await campaignSync(repo);
+  } catch (err) {
+    console.error('nightly campaign reconciliation failed:', err?.message || err);
+    campaigns = { available: false, error: err?.message || 'campaign reconciliation failed' };
+  }
+
   return {
     ...summary,
     instantly,
     instantly_uploaded: instantly?.uploaded_rows ?? 0,
     instantly_failed: instantly?.failed_rows ?? 0,
     actions,
+    campaigns,
     batch_size: batchSize,
     // Restated AFTER the handoff and reconciliation, so the reported request
     // counts cover the whole invocation rather than the rebuild alone.
     sheets: typeof repo.snapshotStats === 'function' ? repo.snapshotStats() : summary.sheets,
   };
+}
+
+async function defaultCampaignSync(repo) {
+  const client = clientFor('read');
+  if (!client) return { available: false, error: 'No Instantly API key configured; campaign reconciliation skipped' };
+  return syncCampaigns(repo, client, { onlyOpen: true });
 }
 
 function safeEqual(a, b) {

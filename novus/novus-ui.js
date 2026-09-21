@@ -97,6 +97,19 @@
         + '</div>';
     }
 
+    // The full chronological story (probe, campaigns/Instantly, replies,
+    // calls, actions) lives on the Command Centre lead drawer's History pane;
+    // this is the one-click way there from a live call.
+    function historyField(lead) {
+      var agencyId = String(lead && lead.agency_id || '').trim();
+      if (!agencyId) return '';
+      return '<a href="/novus/operator.html#leads?agency=' + encodeURIComponent(agencyId) + '" target="_blank" rel="noopener"'
+        + ' style="min-width:120px;flex:0 1 150px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);text-decoration:none;color:inherit;">'
+        + '<div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px">History</div>'
+        + '<div style="font-size:13px;font-weight:600;line-height:1.35;color:var(--blue)">Full timeline &#8599;</div>'
+        + '</a>';
+    }
+
     function sellerLabel(data) {
       if (!data) return 'Loading…';
       var raw = String(data.seller_recognition || '').trim().toLowerCase();
@@ -164,6 +177,7 @@
         + field('Follow-up', followup, false)
         + field('Contact', contact, true)
         + field('Enquiry sent', sentAt, false)
+        + historyField(lead)
         + '</div></div>';
 
       if (existing) existing.outerHTML = html;

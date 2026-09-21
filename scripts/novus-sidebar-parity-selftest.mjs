@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // scripts/novus-sidebar-parity-selftest.mjs — hermetic parity guard for the
-// NOVUS sidebar (novus/operator.html vs novus/calling.html).
+// NOVUS sidebar (novus/operator.html vs novus/calling.html vs
+// novus/campaigns.html).
 //
 // The Calling workspace deliberately reuses operator.html's exact sidebar
 // markup (same items, same order, same groups, same badge ids) rather than
@@ -24,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const OPERATOR_HTML = fs.readFileSync(path.join(ROOT, '..', 'novus', 'operator.html'), 'utf8');
 const CALLING_HTML = fs.readFileSync(path.join(ROOT, '..', 'novus', 'calling.html'), 'utf8');
+const CAMPAIGNS_HTML = fs.readFileSync(path.join(ROOT, '..', 'novus', 'campaigns.html'), 'utf8');
 
 let passed = 0;
 const ok = (msg) => { passed += 1; console.log(`  ✓ ${msg}`); };
@@ -37,6 +39,8 @@ const CANONICAL = [
   { group: null, key: 'prober', label: 'Prober', badge: 'b-prober' },
   { group: null, key: 'leads', label: 'Leads', badge: 'b-leads' },
   { group: null, key: 'analytics', label: 'Analytics', badge: null },
+  { group: 'Email', key: 'campaigns', label: 'Campaigns', badge: null },
+  { group: 'Email', key: 'new-campaign', label: 'New Campaign', badge: null },
   { group: 'Calling', key: 'calling', label: 'Calling', badge: null },
   { group: 'Calling', key: 'call-actions', label: 'Call Actions', badge: null },
   { group: 'Calling', key: 'scripts', label: 'Scripts', badge: null },
@@ -49,6 +53,7 @@ const CANONICAL = [
 // two pages.
 const OPERATOR_OWN = new Set(['overview', 'actions', 'future', 'pipeline', 'prober', 'leads', 'analytics', 'exceptions']);
 const CALLING_OWN = new Set(['calling', 'call-actions', 'scripts', 'calling-analytics']);
+const CAMPAIGNS_OWN = new Set(['campaigns', 'new-campaign']);
 
 function parseNav(html, file) {
   const navMatch = html.match(/<nav class="nav">([\s\S]*?)<\/nav>/);
@@ -84,14 +89,17 @@ function parseNav(html, file) {
 
 const operator = parseNav(OPERATOR_HTML, 'operator.html');
 const calling = parseNav(CALLING_HTML, 'calling.html');
+const campaigns = parseNav(CAMPAIGNS_HTML, 'campaigns.html');
+const PAGES = [['operator.html', operator], ['calling.html', calling], ['campaigns.html', campaigns]];
 
 console.log('\nBranding');
 assert.equal(operator.navSub, 'Acquisition');
 assert.equal(calling.navSub, 'Acquisition', 'calling.html must keep the same "NOVUS / Acquisition" branding as operator.html, never "NOVUS CALLING"');
-ok('both pages carry the same NOVUS / Acquisition sidebar branding');
+assert.equal(campaigns.navSub, 'Acquisition');
+ok('all three pages carry the same NOVUS / Acquisition sidebar branding');
 
 console.log('\nItem list, order, groups and badges');
-for (const [name, parsed] of [['operator.html', operator], ['calling.html', calling]]) {
+for (const [name, parsed] of PAGES) {
   assert.equal(parsed.items.length, CANONICAL.length, `${name}: expected ${CANONICAL.length} sidebar items, found ${parsed.items.length}`);
   CANONICAL.forEach((expected, i) => {
     const got = parsed.items[i];
@@ -101,7 +109,7 @@ for (const [name, parsed] of [['operator.html', operator], ['calling.html', call
     assert.equal(got.badgeId, expected.badge, `${name}: "${expected.label}" expected badge id ${expected.badge}, got ${got.badgeId}`);
   });
 }
-ok('operator.html and calling.html carry the identical item list, order, groups and badges');
+ok('operator.html, calling.html and campaigns.html carry the identical item list, order, groups and badges');
 
 console.log('\nWhich items are this page\'s own tabs vs. links to the other workspace');
 function checkOwnership(name, parsed, ownKeys) {
@@ -119,25 +127,27 @@ function checkOwnership(name, parsed, ownKeys) {
 }
 checkOwnership('operator.html', operator, OPERATOR_OWN);
 checkOwnership('calling.html', calling, CALLING_OWN);
-ok('each page renders its own four-or-eight tabs as active buttons and everything else as a link elsewhere');
+checkOwnership('campaigns.html', campaigns, CAMPAIGNS_OWN);
+ok('each page renders its own tabs as active buttons and everything else as a link elsewhere');
 
 console.log('\nEvery cross-page link resolves to a real file, never a bare route Vercel has no rewrite for');
-for (const [name, parsed] of [['operator.html', operator], ['calling.html', calling]]) {
+for (const [name, parsed] of PAGES) {
   for (const item of parsed.items) {
     if (item.tag !== 'a') continue;
     assert.ok(
-      item.href.startsWith('/novus/operator.html#') || item.href === '/novus/communications.html' || item.href.startsWith('/novus/calling.html#'),
+      item.href.startsWith('/novus/operator.html#') || item.href === '/novus/communications.html' || item.href.startsWith('/novus/calling.html#') || item.href.startsWith('/novus/campaigns.html#'),
       `${name}: "${item.label}" links to "${item.href}", which is not an explicit .html target`,
     );
   }
 }
 // Guard against the exact regression this task fixed: no bare (non-.html)
 // operator/calling route anywhere in either file, sidebar or otherwise.
-for (const [name, html] of [['operator.html', OPERATOR_HTML], ['calling.html', CALLING_HTML]]) {
+for (const [name, html] of [['operator.html', OPERATOR_HTML], ['calling.html', CALLING_HTML], ['campaigns.html', CAMPAIGNS_HTML]]) {
   assert.ok(!/\/novus\/operator#/.test(html), `${name}: found a bare /novus/operator# link — Vercel has no rewrite for /novus/operator, only operator.html, so this 404s`);
   assert.ok(!/\/novus\/calling#/.test(html), `${name}: found a bare /novus/calling# link`);
+  assert.ok(!/\/novus\/campaigns#/.test(html), `${name}: found a bare /novus/campaigns# link`);
 }
-ok('every link between the two workspaces uses the real .html file, so none of them 404 on Vercel');
+ok('every link between the workspaces uses the real .html file, so none of them 404 on Vercel');
 
 console.log('\nActive-view hashes line up with each page\'s own routing');
 // operator.html's own VIEWS array and calling.html's own VIEWS array are the
@@ -149,9 +159,20 @@ for (const item of calling.items.filter((it) => it.tag === 'a' && it.href.starts
   const hash = item.href.split('#')[1];
   assert.ok(operatorViews.includes(hash), `calling.html: "${item.label}" links to operator.html#${hash}, which is not one of operator.html's own VIEWS (${operatorViews.join(', ')})`);
 }
-for (const item of operator.items.filter((it) => it.tag === 'a' && it.href.startsWith('/novus/calling.html#'))) {
+for (const item of [...operator.items, ...campaigns.items].filter((it) => it.tag === 'a' && it.href.startsWith('/novus/calling.html#'))) {
   const hash = item.href.split('#')[1];
-  assert.ok(callingViews.includes(hash), `operator.html: "${item.label}" links to calling.html#${hash}, which is not one of calling.html's own VIEWS (${callingViews.join(', ')})`);
+  assert.ok(callingViews.includes(hash), `"${item.label}" links to calling.html#${hash}, which is not one of calling.html's own VIEWS (${callingViews.join(', ')})`);
+}
+for (const item of campaigns.items.filter((it) => it.tag === 'a' && it.href.startsWith('/novus/operator.html#'))) {
+  const hash = item.href.split('#')[1];
+  assert.ok(operatorViews.includes(hash), `campaigns.html: "${item.label}" links to operator.html#${hash}, which is not one of operator.html's own VIEWS`);
+}
+// campaigns.html routes on #campaigns / #new / #campaign?id=; the other two
+// pages must link only to hashes it recognises.
+const campaignsHashes = new Set(['campaigns', 'new']);
+for (const item of [...operator.items, ...calling.items].filter((it) => it.tag === 'a' && it.href.startsWith('/novus/campaigns.html#'))) {
+  const hash = item.href.split('#')[1];
+  assert.ok(campaignsHashes.has(hash), `"${item.label}" links to campaigns.html#${hash}, which campaigns.html does not route`);
 }
 ok('every cross-page link\'s hash matches a route the target page actually recognises');
 

@@ -64,6 +64,14 @@
     </div>
 
     <div class="nav-group">
+      <div class="nav-label">Email</div>
+      <a class="nav-item" href="/novus/campaigns.html#campaigns">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg><span>Campaigns</span></a>
+      <a class="nav-item" href="/novus/campaigns.html#new">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span>New Campaign</span></a>
+    </div>
+
+    <div class="nav-group">
       <div class="nav-label">Calling</div>
       <a class="nav-item" href="/novus/calling.html#calling">
         <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span></a>
@@ -370,6 +378,7 @@
   <div class="dr-tabs" id="d-tabs">
     <button class="dr-tab on" data-pane="summary" type="button">Summary</button>
     <button class="dr-tab" data-pane="conversation" type="button">Conversation</button>
+    <button class="dr-tab" data-pane="history" type="button">History</button>
     <button class="dr-tab" data-pane="probe" type="button">Probe</button>
     <button class="dr-tab" data-pane="demo" type="button">Demo</button>
     <button class="dr-tab" data-pane="actions" type="button">Actions</button>
@@ -599,6 +608,16 @@ function routeFromHash(){
   const raw = String(window.location.hash || '').replace(/^#\/?/, '').split('?')[0].trim().toLowerCase();
   return VIEWS.includes(raw) ? raw : 'overview';
 }
+/* Deep link from the campaigns page / timeline: #leads?agency=<agency_id>
+   opens that lead's drawer on the History pane once the feed has loaded.
+   Consumed once; the hash is then reduced to the plain view. */
+function pendingAgencyFromHash(){
+  const q = String(window.location.hash || '').split('?')[1] || '';
+  const id = new URLSearchParams(q).get('agency') || '';
+  if(id) history.replaceState(null, '', `${location.pathname}#${routeFromHash()}`);
+  return id;
+}
+let PENDING_AGENCY = pendingAgencyFromHash();
 
 function showView(name, { push = true } = {}){
   VIEW = VIEWS.includes(name) ? name : 'overview';
@@ -1310,6 +1329,7 @@ function renderDrawerPane(){
     }
     return;
   }
+  if(DRAWER_PANE === 'history') { $('d-body').innerHTML = '<div id="hist-body"><div class="note">Loading history…</div></div>'; loadHistory(lead.agency_id); return; }
   if(DRAWER_PANE === 'probe')   { $('d-body').innerHTML = paneProbe(lead); return; }
   if(DRAWER_PANE === 'demo')    { $('d-body').innerHTML = paneDemo(lead); return; }
   if(DRAWER_PANE === 'actions') { $('d-body').innerHTML = paneActions(lead); return; }
@@ -1320,6 +1340,49 @@ function renderDrawerPane(){
         ['Confidence', dash(lead.reply.confidence)],
         ['Suppression', dash(lead.reply.suppression_type)],
       ]) + `<div class="quote">${esc(lead.reply.text)}</div>`) : '');
+}
+
+/* ═══ HISTORY — the full chronological story for one agency ═══════════
+   ONE read of ?novus_operation=lead-timeline (lib/lead-timeline.mjs): probe,
+   the agency's probe replies, Instantly campaigns (added / sent / opened /
+   replied / bounced …), classified sales replies, NOVUS manual sends, demo
+   views, calls and actions — in one list. Email activity is deliberately
+   part of this timeline rather than a separate email tab. */
+let HIST_TOKEN = 0;
+const HIST_DAY = new Intl.DateTimeFormat('en-GB', { day:'numeric', month:'short', year:'numeric', timeZone:'Europe/London' });
+const HIST_TIME = new Intl.DateTimeFormat('en-GB', { hour:'2-digit', minute:'2-digit', timeZone:'Europe/London' });
+function timelineHtml(entries){
+  if(!entries.length) return '<div class="tl-empty">Nothing recorded for this agency yet.</div>';
+  let lastDay = ''; const out = [];
+  for(const e of entries){
+    const ms = Date.parse(e.at || '');
+    const d = Number.isFinite(ms) ? HIST_DAY.format(new Date(ms)) : (e.future ? 'Upcoming' : 'Undated');
+    if(d !== lastDay){ out.push(`<div class="tl-day">${esc(d)}${e.future ? ' <span class="muted">· due</span>' : ''}</div>`); lastDay = d; }
+    const t = Number.isFinite(ms) ? HIST_TIME.format(new Date(ms)) : '';
+    const campaignLink = e.campaign_id ? ` <a class="src" href="/novus/campaigns.html#campaign?id=${encodeURIComponent(e.campaign_id)}" style="text-decoration:none">campaign ↗</a>` : '';
+    out.push(`<div class="tl-e ${esc(e.tone || 'grey')}${e.future ? ' future' : ''}${e.overdue ? ' overdue' : ''}"><span class="w">${esc(t)}</span><span><span class="t">${esc(e.title)}${e.source && e.source !== 'NOVUS' ? `<span class="src">${esc(e.source)}</span>` : ''}${campaignLink}</span>${e.detail ? `<span class="d">${esc(e.detail)}</span>` : ''}</span></div>`);
+  }
+  return `<div class="tl">${out.join('')}</div>`;
+}
+async function loadHistory(agencyId){
+  const token = ++HIST_TOKEN;
+  try{
+    const res = await fetch(`/api/novus/personalisation?novus_operation=lead-timeline&agency_id=${encodeURIComponent(agencyId)}`, { headers:{ Accept:'application/json' } });
+    const data = await res.json();
+    if(token !== HIST_TOKEN || !$('hist-body')) return;
+    if(!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+    const camps = (data.campaigns || []).length
+      ? blk('Campaigns', kv(data.campaigns.map((c) => [c.name || c.campaign_id,
+          `${pill(String(c.status || 'draft').toLowerCase(), { ACTIVE:'t-green', PAUSED:'t-amber', COMPLETED:'t-blue', ERROR:'t-red' }[c.status] || 't-grey')} ${pill(String(c.member_status || '').replace(/_/g,' ').toLowerCase(), 't-grey', true)}
+           <div class="sub">${c.emails_sent_count ? `${esc(c.emails_sent_count)} sent` : 'nothing sent yet'}${c.instantly_lead_status ? ` · ${esc(c.instantly_lead_status.toLowerCase())}` : ''}${c.interest_status ? ` · ${esc(c.interest_status.replace(/_/g,' ').toLowerCase())}` : ''}${c.last_event_type ? ` · last ${esc(c.last_event_type.replace(/_/g,' ').toLowerCase())} ${esc(when(c.last_event_at))}` : ''}</div>
+           <a class="linkout" href="/novus/campaigns.html#campaign?id=${encodeURIComponent(c.campaign_id)}&tab=audience" style="margin-top:6px;padding:4px 9px;font-size:11.5px">Open campaign &#8599;</a>`])))
+      : '';
+    const counts = data.counts || {};
+    const summary = Object.entries(counts).map(([k, n]) => `${n} ${k}`).join(' · ');
+    $('hist-body').innerHTML = camps + blk('Timeline', `<div class="note" style="margin:0 0 12px">${esc(summary || 'no events')}</div>` + timelineHtml(data.entries || []));
+  }catch(err){
+    if(token === HIST_TOKEN && $('hist-body')) $('hist-body').innerHTML = `<div class="banner err"><div>${esc(err.message || 'History could not load.')}</div></div>`;
+  }
 }
 
 function openDrawer(agencyId, pane){
@@ -1640,6 +1703,7 @@ async function load(force){
 
     showWarnings(data.warnings);
     renderAll();
+    if(PENDING_AGENCY){ const id = PENDING_AGENCY; PENDING_AGENCY = ''; if(LEADS.some((l) => l.agency_id === id)) openDrawer(id, 'history'); }
 
     const age = data.cached ? ` · cached ${Math.round((data.cache_age_ms||0)/1000)}s` : '';
     $('stamp').innerHTML = `<span class="nav-dot${data.cached ? ' stale' : ''}"></span>${esc(when(data.generated_at))}${esc(age)}`;
@@ -1779,7 +1843,11 @@ async function createAction(lead){
 
 /* ═══ WIRING ════════════════════════════════════════════════════════════ */
 
-window.addEventListener('hashchange', () => showView(routeFromHash(), { push:false }));
+window.addEventListener('hashchange', () => {
+  const id = pendingAgencyFromHash();
+  showView(routeFromHash(), { push:false });
+  if(id && LOADED && LEADS.some((l) => l.agency_id === id)) openDrawer(id, 'history');
+});
 
 document.addEventListener('click', (e) => {
   const nav = e.target.closest('.nav-item');
