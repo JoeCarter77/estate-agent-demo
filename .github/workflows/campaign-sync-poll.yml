@@ -7,16 +7,17 @@
 # replies, bounces and unsubscribes fresh in NOVUS in between manual "Sync
 # Now" clicks and the nightly full reconciliation.
 #
-# It makes exactly one authenticated POST per tick to the deployed app. It
-# never talks to Instantly directly and holds no Instantly credential — only
-# the same Basic Auth + a dedicated poller secret every other automated
-# writer in this app uses (see api/novus/_auth.mjs).
+# It makes two authenticated POSTs per tick to the deployed app: campaign
+# sync first, then reply classification/action reconciliation. It never talks
+# to Instantly directly and holds no Instantly credential — only Basic Auth
+# and each endpoint's dedicated poller secret (see api/novus/_auth.mjs).
 #
 # Setup: GitHub repo → Settings → Secrets and variables → Actions → add
 #   NOVUS_BASE_URL              e.g. https://estate-agent-demo.vercel.app (no trailing slash)
 #   NOVUS_BASIC_AUTH_USER
 #   NOVUS_BASIC_AUTH_PASS
 #   NOVUS_CAMPAIGN_POLLER_SECRET   the exact same value set in Vercel
+#   NOVUS_REPLY_POLLER_SECRET      the existing reply-poller secret in Vercel
 #
 # Test it any time from the Actions tab: this workflow → "Run workflow".
 name: Campaign sync poll
@@ -39,6 +40,7 @@ jobs:
           NOVUS_BASIC_AUTH_USER: ${{ secrets.NOVUS_BASIC_AUTH_USER }}
           NOVUS_BASIC_AUTH_PASS: ${{ secrets.NOVUS_BASIC_AUTH_PASS }}
           NOVUS_CAMPAIGN_POLLER_SECRET: ${{ secrets.NOVUS_CAMPAIGN_POLLER_SECRET }}
+          NOVUS_REPLY_POLLER_SECRET: ${{ secrets.NOVUS_REPLY_POLLER_SECRET }}
         run: |
           set -euo pipefail
           if [ -z "${NOVUS_BASE_URL:-}" ] || [ -z "${NOVUS_CAMPAIGN_POLLER_SECRET:-}" ]; then
@@ -56,5 +58,22 @@ jobs:
           echo
           if [ "${http_status}" -lt 200 ] || [ "${http_status}" -ge 300 ]; then
             echo "::error::campaign-sync-poll returned HTTP ${http_status}"
+            exit 1
+          fi
+          if [ -z "${NOVUS_REPLY_POLLER_SECRET:-}" ]; then
+            echo "::error::NOVUS_REPLY_POLLER_SECRET repo secret is not set."
+            exit 1
+          fi
+          reply_status=$(curl -sS -o reply-response.json -w '%{http_code}' \
+            -X POST \
+            -u "${NOVUS_BASIC_AUTH_USER}:${NOVUS_BASIC_AUTH_PASS}" \
+            -H "X-Novus-Reply-Poller-Secret: ${NOVUS_REPLY_POLLER_SECRET}" \
+            -H "Accept: application/json" \
+            "${NOVUS_BASE_URL%/}/api/novus/personalisation?novus_operation=instantly-reply-poll")
+          echo "Reply poll HTTP ${reply_status}"
+          cat reply-response.json || true
+          echo
+          if [ "${reply_status}" -lt 200 ] || [ "${reply_status}" -ge 300 ]; then
+            echo "::error::instantly-reply-poll returned HTTP ${reply_status}"
             exit 1
           fi
