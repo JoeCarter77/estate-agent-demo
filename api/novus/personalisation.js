@@ -74,7 +74,7 @@ import { buildInstantlyReplyPayload } from '../../lib/instantly-reply-send.mjs';
 // other operation on this function: a thirteenth file is not available, so the
 // calling workspace is a set of operations here, implemented in lib/.
 import {
-  handleCallingWorkspace, handleCallingAnalytics, handleCallingSetup, handleCallingStart, handleCallingSave, handleCallingDiscard, handleCallingRepair,
+  handleCallingWorkspace, handleCallingAnalytics, handleCallingSetup, handleCallingStart, handleCallingSave, handleCallingDiscard, handleCallingRepair, handleCallingActionReview,
   handleScriptSave, handleScriptDuplicate, handleScriptStatus, handleObjectionSave,
 } from '../../lib/calling-handlers.mjs';
 import {
@@ -486,7 +486,10 @@ async function handleInstantlyReplyPoll(req, res) {
     // derived classification columns on that same row. It still writes
     // nothing to Instantly and touches no OUTBOUND row itself — see
     // runAutoSendDemo for the one thing that runs after it.
-    const classify = hasAnthropicApiKey() ? req.query?.classify !== '0' : false;
+    // Deterministic call invitations, opt-outs and OOO handling must run even
+    // when the optional AI classifier is unavailable; AI failures fall back to
+    // human review on the already-persisted row.
+    const classify = req.query?.classify !== '0';
     const repo = getRepo();
     const summary = await pollInstantlyReplies({ repo, apiKey, limit, dryRun: false, classify, startingAfter });
     const autoSend = await runAutoSendDemo({ repo, apiKey, events: summary.events });
@@ -588,7 +591,7 @@ async function handleInstantlyReplyReconcile(req, res) {
   const startingAfter = String(req.body?.starting_after || '').trim();
   try {
     const repo = getRepo();
-    const classify = hasAnthropicApiKey();
+    const classify = true;
     const summary = await pollInstantlyReplies({
       repo, apiKey, limit: 100, dryRun: false, classify, minTimestampCreated, startingAfter,
     });
@@ -1924,6 +1927,7 @@ export default async function handler(req, res) {
     'calling-save': handleCallingSave,
     'calling-discard': handleCallingDiscard,
     'calling-repair': handleCallingRepair,
+    'calling-action-review': handleCallingActionReview,
     'calling-inbound-intent': handleCallingInboundIntent,
     'script-save': handleScriptSave,
     'script-duplicate': handleScriptDuplicate,

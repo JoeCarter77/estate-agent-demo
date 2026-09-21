@@ -58,6 +58,7 @@
     "novus:reply-persistence-selftest": "node scripts/novus-reply-persistence-selftest.mjs",
     "novus:reply-poller-auth-selftest": "node scripts/novus-reply-poller-auth-selftest.mjs",
     "novus:reply-classification-selftest": "node scripts/novus-reply-classification-selftest.mjs",
+    "novus:email-call-selftest": "node scripts/novus-email-call-selftest.mjs",
     "novus:send-demo-selftest": "node scripts/novus-send-demo-selftest.mjs",
     "novus:send-demo-live-selftest": "node scripts/novus-send-demo-live-selftest.mjs",
     "novus:operator-leads-selftest": "node scripts/novus-operator-leads-selftest.mjs",

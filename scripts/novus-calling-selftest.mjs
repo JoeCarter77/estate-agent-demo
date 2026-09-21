@@ -45,6 +45,14 @@ function makeStore(initial) {
 }
 
 const T0 = Date.parse('2026-09-14T10:00:00.000Z'); // a Monday
+// The fixture's callback and meeting dates are intentionally relative to T0.
+// Freeze both Date.now() and new Date() so this offline suite remains valid
+// after those fixture dates have passed on the real calendar.
+const RealDate = Date;
+globalThis.Date = class FixedDate extends RealDate {
+  constructor(...args) { super(...(args.length ? args : [T0])); }
+  static now() { return T0; }
+};
 const iso = (ms) => new Date(ms).toISOString();
 const DAY = 86_400_000;
 

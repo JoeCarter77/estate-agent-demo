@@ -429,10 +429,11 @@ section('8. Context reaches the prompt, and absence is stated explicitly');
   const sentCtx = buildContextBlock({ previous_novus_message: 'Here is the breakdown', demo_already_sent: true });
   check('demo-already-sent state is stated', sentCtx.includes('ALREADY been sent'));
 
-  // Context is passed through classifyReply to the model.
+  // A bare assent to an unambiguous phone CTA is now a call request without
+  // requiring the model; other context-dependent questions still reach it.
   const ai = fakeAi('POSITIVE_MEETING', 0.93);
-  await classifyReply(reply('yeah okay'), { aiCall: ai, context: { previous_novus_message: 'Open to a quick call tomorrow?' } });
-  check('classifyReply forwards context to the model', ai.calls[0].prompt.includes('quick call tomorrow'));
+  const call = await classifyReply(reply('yeah okay'), { aiCall: ai, context: { previous_novus_message: 'Open to a quick call tomorrow?' } });
+  check('bare assent to a call CTA becomes CALL_REQUESTED without AI', call.classification === 'CALL_REQUESTED' && ai.calls.length === 0);
 
   // Deterministic paths still bypass the model even with context present.
   const ai2 = fakeAi('POSITIVE_SEND_DEMO', 0.99);
@@ -561,9 +562,9 @@ section('12. Relational classification: the real SEND_DEMO CTA regression');
       const ai = fakeAi('POSITIVE_MEETING', 0.93);
       const context = parent ? { previous_novus_message: parent, demo_already_sent: false } : null;
       const d = await classifyReply(reply(phrase), { aiCall: ai, context });
-      check(`${label} + "${phrase}" -> not a deterministic SEND_DEMO`,
-        d.source !== 'DETERMINISTIC_CONTEXTUAL', `source=${d.source}`);
-      check(`${label} + "${phrase}" -> the model decides`, ai.calls.length === 1);
+      check(`${label} + "${phrase}" -> not SEND_DEMO`, d.classification !== 'POSITIVE_SEND_DEMO');
+      if (label === 'call CTA') check(`${label} + "${phrase}" -> deterministic call request`, d.classification === 'CALL_REQUESTED' && ai.calls.length === 0);
+      else check(`${label} + "${phrase}" -> the model decides`, ai.calls.length === 1);
     }
   }
 

@@ -368,6 +368,8 @@ const OP = (name) => `/api/novus/personalisation?novus_operation=${name}`;
 const WORKSPACE_URL     = OP('calling-workspace');
 const SETUP_URL         = OP('calling-setup');
 const SAVE_URL          = OP('calling-save');
+const REVIEW_CALL_URL   = OP('calling-action-review');
+const CONVERSATION_URL  = OP('operator-conversation');
 const START_URL         = OP('calling-start');
 const SCRIPT_SAVE_URL   = OP('script-save');
 const SCRIPT_DUP_URL    = OP('script-duplicate');
@@ -441,7 +443,12 @@ function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,(c)=>({'&':'&amp
 function dash(v){ return (v==null||v==='')?'&mdash;':esc(v); }
 function pill(text, tone, bare){ return `<span class="pill ${tone||'t-grey'}${bare?' bare':''}">${esc(text)}</span>`; }
 function when(iso){ if(!iso) return ''; const d=new Date(iso); if(Number.isNaN(d.getTime())) return String(iso);
-  return d.toLocaleString('en-GB',{ weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }); }
+  return d.toLocaleString('en-GB',{ timeZone:'Europe/London', weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }); }
+function toLondonInput(iso){
+  const d=new Date(iso); if(Number.isNaN(d.getTime())) return '';
+  const p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/London',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d).map((x)=>[x.type,x.value]));
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
 function ago(iso){ const ms=Date.now()-Date.parse(iso||''); if(!Number.isFinite(ms)) return ''; const m=Math.round(ms/60000);
   if(m<1) return 'just now'; if(m<60) return `${m} min ago`; const h=Math.round(m/60); if(h<48) return `${h}h ago`; return `${Math.round(h/24)}d ago`; }
 function outcomeLabel(v){ return OUTCOME_LABEL[v] || String(v||'').replace(/_/g,' ').toLowerCase(); }
@@ -576,18 +583,45 @@ function renderCallActions(){
 }
 function callActionHtml(a){
   const t = Date.parse(a.due_at||''); const over = Number.isFinite(t) && t < Date.now();
-  const time = Number.isFinite(t) ? new Date(t).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
+  const time = Number.isFinite(t) ? new Date(t).toLocaleTimeString('en-GB',{timeZone:'Europe/London',hour:'2-digit',minute:'2-digit'}) : '';
   return `<div class="task${NOTIFY.highlight===a.agency_id?' flash':''}" data-id="${esc(a.agency_id)}" data-action="${esc(a.action_id)}">
     <div class="task-rail ${over?(a.group==='overdue'?'over':'due'):''}"></div>
     <div class="task-main">
       <div class="task-top"><div class="task-what">${esc(a.reason||'Call back')}</div>
-        ${pill(a.kind==='RETRY'?'retry':a.kind==='CALLBACK'?'callback':'call', a.kind==='CALLBACK'?'t-amber':'t-blue', true)}
+        ${pill(a.kind==='EMAIL_REPLY'?'call requested':a.kind==='RETRY'?'retry':a.kind==='CALLBACK'?'callback':'call', a.kind==='EMAIL_REPLY'?'t-green':a.kind==='CALLBACK'?'t-amber':'t-blue', true)}
         ${a.suppressed?pill('suppressed','t-red',true):''}${a.no_phone?pill('no number','t-red',true):''}</div>
       <div class="task-who"><b>${dash(a.agency_name)}</b> &middot; ${dash(a.contact_name)}${a.contact_role?` <span class="muted">(${esc(a.contact_role)})</span>`:''} &middot; <span class="mono">${dash(a.phone)}</span></div>
-      <div class="task-why">${a.previous_outcome?`Last time: ${esc(outcomeLabel(a.previous_outcome))} &middot; `:''}${a.attempts||0} previous attempt${a.attempts===1?'':'s'}${a.note?` &middot; ${esc(a.note)}`:''}</div>
+      <div class="task-why">${a.kind==='EMAIL_REPLY'?`${a.reply_received_at?`Replied ${esc(ago(a.reply_received_at))} &middot; `:''}${a.campaign_name?`Source: ${esc(a.campaign_name)} &middot; `:''}${a.reply_text?`“${esc(a.reply_text)}”`:''}${a.timing?.language?` &middot; Timing: ${esc(a.timing.language)}`:''}${a.needs_review?` &middot; <b>Review number or timing</b>`:''}`:`${a.previous_outcome?`Last time: ${esc(outcomeLabel(a.previous_outcome))} &middot; `:''}${a.attempts||0} previous attempt${a.attempts===1?'':'s'}${a.note?` &middot; ${esc(a.note)}`:''}`}</div>
     </div>
     <div class="task-side"><div class="task-when ${over?'due':''}">${esc(a.group==='overdue'?when(a.due_at):time)}</div>
-      ${!a.suppressed&&!a.no_phone&&over?`<div class="btnrow"><button class="btn btn-secondary btn-sm call-one" data-id="${esc(a.agency_id)}" type="button">Call now</button></div>`:''}</div></div>`;
+      ${a.kind==='EMAIL_REPLY'&&a.needs_review?`<div class="btnrow"><button class="btn btn-secondary btn-sm review-call" data-action="${esc(a.action_id)}" type="button">Review details</button></div>`:''}
+      ${!a.suppressed&&!a.no_phone&&!a.needs_review&&over?`<div class="btnrow"><button class="btn btn-secondary btn-sm call-one" data-id="${esc(a.agency_id)}" data-action="${esc(a.action_id)}" type="button">Call ${esc((a.contact_name||'now').split(/\s+/)[0])}</button></div>`:''}</div></div>`;
+}
+async function reviewCallAction(actionId){
+  const a=(WS?.call_actions||[]).find((item)=>item.action_id===actionId);
+  if(!a) return;
+  let phone=''; let dueAt=''; let dueLondon=''; let contactId='';
+  if(a.contact_candidates?.length>1){
+    const choice=window.prompt(`Choose the contact:\n${a.contact_candidates.map((c,i)=>`${i+1}. ${c.contact_name||c.contact_id}`).join('\n')}\nEnter the number:`, '1');
+    if(choice===null) return;
+    const picked=a.contact_candidates[Number(choice)-1];
+    if(!picked){ window.alert('Choose one of the listed contacts.'); return; }
+    contactId=picked.contact_id;
+  }
+  if(a.phone_candidates?.length>1){
+    const choice=window.prompt(`Choose the number for ${a.contact_name||a.agency_name}:\n${a.phone_candidates.map((p)=>p.raw).join('\n')}`, a.phone_candidates[0].raw);
+    if(choice===null) return;
+    phone=choice.trim();
+  }
+  if(a.timing?.needs_review){
+    const choice=window.prompt(`The reply says: ${a.timing.language||'no clear time'}\nEnter a London callback date/time (YYYY-MM-DDTHH:MM), or "now":`, a.timing?.due_at?toLondonInput(a.timing.due_at):'now');
+    if(choice===null) return;
+    if(choice.trim().toLowerCase()==='now') dueAt=new Date().toISOString();
+    else dueLondon=choice.trim();
+    if(!dueAt&&!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dueLondon)){ window.alert('Enter a valid callback date and time.'); return; }
+  }
+  try { await post(REVIEW_CALL_URL,{confirm:'REVIEW_CALL_ACTION',action_id:actionId,phone,contact_id:contactId,due_at:dueAt,due_london:dueLondon}); await load(true); }
+  catch(err){ showErr(err.message); }
 }
 
 /* ═══ SCRIPTS VIEW ══════════════════════════════════════════════════════ */
@@ -679,10 +713,22 @@ function nextLead(){
   const q = WS?.queue||[];
   return q.find((l) => !SESSION.done.has(l.agency_id) && (SESSION.mode==='all' || l.bucket<=4)) || null;
 }
-function startSession(mode, agencyId){
+function startSession(mode, agencyId, actionId=''){
   SESSION = { mode, done:new Set(), count:0 };
-  const lead = agencyId ? (WS.queue||[]).find((l)=>l.agency_id===agencyId) || WS.leads?.[agencyId] : nextLead();
+  let lead = agencyId ? (WS.queue||[]).find((l)=>l.agency_id===agencyId) || WS.leads?.[agencyId] : nextLead();
+  const action = actionId ? (WS.call_actions||[]).find((a)=>a.action_id===actionId&&a.agency_id===agencyId) : null;
+  if(actionId&&!action){ SESSION=null; showErr('This call action is no longer available. Refresh Calling Mode.'); return; }
+  if(lead&&action){
+    const email=action.kind==='EMAIL_REPLY';
+    lead={...lead,action_id:action.action_id,phone:action.phone,phone_e164:action.phone_e164,
+      contact_name:action.contact_name,contact_role:action.contact_role,
+      context:{...lead.context,call_requested:email,call_reason:email?action.reason:'',call_reply:email?action.reply_text:'',
+        call_received_at:email?action.reply_received_at:'',call_instantly_email_id:email?action.reply_instantly_email_id:'',
+        call_outreach_id:email?action.outreach_id:'',campaign_name:email?action.campaign_name:'',
+        email_sent:email?action.email_sent:'',call_timing:email?action.timing:null,call_needs_review:email&&action.needs_review}};
+  }
   if(!lead){ SESSION=null; return; }
+  if(action ? action.needs_review : lead.context?.call_needs_review){ SESSION=null; showErr('Review the call request details before dialling.'); return; }
   openMode(); beginCall(lead);
 }
 function openMode(){ window.scrollTo(0,0); $('cm').classList.add('on'); $('cm').setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; }
@@ -702,6 +748,23 @@ function beginCall(lead){
     reach: { stage:'ASK', gatekeeper_reached:false, gatekeeper_reached_at:'', owner_reached_at:'', owner_reach_source:'' } };
   DTMF.sent = []; KEYPAD = false;
   saveDraft(); renderMode();
+  hydrateCallEmailContext(CALL);
+}
+async function hydrateCallEmailContext(call){
+  const ctx=call?.lead?.context;
+  if(!ctx?.call_requested||!ctx.call_outreach_id) return;
+  try{
+    const response=await fetch(`${CONVERSATION_URL}&outbound_id=${encodeURIComponent(ctx.call_outreach_id)}`,{credentials:'same-origin',cache:'no-store'});
+    if(!response.ok) return;
+    const data=await response.json();
+    const messages=data.conversation?.messages||[];
+    const index=messages.findIndex((m)=>m.direction==='INBOUND'&&m.instantly_email_id===ctx.call_instantly_email_id);
+    const before=index>=0?messages.slice(0,index):messages.filter((m)=>Date.parse(m.at)<Date.parse(ctx.call_received_at));
+    const sent=[...before].reverse().find((m)=>m.direction==='OUTBOUND'&&m.body_text);
+    if(!sent||CALL?.client_key!==call.client_key) return;
+    CALL.lead.context.email_sent=sent.body_text;
+    saveDraft(); renderMode();
+  }catch{ /* durable reply/action context still renders without Instantly */ }
 }
 function resumeDraft(){
   const d = readDraft(); if(!d) return;
@@ -843,10 +906,11 @@ function liveHtml(){
   return `<div class="cm-body">
     <div class="cm-main">
       ${CALL.discarded_note?`<div class="banner" style="margin-bottom:18px">${esc(CALL.discarded_note)}</div>`:''}
+      ${l.context?.call_requested?`<div class="hintbox" style="margin-bottom:18px"><b>Call requested by email</b>${l.context.campaign_name?` · ${esc(l.context.campaign_name)}`:''}${l.context.call_received_at?` · replied ${esc(ago(l.context.call_received_at))}`:''}<br>${esc(l.context.call_reason||'')}${l.context.call_timing?.language?`<br>Timing: ${esc(l.context.call_timing.language)}`:''}${l.context.call_needs_review?`<br><b>Check callback details before dialling.</b>`:''}</div>${l.context.email_sent?`<div class="cm-label">Email sent</div><div class="quote">${esc(l.context.email_sent)}</div>`:''}<div class="cm-label" style="margin-top:20px">Exact reply</div><div class="quote">${esc(l.context.call_reply||'')}</div><div class="note" style="margin-top:12px">Probe ${esc(l.context.property||'property not recorded')}${l.probe_sent_at?` · ${esc(when(l.probe_sent_at))}`:''}${l.context.probe_grade_reason?` · ${esc(l.context.probe_grade_reason)}`:''}</div>`:''}
       <div class="cm-label">Current script ${s?`<span class="mono muted">${esc(s.name)} v${s.version}</span>`:''}${switcher}</div>
       <div class="script">${s?scriptHtml(s.content, l):'<span class="muted">No script. Add one in Scripts.</span>'}</div>
       ${l.calls&&l.calls.length?`<div class="cm-label" style="margin-top:34px">Previous calls</div><ul class="cm-list">${l.calls.map((c)=>`<li><b>${esc(when(c.at))}</b><span>${esc(outcomeLabel(c.outcome))}${c.pitched?' · pitched':''}${c.callback_at?` · callback ${esc(when(c.callback_at))}`:''}${c.note?` — ${esc(c.note)}`:''}${c.recording?` · <a href="${RECORDING_URL}&call_id=${encodeURIComponent(c.call_id)}" target="_blank" rel="noopener" style="color:var(--blue)">recording</a>`:''}</span></li>`).join('')}</ul>`:''}
-      ${l.context?.reply_text?`<div class="cm-label" style="margin-top:34px">Latest email reply</div><div class="quote">${esc(l.context.reply_text)}</div>`:''}
+      ${l.context?.reply_text&&!l.context?.call_requested?`<div class="cm-label" style="margin-top:34px">Latest email reply</div><div class="quote">${esc(l.context.reply_text)}</div>`:''}
       ${l.context?.probe_grade_reason?`<div class="cm-label" style="margin-top:24px">Probe finding</div><div class="note">${esc(l.context.probe_grade_reason)}</div>`:''}
     </div>
     <div class="cm-side">
@@ -1296,7 +1360,7 @@ function toastClickPlan(action, { callingModeOpen }){
 }
 function toastHtml(a){
   const t = Date.parse(a.due_at||''); const over = Number.isFinite(t) && Date.now()-t > 60_000;
-  const time = Number.isFinite(t) ? new Date(t).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
+  const time = Number.isFinite(t) ? new Date(t).toLocaleTimeString('en-GB',{timeZone:'Europe/London',hour:'2-digit',minute:'2-digit'}) : '';
   const who = [a.contact_name, a.contact_role?`(${a.contact_role})`:''].filter(Boolean).join(' ');
   return `<div class="toast${CALL?' subtle':''}" data-toast="${esc(a.action_id)}" role="status">
     <button class="toast-body" type="button" data-toast-open="${esc(a.action_id)}">
@@ -1685,7 +1749,8 @@ document.addEventListener('click', async (e) => {
   if(t.id==='repair-btn'){ t.disabled = true; try{ const out = await post(REPAIR_URL, { confirm:'REPAIR_CALL_FOLLOWUPS' }); if(out.still_pending) showErr(`${out.still_pending} call(s) could still not be repaired — check the ACTIONS tab header.`); await load(true); }catch(err){ showErr(`Repair failed: ${err.message}`); t.disabled=false; } return; }
   if(t.id==='resume-btn'){ resumeDraft(); return; }
   if(t.id==='discard-btn'){ localStorage.removeItem(DRAFT_KEY); renderResume(); return; }
-  const callOne = t.closest('.call-one'); if(callOne){ startSession('all', callOne.dataset.id); return; }
+  const callOne = t.closest('.call-one'); if(callOne){ startSession('all', callOne.dataset.id, callOne.dataset.action||''); return; }
+  const reviewCall = t.closest('.review-call'); if(reviewCall){ reviewCallAction(reviewCall.dataset.action); return; }
 
   /* Scripts page */
   const scr = t.closest('.scr'); if(scr && !t.closest('button')){ SCR_NEW=false; SCR_SEL = scr.dataset.script; renderScripts(); return; }
