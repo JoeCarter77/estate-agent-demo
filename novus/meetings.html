@@ -192,6 +192,16 @@
     .two ul{margin:0;padding-left:16px;font-size:12.5px;line-height:1.6;color:var(--ink-2);}
     .two .k{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);margin-bottom:6px;}
     .scope-ck{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;padding:4px 0;}
+    .client{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--hair);}
+    .client-k{font-size:9.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--blue);}
+    .client-t{font-family:var(--serif);font-size:22px;letter-spacing:-.018em;} .client-s{font-size:12.5px;color:var(--ink-4);}
+    .client-ul{margin:8px 0 0;padding-left:18px;font-size:14px;line-height:1.55;color:var(--ink-2);}
+    .sol{border:1px solid var(--hair);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:10px;background:rgba(var(--ink-rgb),.02);}
+    .sol-n{font-family:var(--serif);font-size:14px;color:var(--blue);} .sol-h{font-family:var(--serif);font-size:20px;letter-spacing:-.015em;margin-top:2px;} .sol-s{font-size:14.5px;line-height:1.55;color:var(--ink-2);margin-top:6px;}
+    .fold{margin-top:10px;border-top:1px solid var(--hair-soft);padding-top:6px;} .fold summary{cursor:pointer;font-size:11.5px;font-weight:600;letter-spacing:.04em;color:var(--ink-3);} .fold summary:hover{color:var(--ink);} .fold-b{padding:8px 0 4px;}
+    .fold ul{margin:0;padding-left:16px;font-size:12.5px;line-height:1.6;color:var(--ink-2);} .fold .k{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);margin-bottom:4px;}
+    .qa{padding:8px 0;border-bottom:1px solid var(--hair-soft);} .qa .q{font-weight:600;font-size:13px;} .qa .a{font-size:12.5px;line-height:1.6;color:var(--ink-2);margin-top:3px;}
+    .impl{border:1px solid var(--hair);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;} .impl-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;font-weight:600;margin-bottom:4px;}
 
     /* ── presentation mode ─────────────────────────────────────────────── */
     #present{position:fixed;inset:0;z-index:1000;background:#05070D;display:none;align-items:center;justify-content:center;color:#F1EDE6;font-family:var(--sans);}
@@ -460,7 +470,7 @@ let SAVE = { timer:null, dirty:false, inflight:false, failed:false, retry:null }
 let PITCH_VIEW = 0;      // index into S.pitches (0 = latest)
 let GEN = false;
 /* The meeting conclusion (stage 5): current step, open correction form, save state. */
-let CSTEP = 'understanding';
+let CSTEP = 'today';
 let CORR = '';           // finding id whose correction form is open
 let CSAVE = { inflight:false };
 /* Presentation mode. `only` = this window IS the presentation (#present?id=…). */
@@ -567,7 +577,7 @@ async function openSession(sessionId, stage){
     S = await get(`${OP('discovery-session')}&session_id=${encodeURIComponent(sessionId)}`);
     STAGE = stageKey(stage || S.session.stage || 'commercial');
     if(S.session.status === 'COMPLETED' && !stage) STAGE = 'outcome';
-    CSTEP = 'understanding'; CORR = '';
+    CSTEP = 'today'; CORR = '';
     CUR = '';
     PITCH_VIEW = 0;
     if(S.registry_drift?.questions || S.registry_drift?.rules) notice(`<b>This session was answered against an older question/rule set</b> (questions v${esc(S.session.questions_version)}, rules v${esc(S.session.rules_version)}; current v${esc(S.registry.questions_version)}/v${esc(S.registry.rules_version)}). Stored labels are shown from the session's snapshot where they differ.`, 'warn');
@@ -1075,9 +1085,9 @@ function renderConclusion(el){
   const c = C();
   if(!c){ el.innerHTML = `<div class="panel">${emptyState('No conclusion yet', 'Answer the discovery questions first — the conclusion is built from them.')}</div>`; return; }
   const steps = CSTEPS(); const i = Math.max(0, steps.findIndex((x) => x.id === CSTEP));
-  const doneStep = (id) => id === 'understanding' ? c.understanding.agreed : false;
+  const doneStep = (id) => id === 'established' ? c.understanding.agreed : false;
   const modeNote = c.mode === 'PILOT' ? '' : `<div class="suit ${SUIT_CLASS[c.suitability.verdict]}"><div class="v">${esc(SUIT_LABEL[c.suitability.verdict])} — ${c.mode === 'VALIDATION' ? 'not proposing the pilot today' : 'not proposing a pilot'}</div><div class="r">${esc(c.suitability.recommendation)}</div></div>`;
-  const body = { understanding: cStepUnderstanding, opportunity: cStepOpportunity, changes: cStepChanges, deployment: cStepDeployment, pilot: cStepPilot }[CSTEP] || cStepUnderstanding;
+  const body = { today: cStepToday, established: cStepEstablished, opportunity: cStepOpportunity, help: cStepHelp, needs: cStepNeeds, deployment: cStepDeployment, pilot: cStepPilot }[CSTEP] || cStepToday;
   const prev = steps[i-1]; const next = steps[i+1];
   el.innerHTML = `
     <div class="c-head">
@@ -1093,24 +1103,44 @@ function renderConclusion(el){
       ${prev ? `<button class="btn btn-secondary" data-cstep="${esc(prev.id)}" type="button">&larr; ${esc(prev.title)}</button>` : `<button class="btn btn-secondary" data-go-stage="diagnosis" type="button">&larr; Diagnosis</button>`}
       ${next ? `<button class="btn btn-primary" data-cstep="${esc(next.id)}" type="button">${esc(next.title)} &rarr;</button>` : `<button class="btn btn-primary" data-go-stage="outcome" type="button">Record the decision &rarr;</button>`}
     </div>
-    <details class="panel" style="padding:0;margin-top:14px"><summary style="padding:14px 24px;cursor:pointer;font-size:13px;color:var(--ink-3)">Spoken pitch archive — ${S.pitches.length} version${S.pitches.length === 1 ? '' : 's'} <span class="mini">(previous approach; kept, optional)</span></summary><div id="pitch-archive" style="padding:0 24px 14px"></div></details>`;
+    <details class="panel" style="padding:0;margin-top:14px"><summary style="padding:14px 24px;cursor:pointer;font-size:13px;color:var(--ink-3)">Full diagnosis / technical reference — findings, evidence, overrides, interventions, economics, deployment rules</summary><div id="c-diag" style="padding:0 24px 12px"></div></details>
+    <details class="panel" style="padding:0;margin-top:8px"><summary style="padding:14px 24px;cursor:pointer;font-size:13px;color:var(--ink-3)">Spoken pitch archive — ${S.pitches.length} version${S.pitches.length === 1 ? '' : 's'} <span class="mini">(previous approach; kept, optional)</span></summary><div id="pitch-archive" style="padding:0 24px 14px"></div></details>`;
+  renderDiagnosis($('c-diag'), { embedded:true });
   renderPitch($('pitch-archive'));
 }
 
-/* 1. Confirm understanding */
-function cStepUnderstanding(c){
-  const u = c.understanding; const s = u.situation;
-  const fact = (l, e, hint) => `<div class="f"><div class="l">${esc(l)}</div><div class="v${e.known ? '' : ' unk'}">${e.known ? esc(e.display) : 'not established'}</div>${e.known && e.source ? `<div class="mini">${esc(e.source.replace(/_/g,' '))}</div>` : (hint ? `<div class="mini">${hint}</div>` : '')}</div>`;
+/* Each internal step mirrors one client screen: the SAME server-built
+   presentation payload for the client-facing wording (so the two views cannot
+   drift), plus the private guidance underneath in expandable sections. */
+const SCREEN = (id) => (S.presentation?.screens || []).find((x) => x.id === id) || {};
+const fold = (title, inner, open) => `<details class="fold"${open ? ' open' : ''}><summary>${esc(title)}</summary><div class="fold-b">${inner}</div></details>`;
+const ul = (items) => items.length ? `<ul>${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<div class="muted mini">—</div>';
+const qa = (items) => items.map((x) => `<div class="qa"><div class="q">${esc(x.q)}</div><div class="a">${esc(x.a)}</div></div>`).join('');
+const clientHead = (sc) => `<div class="client"><div class="client-k">Client screen</div><div class="client-t">${esc(sc.title||'')}</div>${sc.subtitle ? `<div class="client-s">${esc(sc.subtitle)}</div>` : ''}</div>`;
+
+/* 1. Your agency today */
+function cStepToday(c){
+  const sc = SCREEN('today'); const s = c.understanding.situation;
   const revisit = (q) => `<button class="btn btn-quiet btn-sm" data-go-stage="${esc(QBY(q)?.section === 'value' ? 'intelligence' : 'commercial')}" data-q="${esc(q)}" type="button">ask</button>`;
+  const fact = (l, e, q) => `<div class="f"><div class="l">${esc(l)}</div><div class="v${e.known ? '' : ' unk'}">${e.known ? esc(e.display) : 'not established'}</div>${e.known && e.source ? `<div class="mini">${esc(e.source.replace(/_/g,' '))}</div>` : (q ? `<div class="mini">${revisit(q)}</div>` : '')}</div>`;
+  return `<div class="panel">${clientHead(sc)}
+    <div class="say">${esc(c.understanding.opening)}</div>
+    <div class="facts">${(sc.facts||[]).map((f) => `<div class="f"><div class="l">${esc(f.label)}</div><div class="v">${esc(f.value)}</div></div>`).join('')}</div>
+    ${sc.objective ? `<div class="kv" style="margin-bottom:6px"><div class="k">Objective</div><div>${esc(sc.objective)}${(sc.obstacles||[]).length ? ` · in the way: ${esc(sc.obstacles.join(', '))}` : ''}</div></div>` : ''}
+    ${fold('Private — figures, sources and gaps', `<div class="facts">${fact('Average fee', s.fee_per_instruction, 'C10')}${fact('Conversion', s.conversion_pct, 'C11')}${fact('Enquiries', s.enquiries_per_month, 'C4')}${fact('Database', s.database_size, 'C5')}${fact('Valuations', s.valuations_per_month, 'C8')}${fact('Instructions', s.instructions_per_month, 'C9')}</div>${s.missing.length ? `<div class="mini">Not on the client screen because not established: ${esc(s.missing.map((k) => k.replace(/_/g,' ')).join(', '))}.</div>` : ''}${c.understanding.unknown.length ? `<div class="mini">Dimensions not established: ${esc(c.understanding.unknown.join(', '))}</div>` : ''}`)}
+  </div>`;
+}
+
+/* 2. What we've established — the client cards + agreement controls */
+function cStepEstablished(c){
+  const sc = SCREEN('established'); const u = c.understanding;
   const findingHtml = (f) => {
-    const a = f.agreement; const st = a?.status || '';
-    const open = CORR === f.id;
+    const a = f.agreement; const st = a?.status || ''; const open = CORR === f.id;
+    const card = (sc.findings||[]).find((x) => x.title === f.title) || null;
     return `<div class="fnd ${st.toLowerCase()}">
-      <div class="ft">${esc(f.title)} ${pill(f.evidence === 'CONFIRMED' ? 'established' : 'provisional — hedge it', f.evidence === 'CONFIRMED' ? 't-blue' : 't-amber', true)}${st ? pill(AGREE_LABEL[st], AGREE_TONE[st]) : ''}${st && st !== 'REJECTED' ? pill(f.present ? 'presented' : 'not presented', f.present ? 't-green' : 't-grey', true) : ''}</div>
-      <div class="fs">${esc(f.statement_polished || f.statement)}</div>
-      ${f.statement_polished ? `<div class="mini" style="margin-top:4px">Polished wording · original: “${esc(f.statement)}”</div>` : ''}
-      ${f.owner_words.map((w) => `<div class="fw">“${esc(w)}”</div>`).join('')}
-      ${a?.note ? `<div class="fw" style="color:var(--amber)">Owner: “${esc(a.note)}”${a.dropped?.length ? ` · not a problem: ${esc(a.dropped.map((d) => f.dimensions.find((x) => x.dimension === d)?.label || d).join(', '))}` : ''}</div>` : ''}
+      <div class="ft">${esc(f.title)} ${pill(f.evidence === 'CONFIRMED' ? 'established' : 'provisional — hedge it', f.evidence === 'CONFIRMED' ? 't-blue' : 't-amber', true)}${st ? pill(AGREE_LABEL[st], AGREE_TONE[st]) : ''}${st && st !== 'REJECTED' ? pill(f.present ? 'on the client screen' : 'not presented', f.present ? 't-green' : 't-grey', true) : ''}</div>
+      ${card ? `<ul class="client-ul">${card.points.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${card.corrected ? `<div class="fw">“${esc(card.corrected)}”</div>` : ''}` : `<div class="mini">Not on the client screen.</div>`}
+      ${fold('Private — what to say, in their words', `<div class="fs">${esc(f.statement_polished || f.statement)}</div>${f.statement_polished ? `<div class="mini">Plain original: “${esc(f.statement)}”</div>` : ''}${f.owner_words.map((w) => `<div class="fw">“${esc(w)}”</div>`).join('')}${a?.note ? `<div class="fw" style="color:var(--amber)">Owner: “${esc(a.note)}”${a.dropped?.length ? ` · not a problem: ${esc(a.dropped.map((d) => f.dimensions.find((x) => x.dimension === d)?.label || d).join(', '))}` : ''}</div>` : ''}<div class="mini">${esc(f.dimensions.map((x) => `${x.dimension} ${x.label} · ${x.level} · ${EVID_LABEL[x.evidence_status]}`).join(' — '))}</div>`)}
       <div class="fa">
         <button class="btn btn-secondary btn-sm${st === 'AGREED' ? ' on' : ''}" data-agree="${esc(f.id)}" type="button">Agree</button>
         <button class="btn btn-secondary btn-sm${st === 'CORRECTED' ? ' on cor' : ''}" data-correct="${esc(f.id)}" type="button">Correct…</button>
@@ -1123,100 +1153,103 @@ function cStepUnderstanding(c){
         <div class="btnrow" style="margin-top:8px"><button class="btn btn-primary btn-sm" data-corr-save="${esc(f.id)}" type="button">Save correction</button><button class="btn btn-quiet btn-sm" data-corr-cancel type="button">Cancel</button></div></div>` : ''}
     </div>`;
   };
-  return `<div class="panel">
-    <div class="say">${esc(u.opening)}</div>
-    <div class="facts">
-      ${fact('Branches', s.branches)}${fact('CRM', s.crm)}${fact('Enquiries', s.enquiries_per_month, revisit('C4'))}${fact('Database', s.database_size, revisit('C5'))}
-      ${fact('Valuations', s.valuations_per_month, revisit('C8'))}${fact('Instructions', s.instructions_per_month, revisit('C9'))}${fact('Average fee', s.fee_per_instruction, revisit('C10'))}${fact('Conversion', s.conversion_pct, revisit('C11'))}
-    </div>
-    <div class="kv" style="margin-bottom:14px"><div class="k">Objective</div><div>${dash(s.objective.priority_label)}${s.objective.obstacles.length ? ` · in the way: ${esc(s.objective.obstacles.join(', ').toLowerCase())}` : ''}</div></div>
-    <div class="panel-t" style="font-size:15px">${u.findings.length === 0 ? 'No problem established' : u.findings.length === 1 ? 'The problem that matters' : `The ${u.findings.length} problems that matter`} <span class="mini">grouped, ranked by evidence and their priority — not every dimension</span></div>
-    ${u.findings.length ? u.findings.map(findingHtml).join('') : `<div class="note">No weak or partial dimension with a cause and consequence yet — nothing to reflect back. ${c.mode !== 'PILOT' ? 'Say so plainly.' : ''}</div>`}
+  return `<div class="panel">${clientHead(sc)}
+    ${u.findings.length ? u.findings.map(findingHtml).join('') : `<div class="note">No weak or partial dimension with a cause and consequence yet — nothing to reflect back.${c.mode !== 'PILOT' ? ' Say so plainly.' : ''}</div>`}
     ${u.outside_scope.length ? `<div class="note">Also heard, but not something NOVUS fixes: ${esc(u.outside_scope.map((x) => `${x.label} — ${x.note}`).join(' '))}</div>` : ''}
-    ${u.unknown.length ? `<div class="mini" style="margin-top:8px">Not established: ${esc(u.unknown.join(', '))}</div>` : ''}
     <div class="say q" style="margin-top:14px">${esc(u.closing)}</div>
     <div class="btnrow" style="margin:0">
       ${u.findings.length && !u.agreed ? `<button class="btn btn-secondary btn-sm" data-agree-all type="button">They agreed with all of it</button>` : ''}
-      <button class="btn btn-quiet btn-sm" data-polish type="button" title="Optional: the model rewords these sentences only; validated, never changes findings, scope or price">${c.polish ? `Polished ${c.polish.applied}${c.polish.stale ? ` (${c.polish.stale} stale)` : ''} · re-polish` : 'Polish wording (optional, AI)'}</button>
+      <button class="btn btn-quiet btn-sm" data-polish type="button" title="Optional: the model rewords the private statements only; validated, never changes findings, scope or price">${c.polish ? `Polished ${c.polish.applied}${c.polish.stale ? ` (${c.polish.stale} stale)` : ''} · re-polish` : 'Polish wording (optional, AI)'}</button>
       ${c.polish ? `<button class="btn btn-quiet btn-sm" data-unpolish type="button">Use plain wording</button>` : ''}
     </div>
     ${c.polish?.issues?.length ? `<div class="mini" style="margin-top:6px">Rejected polish: ${esc(c.polish.issues.join('; '))}</div>` : ''}
   </div>`;
 }
 
-/* 2. Commercial opportunity */
+/* 3. The commercial opportunity */
 function cStepOpportunity(c){
-  const o = c.opportunity;
-  if(!o.available) return `<div class="panel"><div class="panel-t">Commercial opportunity</div><div class="note">Their economics aren't established: ${esc(o.missing.join(', '))}. Ask for the figures, or present without a number.</div>
+  const sc = SCREEN('opportunity'); const o = c.opportunity;
+  if(!o.available) return `<div class="panel">${clientHead(sc)}<div class="note">Their economics aren't established: ${esc(o.missing.join(', '))}. Ask for the figures, or present without a number.</div>
     <div class="btnrow"><button class="btn btn-secondary btn-sm" data-go-stage="intelligence" data-q="C10" type="button">Ask the average fee</button><button class="btn btn-secondary btn-sm" data-go-stage="intelligence" data-q="C8" type="button">Ask valuations / instructions</button></div></div>`;
-  const sel = o.selected;
-  return `<div class="panel">
-    <div class="panel-t">Commercial opportunity <span class="mini">their actual economics</span></div>
+  const row = (sc.rows||[]).find((r) => r.n === sc.selected) || {};
+  return `<div class="panel">${clientHead(sc)}
     <div class="facts" style="grid-template-columns:repeat(3,1fr)">
-      <div class="f"><div class="l">Average fee</div><div class="v">${gbp(o.fee_per_instruction.value)}</div><div class="mini">${esc(o.fee_per_instruction.source.replace(/_/g,' '))}</div></div>
-      <div class="f"><div class="l">Valuation → instruction</div><div class="v">${esc(o.conversion_pct.value)}%</div><div class="mini">${esc(o.conversion_pct.detail || o.conversion_pct.source)}</div></div>
-      <div class="f"><div class="l">Expected gross fee income per additional valuation</div><div class="v">${gbp(o.expected_fee_income_per_valuation_gbp)}</div><div class="mini">${gbp(o.fee_per_instruction.value)} × ${esc(o.conversion_pct.value)}%</div></div>
+      <div class="f"><div class="l">Your average fee</div><div class="v">${esc(sc.fee)}</div></div>
+      <div class="f"><div class="l">Valuation to instruction</div><div class="v">${esc(sc.conversion)}</div></div>
+      <div class="f"><div class="l">Per additional valuation</div><div class="v">${esc(sc.per_valuation)}</div></div>
     </div>
-    <div class="say">If we found you <b>${sel.additional_valuations_per_month}</b> additional valuation${sel.additional_valuations_per_month === 1 ? '' : 's'} a month, at your fee and your conversion, that's about <b>${gbp(sel.monthly_gbp)}</b> a month — <b>${gbp(sel.annual_gbp)}</b> a year if sustained. As an illustration, not a forecast.</div>
-    <div class="calc"><span class="mini">Additional valuations a month:</span>${o.rows.map((r) => `<button class="btn btn-secondary btn-sm${r.additional_valuations_per_month === o.selected_additional_valuations ? ' on' : ''}" data-calc="${r.additional_valuations_per_month}" type="button">${r.additional_valuations_per_month}</button>`).join('')}</div>
-    <div class="big2"><div class="b"><div class="l">Per month · illustration</div><div class="v">${gbp(sel.monthly_gbp)}</div></div><div class="b"><div class="l">Per year if sustained · illustration</div><div class="v">${gbp(sel.annual_gbp)}</div></div></div>
-    <div class="tablewrap" style="margin-top:12px"><table class="itab"><thead><tr><th>Additional valuations / mo</th><th>Instructions / mo</th><th>Gross fee income / mo</th><th>12 months</th></tr></thead><tbody>${o.rows.map((r) => `<tr${r.additional_valuations_per_month === o.selected_additional_valuations ? ' style="background:var(--blue-tint)"' : ''}><td>+${r.additional_valuations_per_month}</td><td>${r.additional_instructions_per_month}</td><td>${gbp(r.monthly_gbp)}</td><td>${gbp(r.annual_gbp)}</td></tr>`).join('')}</tbody></table></div>
-    <div class="note">${esc(o.disclaimer)}</div>
+    <div class="calc"><span class="mini">Additional valuations a month:</span>${(sc.rows||[]).map((r) => `<button class="btn btn-secondary btn-sm${r.n === sc.selected ? ' on' : ''}" data-calc="${r.n}" type="button">${r.n}</button>`).join('')}</div>
+    <div class="big2"><div class="b"><div class="l">A month</div><div class="v">${esc(row.monthly||'')}</div></div><div class="b"><div class="l">A year, if sustained</div><div class="v">${esc(row.annual||'')}</div></div></div>
+    <div class="mini" style="margin-top:8px">${esc(sc.label)}. ${esc(sc.footnote||'')}</div>
+    ${fold('Private — how to say it, sources, the full table', `<div class="say">If we found you <b>${sc.selected}</b> additional valuation${sc.selected === 1 ? '' : 's'} a month, at your fee and your conversion, that's about <b>${esc(row.monthly||'')}</b> a month — <b>${esc(row.annual||'')}</b> a year if sustained. As an illustration, not a forecast.</div>
+      <div class="mini">${esc(o.formula)}. Fee: ${esc(o.fee_per_instruction.source.replace(/_/g,' '))}; conversion: ${esc(o.conversion_pct.detail || o.conversion_pct.source)}.</div>
+      <div class="tablewrap" style="margin-top:8px"><table class="itab"><thead><tr><th>Additional valuations / mo</th><th>Instructions / mo</th><th>Gross fee income / mo</th><th>12 months</th></tr></thead><tbody>${o.rows.map((r) => `<tr><td>+${r.additional_valuations_per_month}</td><td>${r.additional_instructions_per_month}</td><td>${gbp(r.monthly_gbp)}</td><td>${gbp(r.annual_gbp)}</td></tr>`).join('')}</tbody></table></div>
+      <div class="note">${esc(o.disclaimer)}</div>`)}
   </div>`;
 }
 
-/* 3. What NOVUS would change */
-function cStepChanges(c){
-  const ch = c.changes;
-  const group = (g) => `<div class="chg">
-    <div class="ct">${esc(g.title)} ${pill(g.status === 'FEASIBLE' ? 'feasible' : g.status === 'PARTLY_SUBJECT_TO_ASSESSMENT' ? 'partly subject to assessment' : 'subject to assessment', g.status === 'FEASIBLE' ? 't-green' : 't-amber', true)} <span class="mono mini">${esc(g.rules.map((r) => r.rule_id).join(' '))}</span></div>
-    <div class="row"><div class="k">The problem</div><div>${esc(g.problem)}${g.owner_note ? ` <span class="muted">(owner: “${esc(g.owner_note)}”)</span>` : ''}</div>
-      <div class="k">Proposed change</div><div>${esc(g.change_polished || g.change)}<div class="mini" style="margin-top:4px">${g.rules.map((r) => `<div><b class="mono">${esc(r.rule_id)}</b> ${esc(r.change)} ${pill(r.delivery_status_label, DS_TONE[r.delivery_status], true)}${r.added_for_dependency ? pill('needed by the intelligence work', 't-blue', true) : ''}</div>`).join('')}</div></div>
-      <div class="k">Commercial effect</div><div>${esc(g.effect)}${g.measured_by.length ? `<div class="mini">Measured by: ${esc(g.measured_by.join(' · '))}</div>` : ''}</div>
-      <div class="k">Preserved</div><div>${g.preserve.length ? esc(g.preserve.join(', ')) + ' — reused, not rebuilt' : '<span class="muted">nothing in this area to preserve</span>'}</div>
-      <div class="k">Has to be true</div><div>${g.conditions.length ? g.conditions.map((x) => `<div class="${x.kind === 'blocked' ? 'blocked' : x.kind === 'delivery' ? '' : 'cond'}">${esc(x.text)}</div>`).join('') : 'Nothing outstanding'}</div>
-    </div>
-  </div>`;
-  return `<div class="panel">
-    <div class="panel-t">What NOVUS would change <span class="mini">from the agreed findings and the deployment rules — recomputed when a finding is corrected</span></div>
-    ${ch.groups.length ? ch.groups.map(group).join('') : `<div class="note">${c.mode === 'PILOT' ? 'No intervention selected.' : esc(c.next_step)}</div>`}
-    ${ch.other_groups.length ? `<details><summary class="mini" style="cursor:pointer">Also in the plan (not led with): ${esc(ch.other_groups.map((g) => g.title).join('; '))}</summary>${ch.other_groups.map(group).join('')}</details>` : ''}
-    ${ch.foundations_note ? `<div class="note">${esc(ch.foundations_note)}${ch.preserved.length ? ` Preserved: ${esc(ch.preserved.map((p) => p.label + (p.verified === false ? ' (checked early)' : '')).join(', '))}.` : ''}</div>` : ''}
-    ${c.mode !== 'PILOT' && ch.groups.length ? `<div class="note">${esc(c.next_step)}</div>` : ''}
-  </div>`;
-}
-
-/* 4. Personalised deployment */
-function cStepDeployment(c){
-  const d = c.deployment;
-  const li = (items) => items.length ? `<ul>${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
-  return `<div class="panel">
-    <div class="panel-t">Your 60-day deployment <span class="mini">${d.rules.length ? `built from ${esc(d.rules.join(', '))}` : 'no interventions selected'}${d.first_workflow ? ` · first workflow ${esc(d.first_workflow)}` : ''}</span></div>
-    ${c.mode !== 'PILOT' ? `<div class="note">${esc(c.next_step)}</div>` : ''}
-    ${d.phases.map((p) => `<div class="dep"><div class="dh"><span class="w">${esc(p.title)}</span><span class="t">${esc(p.heading)}</span></div>
-      ${p.summary ? `<div class="ds">${esc(p.summary)}</div>` : ''}
-      <details><summary>Implementation detail — NOVUS does ${p.novus_does.length}, the agency does ${p.agency_does.length}</summary>
-        <div class="two" style="margin-top:8px"><div><div class="k">NOVUS does</div>${li(p.novus_does) || '<div class="muted mini">—</div>'}</div><div><div class="k">The agency does</div>${li(p.agency_does) || '<div class="muted mini">—</div>'}</div><div><div class="k">The owner sees</div>${li(p.owner_sees) || '<div class="muted mini">—</div>'}</div><div><div class="k">Measured</div>${li(p.measures) || '<div class="muted mini">—</div>'}</div></div>
-      </details></div>`).join('')}
-    ${d.required_access.length ? `<div class="mini" style="margin-top:6px">Needs from the agency: ${esc(d.required_access.join(' · '))}</div>` : ''}
-    <div class="note">${esc(d.caveat)}</div>
-  </div>`;
-}
-
-/* 5. Founding pilot */
-function cStepPilot(c){
-  const p = c.pilot; const d = S.diagnosis;
-  const scope = new Set(p.scope_rule_ids);
-  return `<div class="panel">
-    <div class="price"><span class="p">${gbp(p.price_gbp)}</span><span class="d">all-in · ${p.duration_days} days · setup target ~${p.setup_target_days} days</span>${p.proposed ? pill('propose it', 't-green') : pill('not today', 't-grey')}</div>
-    ${p.proposed ? `<div class="say">${esc(p.pricing_script)}</div>` : `<div class="say">${esc(c.next_step)}</div>`}
+/* 4. How NOVUS would help — the client cards, with the private answers underneath */
+function implHtml(r){
+  return `<div class="impl"><div class="impl-h"><b class="mono">${esc(r.rule_id)}</b> ${esc(r.title)} ${pill(r.delivery_status_label, DS_TONE[r.delivery_status], true)} ${pill(FEAS_LABEL[r.feasibility], FEAS_TONE[r.feasibility], true)}</div>
+    <div class="mini" style="margin-bottom:6px">${esc(r.delivery_status_note)}</div>
     <div class="two">
-      <div><div class="k">Agreed scope <span class="muted" style="text-transform:none;letter-spacing:0">tick what's in</span></div>
-        ${d.interventions.filter((i) => i.selected).map((i) => `<label class="scope-ck"><input type="checkbox" data-cscope="${esc(i.rule_id)}" ${scope.has(i.rule_id) ? 'checked' : ''} /> <span><b class="mono">${esc(i.rule_id)}</b> ${esc(i.title)} ${pill(FEAS_LABEL[i.feasibility], FEAS_TONE[i.feasibility], true)}</span></label>`).join('') || '<div class="muted mini">No interventions selected.</div>'}
-        <div class="k" style="margin-top:12px">Included</div><ul>${p.includes.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
-      <div><div class="k">Success criteria</div><ul>${p.success_criteria.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
-        <div class="k" style="margin-top:12px">End of pilot</div><ul><li>${esc(p.review)}</li><li>${esc(p.commitment)} ${esc(p.continuation)}</li><li>${esc(p.extension)}</li><li>${esc(p.never.join(' '))}</li></ul></div>
+      <div><div class="k">What gets configured or changed</div>${ul(r.configure)}</div>
+      <div><div class="k">Systems and data required</div>${ul(r.systems_data)}<div class="k" style="margin-top:8px">Access and permissions</div>${ul(r.access)}</div>
+      <div><div class="k">NOVUS is responsible for</div>${ul(r.novus)}</div>
+      <div><div class="k">The agency is responsible for</div>${ul(r.agency)}</div>
+      <div style="grid-column:1 / -1"><div class="k">What changes for the team</div><div style="font-size:12.5px;line-height:1.55;color:var(--ink-2)">${esc(r.team_change)}</div></div>
+      <div><div class="k">Dependencies and validation</div>${ul([...r.dependencies, ...r.validation.map((x) => `Validate: ${x}`)])}</div>
+      <div><div class="k">If the preferred route is unavailable</div><div style="font-size:12.5px;line-height:1.55;color:var(--ink-2)">${esc(r.fallback)}</div><div class="k" style="margin-top:8px">Scope limitations</div>${ul(r.limits)}</div>
+    </div></div>`;
+}
+function cStepHelp(c){
+  const sc = SCREEN('help'); const gd = c.guidance?.help || {};
+  const card = (g, k) => { const pg = gd[g.id] || { talking_points:[], implementation:[], questions:[] }; return `<div class="sol">
+      <div class="sol-n">0${k+1}</div><div class="sol-h">${esc(g.heading)}</div><div class="sol-s">${esc(g.sentence)}</div>
+      ${fold('Your talking points', ul(pg.talking_points))}
+      ${fold('Implementation details', pg.implementation.map(implHtml).join(''))}
+      ${fold('Questions & objections', qa(pg.questions))}
+    </div>`; };
+  return `<div class="panel">${clientHead(sc)}
+    ${(sc.cards||[]).length ? sc.cards.map(card).join('') : `<div class="say">${esc(sc.next_step||c.next_step)}</div>`}
+    ${(sc.preserved||[]).length && (sc.cards||[]).length ? `<div class="note">What already works stays as it is: ${esc(sc.preserved.join(', ').toLowerCase())}.</div>` : ''}
+    ${c.changes.other_groups.length ? `<div class="mini">Also in the plan, not led with: ${esc(c.changes.other_groups.map((g) => `${g.title} (${g.rules.map((r) => r.rule_id).join(', ')})`).join('; '))}</div>` : ''}
+  </div>`;
+}
+
+/* 5. What we'd need from you */
+function cStepNeeds(c){
+  const sc = SCREEN('needs'); const n = c.guidance?.needs || { access:[], setup:[], act:[] };
+  return `<div class="panel">${clientHead(sc)}
+    ${(sc.cards||[]).map((g, k) => `<div class="sol"><div class="sol-n">0${k+1}</div><div class="sol-h">${esc(g.heading)}</div><div class="sol-s">${esc(g.sentence)}</div>${fold('Private — precisely what we need from this agency', ul(n[g.id] || []))}</div>`).join('')}
+  </div>`;
+}
+
+/* 6. Your first 60 days */
+function cStepDeployment(c){
+  const sc = SCREEN('deployment'); const d = c.deployment;
+  return `<div class="panel">${clientHead(sc)}
+    ${c.mode !== 'PILOT' ? `<div class="say">${esc(c.next_step)}</div>` : ''}
+    ${(sc.phases||[]).map((p, i) => { const full = d.phases[i] || { novus_does:[], agency_does:[], owner_sees:[], measures:[] }; return `<div class="dep"><div class="dh"><span class="w">${esc(p.title)}</span><span class="t">${esc(p.heading)}</span></div>
+      ${p.summary ? `<div class="ds">${esc(p.summary)}</div>` : ''}
+      ${fold(`Implementation tasks — NOVUS does ${full.novus_does.length}, the agency does ${full.agency_does.length}`, `<div class="two"><div><div class="k">NOVUS does</div>${ul(full.novus_does)}</div><div><div class="k">The agency does</div>${ul(full.agency_does)}</div><div><div class="k">The owner sees</div>${ul(full.owner_sees)}</div><div><div class="k">Measured</div>${ul(full.measures)}</div></div>`)}</div>`; }).join('')}
+    <div class="mini">${esc(sc.caveat||d.caveat)}${d.required_access.length ? ` · Needs from the agency: ${esc(d.required_access.join(' · '))}` : ''}</div>
+  </div>`;
+}
+
+/* 7. The founding pilot */
+function cStepPilot(c){
+  const sc = SCREEN('pilot'); const p = c.pilot; const d = S.diagnosis; const g = c.guidance?.pilot || { closing:[], questions:[] };
+  const scope = new Set(p.scope_rule_ids);
+  return `<div class="panel">${clientHead(sc)}
+    <div class="price"><span class="p">${esc(sc.price||gbp(p.price_gbp))}</span><span class="d">all-in · ${esc(sc.duration||`${p.duration_days} days`)} · no long-term commitment</span>${p.proposed ? pill('propose it', 't-green') : pill('not today', 't-grey')}</div>
+    ${p.proposed ? `<div class="two">
+      <div><div class="k">What's included</div>${ul(sc.includes||p.includes)}<div class="k" style="margin-top:10px">Scope <span class="muted" style="text-transform:none;letter-spacing:0">tick what's in — the client screen follows</span></div>
+        ${d.interventions.filter((i) => i.selected).map((i) => `<label class="scope-ck"><input type="checkbox" data-cscope="${esc(i.rule_id)}" ${scope.has(i.rule_id) ? 'checked' : ''} /> <span><b class="mono">${esc(i.rule_id)}</b> ${esc(i.title)} ${pill(FEAS_LABEL[i.feasibility], FEAS_TONE[i.feasibility], true)}</span></label>`).join('') || '<div class="muted mini">No interventions selected.</div>'}</div>
+      <div><div class="k">How we'll judge it</div>${ul(sc.success_criteria||p.success_criteria)}<div class="mini" style="margin-top:8px">${esc(sc.commitment||'')}</div></div>
     </div>
+    ${fold('Private — closing guidance', `${g.closing.map((x, i) => i === 0 ? `<div class="say">${esc(x)}</div>` : `<div class="fs">${esc(x)}</div>`).join('')}<div class="mini" style="margin-top:8px">${esc(p.review)} ${esc(p.extension)} ${esc(p.never.join(' '))}</div>`, true)}
+    ${fold('Questions & objections', qa(g.questions))}` : `<div class="say">${esc(c.next_step)}</div>`}
   </div>`;
 }
 

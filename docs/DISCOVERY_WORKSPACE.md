@@ -136,6 +136,16 @@ where it was. **New window ↗** opens `#present?id=<session>` — the same page
 slide, calculator and every correction in step between the windows. The spoken pitch of the previous
 approach stays as a read-only archive at the bottom of the stage; its versions are preserved.
 
+The internal Conclusion stage mirrors the seven client screens one to one, rendering the client-facing
+wording from the **same** `presentation` payload the full-screen mode uses (no second copy), with the
+private material underneath in expandable sections: `conclusion.guidance` (never part of
+`presentationPayload`) carries per solution card *talking points*, *implementation details* (from the rule
+registry + this agency's diagnosis: configure, systems/data, access, NOVUS vs agency responsibilities, what
+changes for the team, dependencies/validation, the fallback if the preferred route is unavailable, scope
+limits) and *questions & objections* (only those relevant to the selected rules); per "needs" card the
+precise access / setup / act items for this agency; and closing guidance + likely objections for the pilot.
+The full diagnosis stays available at the bottom of every step as "Full diagnosis / technical reference".
+
 ## Plan and outcome
 
 The Decision stage's scope ticks default to the conclusion's agreed scope. `buildPlan` fills the five phases from the selected rules (days 4–7 = selected foundations or "reuse",

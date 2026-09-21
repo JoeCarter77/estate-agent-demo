@@ -572,7 +572,7 @@ const LOUIS = { C1: a('more_valuations'), C2: m(['not_enough_opportunities', 'lo
   I5: a('informal'), I5_cause: m(['no_outcomes', 'no_time']), I5_consequence: m(['keep_failing', 'drop_working']) };
 const louisSession = { session_id: 'dsc_louis', agency_id: 'ag_l', agency_name: 'TEST - Louis', contact_name: 'Louis Example', answers: LOUIS, overrides: {}, notes: {} };
 const conclude = (session, conclusion = null) => { const { base, agreed, conclusion: out, presentation } = sessionDiagnoses(session, conclusion); return { base, agreed, c: out, p: presentation }; };
-const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.test(js) && 'rule id', /CONFIRMED|PROVISIONAL|EXISTING_STRENGTH|OUTSIDE_SCOPE|FEASIB|REQUIRES_ASSESSMENT|INFEASIBLE/.test(js) && 'evidence/feasibility code', /"(rule_id|delivery_status|pricing_script|owner_note|note|reason|agreement)"/.test(js) && 'internal field'].filter(Boolean); };
+const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.test(js) && 'rule id', /CONFIRMED|PROVISIONAL|EXISTING_STRENGTH|OUTSIDE_SCOPE|FEASIB|REQUIRES_ASSESSMENT|INFEASIBLE/.test(js) && 'evidence/feasibility code', /"(rule_id|delivery_status|pricing_script|owner_note|note|reason|agreement|guidance|talking_points|implementation|questions|fallback|closing)"/.test(js) && 'internal field'].filter(Boolean); };
 {
   // Louis: the worked example from the brief.
   const { c, p } = conclude(louisSession);
@@ -626,6 +626,24 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   assert.equal(p.screens[4].cards.length, 3); assert.equal(p.screens[4].cards[0].heading, 'Access to the relevant systems & information');
   assert.match(p.screens[4].cards[2].sentence, /records what they hear about selling/, 'third card adapted because capture (F1) is in scope');
   assert.equal(p.screens[5].title, 'Your first 60 days');
+  // Private guidance: one entry per client solution card, never on a client screen.
+  const gd = c.guidance;
+  assert.deepEqual(Object.keys(gd.help), p.screens[3].cards.map((x) => x.id), 'guidance keyed to the client cards, same order');
+  for (const card of p.screens[3].cards) {
+    const g = gd.help[card.id];
+    assert.ok(g.talking_points.length >= 3 && g.talking_points[0].startsWith('Why it matters here: you told me'), 'talking points start from their words');
+    assert.ok(g.talking_points.some((x) => /Why that's more valuations/.test(x)), 'connected to the commercial objective');
+    assert.ok(g.implementation.length >= 1 && g.implementation.every((r) => r.configure.length && r.systems_data.length && r.novus.length && r.agency.length && r.team_change && r.fallback && r.limits.length && r.delivery_status_label), 'implementation answers from the rule registry');
+    assert.ok(g.implementation.every((r) => c.pilot.scope_rule_ids.includes(r.rule_id) || c.changes.groups.find((x) => x.id === card.id).rules.some((y) => y.rule_id === r.rule_id)), 'only selected rules');
+    assert.ok(g.questions.length >= 5 && g.questions.every((x) => x.q && x.a.length > 40));
+  }
+  assert.ok(gd.help.opportunities.questions.some((x) => /database is a mess/.test(x.q)) && !gd.help.measure.questions.some((x) => /database is a mess/.test(x.q)), 'only relevant questions');
+  assert.match(gd.help.opportunities.questions.find((x) => /Reapit/.test(x.q)).a, /You said we can get an export/);
+  assert.ok(gd.needs.access.length >= 3 && gd.needs.setup.length >= 3 && gd.needs.act.length >= 3);
+  assert.ok(gd.needs.access.some((x) => /CRM: Reapit/.test(x)));
+  assert.equal(gd.pilot.closing[0], c.pilot.pricing_script); assert.ok(gd.pilot.questions.some((x) => /guaranteeing/.test(x.q) && /No —/.test(x.a)));
+  assert.ok(!JSON.stringify(p).includes('Why it matters here') && !JSON.stringify(p).includes(gd.help.opportunities.questions[0].a), 'private guidance never reaches the client screens');
+  assert.ok(p.screens[4].cards.every((x) => ['access', 'setup', 'act'].includes(x.id)));
   assert.deepEqual(leak(p), [], `presentation leaks: ${leak(p).join(', ')}`);
   assert.ok(!JSON.stringify(p).includes(c.pilot.pricing_script), 'the pricing script is not on a client screen');
   assert.equal(p.screens[1].findings.length, 3, 'before any agreement every finding is presentable');
@@ -657,6 +675,9 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   assert.equal(p.screens[1].findings[1].corrected, 'History is fine in Reapit once you know the name');
   assert.equal(p.screens[1].findings[1].points.length, 1, 'the dropped part is not presented');
   assert.deepEqual(leak(p), []);
+  assert.ok(!('measure' in c.guidance.help) && !p.screens[3].cards.some((x) => x.id === 'measure'), 'a rejected finding leaves both the client card and the private guidance');
+  assert.ok(!c.guidance.help.capture.implementation.some((r) => r.rule_id === 'F2') && !c.guidance.needs.access.some((x) => /customer history/.test(x)), 'the dropped part leaves the implementation answers and the needs');
+  assert.match(c.guidance.help.capture.talking_points[0], /History is fine in Reapit/, 'the owner\'s correction is in the talking points');
   // Operator's own override wins over the owner's remark.
   const withOp = conclude({ ...louisSession, overrides: { F2: { evidence_status: 'CONFIRMED', level: 'weak', reason: 'Saw the duplicate mess on screen' } } }, { agreement });
   assert.equal(withOp.agreed.assessments.F2.evidence_status, 'CONFIRMED');
@@ -917,7 +938,7 @@ console.log('\n7. Conclusion handlers, persistence and an older tab header');
   assert.equal(r.statusCode, 200); assert.ok(r.body.conclusion && r.body.presentation, 'autosave returns the conclusion and the presentation');
   assert.equal(r.body.conclusion.understanding.findings.length, 3);
   r = res(); await handleDiscoverySession(req('GET', { session_id: sid }), r);
-  assert.equal(r.body.conclusion.mode, 'PILOT'); assert.equal(r.body.presentation.screens.length, 7); assert.ok(r.body.registry.conclusion_steps.length === 5);
+  assert.equal(r.body.conclusion.mode, 'PILOT'); assert.equal(r.body.presentation.screens.length, 7); assert.ok(r.body.registry.conclusion_steps.length === 7);
   assert.equal(store.DISCOVERY_SESSIONS[0].length, oldHeader.length, 'nothing extended yet — no conclusion has been written');
   ok('older tab header: still available, session read and autosave carry the deterministic conclusion and the presentation payload');
 
