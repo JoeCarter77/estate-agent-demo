@@ -5,8 +5,9 @@
 out a new API file). Test: `npm run novus:discovery-selftest` (in-memory workbook + fake model).
 
 Workflow: booked meeting → **Open discovery** → Situation → Foundations → Intelligence → Diagnosis →
-**Conclusion** (confirm understanding → commercial opportunity → what NOVUS would change → 60-day
-deployment → founding pilot, with **Present to client**) → Decision. Entry points: the Meetings page (every `CALLS` row with `outcome=BOOKED_MEETING`,
+**Conclusion** (confirm understanding → commercial opportunity → personalised focus areas → what we'd need
+from them → 60-day deployment → *private pre-price checkpoint* → £1,500 founding pilot, with
+**Present to client**) → Decision. Entry points: the Meetings page (every `CALLS` row with `outcome=BOOKED_MEETING`,
 active `PREPARE_MEETING` action, `DEMOS.meeting_booked_at`, `AGENCIES.current_pipeline_status=MEETING_BOOKED`,
 plus every session), the lead drawer ("Open discovery workspace" / "Start discovery"), and the agency
 picker (any agency — the ⌘K `lead-search` operation).
@@ -19,7 +20,7 @@ picker (any agency — the ⌘K `lead-search` operation).
 | `lib/discovery-rules.mjs` | the **versioned deployment rule registry** (`RULES_VERSION`): ten rules with triggers, required evidence, consequence, intervention, steps, data/access, responsibilities, dependencies, measurement, scope limits, pitch explanation and a maintained `delivery_status`; the founding offer; the five plan phases. |
 | `lib/discovery-engine.mjs` | the **deterministic diagnosis**: `assessDimensions` → evidence status, `evaluateInterventions` → feasibility + dependency resolution, `computeEconomics`, `decideSuitability`, `buildPlan`, `diagnose`. No I/O, no model. |
 | `lib/discovery-pitch.mjs` | pitch input (structured, no customer PII), the deterministic template pitch, `validatePitch`, `generatePitch` (model via `lib/ai-client.mjs`, validated, template fallback). |
-| `lib/discovery-conclusion.mjs` | the **meeting conclusion**: grouped findings in the owner's words, the owner's agreement → recorded overrides, economics illustration (1–5 additional valuations), intervention groups, the four-phase deployment, the founding pilot, the six client-facing screens (`presentationPayload`), and the optional validated AI polish. Deterministic; no model needed. |
+| `lib/discovery-conclusion.mjs` | the **meeting conclusion**: grouped findings in the owner's words, the owner's agreement → recorded overrides, economics illustration (1–5 additional valuations), intervention groups, the **seven commercial focus areas** and the up-to-three selected for this agency (`FOCUS_AREAS`, `buildFocusAreas`), the four-phase deployment built from that same selection, the **private pre-price checkpoint** (`buildCheckpoint`), the founding pilot, the seven client-facing screens (`presentationPayload`), and the optional validated AI polish. Deterministic; no model needed. |
 | `lib/discovery-store.mjs` | tabs `DISCOVERY_SESSIONS` (one row per session, patched in place; `conclusion_json` added later — an older header is extended in place) and `DISCOVERY_PITCHES` (one immutable row per pitch version). |
 | `lib/discovery-handlers.mjs` | `discovery-meetings`, `discovery-session` (GET); `discovery-setup`, `discovery-start`, `discovery-save`, `discovery-pitch`, `discovery-conclusion`, `discovery-conclusion-polish`, `discovery-outcome` (POST, Basic Auth + confirm tokens). |
 
@@ -109,8 +110,9 @@ rewritten, and an operator override always wins over the owner's remark.
 |---|---|---|
 | **Confirm understanding** | "Right {name}, correct me if I'm wrong…", the situation in their numbers (branches, CRM, enquiries, database, valuations, instructions, fee, conversion — unknown stays unknown), the two or three problems grouped by theme (capture F1+F2 · progress F3+F4 · opportunities I1–I4 · measure F5+I5), ranked by evidence, commercial consequence and the owner's priority, each in the owner's own answers ("mostly, but some gets missed"), hedged with "I think" when provisional; "Is that a fair reflection…?" | **Agree** · **Correct…** (untick the parts that are not a problem + their words) · **Not a problem** · *Show in presentation* · *They agreed with all of it* |
 | **Commercial opportunity** | fee × conversion = expected gross fee income per additional valuation; selector 1–5 with monthly and annual figures, labelled *Illustration, not a forecast* (Louis: £4,500 × 30% = £1,350; 2/month = £2,700 / £32,400) | the selector (persisted) |
-| **How NOVUS would help** | up to 3 cards in a fixed IMPLEMENTATION SEQUENCE (`buildSolutionSequence`, `lib/discovery-conclusion.mjs`) — foundations/connect (F1+F2) → identify opportunities (I1–I3) → progress & measure (F3–F5, I4–I5) — never the highest-ranked problems. Each stage's sentence is built ONLY from its selected rules' `spoken_change`, names the agency's own CRM where the rule touches it, and hedges with "once we've confirmed…" when a rule still needs a technical assessment; a stage with nothing selected but an existing strength becomes a reuse sentence ("Your X already work well, so we'd reuse…") instead of disappearing | — (recomputed on every correction) |
-| **60-day deployment** | Week 1 / Week 2 / Weeks 3–4 / Weeks 5–8, headings adapted (reuse vs foundations, first workflow), one-paragraph summary from `templatePlan` with rule ids replaced by plain names, implementation detail expandable | — |
+| **Where we'd focus** | *"Here's where we'd focus for your agency."* — up to three personalised **commercial focus areas** (`buildFocusAreas`, see below), in implementation order. Each card: a short heading, one plain-English sentence built ONLY from its selected rules' `spoken_change` (naming the agency's own CRM where the rule touches it, hedged with "once we've confirmed…" where a rule still needs a technical assessment), and a `context` line from a figure this agency actually gave. Under them, one ongoing statement — NOVUS keeps identifying, progressing and reviewing | — (recomputed on every correction) |
+| **60-day deployment** | Week 1 / Week 2 / Weeks 3–4 / Weeks 5–8, generated from **the same focus areas** (`buildDeployment(agreed, solutions, situation)`): week 1 = access, scope, the baseline and only the foundations this agency needs (reuse where they are already strong); week 2 = the first feasible focus area; weeks 3–4 = the rest, with no date attached to anything still awaiting validation; weeks 5–8 = progression and the commercial review. Outcome tracking starts in week 1. Implementation detail expandable | — |
+| **Pre-price checkpoint** (PRIVATE) | `buildCheckpoint`. Between the deployment and the pilot; the client keeps looking at the deployment slide. Two cues: does it make sense (*clear · questions answered · further explanation required*) and do they want it implemented (*yes · potentially · no*), plus relevant outstanding concerns and optional notes. YES → the pilot line and the £1,500 slide; POTENTIALLY → "What would you need…?" and the focus areas' private guidance opens; NO → the outcome is recorded without a price. Never in `presentationPayload` | the two cue answers, concern ticks, "answered on the call", notes (all persisted) |
 | **Founding pilot** | £1,500 all-in · 60 days · scope ticks (default = everything proposed) · included · success criteria from the scope's measurements · day-45/60 review · no long-term commitment · a short pricing script | scope ticks (persisted; the Decision stage defaults to them) |
 
 `discovery-conclusion` (POST `{session_id, agreement?, additional_valuations?, scope_rule_ids?, clear_polish?}`)
@@ -136,14 +138,50 @@ agency-overview/established slides already covered verbally. Neither script is e
 **Present to client** opens a full-screen, 16:9, NOVUS-branded presentation of seven screens rendered from
 `presentationPayload` (server-built; no rule ids, evidence codes, notes, scripts or controls; only findings
 approved for presentation): *Your agency today · What we've established · Commercial opportunity (live
-1–5 calculator) · How NOVUS would help · Your 60-day deployment · Founding pilot* — with *What we'd need from you* between help and deployment (non-fit sessions show
-the owner-facing next step instead of a price). ←/→/space, Home/End, Esc exits (also leaves fullscreen), F
+1–5 calculator) · Here's where we'd focus for your agency · Your 60-day deployment · Founding pilot* — with *What we'd need from you* between focus and deployment (non-fit sessions show
+the owner-facing next step instead of a price). The pre-price checkpoint is **not** a slide: the client
+stays on the deployment screen while it is worked through. ←/→/space, Home/End, Esc exits (also leaves fullscreen), F
 or the hover button uses the Fullscreen API with the edge-to-edge overlay as the fallback. The slide index
 is kept per session (`sessionStorage`) so switching between the workspace and the presentation resumes
 where it was. **New window ↗** opens `#present?id=<session>` — the same page in presentation-only mode
 (the app shell hidden), so that window alone can be shared on Google Meet; a `BroadcastChannel` keeps
 slide, calculator and every correction in step between the windows. The spoken pitch of the previous
 approach stays as a read-only archive at the bottom of the stage; its versions are preserved.
+
+## The seven commercial focus areas
+
+`FOCUS_AREAS` in `lib/discovery-conclusion.mjs` — internal categories, not seven products and not seven
+slides: **operational foundations** (F1+F2) · **incoming enquiry intelligence** (I1) · **historical database
+intelligence** (I3) · **connecting customer activity** (I2) · **opportunity progression** (F3+F4) ·
+**commercial prioritisation** (I4) · **commercial measurement & improvement** (F5+I5). The registry is in
+implementation order and every dimension belongs to exactly one area.
+
+`buildFocusAreas(agreed, situation)` selects **up to three** — the same selection drives the client slide,
+the private guidance and the roadmap, so they cannot drift. An area is a candidate only when the AGREED
+diagnosis has a *selected* rule in it. Each candidate is scored **per rule and averaged** (a two-dimension
+area is not worth double) on the owner's agreed findings and supporting evidence, the commercial
+consequences established, delivery feasibility and dependencies, and the incremental value beyond what
+already works (an existing strength in the area subtracts) — then adjusted for the owner's commercial
+objective and the obstacles they named. Never simply the three weakest dimensions.
+
+Two rules sit on top:
+
+* **Foundations** are a headline only when the intelligence work genuinely depends on them (a dependency
+  resolved `provided`/`added`); otherwise they are delivery detail, not a focus area.
+* **Measurement** is in every pilot regardless (it is how NOVUS is evaluated) but earns a headline card
+  only when the agency's own measurement is a real commercial weakness in its own right.
+
+The top scorer always stands; the second and third must clear `FOCUS_MEANINGFUL_SCORE`, so an agency with
+one or two real areas gets one or two cards — three are never forced. When more than three are meaningful,
+a related pair from `FOCUS_COMBINATIONS` is merged into one coherent intervention (one clause from each)
+before anything is dropped; a merged card is never merged again. A capability that already works
+effectively is never proposed as a focus area — it appears in the screen's `preserved` list instead.
+
+`conclusion.guidance.help[<focus id>]` carries the private material per area: **why_selected** (the owner's
+own answers, their words, any correction, and why it made the three), **say_aloud**, **talking_points**,
+**what_we_implement**, **need_from_agency**, **team_change**, **conditions** (validation, dependencies,
+delivery status), **questions** (only the relevant objections), **fallbacks** per component and the full
+per-rule **implementation** blocks. None of it is in `presentationPayload`.
 
 The internal Conclusion stage mirrors the seven client screens one to one, rendering the client-facing
 wording from the **same** `presentation` payload the full-screen mode uses (no second copy), with the

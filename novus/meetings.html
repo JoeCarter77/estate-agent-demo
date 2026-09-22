@@ -160,6 +160,7 @@
     .c-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:var(--s-4);}
     .c-steps{display:flex;gap:2px;border:1px solid var(--hair);border-radius:var(--r-md);overflow:auto hidden;background:rgba(var(--ink-rgb),.02);flex:1;min-width:min(100%,420px);}
     .c-step{flex:1 0 auto;font-family:inherit;font-size:11px;font-weight:600;color:var(--ink-4);background:none;border:none;padding:9px 6px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;position:relative;white-space:nowrap;}
+    .c-step.priv{color:var(--amber);} .c-step.priv .n{background:rgba(var(--amber-rgb),.14);}
     .c-step .n{font-family:var(--mono);font-size:10px;width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:rgba(var(--ink-rgb),.06);color:var(--ink-3);}
     .c-step.on{color:var(--ink);background:rgba(var(--brand-rgb),.06);} .c-step.on::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--blue);}
     .c-step.done .n{background:var(--blue-tint);color:var(--blue);}
@@ -239,6 +240,8 @@
     .pres-body{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;margin-top:2.5cqh;}
     .pres-body.top{justify-content:flex-start;overflow:hidden;}
     .pres-card.simple{padding:3.2cqh 2.2cqw;gap:1.6cqh;} .pres-card.simple .h{font-size:2.1cqw;} .pres-card.simple p{font-size:1.45cqw;line-height:1.5;}
+    .pres-card.simple p.ctx{font-size:1.15cqw;color:rgba(147,196,255,.85);margin-top:-.6cqh;}
+    .pres-ongoing{margin-top:2.4cqh;font-size:1.3cqw;line-height:1.5;color:rgba(241,237,230,.72);border-top:1px solid rgba(241,237,230,.12);padding-top:1.8cqh;}
     .pres-cols.dense .pres-card ul{font-size:1.05cqw;} .pres-cols.dense .pres-card{padding:1.8cqh 1.5cqw;}
     .pres-price{margin-top:.5cqh;}
     .pres-facts{display:grid;grid-template-columns:repeat(3,1fr);gap:1.4cqw;}
@@ -1140,18 +1143,22 @@ function setAgreement(id, patch){
   saveConclusion({ agreement: ag });
 }
 function goCStep(id){ CSTEP = id; CORR = ''; renderCentre(); window.scrollTo({ top:0, behavior:'smooth' }); }
+function saveCheckpointForm(){
+  const concerns = [...document.querySelectorAll('[data-cp-concern]')].filter((x) => x.checked).map((x) => x.dataset.cpConcern);
+  saveConclusion({ checkpoint: { concerns, concerns_resolved: Boolean(document.querySelector('[data-cp-resolved]')?.checked), notes: $('cp-notes')?.value.trim() || '' } });
+}
 
 function renderConclusion(el){
   const c = C();
   if(!c){ el.innerHTML = `<div class="panel">${emptyState('No conclusion yet', 'Answer the discovery questions first — the conclusion is built from them.')}</div>`; return; }
   const steps = CSTEPS(); const i = Math.max(0, steps.findIndex((x) => x.id === CSTEP));
-  const doneStep = (id) => id === 'established' ? c.understanding.agreed : false;
+  const doneStep = (id) => id === 'established' ? c.understanding.agreed : id === 'checkpoint' ? Boolean(c.checkpoint.interest) : false;
   const modeNote = c.mode === 'PILOT' ? '' : `<div class="suit ${SUIT_CLASS[c.suitability.verdict]}"><div class="v">${esc(SUIT_LABEL[c.suitability.verdict])} — ${c.mode === 'VALIDATION' ? 'not proposing the pilot today' : 'not proposing a pilot'}</div><div class="r">${esc(c.suitability.recommendation)}</div></div>`;
-  const body = { today: cStepToday, established: cStepEstablished, opportunity: cStepOpportunity, help: cStepHelp, needs: cStepNeeds, deployment: cStepDeployment, pilot: cStepPilot }[CSTEP] || cStepToday;
+  const body = { today: cStepToday, established: cStepEstablished, opportunity: cStepOpportunity, help: cStepHelp, needs: cStepNeeds, deployment: cStepDeployment, checkpoint: cStepCheckpoint, pilot: cStepPilot }[CSTEP] || cStepToday;
   const prev = steps[i-1]; const next = steps[i+1];
   el.innerHTML = `
     <div class="c-head">
-      <div class="c-steps">${steps.map((st, k) => `<button class="c-step${CSTEP === st.id ? ' on' : ''}${doneStep(st.id) ? ' done' : ''}" data-cstep="${esc(st.id)}" type="button" title="${esc(st.blurb)}"><span class="n">${k+1}</span>${esc(st.nav || st.title)}</button>`).join('')}</div>
+      <div class="c-steps">${steps.map((st, k) => `<button class="c-step${CSTEP === st.id ? ' on' : ''}${doneStep(st.id) ? ' done' : ''}${st.private ? ' priv' : ''}" data-cstep="${esc(st.id)}" type="button" title="${esc(st.blurb)}"><span class="n">${st.private ? '&#128274;' : k+1}</span>${esc(st.nav || st.title)}</button>`).join('')}</div>
       <div class="btnrow" style="margin:0;flex:none">
         <button class="btn btn-quiet btn-sm" data-pres-window type="button" title="Open the presentation in its own window, so you can share just that window">New window &#8599;</button>
         <button class="btn btn-present" data-present type="button">Present to client</button>
@@ -1264,18 +1271,68 @@ function implHtml(r){
       <div><div class="k">If the preferred route is unavailable</div><div style="font-size:12.5px;line-height:1.55;color:var(--ink-2)">${esc(r.fallback)}</div><div class="k" style="margin-top:8px">Scope limitations</div>${ul(r.limits)}</div>
     </div></div>`;
 }
+const EMPTY_FOCUS_GUIDANCE = { name:'', why_selected:[], say_aloud:'', talking_points:[], what_we_implement:[], need_from_agency:[], team_change:[], conditions:[], questions:[], fallbacks:[], implementation:[] };
+/* The private guidance for one focus area: why it was chosen (from their own
+   answers), what to say aloud, what we'd build, what we need, what changes
+   for their team, the technical conditions, the objections and the fallback
+   if the preferred route isn't available. None of it reaches the client. */
+function focusGuidanceHtml(pg){
+  const conds = (pg.conditions||[]).map((x) => `${x.kind === 'depends' ? 'Depends on' : x.kind === 'delivery' ? 'Delivery' : 'Confirm'}: ${x.text}`);
+  return `${fold('Private — why this area, and how to say it', `${pg.say_aloud ? `<div class="say">${esc(pg.say_aloud)}</div>` : ''}<div class="k">Why it was selected</div>${ul(pg.why_selected||[])}<div class="k" style="margin-top:8px">Talking points</div>${ul(pg.talking_points||[])}`, true)}
+    ${fold('Private — what we\'d implement, and what we need', `<div class="two"><div><div class="k">What we\'d actually implement</div>${ul(pg.what_we_implement||[])}</div><div><div class="k">What we\'d need from the agency</div>${ul(pg.need_from_agency||[])}</div><div style="grid-column:1 / -1"><div class="k">What changes for their team</div>${(pg.team_change||[]).map((t) => `<div style="font-size:12.5px;line-height:1.55;color:var(--ink-2);margin-bottom:6px"><b>${esc(t.name)}.</b> ${esc(t.text)}</div>`).join('') || '<div class="muted mini">—</div>'}</div></div>`)}
+    ${fold(`Private — conditions & dependencies${conds.length ? ` (${conds.length})` : ''}`, ul(conds))}
+    ${fold('Private — questions & objections', qa(pg.questions||[]))}
+    ${fold('Private — if the preferred route isn\'t available', (pg.fallbacks||[]).length ? `${(pg.fallbacks||[]).map((f) => `<div style="font-size:12.5px;line-height:1.55;color:var(--ink-2);margin-bottom:6px"><b>${esc(f.name)}.</b> ${esc(f.text)}</div>`).join('')}` : '<div class="muted mini">—</div>')}
+    ${fold('Full implementation detail (per component)', (pg.implementation||[]).map(implHtml).join(''))}`;
+}
 function cStepHelp(c){
   const sc = SCREEN('help'); const gd = c.guidance?.help || {};
-  const card = (g, k) => { const pg = gd[g.id] || { talking_points:[], implementation:[], questions:[] }; return `<div class="sol">
+  const card = (g, k) => { const pg = gd[g.id] || EMPTY_FOCUS_GUIDANCE; return `<div class="sol">
       <div class="sol-n">0${k+1}</div><div class="sol-h">${esc(g.heading)}</div><div class="sol-s">${esc(g.sentence)}</div>
-      ${fold('Your talking points', ul(pg.talking_points))}
-      ${fold('Implementation details', pg.implementation.map(implHtml).join(''))}
-      ${fold('Questions & objections', qa(pg.questions))}
+      ${g.context ? `<div class="sol-s" style="color:var(--blue)">${esc(g.context)}</div>` : ''}
+      ${pg.name ? `<div class="mini" style="margin-top:6px">Focus area: ${esc(pg.name)}</div>` : ''}
+      ${focusGuidanceHtml(pg)}
     </div>`; };
   return `<div class="panel">${clientHead(sc)}
     ${(sc.cards||[]).length ? sc.cards.map(card).join('') : `<div class="say">${esc(sc.next_step||c.next_step)}</div>`}
+    ${sc.ongoing ? `<div class="note">${esc(sc.ongoing)}</div>` : ''}
     ${(sc.preserved||[]).length && (sc.cards||[]).length ? `<div class="note">What already works stays as it is: ${esc(sc.preserved.join(', ').toLowerCase())}.</div>` : ''}
     ${c.changes.other_groups.length ? `<div class="mini">Also in the plan, not led with: ${esc(c.changes.other_groups.map((g) => `${g.title} (${g.rules.map((r) => r.rule_id).join(', ')})`).join('; '))}</div>` : ''}
+  </div>`;
+}
+
+/* 6b. PRE-PRICE CHECKPOINT — private. The client keeps looking at the
+   deployment slide throughout; nothing here is in the presentation payload.
+   Two questions, in order: did it land, and do they want it? What they
+   answer decides whether the price is put to them at all. */
+function cStepCheckpoint(c){
+  const k = c.checkpoint; const gd = c.guidance?.help || {};
+  const levels = S.registry.understanding_levels || []; const labels = S.registry.understanding_labels || {};
+  const interests = S.registry.interest_levels || []; const ilabels = S.registry.interest_labels || {};
+  const concernIds = new Set(k.concerns.map((x) => x.id));
+  const open = k.open_guidance || [];
+  return `<div class="panel">
+    <div class="client"><div class="client-k">Private — the client still sees your 60-day deployment</div><div class="client-t">Understanding &amp; implementation interest</div><div class="client-s">Ask both before any price. Nothing on this step is ever shown to them.</div></div>
+    <div class="say q">${esc(k.understanding_cue)}</div>
+    <div class="fa">${levels.map((lv) => `<button class="btn btn-secondary btn-sm${k.understanding === lv ? ' on' : ''}" data-cp-understanding="${esc(lv)}" type="button">${esc(labels[lv] || lv)}</button>`).join('')}</div>
+    ${k.explanation_needed ? `<div class="note">They want more explanation — open the focus-area guidance below and go back over it before you ask the second question.</div>` : ''}
+    <div class="say q" style="margin-top:16px">${esc(k.interest_cue)}</div>
+    <div class="fa">${interests.map((lv) => `<button class="btn btn-secondary btn-sm${k.interest === lv ? ' on' : ''}" data-cp-interest="${esc(lv)}" type="button">${esc(ilabels[lv] || lv)}</button>`).join('')}</div>
+    ${k.response ? `<div class="say" style="margin-top:14px">${esc(k.response)}</div>` : ''}
+    ${ul(k.guidance || [])}
+    <div class="corr" style="margin-top:14px">
+      <div class="mini" style="margin-bottom:6px"><b>Outstanding concerns</b> — tick anything still in the way, in their terms.</div>
+      ${(k.concerns_available||[]).map((x) => `<label><input type="checkbox" data-cp-concern="${esc(x.id)}" ${concernIds.has(x.id) ? 'checked' : ''} /> <span>${esc(x.label)}</span></label>`).join('')}
+      ${k.concerns.length ? `<label style="margin-top:6px"><input type="checkbox" data-cp-resolved ${k.concerns_resolved ? 'checked' : ''} /> <span>Answered on the call — no longer in the way</span></label>` : ''}
+      <textarea class="input block" id="cp-notes" style="min-height:56px;margin-top:8px;font-size:12.5px" placeholder="Optional — what they actually said">${esc(k.notes||'')}</textarea>
+      <div class="btnrow" style="margin-top:8px"><button class="btn btn-primary btn-sm" data-cp-save type="button">Save checkpoint</button></div>
+    </div>
+    ${open.length ? `<div class="note" style="margin-top:14px">They're not there yet — the private guidance for each focus area is below. Answer what they raised, don't re-pitch.</div>
+      ${open.map((id) => `<div class="sol"><div class="sol-h">${esc(gd[id]?.heading || id)}</div>${focusGuidanceHtml(gd[id] || EMPTY_FOCUS_GUIDANCE)}</div>`).join('')}` : ''}
+    <div class="btnrow" style="margin-top:14px">
+      ${k.show_pilot ? `<button class="btn btn-primary btn-sm" data-cstep="pilot" type="button">The founding pilot &rarr;</button>` : ''}
+      ${k.interest === 'NO' ? `<button class="btn btn-secondary btn-sm" data-go-stage="outcome" type="button">Record the decision without a price &rarr;</button>` : ''}
+    </div>
   </div>`;
 }
 
@@ -1370,7 +1427,8 @@ function presSlideHtml(sc, i){
         <div class="out"><div class="o"><div class="v">${esc(row.monthly)}</div><div class="l">a month</div></div><div class="o"><div class="v">${esc(row.annual)}</div><div class="l">a year, if sustained</div></div></div></div>
       <div class="pres-note">${esc(sc.label)}. ${esc(sc.footnote)}</div></div>`;
   }
-  if(sc.id === 'help') return `${head(sc.subtitle)}<div class="pres-body">${sc.cards.length ? `<div class="pres-cols" style="--n:${sc.cards.length}">${sc.cards.map((g, k) => `<div class="pres-card simple"><div class="num">0${k+1}</div><div class="h">${esc(g.heading)}</div><p>${esc(g.sentence)}</p></div>`).join('')}</div>` : `<div class="pres-next">${esc(sc.next_step)}</div>`}
+  if(sc.id === 'help') return `${head(sc.subtitle)}<div class="pres-body">${sc.cards.length ? `<div class="pres-cols" style="--n:${sc.cards.length}">${sc.cards.map((g, k) => `<div class="pres-card simple"><div class="num">0${k+1}</div><div class="h">${esc(g.heading)}</div><p>${esc(g.sentence)}</p>${g.context ? `<p class="ctx">${esc(g.context)}</p>` : ''}</div>`).join('')}</div>` : `<div class="pres-next">${esc(sc.next_step)}</div>`}
+      ${sc.ongoing ? `<div class="pres-ongoing">${esc(sc.ongoing)}</div>` : ''}
       ${sc.preserved.length && sc.cards.length ? `<div class="pres-note">What already works stays as it is: ${esc(sc.preserved.join(', ').toLowerCase())}.</div>` : ''}</div>`;
   if(sc.id === 'needs') return `${head(sc.subtitle)}<div class="pres-body"><div class="pres-cols" style="--n:3">${sc.cards.map((g, k) => `<div class="pres-card simple"><div class="num">0${k+1}</div><div class="h">${esc(g.heading)}</div><p>${esc(g.sentence)}</p></div>`).join('')}</div></div>`;
   if(sc.id === 'deployment') return `${head(sc.subtitle)}<div class="pres-body">${sc.proposed ? `<div class="pres-timeline">${sc.phases.map((p) => `<div class="pres-phase"><div class="w">${esc(p.title)}</div><div class="h">${esc(p.heading)}</div><p>${esc(p.summary)}</p></div>`).join('')}</div><div class="pres-note">${esc(sc.caveat)}</div>` : `<div class="pres-next">${esc(S.presentation.screens.find((x) => x.id === 'pilot')?.next_step || '')}</div>`}</div>`;
@@ -1511,6 +1569,10 @@ document.addEventListener('click', async (e) => {
   if(t.closest('[data-gen-pitch]')){ generatePitch(); return; }
   /* meeting conclusion */
   const cs = t.closest('[data-cstep]'); if(cs){ goCStep(cs.dataset.cstep); return; }
+  /* pre-price checkpoint (private) */
+  const cpu = t.closest('[data-cp-understanding]'); if(cpu){ const v = cpu.dataset.cpUnderstanding; saveConclusion({ checkpoint: { understanding: C().checkpoint.understanding === v ? '' : v } }); return; }
+  const cpi = t.closest('[data-cp-interest]'); if(cpi){ const v = cpi.dataset.cpInterest; saveConclusion({ checkpoint: { interest: C().checkpoint.interest === v ? '' : v } }); return; }
+  if(t.closest('[data-cp-save]')){ saveCheckpointForm(); return; }
   if(t.closest('[data-present]')){ openPresentation(); return; }
   const pf = t.closest('[data-present-from]'); if(pf){ openPresentation({ screenId: pf.dataset.presentFrom }); return; }
   if(t.closest('[data-pres-window]')){ presOpenWindow(); return; }

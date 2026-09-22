@@ -25,7 +25,7 @@ import {
   handleDiscoverySave, handleDiscoveryPitch, handleDiscoveryOutcome, handleDiscoveryConclusion, handleDiscoveryConclusionPolish,
   buildAgencyContext, cleanAnswers, sessionDiagnoses,
 } from '../lib/discovery-handlers.mjs';
-import { buildFindings, cleanConclusion, polishConclusion, validatePolishedText, presentationPayload } from '../lib/discovery-conclusion.mjs';
+import { buildFindings, cleanConclusion, polishConclusion, validatePolishedText, presentationPayload, FOCUS_AREAS, CONCLUSION_STEPS, UNDERSTANDING_LEVELS, INTEREST_LEVELS } from '../lib/discovery-conclusion.mjs';
 
 let passed = 0;
 const ok = (msg) => { passed += 1; console.log(`  ✓ ${msg}`); };
@@ -610,7 +610,11 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   assert.ok(c.changes.foundations.includes('F1') && c.changes.foundations.includes('F3'), 'weak foundations the intelligence work needs are built');
   assert.match(c.changes.foundations_note, /only built where the intelligence work needs them/);
   for (const ph of c.deployment.phases) { assert.ok(ph.summary && ph.heading, `${ph.key} has a summary and heading`); assert.ok(!/\b[FI][1-5]\b/.test(ph.summary), `${ph.key} summary carries no rule ids: ${ph.summary}`); }
-  assert.deepEqual(c.deployment.phases.map((ph) => ph.heading), ['Scope, access and necessary foundations', 'Activate the initial intelligence workflow', 'Expand and refine', 'Progress opportunities and measure commercial results']);
+  assert.deepEqual(c.deployment.phases.map((ph) => ph.heading), ['Access, scope and the foundations we need', 'Go live with your incoming enquiries', 'Extend into the rest of your focus areas', 'Progress the opportunities and review the commercial results']);
+  // The roadmap comes from the SAME focus areas as the solution slide.
+  assert.deepEqual(c.deployment.focus_ids, c.solutions.map((f) => f.id), 'the roadmap is built from the selected focus areas, not an independent plan');
+  assert.ok(c.deployment.phases.slice(0, 3).flatMap((ph) => ph.focus_ids).every((id) => c.solutions.some((f) => f.id === id)));
+  assert.match(c.deployment.phases[0].summary, /record your 20 valuations and 6 instructions a month so we can measure/, 'outcome tracking starts at setup, not in weeks 5–8');
   assert.ok(c.deployment.phases[0].novus_does.length > 3, 'implementation detail is available for expansion');
   assert.equal(c.pilot.proposed, true); assert.equal(c.pilot.price_gbp, 1500); assert.equal(c.pilot.duration_days, 60); assert.equal(c.pilot.headline, '£1,500 all-in for 60 days');
   assert.match(c.pilot.pricing_script, /^Louis, the founding pilot is £1,500 all-in for 60 days\./); assert.match(c.pilot.pricing_script, /no long-term commitment/); assert.match(c.pilot.pricing_script, /separate arrangement/); assert.match(c.pilot.pricing_script, /\?$/);
@@ -620,12 +624,17 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
 
   // The presentation payload carries nothing internal.
   assert.equal(p.screens.length, 7); assert.deepEqual(p.screens.map((x) => x.id), ['today', 'established', 'opportunity', 'help', 'needs', 'deployment', 'pilot']);
-  assert.ok(p.screens[3].cards.length >= 2 && p.screens[3].cards.length <= 3, 'at most three solution cards');
-  assert.deepEqual(p.screens[3].cards.map((x) => x.id), ['foundations', 'identify', 'progress'], 'the implementation sequence, not the highest-ranked problems');
+  assert.equal(p.screens[3].title, "Here's where we'd focus for your agency.");
+  assert.ok(p.screens[3].cards.length >= 2 && p.screens[3].cards.length <= 3, 'at most three focus areas');
+  assert.deepEqual(p.screens[3].cards.map((x) => x.id), ['foundations', 'enquiry_intelligence', 'connecting_activity'], 'the focus areas Louis\'s answers establish, in implementation order');
+  assert.deepEqual(p.screens[3].cards.map((x) => x.id), c.solutions.map((f) => f.id), 'client cards and internal focus areas are the same selection');
   for (const card of p.screens[3].cards) { assert.ok(card.heading.length < 55); assert.ok(/\.$/.test(card.sentence) && card.sentence.split(/(?<=[.!?])\s+/).length <= 2, 'concise — one or two sentences'); }
   assert.match(p.screens[3].cards[0].sentence, /gets recorded in Reapit/, 'the foundations card names the CRM it would connect to');
-  assert.match(p.screens[3].cards[1].sentence, /read every incoming enquiry/, 'the identify card leads with the seller-signal work');
-  assert.match(p.screens[3].cards[2].sentence, /dated next step|track every seller/, 'the progress card is about progressing and measuring');
+  assert.match(p.screens[3].cards[1].sentence, /read every incoming enquiry/, 'the enquiry-intelligence card leads with the seller-signal work');
+  assert.match(p.screens[3].cards[2].heading, /customer history/, 'two related areas combined into one coherent intervention');
+  assert.equal(p.screens[3].cards[1].context, 'Working from the 250 enquiries a month you already get.', 'agency-specific context from their own figure');
+  assert.equal(p.screens[3].cards[2].context, 'Across the 5,000 contacts you already hold.');
+  assert.match(p.screens[3].ongoing, /keeps running/, 'the ongoing statement is on the client slide');
   assert.equal(p.screens[4].cards.length, 3); assert.equal(p.screens[4].cards[0].heading, 'Access to the relevant systems & information');
   assert.match(p.screens[4].cards[2].sentence, /records what they hear about selling/, 'third card adapted because capture (F1) is in scope');
   assert.equal(p.screens[5].title, 'Your first 60 days');
@@ -640,12 +649,26 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
     assert.ok(g.implementation.every((r) => c.pilot.scope_rule_ids.includes(r.rule_id)), 'only selected rules');
     assert.ok(g.questions.length >= 5 && g.questions.every((x) => x.q && x.a.length > 40));
   }
-  assert.ok(gd.help.identify.questions.some((x) => /database is a mess/.test(x.q)) && !gd.help.progress.questions.some((x) => /database is a mess/.test(x.q)), 'only relevant questions');
-  assert.match(gd.help.identify.questions.find((x) => /Reapit/.test(x.q)).a, /You said we can get an export/);
+  assert.ok(gd.help.connecting_activity.questions.some((x) => /database is a mess/.test(x.q)) && !gd.help.enquiry_intelligence.questions.some((x) => /database is a mess/.test(x.q)), 'only relevant questions');
+  assert.match(gd.help.connecting_activity.questions.find((x) => /Reapit/.test(x.q)).a, /You said we can get an export/);
+  // Every private field the brief requires, populated for every focus area.
+  for (const card of p.screens[3].cards) {
+    const g = gd.help[card.id];
+    assert.ok(g.why_selected.length >= 2 && /^You told me /.test(g.why_selected[0]), 'why this area, from the owner\'s own answers');
+    assert.ok(g.why_selected.some((x) => /^Why it made the three: /.test(x)), 'the commercial reason it was selected');
+    assert.ok(g.say_aloud.length > 60 && !/\b[FI][1-5]\b/.test(g.say_aloud), 'a natural explanation to say aloud, no ids');
+    assert.ok(g.what_we_implement.length >= 2, 'what we would actually implement');
+    assert.ok(g.need_from_agency.length >= 2, 'what we would need from the agency');
+    assert.ok(g.team_change.length >= 1 && g.team_change.every((t) => t.text), 'what changes for their team');
+    assert.ok(Array.isArray(g.conditions), 'technical conditions and dependencies');
+    assert.ok(g.fallbacks.length >= 1 && g.fallbacks.every((f) => f.text), 'a fallback for every component');
+    assert.equal(g.name, c.solutions.find((f) => f.id === card.id).name);
+  }
   assert.ok(gd.needs.access.length >= 3 && gd.needs.setup.length >= 3 && gd.needs.act.length >= 3);
   assert.ok(gd.needs.access.some((x) => /CRM: Reapit/.test(x)));
   assert.equal(gd.pilot.closing[0], c.pilot.pricing_script); assert.ok(gd.pilot.questions.some((x) => /guaranteeing/.test(x.q) && /No —/.test(x.a)));
-  assert.ok(!JSON.stringify(p).includes('Why it matters here') && !JSON.stringify(p).includes(gd.help.identify.questions[0].a), 'private guidance never reaches the client screens');
+  assert.ok(!JSON.stringify(p).includes('Why it matters here') && !JSON.stringify(p).includes(gd.help.enquiry_intelligence.questions[0].a), 'private guidance never reaches the client screens');
+  assert.ok(!JSON.stringify(p).includes(gd.help.foundations.say_aloud) && !JSON.stringify(p).includes(gd.help.foundations.why_selected[0]), 'the private "why" and the spoken explanation stay off the client screens');
   assert.ok(p.screens[4].cards.every((x) => ['access', 'setup', 'act'].includes(x.id)));
   assert.deepEqual(leak(p), [], `presentation leaks: ${leak(p).join(', ')}`);
   assert.ok(!JSON.stringify(p).includes(c.pilot.pricing_script), 'the pricing script is not on a client screen');
@@ -685,11 +708,18 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   assert.equal(p.screens[1].findings[1].corrected, 'History is fine in Reapit once you know the name');
   assert.equal(p.screens[1].findings[1].points.length, 1, 'the dropped part is not presented');
   assert.deepEqual(leak(p), []);
-  assert.ok(!c.guidance.help.progress.implementation.some((r) => ['F5', 'I5'].includes(r.rule_id)), 'a rejected finding leaves the implementation answers for its rules');
+  assert.ok(Object.values(c.guidance.help).every((g) => !g.implementation.some((r) => ['F5', 'I5'].includes(r.rule_id))), 'a rejected finding leaves the implementation answers for its rules');
   assert.ok(!c.guidance.help.foundations.implementation.some((r) => r.rule_id === 'F2') && !c.guidance.needs.access.some((x) => /customer history/.test(x)), 'the dropped part leaves the implementation answers and the needs');
-  assert.match(c.guidance.help.foundations.talking_points[0], /History is fine in Reapit/, 'the owner\'s correction is in the talking points');
+  assert.ok(c.guidance.help.foundations.why_selected.some((x) => /History is fine in Reapit/.test(x)), 'the owner\'s correction is in the private "why this area"');
+  // Corrections move the focus areas, the guidance and the roadmap together.
   const foundationsCard = p.screens[3].cards.find((x) => x.id === 'foundations');
-  assert.ok(foundationsCard && !/customer.s history in one place/.test(foundationsCard.sentence) && /customer context/i.test(foundationsCard.sentence), 'the corrected part becomes a reuse clause on the client card, not a proposed change');
+  const foundationsFocus = c.solutions.find((x) => x.id === 'foundations');
+  assert.ok(foundationsCard && !/customer.s history in one place/.test(foundationsCard.sentence), 'we no longer propose to improve what the owner says already works');
+  assert.deepEqual(foundationsFocus.preserved.map((x) => x.dimension), ['F2'], 'the corrected part becomes a reuse, not a proposed change');
+  assert.ok(p.screens[3].preserved.includes('Customer context'), 'the client sees it as something that stays as it is');
+  assert.deepEqual(c.deployment.focus_ids, c.solutions.map((f) => f.id), 'the roadmap follows the corrected focus areas');
+  assert.ok(!c.deployment.phases.some((ph) => /history in one place/.test(ph.summary)), 'the roadmap drops the corrected work too');
+  assert.deepEqual(Object.keys(c.guidance.help), c.solutions.map((f) => f.id), 'the private guidance follows the same selection');
   // Operator's own override wins over the owner's remark.
   const withOp = conclude({ ...louisSession, overrides: { F2: { evidence_status: 'CONFIRMED', level: 'weak', reason: 'Saw the duplicate mess on screen' } } }, { agreement });
   assert.equal(withOp.agreed.assessments.F2.evidence_status, 'CONFIRMED');
@@ -709,19 +739,19 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   assert.equal(c.changes.preserved.length, 5);
   assert.ok(c.changes.groups.every((g) => g.rules.every((r) => r.kind === 'intelligence')));
   assert.ok(c.changes.groups.find((g) => g.id === 'opportunities').preserve.length >= 1, 'reused foundations named as preserved');
-  assert.equal(c.deployment.phases[0].heading, 'Scope, access and reuse of what already works');
-  assert.match(c.deployment.phases[0].summary, /stays as it is and NOVUS plugs into it/);
+  assert.equal(c.deployment.phases[0].heading, 'Access, scope and reusing what already works');
+  assert.match(c.deployment.phases[0].summary, /stays exactly as it is and we plug into it/);
   assert.ok(p.screens[3].preserved.length === 5 && p.screens[3].cards.every((x) => !/capture|record/.test(x.heading)));
   assert.match(p.screens[4].cards[2].sentence, /^Your team contacts the relevant customers and records the outcomes/, 'no capture work → the plain third card');
   assert.deepEqual(leak(p), []);
-  // The implementation sequence is genuinely different from Louis's, not the
-  // same three cards restated: the foundations card reuses rather than
-  // builds, and the sentences name different rules.
+  // Foundations that already work effectively are NOT proposed as a focus
+  // area, and the selection is genuinely different from Louis's.
   const louisCards = conclude(louisSession).p.screens[3].cards;
-  assert.notEqual(p.screens[3].cards[0].heading, louisCards[0].heading, 'foundations heading differs: reuse vs build');
+  assert.ok(!c.solutions.some((f) => f.id === 'foundations'), 'a capability that already works is never a headline focus area');
+  assert.ok(c.solutions.every((f) => f.rule_ids.every((id) => /^I/.test(id))), 'only the intelligence side is proposed');
+  assert.notEqual(p.screens[3].cards[0].id, louisCards[0].id, 'a different selection of focus areas from Louis');
   assert.notEqual(p.screens[3].cards[0].sentence, louisCards[0].sentence);
-  assert.match(p.screens[3].cards[0].sentence, /information capture and customer context already work well/);
-  ok('strong-foundation agency: findings and changes on the intelligence side only, all five foundations preserved and reused, week 1 says so; the help slide is genuinely different from Louis\'s');
+  ok('strong-foundation agency: findings and changes on the intelligence side only, all five foundations preserved and reused, week 1 says so; no focus area proposes improving what already works, and the selection is genuinely different from Louis\'s');
 
   // Incomplete information: no numbers, one finding, hedged; no pilot ask.
   const inc = conclude({ ...louisSession, answers: { C1: a('more_valuations'), F1: a('patchy'), F1_cause: m(['time']), F3: a('memory') } });
@@ -789,6 +819,134 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   assert.ok(plain.understanding.findings.every((f) => !f.statement_polished) && plain.polish.applied === 0);
   assert.equal(validatePolishedText('', 'x').valid, false);
   ok('AI polish: valid rewording is applied per sentence with the original kept; guarantees, figures, rule ids and marketing are rejected; an outage leaves the plain wording; a correction invalidates stale polish');
+}
+
+// ── 5d. personalised focus areas and the pre-price checkpoint ─────────────
+console.log('\n5d. Commercial focus areas, personalised deployment and the pre-price checkpoint');
+{
+  // Seven internal categories; up to three selected; never invented.
+  assert.equal(FOCUS_AREAS.length, 7);
+  assert.deepEqual(FOCUS_AREAS.map((x) => x.id), ['foundations', 'enquiry_intelligence', 'database_intelligence', 'connecting_activity', 'progression', 'prioritisation', 'measurement']);
+  assert.deepEqual([...FOCUS_AREAS].sort((x, y) => x.order - y.order).map((x) => x.id), FOCUS_AREAS.map((x) => x.id), 'the registry is already in implementation order');
+  const dims = FOCUS_AREAS.flatMap((x) => x.dims);
+  assert.equal(new Set(dims).size, 10, 'every dimension belongs to exactly one focus area');
+  assert.ok(FOCUS_AREAS.every((x) => x.heading && x.short && x.plan_phrase && x.effect && x.internal));
+
+  // An agency whose seller recognition already works well: not a focus area.
+  const sellerStrong = conclude({ ...louisSession, answers: {
+    ...COMMERCIAL, C2: m(['database']),
+    ...strong('I1', 'system_flags', 'identifies_routes'), ...strong('I2', 'flags_changes', 'yes'),
+    ...strong('F1', 'consistently', 'yes_all'), ...strong('F2', 'yes_easily', 'yes'),
+    ...weak('I3', { primary: 'when_time', causes: ['no_time'] }, 'untouched_value', { I3_history: a('all_in_crm'), I3_quality: a('ok') }),
+    ...weak('F3', { primary: 'memory', causes: ['no_process'] }, 'lost_valuations'),
+  } });
+  const sellerIds = sellerStrong.c.solutions.map((f) => f.id);
+  assert.ok(!sellerIds.includes('enquiry_intelligence') && !sellerIds.includes('connecting_activity'), 'a capability that already works effectively is never proposed as a focus area');
+  assert.ok(sellerIds.includes('database_intelligence'), 'the real gap in the database is');
+  assert.ok(sellerStrong.p.screens[3].preserved.some((x) => /recognition/i.test(x)), 'the existing strength is shown as something that stays');
+  assert.deepEqual(leak(sellerStrong.p), []);
+  ok('existing seller-recognition strengths: the working capability is reused and never proposed as a focus area; only the established gap is');
+
+  // Exactly two commercially meaningful areas → two cards, not three.
+  const twoOnly = conclude({ ...louisSession, answers: {
+    ...COMMERCIAL, C1: a('win_instructions'), C2: m(['slipping_through']),
+    ...strong('F2', 'yes_easily', 'yes'), ...strong('I1', 'system_flags', 'identifies_routes'), ...strong('I2', 'flags_changes', 'yes'),
+    ...strong('I3', 'systematic', 'know_results'), ...strong('I4', 'scored', 'circumstances'), ...strong('I5', 'measured_adjust', 'system_learns'),
+    ...weak('F1', { primary: 'patchy', causes: ['no_process'] }, 'missed_sellers'),
+    ...weak('F3', { primary: 'memory', causes: ['no_process'] }, 'lost_valuations'),
+    ...weak('F4', { primary: 'nothing', causes: ['no_overdue_view'] }, 'missed_sellers'),
+  } });
+  assert.equal(twoOnly.c.solutions.length, 2, 'three cards are never forced when only two areas are established');
+  assert.deepEqual(twoOnly.c.solutions.map((f) => f.id), ['foundations', 'progression']);
+  assert.equal(twoOnly.p.screens[3].cards.length, 2);
+  assert.deepEqual(twoOnly.c.deployment.focus_ids, ['foundations', 'progression'], 'the roadmap covers exactly those two');
+  assert.deepEqual(leak(twoOnly.p), []);
+  ok('only two meaningful areas established: two focus cards, two areas in the roadmap, nothing invented to make a third');
+
+  // A genuine measurement problem is eligible as a headline focus area,
+  // although measurement is in every pilot regardless.
+  const measureOnly = conclude({ ...louisSession, answers: {
+    ...COMMERCIAL, C1: a('win_instructions'), C2: m(['other']),
+    ...strong('F1', 'consistently', 'yes_all'), ...strong('F2', 'yes_easily', 'yes'), ...strong('F3', 'task_every_time', 'yes'), ...strong('F4', 'tracked_reviewed', 'report_or_alert'),
+    ...strong('I1', 'system_flags', 'identifies_routes'), ...strong('I2', 'flags_changes', 'yes'), ...strong('I3', 'systematic', 'know_results'), ...strong('I4', 'scored', 'circumstances'),
+    ...weak('F5', { primary: 'none', causes: ['no_stages'] }, 'cant_judge'),
+    ...weak('I5', { primary: 'no_learning', causes: ['no_outcomes'] }, 'keep_failing'),
+  } });
+  assert.deepEqual(measureOnly.c.solutions.map((f) => f.id), ['measurement'], 'a real measurement weakness earns the headline');
+  assert.equal(measureOnly.c.deployment.first_focus_id, 'measurement', 'it is also what week 2 activates');
+  assert.match(measureOnly.c.deployment.phases[1].summary, /We go live with tracking what turns into valuations/);
+  // …but where the agency measures perfectly well, it is delivery detail.
+  const louisFocus = conclude(louisSession).c;
+  assert.ok(!louisFocus.solutions.some((f) => f.id === 'measurement') && louisFocus.pilot.scope_rule_ids.some((id) => ['F5', 'I5'].includes(id)), 'measurement stays in the pilot scope without taking a headline card');
+  assert.match(louisFocus.deployment.phases[3].summary, /count the valuations and instructions/, 'and the commercial review is still in the roadmap');
+  ok('commercial measurement: a headline focus area only when the agency\'s own measurement is a real weakness, in the pilot scope and the outcome review either way');
+
+  // Technically blocked historical database access: never promised.
+  const blocked = conclude({ ...louisSession, answers: { ...ALL_WEAK, C7: a('blocked') } });
+  assert.ok(!blocked.c.solutions.some((f) => f.rule_ids.some((id) => ['F2', 'I2', 'I3'].includes(id))), 'nothing that depends on blocked historical records is proposed');
+  assert.ok(!/database you already own|history in one place/.test(JSON.stringify(blocked.p.screens[3].cards)), 'the client slide does not promise historical intelligence');
+  assert.ok(!blocked.c.deployment.phases.some((ph) => /database you already own/.test(ph.summary)));
+  assert.deepEqual(leak(blocked.p), []);
+  // Access that merely needs validating: proposed, but without a date.
+  const unsure = conclude({ ...louisSession, answers: { ...ALL_WEAK, C7: a('unsure') } });
+  assert.ok(unsure.c.deployment.pending_validation.length >= 1, 'what has to be confirmed is recorded');
+  const hedged = JSON.stringify(unsure.c.solutions) + JSON.stringify(unsure.c.deployment.phases);
+  assert.match(hedged, /once we've confirmed|confirm what the CRM can export/, 'the condition is stated rather than promised');
+  assert.ok(!/by week|by day \d|guarantee/i.test(hedged), 'no fixed date is promised for anything still to be validated');
+  ok('historical database access: blocked access is never proposed or promised, and access that needs validating is stated as a condition with no date attached');
+}
+{
+  // The PRE-PRICE CHECKPOINT: private, persisted, and it decides whether the
+  // price is put to them at all.
+  const base = conclude(louisSession).c;
+  assert.deepEqual(CONCLUSION_STEPS.map((x) => x.id), ['today', 'established', 'opportunity', 'help', 'needs', 'deployment', 'checkpoint', 'pilot'], 'the checkpoint sits after the deployment and before the pilot');
+  assert.equal(CONCLUSION_STEPS.find((x) => x.id === 'checkpoint').private, true);
+  assert.match(base.checkpoint.understanding_cue, /^Before we get into the commercial side of things, does everything I've shown you make sense\?/);
+  assert.match(base.checkpoint.understanding_cue, /explain in a bit more detail\?$/);
+  assert.equal(base.checkpoint.interest_cue, "Based on everything we've discussed, is this something you'd actually want to get implemented in your agency?");
+  assert.deepEqual(UNDERSTANDING_LEVELS, ['CLEAR', 'QUESTIONS_ANSWERED', 'FURTHER_EXPLANATION']);
+  assert.deepEqual(INTEREST_LEVELS, ['YES', 'POTENTIALLY', 'NO']);
+  assert.equal(base.checkpoint.understanding, ''); assert.equal(base.checkpoint.interest, ''); assert.equal(base.checkpoint.next, '');
+  assert.ok(base.checkpoint.concerns_available.length >= 5 && base.checkpoint.concerns_available.every((x) => x.id && x.label));
+  assert.ok(base.checkpoint.concerns_available.some((x) => x.id === 'data_quality'), 'database work is in scope, so the data-quality concern is offered');
+
+  // YES → the pilot line, then the existing £1,500 slide, unchanged.
+  const yes = conclude(louisSession, { checkpoint: { understanding: 'CLEAR', interest: 'YES' } }).c;
+  assert.equal(yes.checkpoint.understanding_label, 'Clear — it all made sense');
+  assert.equal(yes.checkpoint.response, "Perfect. Let me explain how we're structuring the founding pilot.");
+  assert.equal(yes.checkpoint.next, 'pilot'); assert.equal(yes.checkpoint.show_pilot, true);
+  assert.equal(yes.pilot.price_gbp, 1500); assert.equal(yes.pilot.headline, base.pilot.headline, 'the founding offer is unchanged');
+  assert.deepEqual(yes.pilot.scope_rule_ids, base.pilot.scope_rule_ids);
+
+  // POTENTIALLY → the follow-up question and the relevant private guidance.
+  const maybe = conclude(louisSession, { checkpoint: { understanding: 'QUESTIONS_ANSWERED', interest: 'POTENTIALLY', concerns: ['crm_access', 'team_capacity', 'nonsense'], notes: 'Wants to know what Reapit will give us' } }).c;
+  assert.equal(maybe.checkpoint.response, 'What would you need to feel comfortable moving forward with something like this?');
+  assert.deepEqual(maybe.checkpoint.concerns.map((x) => x.id), ['crm_access', 'team_capacity'], 'unknown concern ids are dropped');
+  assert.equal(maybe.checkpoint.notes, 'Wants to know what Reapit will give us');
+  assert.equal(maybe.checkpoint.concerns_resolved, false);
+  assert.deepEqual(maybe.checkpoint.open_guidance, maybe.solutions.map((f) => f.id), 'the private implementation guidance can be opened');
+  assert.equal(maybe.checkpoint.next, 'explore'); assert.equal(maybe.checkpoint.show_pilot, true, 'still allowed, never forced');
+  const resolved = conclude(louisSession, { checkpoint: { interest: 'POTENTIALLY', concerns: ['crm_access'], concerns_resolved: true } }).c;
+  assert.equal(resolved.checkpoint.concerns_resolved, true, 'whether the concern was resolved is preserved');
+
+  // NO → the outcome can be recorded without ever showing a price.
+  const no = conclude(louisSession, { checkpoint: { understanding: 'FURTHER_EXPLANATION', interest: 'NO', concerns: ['timing'] } }).c;
+  assert.equal(no.checkpoint.next, 'outcome'); assert.equal(no.checkpoint.show_pilot, false, 'the pricing slide is not forced');
+  assert.equal(no.checkpoint.response, ''); assert.equal(no.checkpoint.explanation_needed, true);
+  assert.ok(no.checkpoint.guidance.some((x) => /Do not put the price to them/.test(x)));
+  assert.equal(no.pilot.price_gbp, 1500, 'the founding offer itself is untouched');
+
+  // Nothing private reaches the client presentation.
+  for (const state of [yes, maybe, no]) {
+    const pres = presentationPayload(state);
+    const js = JSON.stringify(pres);
+    assert.ok(!js.includes('checkpoint') && !js.includes(state.checkpoint.understanding_cue) && !js.includes(state.checkpoint.interest_cue), 'the checkpoint cues never reach the client screens');
+    assert.ok(!js.includes('Do not put the price to them') && !js.includes('open_guidance'));
+    assert.deepEqual(pres.screens.map((x) => x.id), ['today', 'established', 'opportunity', 'help', 'needs', 'deployment', 'pilot'], 'the client keeps seeing the deployment slide — the checkpoint is not a slide');
+    assert.deepEqual(leak(pres), []);
+  }
+  if (maybe.checkpoint.notes) assert.ok(!JSON.stringify(presentationPayload(maybe)).includes(maybe.checkpoint.notes), 'private notes never reach the client');
+  ok('pre-price checkpoint: private cues recorded as understanding + interest with concerns and notes; yes goes to the unchanged £1,500 slide, potentially opens the implementation guidance, no records the outcome without a price, and none of it is on a client screen');
 }
 
 // ── 6. handlers end to end against an in-memory workbook ──────────────────
@@ -958,7 +1116,9 @@ console.log('\n7. Conclusion handlers, persistence and an older tab header');
   assert.equal(r.statusCode, 200); assert.ok(r.body.conclusion && r.body.presentation, 'autosave returns the conclusion and the presentation');
   assert.equal(r.body.conclusion.understanding.findings.length, 3);
   r = res(); await handleDiscoverySession(req('GET', { session_id: sid }), r);
-  assert.equal(r.body.conclusion.mode, 'PILOT'); assert.equal(r.body.presentation.screens.length, 7); assert.ok(r.body.registry.conclusion_steps.length === 7);
+  assert.equal(r.body.conclusion.mode, 'PILOT'); assert.equal(r.body.presentation.screens.length, 7); assert.ok(r.body.registry.conclusion_steps.length === 8, 'seven client steps plus the private pre-price checkpoint');
+  assert.equal(r.body.registry.conclusion_steps.filter((st) => st.private).map((st) => st.id).join(','), 'checkpoint');
+  assert.equal(r.body.registry.focus_areas.length, 7, 'the seven focus areas are published to the page');
   assert.equal(store.DISCOVERY_SESSIONS[0].length, oldHeader.length, 'nothing extended yet — no conclusion has been written');
   ok('older tab header: still available, session read and autosave carry the deterministic conclusion and the presentation payload');
 
@@ -983,6 +1143,31 @@ console.log('\n7. Conclusion handlers, persistence and an older tab header');
   assert.ok(!r.body.diagnosis.proposed.includes('F5')); assert.equal(r.body.conclusion.understanding.counts.rejected, 1);
   ok('discovery-conclusion: extends an older header in place, persists agreement / illustration / scope, recomputes and stores the corrected diagnosis, never rewrites answers or operator overrides; a later autosave keeps the agreement');
 
+  // The pre-price checkpoint survives a refresh, and is patched field by
+  // field like the rest of the conclusion state.
+  r = res(); await handleDiscoveryConclusion(req('POST', {}, { session_id: sid, checkpoint: { understanding: 'QUESTIONS_ANSWERED', interest: 'POTENTIALLY', concerns: ['crm_access', 'team_capacity'], notes: 'Wants to check with his business partner' } }), r);
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.body.conclusion.checkpoint.interest, 'POTENTIALLY');
+  assert.deepEqual(r.body.conclusion.checkpoint.concerns.map((x) => x.id), ['team_capacity'], 'crm_access is not offered: nothing in this session\'s scope depends on the CRM history');
+  row = rowOf();
+  assert.equal(row.conclusion.checkpoint.notes, 'Wants to check with his business partner');
+  assert.equal(row.conclusion.agreement.measure.status, 'REJECTED', 'the checkpoint save keeps the agreement');
+  // Reload the session as the page does after a refresh.
+  r = res(); await handleDiscoverySession(req('GET', { session_id: sid }), r);
+  const reloaded = r.body.conclusion.checkpoint;
+  assert.equal(reloaded.understanding, 'QUESTIONS_ANSWERED'); assert.equal(reloaded.interest, 'POTENTIALLY');
+  assert.deepEqual(reloaded.concerns.map((x) => x.id), ['team_capacity']);
+  assert.equal(reloaded.notes, 'Wants to check with his business partner'); assert.equal(reloaded.concerns_resolved, false);
+  assert.ok(reloaded.at, 'the checkpoint is timestamped');
+  assert.ok(!JSON.stringify(r.body.presentation).includes('business partner'), 'private checkpoint notes are not in the presentation payload after a reload');
+  // A later patch of one field keeps the rest.
+  r = res(); await handleDiscoveryConclusion(req('POST', {}, { session_id: sid, checkpoint: { concerns_resolved: true, interest: 'YES' } }), r);
+  assert.equal(r.body.conclusion.checkpoint.interest, 'YES'); assert.equal(r.body.conclusion.checkpoint.concerns_resolved, true);
+  assert.equal(r.body.conclusion.checkpoint.notes, 'Wants to check with his business partner', 'the earlier notes survive a partial patch');
+  assert.equal(r.body.conclusion.checkpoint.understanding, 'QUESTIONS_ANSWERED');
+  assert.equal(r.body.conclusion.pilot.price_gbp, 1500, 'the founding offer is unchanged throughout');
+  ok('pre-price checkpoint persistence: stored against the discovery session, survives a refresh with understanding, interest, concerns, resolution and notes intact, patched field by field, and never in the presentation payload');
+
   // Polish through the handler: fake model, then invalid, then outage.
   __setAiCallerForTests(async ({ prompt, tool }) => { const inp = JSON.parse(prompt.slice(prompt.indexOf('\n\n') + 2)); if (tool.name !== 'polish_conclusion') return { spoken: 'x?', week1: 'a', week2: 'b', weeks3_4: 'c', weeks5_8: 'd' }; return { findings: inp.findings.map((f) => ({ id: f.id, text: f.text.replace(/Mainly because/g, 'That comes down to') })), changes: inp.changes.map((x) => ({ id: x.id, text: x.text })) }; });
   r = res(); await handleDiscoveryConclusionPolish(req('POST', {}, { session_id: sid }), r); assert.equal(r.statusCode, 400);
@@ -1006,6 +1191,7 @@ console.log('\n7. Conclusion handlers, persistence and an older tab header');
   assert.equal(r.statusCode, 201); assert.equal(r.body.pitch.version, 1); assert.ok(!r.body.pitch.diagnosis_snapshot.proposed.includes('F2'));
   ok('the spoken pitch archive still works on the corrected diagnosis and keeps its immutable versions');
 
+
   // Outcome: the exact findings and scope the owner agreed are frozen with the scope.
   r = res(); await handleDiscoveryOutcome(req('POST', {}, { session_id: sid, confirm: 'RECORD_OUTCOME', outcome: 'PILOT_AGREED', outcome_notes: 'Yes.' }), r);
   assert.equal(r.statusCode, 200);
@@ -1016,9 +1202,17 @@ console.log('\n7. Conclusion handlers, persistence and an older tab header');
   assert.equal(snap.opportunity.expected_fee_income_per_valuation_gbp, 1350); assert.equal(snap.opportunity.selected.additional_valuations_per_month, 4);
   assert.equal(snap.pilot.headline, '£1,500 all-in for 60 days'); assert.ok(snap.owner_overrides.F2 && snap.owner_overrides.F5);
   assert.ok(row.agreed_scope.checklist.length > 3);
+  // The focus areas, the roadmap built from them and the checkpoint are
+  // frozen with the agreed scope, so what was actually shown is recoverable.
+  assert.ok(snap.focus_areas.length >= 1 && snap.focus_areas.every((f) => f.id && f.heading && f.sentence && f.rule_ids.length));
+  assert.deepEqual(snap.deployment.map((ph) => ph.key), ['week1', 'week2', 'weeks3_4', 'weeks5_8']);
+  assert.ok(snap.deployment.flatMap((ph) => ph.focus_ids).every((id) => snap.focus_areas.some((f) => f.id === id)), 'the frozen roadmap references only the frozen focus areas');
+  assert.equal(snap.checkpoint.interest, 'YES'); assert.equal(snap.checkpoint.understanding, 'QUESTIONS_ANSWERED');
+  assert.deepEqual(snap.checkpoint.concerns, ['team_capacity']); assert.equal(snap.checkpoint.concerns_resolved, true);
+  assert.equal(snap.checkpoint.notes, 'Wants to check with his business partner');
   r = res(); await handleDiscoveryConclusion(req('POST', {}, { session_id: sid, additional_valuations: 1 }), r); assert.equal(r.statusCode, 409, 'a completed session is not silently changed');
   r = res(); await handleDiscoveryConclusion(req('POST', {}, { session_id: sid, additional_valuations: 1, reopen: true }), r); assert.equal(r.statusCode, 200); assert.equal(rowOf().status, 'IN_PROGRESS');
-  ok('outcome: the agreed scope defaults to the conclusion\'s ticks and freezes the exact findings, agreement, economics illustration, pilot headline and owner overrides; completed sessions need reopen=true');
+  ok('outcome: the agreed scope defaults to the conclusion\'s ticks and freezes the exact findings, agreement, economics illustration, focus areas, roadmap, pre-price checkpoint, pilot headline and owner overrides; completed sessions need reopen=true');
 }
 
 console.log(`\n✅ Discovery self-test passed (${passed} checks).\n`);
