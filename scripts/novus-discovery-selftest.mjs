@@ -720,14 +720,15 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   // The presentation payload carries nothing internal.
   assert.equal(p.screens.length, 7); assert.deepEqual(p.screens.map((x) => x.id), ['today', 'established', 'opportunity', 'help', 'needs', 'deployment', 'pilot']);
   const help = p.screens[3];
-  assert.equal(help.title, "Here's what I'd propose for your agency.");
+  assert.equal(help.title, 'Your proposed NOVUS deployment');
   assert.equal(help.headline, 'Generate more valuations from the customers you already have.', 'one commercially meaningful project');
-  assert.match(help.description, /^We'd focus on finding potential sellers within the 5,000 contacts in Reapit and putting an ongoing process in place/);
-  assert.equal(help.ambition, 'Built around your aim of more valuations.', 'no target was given, so none is invented');
-  assert.deepEqual(help.components.map((x) => x.heading), ['Find existing opportunities', 'Recognise new opportunities', 'Turn opportunities into business']);
+  assert.equal(help.description, 'A focused 60-day project built around the potential sellers already in your Reapit database, and an ongoing process to turn more of them into valuations.');
+  assert.equal(help.objective, 'Work towards more valuations, establishing what additional business NOVUS can genuinely contribute during the pilot.', 'no target was given, so none is invented');
+  assert.deepEqual(help.components.map((x) => x.label), ['Recover existing opportunities', 'Identify new opportunities', 'Generate commercial results']);
+  assert.deepEqual(help.components.map((x) => x.heading), ['Find potential sellers within your 5,000 contacts', 'Pick up when those customers come back into the market', 'Turn those opportunities into valuation conversations']);
   assert.equal(help.cards, undefined, 'the three independent focus-area cards are gone');
   for (const x of help.components) { assert.ok(/\.$/.test(x.sentence) && x.sentence.split(/(?<=[.!?])\s+/).length === 1, 'one sentence per component'); }
-  assert.match(help.components[0].sentence, /the 5,000 contacts in Reapit/);
+  assert.match(help.components[0].sentence, /previous valuations and suitable existing customers in Reapit/);
   assert.match(help.components[2].sentence, /dated next step with a named owner/, 'Louis\'s follow-up is weak, so the project covers it');
   assert.match(help.setup, /^To support this, we'd first make sure what your team hear about selling actually gets recorded in Reapit/, 'foundations are supporting setup, not the headline');
   assert.match(help.ongoing, /^This isn't a one-off database clean-up or list\. Once established, NOVUS continues identifying relevant opportunities/);
@@ -739,7 +740,7 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   const gd = c.guidance;
   const pg = gd.project;
   assert.equal(pg.title, help.headline, 'the workspace and the slide carry identical project wording');
-  assert.deepEqual(pg.components.map((x) => x.heading), help.components.map((x) => x.heading), 'and identical components');
+  assert.deepEqual(pg.components.map((x) => [x.label, x.heading]), help.components.map((x) => [x.label, x.heading]), 'and identical components');
   assert.ok(pg.why.length >= 2 && pg.supporting_answers.length >= 2 && pg.objective_link && pg.what_we_implement.length >= 3 && pg.data_access.length >= 2 && pg.need_from_team.length >= 2 && pg.ongoing.length >= 2 && pg.measures.length >= 2 && pg.fallbacks.length >= 2 && pg.questions.length >= 5);
   assert.ok(pg.components.every((x) => x.implementation.length && x.implementation.every((r) => r.configure.length && r.fallback)), 'implementation answers from the rule registry, per component');
   assert.match(pg.say_aloud, /^So Louis, based on what you've told me, the project I'd propose is generating more valuations from the customers you already have\./);
@@ -795,9 +796,9 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   assert.ok(c.guidance.project.supporting_answers.some((x) => /History is fine in Reapit/.test(x)), 'the owner\'s correction is in the private "why"');
   // Corrections move the project, its components, the guidance and the roadmap together.
   const before3 = before.p.screens[3];
-  assert.match(before3.setup, /history in one place/); assert.match(before3.components[2].sentence, /track the valuations/);
+  assert.match(before3.setup, /history in one place/); assert.ok(before.c.project.rule_ids.includes('F5'));
   assert.ok(!/history in one place/.test(p.screens[3].setup), 'we no longer propose to improve what the owner says already works');
-  assert.ok(!/track the valuations/.test(p.screens[3].components[2].sentence), 'the rejected measurement leaves the component wording');
+  assert.ok(!c.project.components.some((x) => x.rule_ids.some((id) => ['F5', 'I5'].includes(id))), 'the rejected measurement leaves the project components');
   assert.ok(!c.project.rule_ids.includes('F2') && c.project.preserved.includes('Customer context'), 'the corrected part becomes a reuse, not a proposed change');
   assert.ok(p.screens[3].preserved.includes('Customer context'), 'the client sees it as something that stays as it is');
   assert.deepEqual(c.deployment.component_ids, c.project.components.map((f) => f.id), 'the roadmap follows the corrected project');
@@ -890,7 +891,7 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   assert.ok(polished.project.description_polished && polished.project.components.every((st) => st.sentence_polished), 'the project description and components can be polished too');
   assert.equal(presentationPayload(polished).screens[3].description, polished.project.description_polished, 'the slide shows the polished wording');
   // A correction changes the original → the polish for that stage is stale and dropped.
-  const stale = conclude(louisSession, { polish: out.polish, agreement: { measure: { status: 'REJECTED', note: 'x' } } }).c;
+  const stale = conclude(louisSession, { polish: out.polish, agreement: { opportunities: { status: 'CORRECTED', dropped: ['I4'], note: 'x' } } }).c;
   assert.equal(stale.project.components.find((st) => st.id === 'business').sentence_polished, undefined, 'the corrected component loses its stale polish');
   assert.ok(stale.polish.stale >= 1);
   const bad = async ({ prompt }) => { const inp = JSON.parse(prompt.slice(prompt.indexOf('\n\n') + 2)); return { findings: inp.findings.map((f, i) => ({ id: f.id, text: i === 0 ? `${f.text} We guarantee £40,000 a year.` : i === 1 ? 'Too short? Sure. F1 is broken.' : f.text })), changes: inp.changes.map((x) => ({ id: x.id, text: `${x.text} It leverages cutting-edge AI-powered intelligence.` })) }; };
@@ -941,10 +942,11 @@ console.log('\n5d. Primary commercial project, personalised deployment and the p
   const jh = john.p.screens[3];
   assert.equal(john.c.mode, 'PILOT'); assert.equal(john.c.project.type, 'existing_customers');
   assert.equal(jh.headline, 'Generate more valuations from the customers you already have.');
-  assert.equal(jh.description, "We'd focus on finding potential sellers within the 5,000 contacts in Reapit and putting an ongoing process in place to turn more of those opportunities into valuations.");
-  assert.equal(jh.ambition, 'Built around your ambition: another five or six valuations a month.', 'their ambition, in their words, not a promise');
-  assert.deepEqual(jh.components.map((x) => x.heading), ['Find existing opportunities', 'Recognise new opportunities', 'Turn opportunities into business']);
-  assert.match(jh.components[2].sentence, /progress them through your existing follow-up process/, 'his managers\' follow-up is reused, not rebuilt');
+  assert.equal(jh.title, 'Your proposed NOVUS deployment');
+  assert.equal(jh.description, 'A focused 60-day project built around the potential sellers already in your Reapit database, and an ongoing process to turn more of them into valuations.');
+  assert.equal(jh.objective, 'Work towards your ambition of another five or six valuations a month, establishing what additional business NOVUS can genuinely contribute during the pilot.', 'their ambition, in their words, not a promise');
+  assert.deepEqual(jh.components.map((x) => `${x.label} | ${x.heading}`), ['Recover existing opportunities | Find potential sellers within your 5,000 contacts', 'Identify new opportunities | Pick up when those customers come back into the market', 'Generate commercial results | Turn those opportunities into valuation conversations']);
+  assert.match(jh.components[2].sentence, /^Put relevant contacts in front of your negotiators, work them through your existing follow-up process and establish which become additional valuations and instructions\.$/, 'his managers\' follow-up is reused, not rebuilt');
   assert.ok(!/incoming enquir|dated next step/i.test(JSON.stringify(jh.components)), 'no pitch for what his team already handle well');
   assert.ok(!john.c.project.rule_ids.some((id) => ['I1', 'F3', 'F4', 'I4'].includes(id)));
   assert.match(jh.setup, /customer's history in one place/, 'the foundation the history work needs is supporting setup');
@@ -985,7 +987,9 @@ console.log('\n5d. Primary commercial project, personalised deployment and the p
   const eh = enquiryGap.p.screens[3];
   assert.equal(enquiryGap.c.project.type, 'incoming_demand');
   assert.equal(eh.headline, 'Generate more valuations from the enquiries you already get.');
-  assert.equal(eh.components[0].heading, 'Spot the sellers in new enquiries'); assert.match(eh.components[0].sentence, /the 250 enquiries you get each month/);
+  assert.equal(eh.components[0].label, 'Find sellers in new demand'); assert.equal(eh.components[0].heading, 'Spot the sellers within your 250 enquiries a month');
+  assert.notDeepEqual(eh.components.map((x) => x.label), jh.components.map((x) => x.label), 'not John\'s three categories with the figures swapped');
+  assert.match(eh.description, /the sellers already contacting you/);
   assert.ok(!/database|customers you already have/.test(JSON.stringify(eh.components)), 'nothing about the database they already work well');
   assert.notEqual(eh.headline, jh.headline);
   same(enquiryGap.c, enquiryGap.p);
@@ -1001,7 +1005,8 @@ console.log('\n5d. Primary commercial project, personalised deployment and the p
   } });
   assert.equal(measureOnly.c.project.type, 'visibility');
   assert.equal(measureOnly.p.screens[3].headline, 'See exactly what produces your valuations and instructions.');
-  assert.deepEqual(measureOnly.p.screens[3].components.map((x) => x.heading), ['Track every opportunity', 'Learn what works']);
+  assert.deepEqual(measureOnly.p.screens[3].components.map((x) => x.label), ['Track every opportunity', 'Learn what works'], 'two components, not forced to three');
+  assert.equal(measureOnly.p.screens[3].objective, 'Work towards winning more of the valuations we do, establishing what additional business NOVUS can genuinely contribute during the pilot.');
   assert.equal(measureOnly.c.deployment.phases[1].heading, 'Start tracking every opportunity');
   assert.ok(measureOnly.c.guidance.project.ongoing.some((x) => /not automated learning/.test(x)), 'the outcome review is described honestly');
   same(measureOnly.c, measureOnly.p);
@@ -1351,7 +1356,7 @@ console.log('\n7. Conclusion handlers, persistence and an older tab header');
   // The ONE project, the roadmap built from it and the checkpoint are frozen
   // with the agreed scope, so what was actually shown is recoverable.
   assert.ok(snap.project && snap.project.title && snap.project.description && snap.project.commercial_objective.priority === 'more_valuations');
-  assert.ok(snap.project.components.length >= 1 && snap.project.components.every((f) => f.id && f.heading && f.sentence && f.rule_ids.length));
+  assert.ok(snap.project.components.length >= 1 && snap.project.components.every((f) => f.id && f.label && f.heading && f.sentence && f.rule_ids.length) && snap.project.objective_statement);
   assert.ok(Array.isArray(snap.project.supporting_setup) && Array.isArray(snap.project.technical_conditions) && snap.project.ongoing && Array.isArray(snap.project.preserved));
   assert.deepEqual(snap.deployment_scope, row.agreed_scope.rule_ids);
   assert.ok(snap.agency_responsibilities.length >= 1 && snap.success_criteria.length >= 1);

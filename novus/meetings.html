@@ -241,8 +241,22 @@
     .pres-body.top{justify-content:flex-start;overflow:hidden;}
     .pres-card.simple{padding:3.2cqh 2.2cqw;gap:1.6cqh;} .pres-card.simple .h{font-size:2.1cqw;} .pres-card.simple p{font-size:1.45cqw;line-height:1.5;}
     .pres-card.simple p.ctx{font-size:1.15cqw;color:rgba(147,196,255,.85);margin-top:-.6cqh;}
-    .pres-project{margin-bottom:2.6cqh;} .pres-project .h{font-size:2.6cqw;font-weight:600;color:#fff;line-height:1.25;letter-spacing:-.01em;} .pres-project p{margin-top:1.2cqh;font-size:1.5cqw;line-height:1.5;color:rgba(241,237,230,.85);max-width:80%;} .pres-project p.amb{font-size:1.25cqw;color:rgba(147,196,255,.9);margin-top:.8cqh;}
-    .pres-project + .pres-cols .pres-card.simple{padding:2.4cqh 1.8cqw;gap:1.2cqh;} .pres-project + .pres-cols .pres-card.simple .h{font-size:1.7cqw;} .pres-project + .pres-cols .pres-card.simple p{font-size:1.25cqw;}
+    /* The proposed-deployment slide: headline, description, up to three
+       numbered components and THE OBJECTIVE — sized to fit 16:9 unscrolled. */
+    .pres-slide:has(.pres-body.proposal){padding-top:9.5cqh;padding-bottom:8cqh;}
+    .pres-title.sm{font-size:1.15cqw;font-family:var(--sans);font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#93C4FF;margin-top:.6cqh;}
+    .pres-project .h{font-family:var(--serif);font-size:2.75cqw;font-weight:400;color:#fff;line-height:1.12;letter-spacing:-.022em;max-width:92%;}
+    .pres-project p{margin-top:1cqh;font-size:1.25cqw;line-height:1.45;color:rgba(241,237,230,.8);max-width:80%;}
+    .pres-body.proposal{justify-content:flex-start;margin-top:1.6cqh;gap:2cqh;}
+    .pres-comps .pres-card{padding:2cqh 1.5cqw;gap:.8cqh;}
+    .pres-comps .lab{font-size:.85cqw;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#93C4FF;}
+    .pres-comps .h{font-size:1.5cqw;line-height:1.2;}
+    .pres-comps p{font-size:1.08cqw;line-height:1.45;color:rgba(241,237,230,.82);margin:0;}
+    .pres-setup{font-size:1cqw;line-height:1.4;color:rgba(241,237,230,.62);margin-top:-.8cqh;}
+    .pres-objective{border-left:.25cqw solid #4E9BFF;padding:.2cqh 0 .2cqh 1.4cqw;}
+    .pres-objective .lab{font-size:.85cqw;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:rgba(241,237,230,.55);}
+    .pres-objective p{margin:.6cqh 0 0;font-size:1.3cqw;line-height:1.4;color:#fff;max-width:88%;}
+    .pres-objective .ong{font-size:1cqw;line-height:1.4;color:rgba(241,237,230,.6);margin-top:.7cqh;}
     .pres-ongoing{margin-top:2.4cqh;font-size:1.3cqw;line-height:1.5;color:rgba(241,237,230,.72);border-top:1px solid rgba(241,237,230,.12);padding-top:1.8cqh;}
     .pres-cols.dense .pres-card ul{font-size:1.05cqw;} .pres-cols.dense .pres-card{padding:1.8cqh 1.5cqw;}
     .pres-price{margin-top:.5cqh;}
@@ -1307,12 +1321,11 @@ function cStepHelp(c){
   return `<div class="panel">${clientHead(sc)}
     ${sc.headline ? `<div class="sol">
       <div class="sol-h" style="font-size:17px">${esc(sc.headline)}</div><div class="sol-s">${esc(sc.description)}</div>
-      ${sc.ambition ? `<div class="sol-s" style="color:var(--blue)">${esc(sc.ambition)}</div>` : ''}
       ${pg ? `<div class="mini" style="margin-top:6px">Project: ${esc(pg.name)}</div>` : ''}
     </div>
-    ${(sc.components||[]).map((g, k) => `<div class="sol"><div class="sol-n">0${k+1}</div><div class="sol-h">${esc(g.heading)}</div><div class="sol-s">${esc(g.sentence)}</div></div>`).join('')}
+    ${(sc.components||[]).map((g, k) => `<div class="sol"><div class="mini" style="letter-spacing:.14em;text-transform:uppercase;color:var(--blue);font-weight:700">0${k+1} · ${esc(g.label)}</div><div class="sol-h">${esc(g.heading)}</div><div class="sol-s">${esc(g.sentence)}</div></div>`).join('')}
     ${sc.setup ? `<div class="note">${esc(sc.setup)}</div>` : ''}
-    ${sc.ongoing ? `<div class="note">${esc(sc.ongoing)}</div>` : ''}
+    ${sc.objective ? `<div class="sol"><div class="mini" style="letter-spacing:.14em;text-transform:uppercase;font-weight:700">The objective</div><div class="sol-s">${esc(sc.objective)}</div>${sc.ongoing ? `<div class="sol-s" style="color:var(--ink-3)">${esc(sc.ongoing)}</div>` : ''}</div>` : ''}
     ${(sc.preserved||[]).length ? `<div class="note">What already works stays as it is: ${esc(sc.preserved.join(', ').toLowerCase())}.</div>` : ''}
     ${projectGuidanceHtml(pg)}` : `<div class="say">${esc(sc.next_step||c.next_step)}</div>`}
   </div>`;
@@ -1444,9 +1457,14 @@ function presSlideHtml(sc, i){
         <div class="out"><div class="o"><div class="v">${esc(row.monthly)}</div><div class="l">a month</div></div><div class="o"><div class="v">${esc(row.annual)}</div><div class="l">a year, if sustained</div></div></div></div>
       <div class="pres-note">${esc(sc.label)}. ${esc(sc.footnote)}</div></div>`;
   }
-  if(sc.id === 'help') return `${head(sc.subtitle)}<div class="pres-body">${sc.headline ? `<div class="pres-project"><div class="h">${esc(sc.headline)}</div><p>${esc(sc.description)}</p>${sc.ambition ? `<p class="amb">${esc(sc.ambition)}</p>` : ''}</div>
-      <div class="pres-cols" style="--n:${sc.components.length}">${sc.components.map((g, k) => `<div class="pres-card simple"><div class="num">0${k+1}</div><div class="h">${esc(g.heading)}</div><p>${esc(g.sentence)}</p></div>`).join('')}</div>` : `<div class="pres-next">${esc(sc.next_step)}</div>`}
-      ${sc.ongoing ? `<div class="pres-ongoing">${esc(sc.ongoing)}</div>` : ''}</div>`;
+  if(sc.id === 'help'){
+    if(!sc.headline) return `${head(sc.subtitle)}<div class="pres-body"><div class="pres-next">${esc(sc.next_step)}</div></div>`;
+    return `${eyebrow}<h1 class="pres-title sm">${esc(sc.title)}</h1><div class="pres-body proposal">
+      <div class="pres-project"><div class="h">${esc(sc.headline)}</div><p>${esc(sc.description)}</p></div>
+      <div class="pres-cols pres-comps" style="--n:${sc.components.length}">${sc.components.map((g, k) => `<div class="pres-card"><div class="lab">0${k+1} · ${esc(g.label)}</div><div class="h">${esc(g.heading)}</div><p>${esc(g.sentence)}</p></div>`).join('')}</div>
+      ${sc.setup ? `<div class="pres-setup">${esc(sc.setup)}</div>` : ''}
+      ${sc.objective ? `<div class="pres-objective"><div class="lab">The objective</div><p>${esc(sc.objective)}</p>${sc.ongoing ? `<div class="ong">${esc(sc.ongoing)}</div>` : ''}</div>` : ''}</div>`;
+  }
   if(sc.id === 'needs') return `${head(sc.subtitle)}<div class="pres-body"><div class="pres-cols" style="--n:3">${sc.cards.map((g, k) => `<div class="pres-card simple"><div class="num">0${k+1}</div><div class="h">${esc(g.heading)}</div><p>${esc(g.sentence)}</p></div>`).join('')}</div></div>`;
   if(sc.id === 'deployment') return `${head(sc.subtitle)}<div class="pres-body">${sc.proposed ? `<div class="pres-timeline">${sc.phases.map((p) => `<div class="pres-phase"><div class="w">${esc(p.title)}</div><div class="h">${esc(p.heading)}</div><p>${esc(p.summary)}</p></div>`).join('')}</div><div class="pres-note">${esc(sc.caveat)}</div>` : `<div class="pres-next">${esc(S.presentation.screens.find((x) => x.id === 'pilot')?.next_step || '')}</div>`}</div>`;
   if(sc.id === 'pilot') return `${head('')}<div class="pres-body top">${sc.proposed ? `<div class="pres-price"><span class="p">${esc(sc.price)}</span><span class="d">all-in · ${esc(sc.duration)} · no long-term commitment</span></div>
