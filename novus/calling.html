@@ -588,10 +588,11 @@ function callActionHtml(a){
     <div class="task-rail ${over?(a.group==='overdue'?'over':'due'):''}"></div>
     <div class="task-main">
       <div class="task-top"><div class="task-what">${esc(a.reason||'Call back')}</div>
+        ${a.priority==='CRITICAL'?pill('CRITICAL','t-red',true):''}
         ${pill(a.kind==='EMAIL_REPLY'?'call requested':a.kind==='RETRY'?'retry':a.kind==='CALLBACK'?'callback':'call', a.kind==='EMAIL_REPLY'?'t-green':a.kind==='CALLBACK'?'t-amber':'t-blue', true)}
         ${a.suppressed?pill('suppressed','t-red',true):''}${a.no_phone?pill('no number','t-red',true):''}</div>
       <div class="task-who"><b>${dash(a.agency_name)}</b> &middot; ${dash(a.contact_name)}${a.contact_role?` <span class="muted">(${esc(a.contact_role)})</span>`:''} &middot; <span class="mono">${dash(a.phone)}</span></div>
-      <div class="task-why">${a.kind==='EMAIL_REPLY'?`${a.reply_received_at?`Replied ${esc(ago(a.reply_received_at))} &middot; `:''}${a.campaign_name?`Source: ${esc(a.campaign_name)} &middot; `:''}${a.reply_text?`“${esc(a.reply_text)}”`:''}${a.timing?.language?` &middot; Timing: ${esc(a.timing.language)}`:''}${a.needs_review?` &middot; <b>Review number or timing</b>`:''}`:`${a.previous_outcome?`Last time: ${esc(outcomeLabel(a.previous_outcome))} &middot; `:''}${a.attempts||0} previous attempt${a.attempts===1?'':'s'}${a.note?` &middot; ${esc(a.note)}`:''}`}</div>
+      <div class="task-why">${a.kind==='EMAIL_REPLY'?`${a.reply_received_at?`Replied ${esc(ago(a.reply_received_at))} &middot; `:''}${a.campaign_name?`Source: ${esc(a.campaign_name)} &middot; `:''}${a.property?`Property: ${esc(a.property)} &middot; `:''}${a.probe_reference?`Probe: ${esc(a.probe_reference)} &middot; `:''}${a.reply_text?`“${esc(a.reply_text)}”`:''}${a.timing?.language?` &middot; Timing: ${esc(a.timing.language)}`:''}${a.needs_review?` &middot; <b>Review number or timing</b>`:''}`:`${a.previous_outcome?`Last time: ${esc(outcomeLabel(a.previous_outcome))} &middot; `:''}${a.attempts||0} previous attempt${a.attempts===1?'':'s'}${a.note?` &middot; ${esc(a.note)}`:''}`}</div>
     </div>
     <div class="task-side"><div class="task-when ${over?'due':''}">${esc(a.group==='overdue'?when(a.due_at):time)}</div>
       ${a.kind==='EMAIL_REPLY'&&a.needs_review?`<div class="btnrow"><button class="btn btn-secondary btn-sm review-call" data-action="${esc(a.action_id)}" type="button">Review details</button></div>`:''}
@@ -612,6 +613,12 @@ async function reviewCallAction(actionId){
     const choice=window.prompt(`Choose the number for ${a.contact_name||a.agency_name}:\n${a.phone_candidates.map((p)=>p.raw).join('\n')}`, a.phone_candidates[0].raw);
     if(choice===null) return;
     phone=choice.trim();
+  }
+  if(a.no_phone && !phone){
+    const choice=window.prompt(`Obtain a callback number for ${a.contact_name||a.agency_name}, then enter it here:`, '');
+    if(choice===null) return;
+    phone=choice.trim();
+    if(!phone){ window.alert('A callback number is required. This critical action will stay open.'); return; }
   }
   if(a.timing?.needs_review){
     const choice=window.prompt(`The reply says: ${a.timing.language||'no clear time'}\nEnter a London callback date/time (YYYY-MM-DDTHH:MM), or "now":`, a.timing?.due_at?toLondonInput(a.timing.due_at):'now');
@@ -723,7 +730,7 @@ function startSession(mode, agencyId, actionId=''){
     lead={...lead,action_id:action.action_id,phone:action.phone,phone_e164:action.phone_e164,
       contact_name:action.contact_name,contact_role:action.contact_role,
       context:{...lead.context,call_requested:email,call_reason:email?action.reason:'',call_reply:email?action.reply_text:'',
-        call_received_at:email?action.reply_received_at:'',call_instantly_email_id:email?action.reply_instantly_email_id:'',
+        call_received_at:email?action.reply_received_at:'',call_original_reply:email?action.original_reply:'',call_instantly_email_id:email?action.reply_instantly_email_id:'',
         call_outreach_id:email?action.outreach_id:'',campaign_name:email?action.campaign_name:'',
         email_sent:email?action.email_sent:'',call_timing:email?action.timing:null,call_needs_review:email&&action.needs_review}};
   }
@@ -906,9 +913,9 @@ function liveHtml(){
   return `<div class="cm-body">
     <div class="cm-main">
       ${CALL.discarded_note?`<div class="banner" style="margin-bottom:18px">${esc(CALL.discarded_note)}</div>`:''}
-      ${l.context?.call_requested?`<div class="hintbox" style="margin-bottom:18px"><b>Call requested by email</b>${l.context.campaign_name?` · ${esc(l.context.campaign_name)}`:''}${l.context.call_received_at?` · replied ${esc(ago(l.context.call_received_at))}`:''}<br>${esc(l.context.call_reason||'')}${l.context.call_timing?.language?`<br>Timing: ${esc(l.context.call_timing.language)}`:''}${l.context.call_needs_review?`<br><b>Check callback details before dialling.</b>`:''}</div>${l.context.email_sent?`<div class="cm-label">Email sent</div><div class="quote">${esc(l.context.email_sent)}</div>`:''}<div class="cm-label" style="margin-top:20px">Exact reply</div><div class="quote">${esc(l.context.call_reply||'')}</div><div class="note" style="margin-top:12px">Probe ${esc(l.context.property||'property not recorded')}${l.probe_sent_at?` · ${esc(when(l.probe_sent_at))}`:''}${l.context.probe_grade_reason?` · ${esc(l.context.probe_grade_reason)}`:''}</div>`:''}
-      <div class="cm-label">Current script ${s?`<span class="mono muted">${esc(s.name)} v${s.version}</span>`:''}${switcher}</div>
-      <div class="script">${s?scriptHtml(s.content, l):'<span class="muted">No script. Add one in Scripts.</span>'}</div>
+      ${l.context?.call_requested?`<div class="hintbox" style="margin-bottom:18px"><b>Call requested by email</b>${l.context.campaign_name?` · ${esc(l.context.campaign_name)}`:''}${l.context.call_received_at?` · replied ${esc(ago(l.context.call_received_at))}`:''}<br>${esc(l.context.call_reason||'')}${l.context.call_timing?.language?`<br>Timing: ${esc(l.context.call_timing.language)}`:''}${l.context.call_needs_review?`<br><b>Check callback details before dialling.</b>`:''}</div>${l.context.email_sent?`<div class="cm-label">Email sent</div><div class="quote">${esc(l.context.email_sent)}</div>`:''}<div class="cm-label" style="margin-top:20px">Prospect reply</div><div class="quote">${esc(l.context.call_reply||'')}</div>${l.context.call_original_reply&&l.context.call_original_reply!==l.context.call_reply?`<details class="note"><summary>Full original email</summary><div class="quote">${esc(l.context.call_original_reply)}</div></details>`:''}<div class="note" style="margin-top:12px">Probe ${esc(l.context.property||'property not recorded')}${l.probe_sent_at?` · ${esc(when(l.probe_sent_at))}`:''}${l.context.probe_grade_reason?` · ${esc(l.context.probe_grade_reason)}`:''}</div>`:''}
+      <div class="cm-label">${l.context?.campaign_script?'Campaign script':`Current script ${s?`<span class="mono muted">${esc(s.name)} v${s.version}</span>`:''}${switcher}`}</div>
+      <div class="script">${l.context?.campaign_script?scriptHtml(l.context.campaign_script,l):s?scriptHtml(s.content, l):'<span class="muted">No script. Add one in Scripts.</span>'}</div>
       ${l.calls&&l.calls.length?`<div class="cm-label" style="margin-top:34px">Previous calls</div><ul class="cm-list">${l.calls.map((c)=>`<li><b>${esc(when(c.at))}</b><span>${esc(outcomeLabel(c.outcome))}${c.pitched?' · pitched':''}${c.callback_at?` · callback ${esc(when(c.callback_at))}`:''}${c.note?` — ${esc(c.note)}`:''}${c.recording?` · <a href="${RECORDING_URL}&call_id=${encodeURIComponent(c.call_id)}" target="_blank" rel="noopener" style="color:var(--blue)">recording</a>`:''}</span></li>`).join('')}</ul>`:''}
       ${l.context?.reply_text&&!l.context?.call_requested?`<div class="cm-label" style="margin-top:34px">Latest email reply</div><div class="quote">${esc(l.context.reply_text)}</div>`:''}
       ${l.context?.probe_grade_reason?`<div class="cm-label" style="margin-top:24px">Probe finding</div><div class="note">${esc(l.context.probe_grade_reason)}</div>`:''}

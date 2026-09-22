@@ -181,6 +181,7 @@
                   <div class="fl">Campaign</div>
                   <input class="input" id="f-name" type="text" placeholder="Campaign name, e.g. Enquiry → Quick Call V1" />
                   <select class="input" id="f-type">
+                    <option value="PROBE_FIVE_MINUTE_CALL">Probe-led 5-minute call</option>
                     <option value="ENQUIRY_FOLLOWUP">Enquiry follow-up (copy refers to the probe)</option>
                     <option value="GENERAL">General (no probe required)</option>
                   </select>
@@ -208,6 +209,7 @@
                   <label class="ck"><input type="checkbox" id="f-include_opted_out" /> Include opted out (always blocked)</label>
                   <label class="ck"><input type="checkbox" id="f-include_bounced" /> Include bounced (always blocked)</label>
                   <div class="fl">Agency</div>
+                  <input class="input" id="f-agency_ids" type="text" placeholder="Controlled cohort: agency IDs, comma-separated" />
                   <input class="input" id="f-agency_name" type="text" placeholder="Agency name contains…" />
                   <input class="input" id="f-location" type="text" list="dl-locations" placeholder="Location contains…" /><datalist id="dl-locations"></datalist>
                   <input class="input" id="f-crm" type="text" list="dl-crms" placeholder="CRM contains…" /><datalist id="dl-crms"></datalist>
@@ -393,6 +395,7 @@ async function loadList(force){
   $('refresh').disabled = true; $('stamp').innerHTML = '<span class="spin"></span>Loading'; hideErr();
   try{
     LIST = await get(OP('campaigns-list') + (force ? '&refresh=1' : ''));
+    if(VIEW === 'new-campaign' && WIZ.booted && !WIZ.steps.length){ WIZ.steps = defaultSteps(); $('f-name').value = LIST?.enums?.probe_call_name || 'NOVUS — Probe-Led 5-Minute Call'; renderSequence(); }
     renderSetup();
     if(VIEW === 'campaigns') renderList();
     $('stamp').innerHTML = `<span class="nav-dot${LIST.cached?' stale':''}"></span>${esc(when(LIST.generated_at))}${LIST.cached?` · cached ${Math.round((LIST.cache_age_ms||0)/1000)}s`:''}`;
@@ -425,7 +428,7 @@ function renderList(){
   ].map(([l, n, f, cls]) => `<div class="kpi ${cls}"><div class="kpi-l">${esc(l)}</div><div class="kpi-n">${esc(n)}</div><div class="kpi-f">${esc(f)}</div></div>`).join('');
   const num = (v, cls) => `<td class="n"><span class="${v ? (cls||'') : 'dim'}">${esc(v ?? 0)}</span></td>`;
   $('c-rows').innerHTML = cs.map((c) => `<tr class="cmp-row" data-id="${esc(c.campaign_id)}">
-    <td><div class="t-name">${esc(c.name)}</div><div class="t-sub">${esc(c.campaign_type === 'GENERAL' ? 'General' : 'Enquiry follow-up')} · ${c.sequence?.step_count||0} step${c.sequence?.step_count===1?'':'s'}${c.instantly_campaign_id ? ` · <span class="mono">${esc(c.instantly_campaign_id.slice(0,8))}…</span>` : ' · not pushed'}${c.last_error ? ` · <span style="color:var(--red)">error</span>` : ''}</div></td>
+    <td><div class="t-name">${esc(c.name)}</div><div class="t-sub">${esc(typeLabel(c.campaign_type))} · ${c.sequence?.step_count||0} step${c.sequence?.step_count===1?'':'s'}${c.instantly_campaign_id ? ` · <span class="mono">${esc(c.instantly_campaign_id.slice(0,8))}…</span>` : ' · not pushed'}${c.last_error ? ` · <span style="color:var(--red)">error</span>` : ''}</div></td>
     <td>${pill(c.status.toLowerCase(), STATUS_TONE[c.status])}${c.status === 'DRAFT' && c.pushed_at ? `<div class="t-sub">pushed, not launched</div>` : ''}</td>
     ${num(c.metrics.leads)}
     <td class="col-md">${dash(day(c.launched_at))}${!c.launched_at ? `<div class="t-sub">created ${esc(day(c.created_at))}</div>` : ''}</td>
@@ -438,9 +441,10 @@ function renderList(){
 
 /* ═══ WIZARD ════════════════════════════════════════════════════════════ */
 const WIZ = { booted:false, step:'audience', audience:null, excluded:new Set(), timer:null, seq:0, steps:[], name:'' };
-const FILTER_IDS = ['email_exists','include_risky','contact_kind','owner_identified','contact_name','contact_role','probe_sent','probe_completed','probe_not_compromised','never_emailed','max_prior_emails','last_emailed_before','replied_before','positive_reply','negative_reply','spoken_to','in_active_campaign','include_opted_out','include_bounced','agency_name','location','crm','branch_count_min','branch_count_max'];
+const FILTER_IDS = ['email_exists','include_risky','contact_kind','owner_identified','contact_name','contact_role','probe_sent','probe_completed','probe_not_compromised','never_emailed','max_prior_emails','last_emailed_before','replied_before','positive_reply','negative_reply','spoken_to','in_active_campaign','include_opted_out','include_bounced','agency_ids','agency_name','location','crm','branch_count_min','branch_count_max'];
 const POLICY_IDS = ['cooling_days','allow_risky_email','allow_generic_email','require_owner_contact','block_active_campaign','block_prior_negative','block_active_conversation','block_active_followup','block_meeting_booked'];
-const VARS = ['{{firstName}}','{{companyName}}','{{property_street}}','{{probe_date}}','{{probe_time}}','{{email_observation}}','{{email_commercial_hook}}','{{demo_url}}'];
+const VARS = ['{{firstName}}','{{agency}}','{{property}}','{{companyName}}','{{property_street}}','{{probe_date}}','{{probe_time}}','{{email_observation}}','{{email_commercial_hook}}','{{demo_url}}'];
+const typeLabel = (type) => type === 'PROBE_FIVE_MINUTE_CALL' ? 'Probe-led 5-minute call' : type === 'GENERAL' ? 'General' : 'Enquiry follow-up';
 function readFilters(){
   const f = {};
   for(const id of FILTER_IDS){ const el = $('f-'+id); if(!el) continue; f[id] = el.type === 'checkbox' ? el.checked : el.value; }
@@ -452,7 +456,7 @@ function readFilters(){
 function readPolicy(){
   const p = {};
   for(const id of POLICY_IDS){ const el = $('p-'+id); p[id] = el.type === 'checkbox' ? el.checked : el.value; }
-  p.requires_probe = $('f-type').value === 'ENQUIRY_FOLLOWUP';
+  p.requires_probe = $('f-type').value !== 'GENERAL';
   return p;
 }
 function scheduleAudience(){ if(WIZ.timer) clearTimeout(WIZ.timer); WIZ.timer = setTimeout(previewAudience, 250); }
@@ -488,20 +492,23 @@ function renderAudience(){
   $('ws-audience').textContent = `${a.selected} selected · ${s.READY} ready`;
 }
 function defaultSteps(){
+  if($('f-type').value === 'PROBE_FIVE_MINUTE_CALL') return (LIST?.enums?.probe_call_sequence?.steps||[]).map((s)=>({subject:s.variants[0].subject, body:s.variants[0].body, delay_days:s.delay_days}));
   return [
     { subject: 'Your enquiry on {{property_street}}', body: 'Hi {{firstName}},\n\nI sent an enquiry to {{companyName}} about {{property_street}} on {{probe_date}} at {{probe_time}}.\n\n{{email_observation}}\n\n{{email_commercial_hook}}\n\nI put what I found into a two-minute demo for you: {{demo_url}}\n\nWorth a quick call?\n\nJoe', delay_days: 0 },
     { subject: 'Re: Your enquiry on {{property_street}}', body: 'Hi {{firstName}},\n\nJust making sure this reached you — the demo is here: {{demo_url}}\n\nJoe', delay_days: 3 },
   ];
 }
 function renderSequence(){
+  const fixed = $('f-type').value === 'PROBE_FIVE_MINUTE_CALL';
+  $('seq-add').disabled = fixed;
   $('seq').innerHTML = WIZ.steps.map((s, i) => `<div class="seq-step" data-i="${i}">
     <div class="seq-head"><span class="t">${i === 0 ? 'Email 1' : `Follow-up ${i}`}</span>
-      ${i > 0 ? `<span class="delay">wait <input class="input" type="number" min="1" value="${esc(s.delay_days)}" data-delay="${i}" /> days after the previous email</span>` : '<span class="delay">sent first</span>'}
-      ${i > 0 ? `<button class="x-btn" data-remove="${i}" type="button" title="Remove step">✕</button>` : ''}</div>
+      ${i > 0 ? `<span class="delay">wait <input class="input" type="number" min="1" value="${esc(s.delay_days)}" data-delay="${i}" ${fixed?'readonly':''} /> days after the previous email</span>` : '<span class="delay">sent first</span>'}
+      ${i > 0 && !fixed ? `<button class="x-btn" data-remove="${i}" type="button" title="Remove step">✕</button>` : ''}</div>
     <div class="seq-body">
-      <input class="input" type="text" placeholder="Subject" value="${esc(s.subject)}" data-subject="${i}" />
-      <textarea class="input" placeholder="Body" data-body="${i}">${esc(s.body)}</textarea>
-      <div class="seq-vars">${VARS.map((v) => `<button type="button" data-var="${esc(v)}" data-for="${i}">${esc(v)}</button>`).join('')}</div>
+      <input class="input" type="text" placeholder="${i ? 'Blank subject keeps the same thread' : 'Subject'}" value="${esc(s.subject)}" data-subject="${i}" ${fixed?'readonly':''} />
+      <textarea class="input" placeholder="Body" data-body="${i}" ${fixed?'readonly':''}>${esc(s.body)}</textarea>
+      ${fixed?'':`<div class="seq-vars">${VARS.map((v) => `<button type="button" data-var="${esc(v)}" data-for="${i}">${esc(v)}</button>`).join('')}</div>`}
     </div></div>`).join('');
   $('ws-sequence').textContent = `${WIZ.steps.length} email${WIZ.steps.length===1?'':'s'}`;
 }
@@ -530,7 +537,7 @@ function renderReview(){
   const a = WIZ.audience; const s = a?.summary; const sch = readSchedule(); const snd = readSending(); const labels = LIST?.enums?.reason_labels || {};
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const rows = [
-    ['Campaign', `<b>${esc($('f-name').value || '(unnamed)')}</b> <span class="muted">· ${esc($('f-type').value === 'GENERAL' ? 'General' : 'Enquiry follow-up')}</span>`],
+    ['Campaign', `<b>${esc($('f-name').value || '(unnamed)')}</b> <span class="muted">· ${esc(typeLabel($('f-type').value))}</span>`],
     ['Sequence', WIZ.steps.map((st, i) => `${i === 0 ? 'Email 1' : `+${st.delay_days}d follow-up ${i}`}: <span class="muted">${esc(st.subject)}</span>`).join('<br/>')],
     ['Sending accounts', snd.email_list.length ? snd.email_list.map((e) => `<span class="mono">${esc(e)}</span>`).join(', ') : '<span style="color:var(--red)">none selected</span>'],
     ['Schedule', `${esc(Object.entries(sch.days).filter(([,v]) => v).map(([d]) => dayNames[d]).join(' '))} · ${esc(sch.from)}–${esc(sch.to)} UK${sch.start_date ? ` · from ${esc(sch.start_date)}` : ''} · ${esc(snd.daily_limit)}/day${snd.stop_on_reply ? ' · stops on reply' : ''}`],
@@ -553,6 +560,7 @@ function wizStep(step){
 }
 function bootWizard(){
   WIZ.booted = true; WIZ.steps = defaultSteps(); WIZ.emailList = new Set();
+  if($('f-type').value === 'PROBE_FIVE_MINUTE_CALL') $('f-name').value = LIST?.enums?.probe_call_name || 'NOVUS — Probe-Led 5-Minute Call';
   $('days').innerHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => `<label class="${i >= 1 && i <= 5 ? 'on' : ''}"><input type="checkbox" data-day="${i}" ${i >= 1 && i <= 5 ? 'checked' : ''} />${d}</label>`).join('');
   renderSequence(); previewAudience(); wizStep('audience');
 }
@@ -639,7 +647,7 @@ function renderDetail(){
       <div class="page-head">
         <div class="cmp-title"><h1 class="page-title">${esc(c.name)}</h1>${pill(c.status.toLowerCase(), STATUS_TONE[c.status])}${c.status === 'DRAFT' && c.pushed_at ? pill('pushed · not launched', 't-blue', true) : ''}${c.source === 'IMPORTED' ? pill('linked from Instantly', 't-violet', true) : ''}</div>
         <div class="cmp-meta">
-          <span>${esc(c.campaign_type === 'GENERAL' ? 'General' : 'Enquiry follow-up')}</span>
+          <span>${esc(typeLabel(c.campaign_type))}</span>
           <span>created <b>${esc(day(c.created_at))}</b></span>
           ${c.launched_at ? `<span>launched <b>${esc(when(c.launched_at))}</b></span>` : ''}
           ${c.paused_at && c.status === 'PAUSED' ? `<span>paused <b>${esc(when(c.paused_at))}</b></span>` : ''}
@@ -724,12 +732,21 @@ function paneHtml(c){
   }
   if(DETAIL_TAB === 'analytics'){
     const a = c.analytics; const steps = c.step_analytics || [];
+    const pcm = c.probe_call_metrics;
     const rate = (n, d) => (d ? `${Math.round((n / d) * 1000) / 10}%` : '—');
     return `${a ? '' : '<div class="banner info"><div>No Instantly analytics yet — click <b>Sync</b> once the campaign has been pushed. Figures below are from the NOVUS event ledger.</div></div>'}
       <div class="funnel" style="margin-bottom:var(--s-5)">
         ${[['Pushed', m.pushed, ''], ['Contacted', m.contacted, rate(m.contacted, m.pushed)], ['Opened', m.opens, rate(m.opens, m.contacted)], ['Replied', m.replies, rate(m.replies, m.contacted)], ['Positive', m.positive, rate(m.positive, m.replies)], ['Meetings', m.meetings, rate(m.meetings, m.contacted)]].map(([l, n, r]) => `<div class="fstep" style="cursor:default"><div class="fstep-l">${esc(l)}</div><div class="fstep-n">${esc(n)}</div><div class="fstep-r">${esc(r)}</div></div>`).join('')}
       </div>
       <div class="an-grid">
+        ${pcm?`<div class="card"><div class="card-head"><div class="card-title">Probe-led acquisition</div><div class="card-note">Attributed to this campaign</div></div><div class="card-body"><dl class="kv">
+          <dt>Actual sends</dt><dd>${esc(pcm.actual_emails_sent)}</dd><dt>Delivered</dt><dd>${pcm.delivered_emails==null?'—':esc(pcm.delivered_emails)}</dd>
+          <dt>Interested replies</dt><dd>${esc(pcm.interested_replies)}</dd><dt>Explicit numbers</dt><dd>${esc(pcm.explicit_phone_replies)}</dd>
+          <dt>Critical call actions</dt><dd>${esc(pcm.critical_call_actions)}</dd><dt>Calls attempted</dt><dd>${esc(pcm.critical_calls_attempted)}</dd>
+          <dt>Owners reached</dt><dd>${esc(pcm.owners_reached)}</dd><dt>Meetings booked</dt><dd>${esc(pcm.meetings_booked)}</dd>
+          <dt>Meetings attended</dt><dd>${esc(pcm.meetings_attended)}</dd><dt>Pilots agreed</dt><dd>${esc(pcm.pilots_agreed)}</dd>
+          <dt>Pilots sold</dt><dd>${pcm.pilots_sold == null ? '—' : esc(pcm.pilots_sold)}</dd>
+        </dl></div></div>`:''}
         <div class="card"><div class="card-head"><div class="card-title">Totals</div><div class="card-note">${a ? `Instantly · synced ${esc(when(c.last_synced_at))}` : 'NOVUS ledger'}</div></div><div class="card-body"><dl class="kv">
           <dt>Emails sent</dt><dd>${esc(m.emails_sent)}</dd><dt>Unique opens</dt><dd>${esc(m.opens)}${a && a.open_count != null ? ` <span class="sub">${esc(a.open_count)} total</span>` : ''}</dd>
           <dt>Replies</dt><dd>${esc(m.replies)}${a && a.reply_count_automatic != null ? ` <span class="sub">${esc(a.reply_count_automatic)} automatic</span>` : ''}</dd>
@@ -929,7 +946,7 @@ document.addEventListener('click', async (e) => {
   const nx = e.target.closest('[data-next]'); if(nx){ wizStep(nx.dataset.next); return; }
   const ex = e.target.closest('[data-exclude]'); if(ex){ WIZ.excluded.add(ex.dataset.exclude); previewAudience(); return; }
   if(e.target.id === 'f-reset'){ WIZ.excluded = new Set(); document.querySelectorAll('#aud-filters input, #aud-filters select').forEach((el) => { if(el.id === 'f-name' || el.id === 'f-type') return; if(el.type === 'checkbox') el.checked = ['f-email_exists','f-valid','f-probe_not_compromised','p-allow_generic_email','p-block_active_campaign','p-block_prior_negative','p-block_active_conversation','p-block_active_followup','p-block_meeting_booked'].includes(el.id); else if(el.id === 'p-cooling_days') el.value = '14'; else el.value = ''; }); previewAudience(); return; }
-  if(e.target.id === 'seq-add'){ WIZ.steps.push({ subject: `Re: ${WIZ.steps[0]?.subject || ''}`, body: '', delay_days: 3 }); renderSequence(); return; }
+  if(e.target.id === 'seq-add'){ WIZ.steps.push({ subject: '', body: '', delay_days: 3 }); renderSequence(); return; }
   const rs = e.target.closest('[data-remove]'); if(rs){ WIZ.steps.splice(Number(rs.dataset.remove), 1); renderSequence(); return; }
   const vb = e.target.closest('[data-var]'); if(vb){ const ta = document.querySelector(`textarea[data-body="${vb.dataset.for}"]`); const i = Number(vb.dataset.for); const at = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, at) + vb.dataset.var + ta.value.slice(at); WIZ.steps[i].body = ta.value; ta.focus(); return; }
   if(e.target.id === 'create-btn'){ createCampaign(); return; }
@@ -945,7 +962,7 @@ document.addEventListener('input', (e) => {
   if(t.dataset.acct !== undefined){ if(t.checked) WIZ.emailList.add(t.dataset.acct); else WIZ.emailList.delete(t.dataset.acct); $('ws-sending').textContent = `${WIZ.emailList.size} account${WIZ.emailList.size===1?'':'s'} · ${$('s-daily_limit').value}/day`; return; }
   if(t.id === 's-daily_limit'){ $('ws-sending').textContent = `${WIZ.emailList.size} account${WIZ.emailList.size===1?'':'s'} · ${t.value}/day`; }
 });
-document.addEventListener('change', (e) => { if(e.target.closest('#aud-filters') && e.target.id !== 'f-name') scheduleAudience(); });
+document.addEventListener('change', (e) => { if(e.target.id === 'f-type'){ WIZ.steps = defaultSteps(); $('f-name').value = e.target.value === 'PROBE_FIVE_MINUTE_CALL' ? (LIST?.enums?.probe_call_name || 'NOVUS — Probe-Led 5-Minute Call') : ''; renderSequence(); } if(e.target.closest('#aud-filters') && e.target.id !== 'f-name') scheduleAudience(); });
 $('refresh').addEventListener('click', () => { loadList(true); if(VIEW === 'campaign' && DETAIL_ID) loadDetail(DETAIL_ID, false); });
 
 const first = routeFromHash();

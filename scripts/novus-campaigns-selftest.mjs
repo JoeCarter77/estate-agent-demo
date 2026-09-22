@@ -17,6 +17,7 @@ import { webhookDedupeKey, CAMPAIGNS_HEADER, CAMPAIGN_MEMBERS_HEADER, CAMPAIGN_E
 import { buildInstantlyCampaignPayload, normaliseSequence, interpretWebhookPayload, syncCampaigns } from '../lib/campaign-handlers.mjs';
 import { buildLeadTimeline } from '../lib/lead-timeline.mjs';
 import { parseCsv, parseInstantlyLeadsCsv, parseInstantlyActivityCsv, buildNovusMatchIndex, matchInstantlyLead } from '../lib/campaign-import.mjs';
+import { PROBE_CALL_CAMPAIGN_NAME, PROBE_CALL_CAMPAIGN_TYPE, PROBE_CALL_SEQUENCE } from '../lib/probe-call-campaign.mjs';
 
 let passed = 0;
 const ok = (msg) => { passed += 1; console.log(`  ✓ ${msg}`); };
@@ -268,7 +269,7 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
     instantly.calls.push({ path: u.pathname, method: init.method, body });
     const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status });
     if (init.method === 'GET' && u.pathname === '/api/v2/campaigns') return json({ items: [...instantly.campaigns.values()], next_starting_after: null });
-    if (init.method === 'POST' && u.pathname === '/api/v2/campaigns') { const id = `ic_${instantly.campaigns.size + 1}`; const c = { id, name: body.name, status: 0, email_list: body.email_list, daily_limit: body.daily_limit, sequences: body.sequences }; instantly.campaigns.set(id, c); return json(c); }
+    if (init.method === 'POST' && u.pathname === '/api/v2/campaigns') { const id = `ic_${instantly.campaigns.size + 1}`; const c = { id, name: body.name, status: 0, email_list: body.email_list, daily_limit: body.daily_limit, sequences: body.sequences, stop_on_reply: body.stop_on_reply }; instantly.campaigns.set(id, c); return json(c); }
     const m = u.pathname.match(/^\/api\/v2\/campaigns\/([^/]+)(\/activate|\/pause)?$/);
     if (m && m[1] !== 'analytics') {
       const c = instantly.campaigns.get(m[1]); if (!c) return json({ statusCode: 404, error: 'Not Found', message: 'no campaign' }, 404);
@@ -498,6 +499,34 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
   assert.deepEqual(t1.entries.map((e) => e.type), ['PROBE_SENT', 'PROBE_EMAIL_IN', 'PROBE_CLOSED', 'CALL_OUTBOUND', 'LEAD_ADDED', 'LEAD_PUSHED', 'EMAIL_SENT']);
   assert.match(t1.entries.find((e) => e.type === 'CALL_OUTBOUND').title, /callback requested/);
   ok('lead timeline is one chronological story: probe → agency reply → legacy handoff → campaign → sends → reply → interest, with calls interleaved');
+
+  // The new campaign requires an explicit cohort. A provider member left by a
+  // previous partial push is recovered before any lead-add request.
+  store.AGENCIES.push(['ag_7', 'Oak Homes', 'Oak Homes', 'London', '1', '', 'Jo Owner', 'Jo Owner', 'jo@oak.test', 'VALID', '', '', '', '020 7000 0000']);
+  store.CONTACTS.push(['cnt_7', 'ag_7', 'Jo Owner', 'Owner', 'jo@oak.test', 'OWNER_DIRECT', 'VALID', 'TRUE']);
+  store.PROBES[0].push('enquiry_text');
+  store.PROBES.push(['pr_7', 'RM-0007', 'ag_7', 'rightmove', '10 High Street, London', '10 High Street', iso(T0 - 8 * DAY), 'closed', 'FALSE', iso(T0 - DAY), iso(T0 - 8 * DAY), 'Declared: has a property to sell, not yet on the market.']);
+  res = await call('POST', 'campaign-create', { confirm: 'CREATE_CAMPAIGN', name: PROBE_CALL_CAMPAIGN_NAME, campaign_type: PROBE_CALL_CAMPAIGN_TYPE, sequence: PROBE_CALL_SEQUENCE, sending, filters: {} });
+  assert.equal(res.statusCode, 400); assert.match(res.body.error, /explicit agency ID cohort/);
+  res = await call('POST', 'campaign-create', { confirm: 'CREATE_CAMPAIGN', name: PROBE_CALL_CAMPAIGN_NAME, campaign_type: PROBE_CALL_CAMPAIGN_TYPE, sequence: PROBE_CALL_SEQUENCE, sending, filters: { agency_ids: ['ag_7'] } });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body)); assert.equal(res.body.summary.READY, 1);
+  const probeCampaignId = res.body.campaign_id;
+  const remoteProbeCampaign = { id: 'ic_probe', ...buildInstantlyCampaignPayload({ name: PROBE_CALL_CAMPAIGN_NAME, sequence: PROBE_CALL_SEQUENCE, schedule: { name: 'NOVUS working hours', from: '09:00', to: '17:00', timezone: 'Europe/Isle_of_Man', days: { 0: false, 1: true, 2: true, 3: true, 4: true, 5: true, 6: false } }, sending: { email_list: ['joe@novushq.co.uk'], daily_limit: 30, stop_on_reply: true, stop_on_auto_reply: false, open_tracking: true, link_tracking: false, text_only: false } }), status: 0 };
+  instantly.campaigns.set('ic_probe', remoteProbeCampaign);
+  instantly.leads.set('ic_probe|jo@oak.test', { id: 'lead_recovered', email: 'jo@oak.test', campaign: 'ic_probe', status: 1 });
+  const beforeRecovery = instantly.calls.filter((item) => item.path === '/api/v2/leads/add').length;
+  remoteProbeCampaign.stop_on_reply = false;
+  res = await call('POST', 'campaign-push', { confirm: 'PUSH_TO_INSTANTLY', campaign_id: probeCampaignId });
+  assert.equal(res.statusCode, 502); assert.match(res.body.error, /draft copy/);
+  remoteProbeCampaign.stop_on_reply = true;
+  res = await call('POST', 'campaign-push', { confirm: 'PUSH_TO_INSTANTLY', campaign_id: probeCampaignId });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body)); assert.equal(res.body.skipped, 1);
+  assert.equal(instantly.calls.filter((item) => item.path === '/api/v2/leads/add').length, beforeRecovery);
+  res = await call('GET', 'campaign-detail', null, { campaign_id: probeCampaignId });
+  assert.equal(res.body.members[0].instantly_lead_id, 'lead_recovered');
+  assert.equal(res.body.members[0].member_status, 'PUSHED');
+  assert.equal(instantly.activated.includes('ic_probe'), false);
+  ok('probe-call campaign requires an explicit cohort, verifies provider draft safety, and recovers existing members without duplicate enrolment or launch');
 
   globalThis.fetch = realFetch;
   __setRepoForTests(null);
