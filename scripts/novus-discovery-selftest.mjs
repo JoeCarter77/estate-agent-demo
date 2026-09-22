@@ -14,7 +14,7 @@ import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { __setAiCallerForTests } from '../lib/ai-client.mjs';
 import { ACTIONS_HEADER } from '../lib/actions-store.mjs';
 import { CALLS_HEADER } from '../lib/calling-store.mjs';
-import { QUESTIONS, QUESTION_BY_ID, DIMENSIONS, isVisible, effectiveLevel, snapshotFor, QUESTIONS_VERSION, evaluateCoverage, visibleQuestions, wordingFor, visibleOptions, COVERAGE_RULES } from '../lib/discovery-questions.mjs';
+import { QUESTIONS, QUESTION_BY_ID, DIMENSIONS, isVisible, effectiveLevel, snapshotFor, QUESTIONS_VERSION, evaluateCoverage, visibleQuestions, wordingFor, visibleOptions, optionOf, COVERAGE_RULES, SECTION_TRANSITIONS, STAGE_SECTIONS } from '../lib/discovery-questions.mjs';
 import { RULES, RULE_BY_ID, DELIVERY_STATUSES, FOUNDING_OFFER } from '../lib/discovery-rules.mjs';
 import { diagnose, assessDimension, computeEconomics, SUITABILITY_POLICY } from '../lib/discovery-engine.mjs';
 import { templatePlan } from '../lib/discovery-pitch.mjs';
@@ -25,7 +25,7 @@ import {
   handleDiscoverySave, handleDiscoveryPitch, handleDiscoveryOutcome, handleDiscoveryConclusion, handleDiscoveryConclusionPolish,
   buildAgencyContext, cleanAnswers, sessionDiagnoses,
 } from '../lib/discovery-handlers.mjs';
-import { buildFindings, cleanConclusion, polishConclusion, validatePolishedText, presentationPayload, FOCUS_AREAS, CONCLUSION_STEPS, UNDERSTANDING_LEVELS, INTEREST_LEVELS } from '../lib/discovery-conclusion.mjs';
+import { buildFindings, cleanConclusion, polishConclusion, validatePolishedText, presentationPayload, FOCUS_AREAS, CONCLUSION_STEPS, UNDERSTANDING_LEVELS, INTEREST_LEVELS, buildFocusAreas, buildSituation } from '../lib/discovery-conclusion.mjs';
 
 let passed = 0;
 const ok = (msg) => { passed += 1; console.log(`  ✓ ${msg}`); };
@@ -100,6 +100,98 @@ console.log('\n1. Question and rule registries');
   }
   assert.equal(FOUNDING_OFFER.price_gbp, 1500); assert.equal(FOUNDING_OFFER.duration_days, 60); assert.equal(FOUNDING_OFFER.setup_target_days, 14);
   ok('10 rules carry every required field, a valid delivery status and resolvable dependencies; founding offer is £1,500 / 60 days / ~14-day setup');
+}
+
+// ── 1b. the opening questions, ordering and section transitions ───────────
+console.log('\n1b. Opening questions, discovery order and section cues');
+{
+  // The first commercial question: new wording, the five supported options,
+  // and every previously stored value still readable.
+  const C1 = QUESTION_BY_ID.C1;
+  assert.match(C1.primary, /^So just to start with the bigger picture, what's the main focus commercially for you at the moment\?/);
+  assert.match(C1.primary, /winning more instructions, generating more buyer demand, getting more out of your existing team, or something else entirely\?$/);
+  assert.deepEqual(visibleOptions(C1, {}).map((o) => o.value), ['more_instructions', 'more_valuations', 'more_buyer_demand', 'capacity', 'other', 'unknown']);
+  assert.equal(visibleOptions(C1, {}).find((o) => o.value === 'capacity').label, 'Greater team efficiency');
+  // COMPATIBILITY: the old values still resolve to their own labels, and a
+  // session that chose one is still offered it.
+  for (const [value, label] of [['win_instructions', 'Winning more of the valuations we do'], ['fees', 'Fee levels and margin'], ['lettings', 'Growing lettings'], ['more_valuations', 'More valuations'], ['capacity', 'Greater team efficiency']]) {
+    assert.equal(optionOf(C1, value)?.label, label, `${value} still resolves`);
+  }
+  assert.ok(visibleOptions(C1, { C1: a('win_instructions') }).some((o) => o.value === 'win_instructions'), 'a stored legacy answer is still offered to that session');
+  assert.ok(!visibleOptions(C1, { C1: a('more_valuations') }).some((o) => o.value === 'fees'), 'a legacy value nobody chose is not offered');
+  assert.equal(diagnose({ answers: { C1: a('win_instructions') } }).objective.priority_label, 'Winning more of the valuations we do', 'an older session still reads its own objective');
+
+  // The desired outcome: free text, an OPTIONAL number, never required.
+  const C1a = QUESTION_BY_ID.C1a;
+  assert.equal(C1a.type, 'text'); assert.equal(C1a.section, 'commercial');
+  assert.equal(C1a.primary, 'And if we were having this conversation again in six months and things had gone really well, what would have changed for you?');
+  assert.equal(C1a.simpler, 'What would a really successful next six months look like for the agency?');
+  assert.ok(C1a.target && C1a.target.label, 'an optional numerical target is offered');
+  assert.equal(C1a.required, false, 'never required');
+  const words = diagnose({ answers: { C1: a('more_instructions'), C1a: { value: 'I would not be worrying about where next month\'s stock comes from', answered_at: 'x' } } });
+  assert.equal(words.objective.outcome.text, 'I would not be worrying about where next month\'s stock comes from');
+  assert.equal(words.objective.outcome.target, null, 'no target given stays null, never zero');
+  const withTarget = diagnose({ answers: { C1: a('more_valuations'), C1a: { value: 'Thirty valuations a month', target: 30, note: 'valuations a month', answered_at: 'x' } } });
+  assert.equal(withTarget.objective.outcome.target, 30); assert.equal(withTarget.objective.outcome.note, 'valuations a month');
+  assert.deepEqual(cleanAnswers({ C1a: { value: 'More stock', target: '25' } }).C1a, { value: 'More stock', target: 25, note: '', answered_at: cleanAnswers({ C1a: { value: 'More stock', target: '25' } }).C1a.answered_at });
+  assert.equal(cleanAnswers({ C1a: { value: 'More stock', target: 'not a number' } }).C1a.target, undefined, 'a non-numeric target is dropped, the words stand');
+  assert.equal(cleanAnswers({ C1a: { value: '', target: '' } }).C1a, undefined, 'an empty answer is not stored');
+
+  // The new objectives steer the diagnosis the way the goal implies.
+  const answersFor = (priority) => ({ ...ALL_WEAK, C1: a(priority), C2: m(['unknown']) });
+  const focusFor = (priority) => { const d = diagnose({ answers: answersFor(priority) }); return buildFocusAreas(d, buildSituation({ agency_name: 'T', contact_name: 'O' }, d)).map((f) => f.id); };
+  assert.ok(focusFor('more_buyer_demand').includes('enquiry_intelligence'), 'more buyer demand leads on the demand already coming in');
+  assert.ok(focusFor('more_instructions').some((id) => ['progression', 'foundations'].includes(id)), 'more instructions leads on progressing and converting what is found');
+
+  // ORDER: objective, outcome, obstacles, branches, enquiries, database and
+  // CRM first; the commercial numbers last, after intelligence.
+  const order = QUESTIONS.filter((q) => !q.show_when && !q.dimension).map((q) => q.id);
+  assert.deepEqual(order.slice(0, 8), ['C1', 'C1a', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7'], 'the opening runs objective → outcome → obstacles → scale → demand → database → CRM');
+  for (const id of ['C8', 'C9', 'C10', 'C11']) assert.equal(QUESTION_BY_ID[id].section, 'value', `${id} is asked in the commercial-numbers section`);
+  const stageOf = (section) => Object.entries(STAGE_SECTIONS).find(([, list]) => list.includes(section))[0];
+  assert.equal(stageOf('value'), 'intelligence', 'the numbers sit in the last stage');
+  assert.equal(STAGE_SECTIONS.intelligence.indexOf('value'), STAGE_SECTIONS.intelligence.length - 1, 'and after the intelligence questions');
+  const numbersFirst = QUESTIONS.findIndex((q) => q.id === 'C8');
+  assert.ok(QUESTIONS.findIndex((q) => q.id === 'I5') < numbersFirst, 'every intelligence question is asked before the numbers');
+  // Conversion is not asked twice: it is computed once the volumes are known.
+  const cov = evaluateCoverage({ C8: a(20), C9: a(6) });
+  assert.equal(cov.C11.rule_id, 'C11_from_volumes'); assert.equal(cov.C11.derived.value, 30);
+  assert.ok(!visibleQuestions({ C8: a(20), C9: a(6) }).some((q) => q.id === 'C11'), 'conversion is not asked when it can be worked out');
+  assert.ok(visibleQuestions({ C8: a(20) }).some((q) => q.id === 'C11'), 'but it is asked when it cannot be');
+
+  // SECTION TRANSITIONS: private, one per section entered, never for the
+  // opening section, never in anything the client sees.
+  assert.deepEqual(Object.keys(SECTION_TRANSITIONS), ['foundations', 'intelligence', 'value']);
+  assert.equal(SECTION_TRANSITIONS.foundations, "Okay, that gives me a good idea of where you're trying to get to. Just so I can understand what's happening underneath that, can I ask you a few questions about how things currently work across the agency — particularly how customer information gets recorded and followed up?");
+  assert.match(SECTION_TRANSITIONS.intelligence, /^Perfect\. So I've got a better picture of how the team currently operates\./);
+  assert.match(SECTION_TRANSITIONS.intelligence, /might otherwise get missed\.$/);
+  assert.match(SECTION_TRANSITIONS.value, /^Okay, that's useful\. I think I've got a much clearer picture now\./);
+  assert.match(SECTION_TRANSITIONS.value, /commercial context around what we've discussed\.$/);
+  assert.equal(SECTION_TRANSITIONS.commercial, undefined, 'the meeting opens on the commercial section — there is nothing to bridge from');
+  const louisSessionForCues = { session_id: 'dsc_cue', agency_id: 'ag_c', agency_name: 'TEST - Cues', contact_name: 'Sam Cue', answers: { ...ALL_WEAK, C1a: { value: 'Thirty valuations a month', target: 30, answered_at: 'x' } }, overrides: {}, notes: {} };
+  // An OLDER session (questions v2: legacy objective, no desired outcome)
+  // still diagnoses, concludes and presents exactly as it did.
+  const older = { session_id: 'dsc_old', agency_id: 'ag_o', agency_name: 'TEST - Older', contact_name: 'Pat Older', questions_version: 2,
+    answers: { ...ALL_WEAK, C1: a('win_instructions'), C2: m(['slipping_through']) }, overrides: {}, notes: {} };
+  const oldLive = sessionDiagnoses(older);
+  assert.equal(oldLive.agreed.objective.priority, 'win_instructions');
+  assert.equal(oldLive.agreed.objective.priority_label, 'Winning more of the valuations we do');
+  assert.deepEqual(oldLive.agreed.objective.outcome, { text: '', target: null, note: '' }, 'a session recorded before the outcome question stays empty, never invented');
+  assert.equal(oldLive.conclusion.mode, 'PILOT');
+  assert.ok(oldLive.conclusion.solutions.length >= 1 && oldLive.conclusion.understanding.findings.length >= 2, 'the diagnosis and conclusion are unchanged for it');
+  assert.equal(oldLive.presentation.screens.length, 7);
+  assert.equal(oldLive.conclusion.opportunity.expected_fee_income_per_valuation_gbp, 1400, 'its economics still compute (£3,500 × 40%, from 20 valuations and 8 instructions)');
+  assert.ok(!Object.values(snapshotFor(older.answers)).some((x) => x.primary === undefined), 'the label snapshot still covers every answered question');
+
+  // The cues are PRIVATE: never in the conclusion or on a client screen.
+  const cueText = Object.values(SECTION_TRANSITIONS);
+  for (const payload of [oldLive.presentation, sessionDiagnoses(louisSessionForCues).presentation]) {
+    const js = JSON.stringify(payload);
+    for (const cue of cueText) assert.ok(!js.includes(cue.slice(0, 40)), 'a section transition never reaches the client screens');
+  }
+  assert.ok(!JSON.stringify(oldLive.conclusion).includes(cueText[0].slice(0, 40)), 'nor the conclusion payload');
+
+  ok('opening questions: the reworded objective with five options (old values still readable and still offered to the sessions that chose them), a free-text desired outcome with an optional target, the numbers asked last with conversion derived, and three private section cues');
 }
 
 // ── 2. conditional logic ───────────────────────────────────────────────────

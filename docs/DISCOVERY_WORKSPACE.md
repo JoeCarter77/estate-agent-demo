@@ -16,7 +16,7 @@ picker (any agency — the ⌘K `lead-search` operation).
 
 | file | owns |
 |---|---|
-| `lib/discovery-questions.mjs` | the **versioned question registry** (`QUESTIONS_VERSION`): 11 commercial questions, 10 dimension primaries (F1–F5, I1–I5), each with simpler wording, an example, options with `level`, and the conditional exploration (`verify`, `cause`, `consequence`, `frequency`, `tried`, `example`, dimension-specific `detail`). `isVisible()` / `effectiveLevel()` are the only conditional logic — the page mirrors them. |
+| `lib/discovery-questions.mjs` | the **versioned question registry** (`QUESTIONS_VERSION`): 12 commercial questions, 10 dimension primaries (F1–F5, I1–I5), each with simpler wording, an example, options with `level`, and the conditional exploration (`verify`, `cause`, `consequence`, `frequency`, `tried`, `example`, dimension-specific `detail`), plus `SECTION_TRANSITIONS`. `isVisible()` / `effectiveLevel()` / `visibleOptions()` are the only conditional logic — the page mirrors them. |
 | `lib/discovery-rules.mjs` | the **versioned deployment rule registry** (`RULES_VERSION`): ten rules with triggers, required evidence, consequence, intervention, steps, data/access, responsibilities, dependencies, measurement, scope limits, pitch explanation and a maintained `delivery_status`; the founding offer; the five plan phases. |
 | `lib/discovery-engine.mjs` | the **deterministic diagnosis**: `assessDimensions` → evidence status, `evaluateInterventions` → feasibility + dependency resolution, `computeEconomics`, `decideSuitability`, `buildPlan`, `diagnose`. No I/O, no model. |
 | `lib/discovery-pitch.mjs` | pitch input (structured, no customer PII), the deterministic template pitch, `validatePitch`, `generatePitch` (model via `lib/ai-client.mjs`, validated, template fallback). |
@@ -34,6 +34,27 @@ in the page) keep it that way:
 | **Coverage rules** (`COVERAGE_RULES`, data-driven) | When a stored earlier answer already establishes what a question was designed to collect, the question is suppressed and shown as *"Already covered — …"* with the basis. Its derived answer is a **mapping of the owner's real answer** (e.g. F3 "nothing happens" → F4 "nothing"; F1 patchy + missed sellers → I1 ad hoc; C8/C9 → C11), never invented, never chained through other derived answers. A finding derived this way can only be `CONFIRMED` when the dimension it came from is `CONFIRMED`; `assessments[dim].derived` and `diagnosis.coverage` record the basis. **Ask anyway** stores `{reopened:true}` and switches the rule off; a real answer always wins. |
 | **Contextual wording** (`variants`) | A question carries alternative primary wording keyed to earlier answers ("You said it's mostly down to the negotiator remembering — if one gets forgotten, does anything pick it up?"). The wording used is saved as `asked_as` for the snapshot. |
 | **Option hiding** (`hide_when`) | An option an earlier answer has made redundant is not offered again (F2's "not much gets recorded" once F1 is weak/partial). |
+
+## The opening, the order and the section cues
+
+The meeting opens on the **commercial objective** (C1) — *"So just to start with the bigger picture, what's
+the main focus commercially for you at the moment? …"* — offering **more instructions · more valuations ·
+more buyer demand · greater team efficiency · something else**. Older values are never redefined:
+`win_instructions` ("winning more of the valuations we do") is a narrower objective than the new
+`more_instructions`, so it is kept as a `legacy` option — `optionOf()` still resolves its label, and
+`visibleOptions()` only offers a legacy value again to a session whose own answer already uses it.
+
+C1 is followed by the **desired outcome** (C1a): *"And if we were having this conversation again in six
+months and things had gone really well, what would have changed for you?"* — free text with an **optional**
+numerical `target`. A number is never required; when none is given the target stays `null`, never zero. It
+reaches the conclusion as `objective.outcome` and is shown on the internal Today step only — their words
+about their own agency are private, not a claim on a client slide.
+
+Order: objective → outcome → obstacles → branches → enquiry volume → database size → CRM → CRM access, then
+foundations, then intelligence, then the numbers. `SECTION_TRANSITIONS` (registry, published in the
+registry payload) carries one **private speaking cue per section entered** — foundations, intelligence and
+the commercial numbers; the opening section has none. The page shows a cue once, on the first visible
+question of that section, and never in `presentationPayload` or the conclusion.
 
 Other flow changes: the commercial-value numbers (C8–C11) are asked last (section `value`, stage 3) so the
 conversation runs priorities → operation → gaps → intelligence → value; "Next" steps over optional detail

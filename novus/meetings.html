@@ -675,7 +675,11 @@ function isVisible(q){
   return true;
 }
 function wordingFor(q){ const eff = EFF(); for(const [i, v] of (q.variants||[]).entries()){ if(condHolds(v.when, eff.answers)) return { primary: v.primary, variant: v.id || `v${i+1}` }; } return { primary: q.primary, variant:'' }; }
-function visibleOptions(q){ const eff = EFF(); return (q.options||[]).filter((o) => !o.hide_when || !condHolds(o.hide_when, eff.answers)); }
+/* Mirrors visibleOptions() in lib/discovery-questions.mjs: a `legacy` option
+   exists so an older stored answer stays readable, and is only offered again
+   to a session whose own answer already uses it. */
+function visibleOptions(q){ const eff = EFF(); const chosen = answerValues(eff.answers[q.id]).map(String);
+  return (q.options||[]).filter((o) => (!o.legacy || chosen.includes(o.value)) && (!o.hide_when || !condHolds(o.hide_when, eff.answers))); }
 function isAnswered(a){ if(!a || a.skipped) return false; if(Array.isArray(a.values)) return a.values.length > 0; return a.value !== undefined && a.value !== '' && a.value !== null; }
 const SECTIONS_OF = (stage) => (S.registry.stage_sections||{})[stage] || [stage];
 function visible(stage){ const secs = SECTIONS_OF(stage); return Q().filter((q) => secs.includes(q.section) && isVisible(q)); }
@@ -829,10 +833,18 @@ function renderCentre(){
   const opts = visibleOptions(q);
   const optHtml = (q.type === 'single' || q.type === 'multi') ? `<div class="opts${opts.length > 6 ? ' two' : ''}">${opts.map((o, i) => `<button class="opt${values.includes(o.value) ? ' on' : ''}" data-opt="${esc(o.value)}" type="button"><span class="key">${i+1 <= 9 ? i+1 : ''}</span><span>${esc(o.label)}</span>${o.level && o.level !== 'unknown' ? `<span class="lv">${esc(o.level)}</span>` : ''}${o.verdict ? `<span class="lv">${o.verdict === 'confirm' ? 'confirms' : 'gap'}</span>` : ''}</button>`).join('')}</div>` : '';
   const numHtml = q.type === 'number' ? `<div class="numrow"><input class="input" id="q-num" type="number" inputmode="decimal" value="${a.value ?? ''}" placeholder="—" /><span class="unit">${esc(q.unit||'')}</span>${q.source_toggle ? `<span class="seg"><button type="button" data-src="actual" class="${a.source === 'actual' ? 'on' : ''}">Actual figure</button><button type="button" data-src="owner_estimate" class="${!a.source || a.source === 'owner_estimate' ? 'on' : ''}">Owner estimate</button></span>` : ''}${q.id === 'C11' && S.diagnosis?.economics?.baseline?.conversion_pct?.source === 'derived' ? `<span class="mini">derived: ${esc(S.diagnosis.economics.baseline.conversion_pct.value)}% (${esc(S.diagnosis.economics.baseline.conversion_pct.detail)})</span>` : ''}</div>` : '';
-  const textHtml = q.type === 'text' ? `<div class="q-notes"><textarea class="input block" id="q-text" placeholder="In their words…">${esc(a.value||'')}</textarea></div>` : '';
+  const textHtml = q.type === 'text' ? `<div class="q-notes"><textarea class="input block" id="q-text" placeholder="In their words…">${esc(a.value||'')}</textarea>${q.target ? `<div class="numrow" style="margin-top:8px"><span class="unit">${esc(q.target.label||'Optional target')}</span><input class="input" id="q-target" type="number" inputmode="decimal" style="max-width:140px" value="${a.target ?? ''}" placeholder="—" />${q.target.hint ? `<span class="mini">${esc(q.target.hint)}</span>` : ''}</div>` : ''}</div>` : '';
   const explore = q.dimension && q.role !== 'primary' && q.role !== 'verify' ? S.diagnosis?.assessments?.[q.dimension] : null;
   const exploreHint = explore ? (explore.exploration.complete ? `<span class="q-hint"><b>Enough to diagnose ${esc(q.dimension)}</b> — the rest is optional</span>` : `<span class="q-hint">Still needed for ${esc(q.dimension)}: ${esc(explore.exploration.missing.map((m) => m.endsWith('_cause') ? 'a cause' : 'a consequence').join(' and '))}</span>`) : '';
-  el.innerHTML = `<div class="qcard">
+  /* Private section transition: shown once, on the first visible question of
+     the section being entered — not before every question, and never part of
+     anything the client sees. */
+  const transition = (S.registry.section_transitions || {})[q.section];
+  const firstInSection = vs.find((x) => x.section === q.section)?.id === q.id;
+  const transitionHtml = transition && firstInSection
+    ? `<div class="script-block"><div class="script-label">Private — say this as you move on</div><div class="script-text">${esc(transition)}</div></div>`
+    : '';
+  el.innerHTML = `${transitionHtml}<div class="qcard">
     <div class="q-eyebrow"><span>${esc(S.registry.sections.find((x) => x.id === q.section)?.label || q.section)}</span>${dim ? `<span>· ${esc(dim.id)} ${esc(dim.label)}</span>` : ''}<span class="role">· ${esc(ROLE_LABEL[q.role] || q.role)}${q.optional ? ' · optional' : ''}</span><span class="role" style="margin-left:auto">${idx+1} / ${vs.length}</span></div>
     <div class="q-purpose">${esc(q.purpose||'')}</div>
     <div class="q-text">${esc(primaryText)}</div>
@@ -1194,6 +1206,7 @@ function cStepToday(c){
     <div class="say">${esc(c.understanding.opening)}</div>
     <div class="facts">${(sc.facts||[]).map((f) => `<div class="f"><div class="l">${esc(f.label)}</div><div class="v">${esc(f.value)}</div></div>`).join('')}</div>
     ${sc.objective ? `<div class="kv" style="margin-bottom:6px"><div class="k">Objective</div><div>${esc(sc.objective)}${(sc.obstacles||[]).length ? ` · in the way: ${esc(sc.obstacles.join(', '))}` : ''}</div></div>` : ''}
+    ${s.objective.outcome?.text || s.objective.outcome?.target !== null && s.objective.outcome?.target !== undefined ? `<div class="kv" style="margin-bottom:6px"><div class="k">What good looks like</div><div>${esc(s.objective.outcome.text || '—')}${s.objective.outcome.target !== null && s.objective.outcome.target !== undefined ? ` · target ${esc(s.objective.outcome.target)}${s.objective.outcome.note ? ` ${esc(s.objective.outcome.note)}` : ''}` : ''} <span class="mini">(private — their words, not on the client screen)</span></div></div>` : ''}
     ${fold('Private — figures, sources and gaps', `<div class="facts">${fact('Average fee', s.fee_per_instruction, 'C10')}${fact('Conversion', s.conversion_pct, 'C11')}${fact('Enquiries', s.enquiries_per_month, 'C4')}${fact('Database', s.database_size, 'C5')}${fact('Valuations', s.valuations_per_month, 'C8')}${fact('Instructions', s.instructions_per_month, 'C9')}</div>${s.missing.length ? `<div class="mini">Not on the client screen because not established: ${esc(s.missing.map((k) => k.replace(/_/g,' ')).join(', '))}.</div>` : ''}${c.understanding.unknown.length ? `<div class="mini">Dimensions not established: ${esc(c.understanding.unknown.join(', '))}</div>` : ''}`)}
   </div>`;
 }
@@ -1557,7 +1570,7 @@ document.addEventListener('click', async (e) => {
   if(t.closest('[data-skip]')){ SKIPPING = CUR; renderCentre(); return; }
   if(t.closest('[data-skip-cancel]')){ SKIPPING = ''; renderCentre(); return; }
   if(t.closest('[data-skip-confirm]') && q){ const r = $('skip-reason'); const label = r.options[r.selectedIndex].text; A()[q.id] = { ...(A()[q.id]||{}), skipped:true, skip_reason: label, answered_at:new Date().toISOString() }; SKIPPING = ''; markDirty(); currentQuestionNav('next'); renderSide(); return; }
-  const nv = t.closest('[data-nav]'); if(nv){ if(nv.dataset.nav === 'next' && q){ if(q.type === 'number' && $('q-num')?.value !== '' ) setAnswer(q, { value: Number($('q-num').value), source: A()[q.id]?.source || 'owner_estimate' }); if(q.type === 'text' && $('q-text')) setAnswer(q, { value: $('q-text').value }); } currentQuestionNav(nv.dataset.nav); renderSide(); return; }
+  const nv = t.closest('[data-nav]'); if(nv){ if(nv.dataset.nav === 'next' && q){ if(q.type === 'number' && $('q-num')?.value !== '' ) setAnswer(q, { value: Number($('q-num').value), source: A()[q.id]?.source || 'owner_estimate' }); if(q.type === 'text' && $('q-text')) setAnswer(q, { value: $('q-text').value, ...($('q-target') && $('q-target').value !== '' ? { target: Number($('q-target').value) } : {}) }); } currentQuestionNav(nv.dataset.nav); renderSide(); return; }
   /* diagnosis overrides */
   const oo = t.closest('[data-ov-open]'); if(oo){ OVR_OPEN = oo.dataset.ovOpen; renderCentre(); return; }
   const ro = t.closest('[data-rov-open]'); if(ro){ OVR_OPEN = `rule:${ro.dataset.rovOpen}`; renderCentre(); return; }
@@ -1598,6 +1611,7 @@ document.addEventListener('input', (e) => {
   if(t.id === 'q-note' && q){ const a = A()[q.id] || {}; A()[q.id] = { ...a, note: t.value }; markDirty(); return; }
   if(t.id === 'q-num' && q){ if(t.value === ''){ const a = A()[q.id]||{}; delete a.value; A()[q.id] = a; } else { const a = A()[q.id] || {}; A()[q.id] = { ...a, value: Number(t.value), source: a.source || 'owner_estimate', answered_at:new Date().toISOString() }; delete A()[q.id].skipped; delete A()[q.id].prefilled; } markDirty(); return; }
   if(t.id === 'q-text' && q){ const a = A()[q.id] || {}; A()[q.id] = { ...a, value: t.value, answered_at:new Date().toISOString() }; delete A()[q.id].skipped; markDirty(); return; }
+  if(t.id === 'q-target' && q){ const a = A()[q.id] || {}; if(t.value === ''){ const next = { ...a }; delete next.target; A()[q.id] = next; } else { A()[q.id] = { ...a, target: Number(t.value), answered_at:new Date().toISOString() }; delete A()[q.id].skipped; } markDirty(); return; }
   if(t.id === 'm-notes'){ S.session.notes = S.session.notes || {}; S.session.notes.meeting = t.value; markDirty(); return; }
   if(t.id === 'd-notes'){ S.session.notes = S.session.notes || {}; S.session.notes.diagnosis = t.value; markDirty(); return; }
   const pk = t.closest('[data-present-ck]'); if(pk){ setAgreement(pk.dataset.presentCk, { present: pk.checked }); return; }
