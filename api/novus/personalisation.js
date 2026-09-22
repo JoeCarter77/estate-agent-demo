@@ -605,7 +605,7 @@ async function handleInstantlyReplyReconcile(req, res) {
     // Re-run durable unresolved events first. This repairs rows created before
     // Campaign UI members were part of reply matching, without fetching or
     // sending any message and without appending a second REPLY_EVENTS row.
-    const recovery = await recoverUnresolvedReplyEvents({ repo, dryRun: false, classify: false });
+    const recovery = await recoverUnresolvedReplyEvents({ repo, dryRun: false, classify: true });
     const classify = false;
     const summary = await pollInstantlyReplies({
       repo, apiKey, limit: 100, dryRun: false, classify, minTimestampCreated, startingAfter,
