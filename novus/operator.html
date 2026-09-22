@@ -334,6 +334,10 @@
 
               <div class="btnrow hidden" id="au-release-row">
                 <button class="btn btn-primary" id="au-release" type="button">I have finished &mdash; release the session</button>
+                <!-- Only ever offered for an enquiry the operator could not confirm. It
+                     records what already happened and continues at Create probe; it
+                     never sends anything. -->
+                <button class="btn btn-secondary hidden" id="au-confirmed" type="button">I saw Rightmove&rsquo;s confirmation &mdash; record it as sent</button>
                 <button class="btn btn-secondary" id="au-abandon" type="button">Abandon this agency</button>
               </div>
 
@@ -2131,6 +2135,10 @@ load(false);
         + '<br><span class="mono">enquiry: ' + esc(SUBMISSION_WORDS[intervention.submission] || 'unknown') + '</span></span>';
     }
     $('au-release-row').classList.toggle('hidden', !intervention);
+    // The "I saw the confirmation" route exists only where it is meaningful:
+    // an enquiry that was actually submitted and whose outcome is unknown.
+    $('au-confirmed').classList.toggle('hidden',
+      !intervention || !['in_flight', 'sent'].includes(intervention.submission));
 
     const running = worker.status === 'running';
     const paused = worker.status === 'paused';
@@ -2141,6 +2149,7 @@ load(false);
     $('au-stop-after').disabled = !busy;
     $('au-emergency').disabled = false;
     $('au-release').disabled = !intervention;
+    $('au-confirmed').disabled = !intervention;
     $('au-abandon').disabled = !intervention;
   }
 
@@ -2186,6 +2195,11 @@ load(false);
     if (window.confirm('Emergency stop: abandon the run and close the operator browser? Anything already submitted stays on the record.')) command('/emergency-stop');
   });
   $('au-release').addEventListener('click', () => command('/release', { outcome: 'resume' }));
+  $('au-confirmed').addEventListener('click', () => {
+    if (window.confirm('Record this enquiry as sent? Only do this if you saw Rightmove\u2019s own confirmation page. NOVUS will create the probe and mark it as sent \u2014 no enquiry is submitted.')) {
+      command('/release', { outcome: 'confirmed_sent' });
+    }
+  });
   $('au-abandon').addEventListener('click', () => {
     if (window.confirm('Abandon this agency? The operator will move on and will not resubmit anything for it.')) command('/release', { outcome: 'abandon' });
   });

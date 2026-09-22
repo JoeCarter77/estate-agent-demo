@@ -40,7 +40,7 @@ export const INTERVENTIONS = {
   },
   uncertain_submission: {
     title: 'Enquiry outcome UNCERTAIN — not confirmed sent',
-    action: 'Check the probe mailbox for a Rightmove confirmation before doing anything. The operator will not resubmit.',
+    action: 'If Rightmove showed its confirmation page, press "I saw Rightmove\u2019s confirmation" in NOVUS and the probe is recorded. Otherwise check the probe mailbox first. Either way the operator will not resubmit.',
   },
   repeated_failure: {
     title: 'Repeated browser failures',

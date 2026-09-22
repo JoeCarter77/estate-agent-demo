@@ -137,7 +137,19 @@ uncertain submission result · repeated browser failure · a probe NOVUS did not
 record as sent.
 
 Finish whatever is needed in the operator's own browser window, then press
-**I have finished — release the session** (or **Abandon this agency**).
+**I have finished — release the session**. The operator then RE-READS the page;
+it never re-sends. If Rightmove's confirmation is on screen it recognises it and
+carries straight on to Create probe.
+
+When it still cannot recognise the confirmation, an enquiry that was actually
+submitted also offers **I saw Rightmove's confirmation — record it as sent**.
+That records what already happened and continues at Create probe; it submits
+nothing. It is offered only for an enquiry that was genuinely sent, never for
+one that never left. **Abandon this agency** leaves it alone.
+
+Send is pressed at most once per agency, enforced in the state file below every
+caller: no retry, no resumed cycle and no path back from a CAPTCHA can press it
+again.
 
 A notification never claims a probe was sent. "Confirmed sent" appears only
 after the PROBES row has been read back and found `observing` with a timestamp

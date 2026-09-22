@@ -58,7 +58,7 @@ function emptyTransaction() {
     property_url: '',
     property_title: '',
     stage: 'idle',
-    submission: { state: 'none', attempts: 0, started_at: '', settled_at: '', evidence: '', detail: '' },
+    submission: { state: 'none', attempts: 0, started_at: '', settled_at: '', evidence: '', detail: '', confirmed_by: '' },
     probe_id: '',
     probe_reference: '',
     marked_sent: false,
@@ -162,8 +162,16 @@ export class OperatorState {
 
   // Called immediately BEFORE the Send button is clicked. The write lands on
   // disk first, so a crash during the click is still recorded as in_flight.
+  //
+  // IT REFUSES A SECOND ATTEMPT. One agency, one click of Send. Nothing in the
+  // workflow is allowed to press it twice — not a retry, not a resumed cycle,
+  // and not the path back from a CAPTCHA — so the refusal lives here, below
+  // every caller, rather than in each of them.
   markSubmitInFlight() {
     const s = this.data.current.submission;
+    if (s.attempts > 0 || s.state === 'in_flight' || s.state === 'sent') {
+      throw new Error(`Send has already been pressed for ${this.data.current.agency_name || this.data.current.agency_id} (attempt ${s.attempts}, state ${s.state}). The operator will not submit a second enquiry.`);
+    }
     s.state = 'in_flight';
     s.attempts += 1;
     s.started_at = new Date().toISOString();
@@ -172,8 +180,9 @@ export class OperatorState {
     return this.stage('submitting');
   }
 
-  settleSubmission(state, { evidence = '', detail = '' } = {}) {
+  settleSubmission(state, { evidence = '', detail = '', confirmedBy = 'operator' } = {}) {
     if (!['sent', 'failed'].includes(state)) throw new Error(`Bad submission settlement: ${state}`);
+    this.data.current.submission.confirmed_by = confirmedBy;
     const s = this.data.current.submission;
     s.state = state;
     s.settled_at = new Date().toISOString();

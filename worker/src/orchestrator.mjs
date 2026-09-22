@@ -13,7 +13,7 @@
 
 import {
   verifyBranchPage, readBranchCandidates, openProperty, openEnquiryForm,
-  verifyAndPrepareEnquiry, submitEnquiry, propertyIdOf,
+  verifyAndPrepareEnquiry, submitEnquiry, observeSubmissionOutcome, propertyIdOf,
 } from './rightmove.mjs';
 import { chooseListing } from './suitability.mjs';
 import { ProberPage } from './novus-prober.mjs';
@@ -97,8 +97,38 @@ export class Orchestrator {
   }
 
   // The human has finished the challenge and hands the session back (step 9.7).
+  //
+  // 'resume'          look at the page again — the operator re-reads it, never re-sends.
+  // 'confirmed_sent'  the human saw Rightmove's confirmation with their own eyes.
+  //                   Records the enquiry as sent and continues at Create probe.
+  //                   It never presses Send; it only settles what already happened.
+  // 'abandon'         leave this agency alone and move on.
   release({ outcome = 'resume' } = {}) {
     if (!this.state.data.current.needs_human) return { ok: false, error: 'nothing is waiting for you' };
+
+    if (outcome === 'confirmed_sent') {
+      const submission = this.state.data.current.submission;
+      if (submission.state !== 'in_flight' && submission.state !== 'sent') {
+        return { ok: false, error: 'there is no enquiry awaiting confirmation for this agency' };
+      }
+      if (submission.state === 'in_flight') {
+        this.state.settleSubmission('sent', { detail: 'confirmed by the operator', confirmedBy: 'human' });
+      }
+      this.state.clearHuman();
+      if (this.releaseResolver) {
+        // A run is holding the page: it carries on from Create probe itself.
+        this.state.setRun({ mode: 'running' });
+        this.releaseResolver('confirmed_sent');
+        this.releaseResolver = null;
+      } else {
+        // The worker was restarted since. Nothing is holding the page, so the
+        // next Start recovers this agency at Create probe — no enquiry is
+        // re-sent, because the submission is already settled as sent.
+        this.state.setRun({ mode: 'stopped', stop_reason: 'enquiry confirmed by the operator — press Start to record it in NOVUS' });
+      }
+      return { ok: true, outcome: 'confirmed_sent' };
+    }
+
     if (outcome === 'abandon') {
       this.state.clearHuman();
       this.state.fail('abandoned by operator after human review');
@@ -181,7 +211,13 @@ export class Orchestrator {
         if (error instanceof HumanNeeded) {
           const action = await this.waitForRelease(error.reason, error.detail);
           if (action === 'abandon') { outcome = 'abandoned'; }
-          else { continue; }                        // retry the same agency
+          else if (this.state.data.current.submission.state !== 'none') {
+            // Retrying means running the agency again from step 1, which would
+            // reach the enquiry form a second time. That is only ever safe when
+            // Send has not been pressed for this agency.
+            this.log('[operator] not restarting this agency: Send has already been pressed for it');
+            outcome = 'abandoned';
+          } else { continue; }                      // retry the same agency
         } else {
           this.state.fail(error.message);
           this.state.finishCycle('failed');
@@ -238,6 +274,11 @@ export class Orchestrator {
     await this.prober.openAgency(current.agency_id).catch(() => {});
     if (plan.action === 'close_cycle') { this.state.finishCycle('completed'); return true; }
     if (plan.action === 'resume_create_probe') {
+      if (!String(current.property_url || '').trim()) {
+        this.raiseHuman('probe_not_recorded',
+          `${current.agency_name || current.agency_id}: the enquiry is recorded as sent but no property URL was captured, so the probe cannot be created automatically. Create it in the Prober by hand.`);
+        return false;
+      }
       const created = await this.createProbeAndMarkSent(current.property_url);
       return created === 'completed';
     }
@@ -367,22 +408,31 @@ export class Orchestrator {
 
     if (result.outcome === 'challenge') {
       // STEP 9 — never circumvent, never retry to avoid it, never drop the
-      // agency. The submission stays in_flight because the click already
-      // happened, so after release the outcome is re-read rather than re-sent.
+      // agency. Send has already been pressed, so after the human clears the
+      // challenge the page is RE-READ, never re-submitted: the recheck below
+      // has no click in it at all, which is why clicking and observing are two
+      // separate functions in rightmove.mjs.
       const released = await this.waitForRelease(result.challenge.kind, result.challenge.detail);
       if (released === 'abandon') return 'abandoned';
-      const after = await submitEnquiry(propertyPage, { timeout: this.config.timeouts.submitResult, layout })
-        .catch(() => ({ outcome: 'uncertain', detail: 'could not re-read the page after the challenge' }));
-      if (after.outcome !== 'sent') {
-        this.state.stage('submitting');
-        throw new HumanNeeded('uncertain_submission', after.detail || 'the outcome after the challenge is unknown');
+      if (released === 'confirmed_sent') {
+        result.outcome = 'sent';
+        result.detail = 'confirmed by the operator after completing the challenge';
+      } else {
+        // Rightmove reaches its confirmation by a full navigation once the
+        // challenge is solved, so give the page a moment to land.
+        const after = await observeSubmissionOutcome(propertyPage, { timeout: this.config.timeouts.submitResult, layout })
+          .catch(() => ({ outcome: 'uncertain', detail: 'could not re-read the page after the challenge' }));
+        if (after.outcome !== 'sent') {
+          return this.resolveUncertainSubmission(propertyPage, layout,
+            after.detail || 'the outcome after the challenge is unknown', property.url);
+        }
+        result.outcome = 'sent';
+        result.detail = after.detail;
       }
-      result.outcome = 'sent';
-      result.detail = after.detail;
     }
 
     if (result.outcome === 'uncertain') {
-      throw new HumanNeeded('uncertain_submission', result.detail);
+      return this.resolveUncertainSubmission(propertyPage, layout, result.detail, property.url);
     }
     if (result.outcome === 'failed') {
       // A definitive rejection means the enquiry demonstrably did not leave, so
@@ -399,6 +449,56 @@ export class Orchestrator {
 
     // STEPS 10, 11, 12.
     return this.createProbeAndMarkSent(property.url);
+  }
+
+  // AN ENQUIRY WHOSE OUTCOME IS UNKNOWN. Handled here, holding the page, rather
+  // than by throwing into the run loop — the loop's recovery for a human-needed
+  // error is to restart the agency, and restarting an agency whose Send has
+  // already been pressed is precisely the duplicate enquiry the whole design
+  // exists to prevent.
+  //
+  // Send is never pressed again on any branch of this. The only ways out are:
+  // the page itself now reads as confirmed, the human says they saw the
+  // confirmation, or the agency is abandoned.
+  async resolveUncertainSubmission(page, layout, detail, propertyUrl) {
+    this.state.stage('submitting');
+    let reason = detail;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      // Keep the page itself: it is the only record of wording the operator
+      // did not recognise, and it is what teaches it the next variant.
+      const dump = await this.browser.saveFormEvidence(page, `unconfirmed-${this.state.data.current.agency_id}`).catch(() => '');
+      const released = await this.waitForRelease('uncertain_submission',
+        [reason, dump ? `saved: ${dump}` : ''].filter(Boolean).join(' — '));
+
+      if (released === 'abandon') return 'abandoned';
+
+      if (released === 'confirmed_sent') {
+        const evidence = await this.browser.saveEvidence(page, `sent-confirmed-${this.state.data.current.agency_id}`).catch(() => '');
+        // release() has already settled it; this only attaches the evidence.
+        if (this.state.data.current.submission.state !== 'sent') {
+          this.state.settleSubmission('sent', { evidence, detail: 'confirmed by the operator', confirmedBy: 'human' });
+        } else {
+          this.state.data.current.submission.evidence = evidence || this.state.data.current.submission.evidence;
+          this.state.save();
+        }
+        this.log('[operator] operator confirmed the enquiry was sent; continuing to Create probe');
+        return this.createProbeAndMarkSent(propertyUrl || this.state.data.current.property_url);
+      }
+
+      // Plain release: look at the page again, with no click.
+      const seen = await observeSubmissionOutcome(page, { timeout: this.config.timeouts.submitResult, layout })
+        .catch(() => ({ outcome: 'uncertain', detail: 'the page could not be read after release' }));
+      if (seen.outcome === 'sent') {
+        const evidence = await this.browser.saveEvidence(page, `sent-${this.state.data.current.agency_id}`).catch(() => '');
+        this.state.settleSubmission('sent', { evidence, detail: seen.detail });
+        this.log('[operator] confirmation recognised after release; continuing to Create probe');
+        return this.createProbeAndMarkSent(propertyUrl || this.state.data.current.property_url);
+      }
+      reason = `still not confirmed after release: ${seen.detail}`;
+    }
+    // Out of rechecks. The agency is preserved and nothing was resubmitted.
+    this.state.requireHuman('uncertain_submission', reason);
+    return 'abandoned';
   }
 
   // STEP 2's tab handling. probe.html already calls window.open on the branch

@@ -11,6 +11,7 @@ import { buildHarness } from './harness.mjs';
 import { standardWorld, APPROVED_IDENTITY } from './mock/fixtures.mjs';
 import { classifyPropertyType, chooseListing } from '../src/suitability.mjs';
 import { recoveryPlan, OperatorState } from '../src/state.mjs';
+import { classifySubmissionPage } from '../src/rightmove.mjs';
 
 const results = [];
 let only = process.argv[2] || '';
@@ -550,6 +551,167 @@ await test('an emergency stop interrupts a cooldown instead of waiting it out', 
     await run.catch(() => {});
     assert.ok(Date.now() - stoppedAt < 5000, 'the stop was honoured during the wait');
     assert.equal(h.world.probes.length, 1, 'the second enquiry never went out');
+  } finally { await h.close(); }
+});
+
+// ── confirmation after a human CAPTCHA ─────────────────────────────────────
+
+console.log('\nconfirmation after a CAPTCHA');
+
+await test("Rightmove's confirmation wordings are recognised", async () => {
+  const sent = (page) => assert.equal(classifySubmissionPage(page).kind, 'sent', JSON.stringify(page));
+  sent({ url: 'https://www.rightmove.co.uk/property-for-sale/contactBranchConfirmation.html?propertyId=1', text: '', formStillThere: false });
+  sent({ url: 'x', text: 'Your enquiry has been sent to Signature Estates', formStillThere: false });
+  sent({ url: 'x', text: 'Thanks for your enquiry', formStillThere: false });
+  sent({ url: 'x', text: 'Your enquiry is on its way', formStillThere: false });
+  sent({ url: 'x', text: "We've sent your details to the agent", formStillThere: false });
+  sent({ url: 'x', text: 'What happens next The agent will be in touch shortly', formStillThere: false });
+  // And what must NOT read as a confirmation.
+  assert.equal(classifySubmissionPage({ url: 'x', text: 'Contact the agent', formStillThere: true, errors: [] }).kind, 'pending');
+  assert.equal(classifySubmissionPage({ url: 'x', text: 'form', formStillThere: true, errors: ['Enter a valid number'] }).kind, 'failed');
+  assert.equal(classifySubmissionPage({ url: 'x', text: 'Loading…', formStillThere: false }).kind, 'gone');
+});
+
+await test('a confirmation reached after the human clears the CAPTCHA is recognised', async () => {
+  const world = standardWorld();
+  world.submitBehaviour = 'captcha';
+  const h = await buildHarness(world);
+  try {
+    const run = h.run({ batchSize: 1 });
+    await waitFor(() => h.state.data.current.needs_human?.reason === 'captcha', 25000);
+    // The human completes the challenge; Rightmove lands on its confirmation.
+    const page = h.browser.rightmoveTabs().find((candidate) => /contactBranch/.test(candidate.url()));
+    await page.evaluate(() => window.__completeChallenge('<h1>Your enquiry has been sent to Alpha Residential</h1>'));
+    h.orchestrator.release({ outcome: 'resume' });
+    await run;
+
+    assert.equal(h.world.probes.length, 1, 'the probe was created from the recognised confirmation');
+    assert.equal(h.world.probes[0].probe_status, 'observing');
+    assert.equal(h.state.data.counters.completed, 1);
+    // The decisive assertion: Send was pressed exactly once, in total.
+    assert.equal(h.world.log.filter((e) => e.op === 'enquiry-submitted').length, 1,
+      'Send was never pressed a second time');
+  } finally { await h.close(); }
+});
+
+await test('rechecking after release never presses Send again', async () => {
+  const world = standardWorld();
+  world.submitBehaviour = 'captcha';
+  const h = await buildHarness(world);
+  try {
+    const run = h.run({ batchSize: 1 });
+    await waitFor(() => h.state.data.current.needs_human?.reason === 'captcha', 25000);
+    const page = h.browser.rightmoveTabs().find((candidate) => /contactBranch/.test(candidate.url()));
+    // Released with the challenge still unsolved and no confirmation: the
+    // operator must look again, not send again.
+    h.orchestrator.release({ outcome: 'resume' });
+    await waitFor(() => h.state.data.current.needs_human?.reason === 'uncertain_submission', 25000);
+    assert.equal(h.state.data.current.submission.attempts, 1, 'still exactly one attempt');
+    assert.equal(h.world.log.filter((e) => e.op === 'enquiry-submitted').length, 1);
+    // Now the human clears it and says they saw the confirmation.
+    await page.evaluate(() => window.__completeChallenge('<h1>Your enquiry has been sent</h1>'));
+    h.orchestrator.release({ outcome: 'confirmed_sent' });
+    await run;
+    assert.equal(h.world.probes.length, 1);
+    assert.equal(h.world.log.filter((e) => e.op === 'enquiry-submitted').length, 1, 'still one enquiry');
+  } finally { await h.close(); }
+});
+
+await test('"I saw the confirmation" records the probe without sending anything', async () => {
+  const world = standardWorld();
+  world.submitBehaviour = 'uncertain';
+  const h = await buildHarness(world);
+  try {
+    const run = h.run({ batchSize: 1 });
+    await waitFor(() => h.state.data.current.needs_human?.reason === 'uncertain_submission', 25000);
+    h.orchestrator.release({ outcome: 'confirmed_sent' });
+    await run;
+    assert.equal(h.world.probes.length, 1, 'the probe was recorded');
+    assert.equal(h.world.probes[0].probe_status, 'observing');
+    assert.equal(h.state.data.current.submission.state, 'none', 'the cycle closed cleanly');
+    assert.equal(h.world.log.filter((e) => e.op === 'enquiry-submitted').length, 1, 'no second enquiry');
+    assert.equal(h.state.data.history[0].outcome, 'completed');
+  } finally { await h.close(); }
+});
+
+await test('Send can never be pressed twice for one agency', async () => {
+  const h = await buildHarness(standardWorld());
+  try {
+    h.state.beginAgency({ agency_id: 'ag-alpha-1', agency_name: 'Alpha Residential' });
+    h.state.markSubmitInFlight();
+    assert.throws(() => h.state.markSubmitInFlight(), /will not submit a second enquiry/);
+    h.state.settleSubmission('sent', { detail: 'x' });
+    assert.throws(() => h.state.markSubmitInFlight(), /will not submit a second enquiry/);
+  } finally { await h.close(); }
+});
+
+await test('an agency whose Send was pressed is never restarted from step 1', async () => {
+  const world = standardWorld();
+  world.submitBehaviour = 'uncertain';
+  const h = await buildHarness(world);
+  try {
+    const run = h.run({ batchSize: 1 });
+    await waitFor(() => h.state.data.current.needs_human?.reason === 'uncertain_submission', 25000);
+    h.orchestrator.release({ outcome: 'abandon' });
+    await h.orchestrator.emergencyStop();
+    await run.catch(() => {});
+    assert.equal(h.world.log.filter((e) => e.op === 'enquiry-submitted').length, 1,
+      'the abandoned agency was not worked again');
+    assert.equal(h.world.probes.length, 0);
+  } finally { await h.close(); }
+});
+
+// ── recovering Signature Estates: submitted, never recorded ────────────────
+
+console.log('\nrecovering an enquiry that was sent but never recorded');
+
+await test('a restarted worker recovers a human-confirmed enquiry at Create probe', async () => {
+  const world = standardWorld();
+  const h = await buildHarness(world);
+  try {
+    // Exactly the Signature Estates situation: the enquiry went out, the
+    // CAPTCHA was cleared by hand, the operator could not confirm it, and the
+    // worker was restarted before anything reached NOVUS.
+    h.state.beginAgency({
+      agency_id: 'ag-alpha-1', agency_name: 'Alpha Residential',
+      branch_url: world.agencies[0].rightmove_sales_branch_url,
+    });
+    h.state.stage('url_captured', { property_url: 'https://www.rightmove.co.uk/properties/900002' });
+    h.state.markSubmitInFlight();
+    h.state.requireHuman('uncertain_submission', 'confirmation not recognised after the CAPTCHA');
+
+    // The worker refuses to run while that is outstanding.
+    const refused = await h.orchestrator.start({ batchSize: 1, dailyLimit: 5, liveSubmit: true });
+    assert.equal(refused.ok, false);
+    assert.match(refused.error, /uncertain_submission/);
+
+    // "I saw Rightmove's confirmation."
+    const released = h.orchestrator.release({ outcome: 'confirmed_sent' });
+    assert.equal(released.ok, true);
+    assert.equal(h.state.data.current.submission.state, 'sent');
+    assert.equal(h.state.data.current.submission.confirmed_by, 'human');
+    assert.match(h.state.data.run.stop_reason, /press Start/);
+
+    // Start now resumes at Create probe.
+    await h.run({ batchSize: 1 });
+    const probes = h.world.probes.filter((p) => p.agency_id === 'ag-alpha-1');
+    assert.equal(probes.length, 1, 'exactly one probe for the recovered agency');
+    assert.equal(probes[0].probe_status, 'observing');
+    assert.match(probes[0].property_url, /900002$/, 'the property URL captured before the CAPTCHA');
+    assert.equal(h.world.agencies.find((a) => a.agency_id === 'ag-alpha-1').probe_sent, 'YES');
+    assert.equal(h.world.log.filter((e) => e.op === 'enquiry-submitted').length, 0,
+      'recovery sends no enquiry at all');
+  } finally { await h.close(); }
+});
+
+await test('confirmed_sent is refused when no enquiry was ever submitted', async () => {
+  const h = await buildHarness(standardWorld());
+  try {
+    h.state.beginAgency({ agency_id: 'ag-alpha-1', agency_name: 'Alpha Residential' });
+    h.state.requireHuman('unexpected_form', 'the form did not match');
+    const result = h.orchestrator.release({ outcome: 'confirmed_sent' });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /no enquiry awaiting confirmation/);
   } finally { await h.close(); }
 });
 

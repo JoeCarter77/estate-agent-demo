@@ -421,6 +421,97 @@ export async function readEnquiryForm(page) {
 
 // STEP 8 — submit and wait for a DEFINITIVE result. Three outcomes only:
 // sent, failed, uncertain. "The button was clicked" is never a success.
+//
+// CLICKING AND OBSERVING ARE SEPARATE FUNCTIONS, deliberately. Re-reading the
+// page after a CAPTCHA must never be able to press Send a second time, and the
+// only way to guarantee that is for the re-read path to have no click in it.
+
+// What Rightmove's confirmation page says. A pure function of what was on
+// screen, so it can be tested against real wording without a browser.
+//
+// Both signals are accepted because the human-CAPTCHA path reaches the
+// confirmation by a full navigation: Rightmove's own confirmation URL is as
+// good evidence as its confirmation copy, and after a challenge the copy is
+// what changes most between variants.
+const CONFIRMATION_URL = /contactbranchconfirmation|enquiryconfirmation|enquirysent|confirmation|thank[-_]?you/i;
+
+const CONFIRMATION_TEXT = [
+  /your (enquiry|email|message|details) (has|have) been sent/i,
+  /your (enquiry|email|message) was sent/i,
+  /(enquiry|message|email) sent(?![a-z])/i,
+  /we('ve| have) sent your (enquiry|details|message)/i,
+  /thanks?[,!]? (for (your |getting in touch)|your (enquiry|message))/i,
+  /your (enquiry|message|details) (is|are) on (its|their) way/i,
+  /(has|have) been (sent|passed|forwarded) (on )?to/i,
+  /we('ve| have) passed your details/i,
+];
+
+export function classifySubmissionPage({ url = '', text = '', formStillThere = true, errors = [] }) {
+  const flat = String(text).replace(/\s+/g, ' ');
+
+  if (CONFIRMATION_URL.test(String(url))) return { kind: 'sent', snippet: flat.slice(0, 200) };
+  const matched = CONFIRMATION_TEXT.find((pattern) => pattern.test(flat));
+  if (matched) return { kind: 'sent', snippet: flat.slice(0, 200) };
+
+  // "What happens next" is Rightmove's confirmation heading on some variants,
+  // but it is too generic to stand alone — it only counts once the enquiry
+  // form itself has gone, which rules out the form page that still offers it.
+  if (!formStillThere && /what happens next|we'll be in touch|the agent will/i.test(flat)) {
+    return { kind: 'sent', snippet: flat.slice(0, 200) };
+  }
+
+  // A validation failure keeps the form on screen with visible errors: the
+  // enquiry demonstrably did not leave.
+  if (formStillThere && errors.length) return { kind: 'failed', snippet: errors.join(' | ').slice(0, 300) };
+  if (!formStillThere) return { kind: 'gone', snippet: flat.slice(0, 200) };
+  return { kind: 'pending', snippet: '' };
+}
+
+// Read the page as it stands. NO CLICK, EVER. This is what the post-CAPTCHA
+// and post-release rechecks call.
+export async function readSubmissionPage(page, { layout = 'editable' } = {}) {
+  return page.evaluate((mode) => ({
+    url: location.href,
+    text: (document.body?.innerText || '').replace(/\s+/g, ' '),
+    errors: [...document.querySelectorAll('[class*="error"], [role="alert"], .form-error')]
+      .map((el) => (el.innerText || '').trim()).filter(Boolean),
+    // "Is the enquiry still on screen?" asked in the layout's own terms: the
+    // signed-in form has no #email input, and treating its absence as the form
+    // vanishing reported every signed-in submission as uncertain.
+    formStillThere: mode === 'signed_in'
+      ? [...document.querySelectorAll('button')].some((element) => element.matches('[data-testid="submitButton"]')
+          || /^send( (email|enquiry|message))?$/i.test((element.innerText || '').trim()))
+      : Boolean(document.querySelector('#email')),
+  }), layout).catch(() => null);
+}
+
+// Poll an already-submitted enquiry for its outcome. Observation only.
+export async function observeSubmissionOutcome(page, { timeout, layout = 'editable' }) {
+  const deadline = Date.now() + timeout;
+  let last = null;
+  while (Date.now() < deadline) {
+    const challenge = await detectChallenge(page);
+    if (challenge) return { outcome: 'challenge', challenge };
+
+    const seen = await readSubmissionPage(page, { layout });
+    if (seen) {
+      last = seen;
+      const verdict = classifySubmissionPage(seen);
+      if (verdict.kind === 'sent') return { outcome: 'sent', detail: verdict.snippet };
+      if (verdict.kind === 'failed') return { outcome: 'failed', detail: verdict.snippet };
+      // The form disappearing without anything that reads as a confirmation is
+      // exactly the ambiguous case: the enquiry may well have gone.
+      if (verdict.kind === 'gone') {
+        return { outcome: 'uncertain', detail: `the form left the page without a confirmation message: ${verdict.snippet}`, page: seen };
+      }
+    }
+    await page.waitForTimeout(500);
+  }
+  return { outcome: 'uncertain', detail: 'no confirmation and no error appeared before the timeout', page: last };
+}
+
+// Click Send, then observe. The caller is responsible for never calling this
+// twice for one agency; the orchestrator and the state file both enforce it.
 export async function submitEnquiry(page, { timeout, layout = 'editable' }) {
   const submit = page.locator('button[data-testid="submitButton"]').first();
   // The signed-in layout labels the same control "Send enquiry" on some
@@ -430,40 +521,5 @@ export async function submitEnquiry(page, { timeout, layout = 'editable' }) {
   if (!(await button.count())) return { outcome: 'failed', detail: 'no submit control on the enquiry form' };
 
   await button.click();
-
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const challenge = await detectChallenge(page);
-    if (challenge) return { outcome: 'challenge', challenge };
-
-    const verdict = await page.evaluate((mode) => {
-      const text = (document.body?.innerText || '').replace(/\s+/g, ' ');
-      if (/your (enquiry|email|message) (has been |was )?sent|thanks? for (your )?(enquiry|getting in touch)|we've sent your (enquiry|details)|email sent/i.test(text)) {
-        return { kind: 'sent', snippet: text.slice(0, 200) };
-      }
-      // A validation failure keeps the form on screen with visible errors: the
-      // enquiry demonstrably did not leave.
-      const errors = [...document.querySelectorAll('[class*="error"], [role="alert"], .form-error')]
-        .map((el) => (el.innerText || '').trim()).filter(Boolean);
-      // "Is the enquiry still on screen?" must be asked in the layout's own
-      // terms: the signed-in form has no #email input, and treating its absence
-      // as the form vanishing reported every signed-in submission as uncertain.
-      const formStillThere = mode === 'signed_in'
-        ? [...document.querySelectorAll('button')].some((element) => element.matches('[data-testid="submitButton"]')
-            || /^send( (email|enquiry|message))?$/i.test((element.innerText || '').trim()))
-        : Boolean(document.querySelector('#email'));
-      if (formStillThere && errors.length) return { kind: 'failed', snippet: errors.join(' | ').slice(0, 300) };
-      if (!formStillThere) return { kind: 'gone', snippet: text.slice(0, 200) };
-      return null;
-    }, layout).catch(() => null);
-
-    if (verdict?.kind === 'sent') return { outcome: 'sent', detail: verdict.snippet };
-    if (verdict?.kind === 'failed') return { outcome: 'failed', detail: verdict.snippet };
-    // The form disappearing without a confirmation is exactly the ambiguous
-    // case the spec calls out: the enquiry may well have gone.
-    if (verdict?.kind === 'gone') return { outcome: 'uncertain', detail: `the form left the page without a confirmation message: ${verdict.snippet}` };
-
-    await page.waitForTimeout(500);
-  }
-  return { outcome: 'uncertain', detail: 'no confirmation and no error appeared before the timeout' };
+  return observeSubmissionOutcome(page, { timeout, layout });
 }

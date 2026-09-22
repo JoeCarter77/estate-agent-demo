@@ -252,6 +252,13 @@ function signedInEnquiryPage(world, propertyId) {
           }
         }, 150);
       });
+      // What a human completing the challenge does: the challenge goes away and
+      // Rightmove navigates to its own confirmation page.
+      window.__completeChallenge = (wording) => {
+        document.getElementById('captcha-host').innerHTML = '';
+        document.querySelector('section')?.remove();
+        document.body.innerHTML = wording;
+      };
     </script>`);
 }
 
@@ -317,6 +324,11 @@ function enquiryPage(world, propertyId) {
           }
         }, 150);
       });
+      window.__completeChallenge = (wording) => {
+        document.getElementById('captcha-host').innerHTML = '';
+        document.querySelector('form')?.remove();
+        document.body.innerHTML = wording;
+      };
     </script>`);
 }
 

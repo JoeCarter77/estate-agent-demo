@@ -62,11 +62,14 @@ export class ProberPage {
     }
     if (error) return { empty: false, agencyId, error };
 
-    // The branch link is only rendered once AGENCIES.rightmove_sales_branch_url
-    // has been read back, so waiting for the name is not enough.
-    const name = await this.page.locator('#agency-name').inputValue();
+    // ORDER MATTERS. probe.html seeds #agency-name with the agency_id and
+    // replaces it with the real name only once the agency has been read back —
+    // at the same moment it fills in the branch link. Reading the name first
+    // captured the id, which then became the agency's name in every log line
+    // and every intervention notification. Wait for the link, then read.
     const branchUrl = await this.page.locator('#rm-agent-link')
       .getAttribute('href', { timeout: 5000 }).catch(() => '');
+    const name = await this.page.locator('#agency-name').inputValue();
     return { empty: false, agencyId, agencyName: name, branchUrl: branchUrl && branchUrl !== '#' ? branchUrl : '' };
   }
 
