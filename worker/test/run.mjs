@@ -202,6 +202,29 @@ await test('a blocked popup is recovered, not treated as a dead agency', async (
   } finally { await h.close(); }
 });
 
+await test('a stray tab racing the property tab does not hijack the property URL', async () => {
+  // The ag-bedfords-873 failure: a listing opened fine, but a tab that opened
+  // first was read instead, so the operator reported "no property id" against
+  // the agency's branch URL.
+  const world = standardWorld();
+  world.strayTabOnPropertyOpen = true;
+  const h = await buildHarness(world);
+  try {
+    // Fail fast rather than hang: before the fix this escalated and blocked
+    // waiting for a human, so a regression must surface as a failure.
+    const run = h.run({ batchSize: 1 });
+    const escalated = waitFor(() => h.state.data.current.needs_human, 30000).then((needs) => {
+      throw new Error(`escalated instead of using the property tab: ${needs.reason} — ${needs.detail}`);
+    }, () => null);
+    await Promise.race([run, escalated]);
+    assert.equal(h.world.probes.length, 1, 'the probe completed despite the racing tab');
+    const probe = h.world.probes[0];
+    assert.match(probe.property_url, /\/properties\/900002$/, 'the chosen property URL, captured from its own page');
+    assert.ok(!/estate-agents/.test(probe.property_url), 'never the agency branch URL');
+    assert.equal(h.state.data.counters.interventions, 0, 'no bogus uncertain-suitability escalation');
+  } finally { await h.close(); }
+});
+
 await test('leftover Rightmove tabs are closed before returning to NOVUS', async () => {
   // One eligible agency only, so the run ends rather than immediately opening
   // the next agency's branch page (which would be a tab by design).

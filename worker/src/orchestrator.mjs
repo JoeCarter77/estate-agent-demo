@@ -346,9 +346,13 @@ export class Orchestrator {
     await this.checkpoint();
 
     // STEP 4 & 5 — open it, verify ownership, capture the canonical URL.
+    // Only the tab holding the listing that was chosen will do. Matching on the
+    // property id means a stray tab — an interstitial, or the Prober's own
+    // branch popup arriving late — can never be mistaken for it.
+    const chosenId = propertyIdOf(chosen.href);
     const { page: propertyPage } = await this.browser.openInNewTab(
       () => branchPage.evaluate((href) => window.open(href, '_blank'), chosen.href),
-      { fallbackUrl: chosen.href },
+      { fallbackUrl: chosen.href, matches: (url) => !chosenId || propertyIdOf(url) === chosenId },
     );
     if (!propertyPage) throw new HumanNeeded('agency_page_unavailable', 'the property tab would not open');
     this.state.stage('property_selected');
@@ -357,6 +361,12 @@ export class Orchestrator {
     if (!property.ok) {
       if (property.challenge) throw new HumanNeeded(property.challenge.kind, property.challenge.detail);
       throw new HumanNeeded('uncertain_suitability', property.reason);
+    }
+    // The URL that goes into NOVUS comes from the property page itself, and it
+    // must be the property that was chosen — never a neighbour, never a branch.
+    if (chosenId && propertyIdOf(property.url) !== chosenId) {
+      throw new HumanNeeded('uncertain_suitability',
+        `the open tab is property ${propertyIdOf(property.url)} but ${chosenId} was chosen`);
     }
     this.state.stage('url_captured', { property_url: property.url, property_title: property.title });
     this.log(`[operator] property: ${property.url}`);
@@ -512,7 +522,7 @@ export class Orchestrator {
     if (existing) return existing;
     const { page } = await this.browser.openInNewTab(
       () => this.prober.branchLink().click({ timeout: 8000 }),
-      { fallbackUrl: branchUrl },
+      { fallbackUrl: branchUrl, matches: (url) => /\/estate-agents\/agent\//i.test(url) },
     );
     if (!page) throw new HumanNeeded('agency_page_unavailable', `could not open ${branchUrl}`);
     return page;

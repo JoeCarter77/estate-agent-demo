@@ -74,25 +74,47 @@ export class OperatorBrowser {
   // popup being blocked or the click navigating in place, which is why the
   // caller always passes the URL it expected: a blocked popup is recovered by
   // opening the page directly rather than abandoning the agency.
-  async openInNewTab(trigger, { fallbackUrl = '', timeout = 15000 } = {}) {
+  async openInNewTab(trigger, { fallbackUrl = '', timeout = 15000, graceMs = 2500, matches = null } = {}) {
     await this.launch();
+    const accept = matches || (() => true);
     const before = new Set(this.context.pages());
-    let popup = null;
-    try {
-      const waiter = this.context.waitForEvent('page', { timeout });
-      await trigger();
-      popup = await waiter;
-    } catch {
-      popup = this.context.pages().find((page) => !before.has(page)) || null;
+    await trigger().catch(() => {});
+
+    // THE TAB IS IDENTIFIED BY WHAT IT IS, NOT BY WHEN IT ARRIVED. Waiting for
+    // the next 'page' event returned whichever tab happened to open first —
+    // and the Prober opens the agency's branch page with its own window.open
+    // as the agency loads, so a late branch tab could be handed back as "the
+    // property". openProperty then read the branch page and reported "no
+    // property id in <branch url>" for a listing that had opened perfectly
+    // well in the tab next to it.
+    //
+    // So: poll the tab list, skip anything still on about:blank, and return
+    // only a tab whose URL is the one that was asked for. Tabs that do not
+    // match are left alone; closeRightmoveTabs tidies them up at step 10.
+    const deadline = Date.now() + timeout;
+    let sawNewTab = false;
+    while (Date.now() < deadline) {
+      for (const page of this.context.pages()) {
+        if (before.has(page) || page.isClosed()) continue;
+        sawNewTab = true;
+        const url = page.url();
+        if (!url || url === 'about:blank') continue;     // still navigating
+        if (!accept(url)) continue;                      // somebody else's tab
+        await page.waitForLoadState('domcontentloaded').catch(() => {});
+        return { page, recovered: false };
+      }
+      // Nothing opened at all within the grace period: the popup was blocked,
+      // which is recovered below rather than waited out.
+      if (!sawNewTab && Date.now() - (deadline - timeout) > graceMs) break;
+      await new Promise((resolve) => setTimeout(resolve, 150));
     }
-    if (!popup && fallbackUrl) {
-      popup = await this.context.newPage();
-      await popup.goto(fallbackUrl, { waitUntil: 'domcontentloaded' });
-      return { page: popup, recovered: true };
+
+    if (fallbackUrl) {
+      const page = await this.context.newPage();
+      await page.goto(fallbackUrl, { waitUntil: 'domcontentloaded' });
+      return { page, recovered: true };
     }
-    if (!popup) return { page: null, recovered: false };
-    await popup.waitForLoadState('domcontentloaded').catch(() => {});
-    return { page: popup, recovered: false };
+    return { page: null, recovered: false };
   }
 
   async screenshotBase64(page) {

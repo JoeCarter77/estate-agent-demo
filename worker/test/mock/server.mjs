@@ -39,6 +39,9 @@ export function createMockWorld(fixture = {}) {
     signedInIdentity: fixture.signedInIdentity || null,
     signedInDeclaration: fixture.signedInDeclaration ?? 'displayed',
     blockPopups: Boolean(fixture.blockPopups),
+    // Reproduces the tab race: opening a listing also opens a stray tab that
+    // wins the race to the 'page' event.
+    strayTabOnPropertyOpen: Boolean(fixture.strayTabOnPropertyOpen),
     log: [],
   };
 }
@@ -164,8 +167,18 @@ function branchPage(world, branchId) {
         </div>
       </div>
     </div>`).join('');
+  const stray = world.strayTabOnPropertyOpen ? `
+    <script>
+      // A stray tab beats the property tab to the 'page' event — exactly what
+      // the Prober's own delayed window.open of the branch page does live.
+      const realOpen = window.open;
+      window.open = function (url, ...rest) {
+        realOpen(location.href, '_blank');
+        return realOpen(url, ...rest);
+      };
+    </script>` : '';
   return page(`${branch.name} | Rightmove`, `
-    <h1>${branch.name}</h1>
+    <h1>${branch.name}</h1>${stray}
     <div data-test="propertyList">
       <div class="tabs_tabs__5aj7U propertyList_propertyListControls__rQG_b">
         Properties for sale (${branch.forSale ?? (branch.listings || []).length})
