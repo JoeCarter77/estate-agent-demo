@@ -282,4 +282,17 @@ assert.equal((await recoverUnresolvedReplyEvents({ repo, classify: true })).repa
 assert.equal((await reconcileActionEngine(repo, { now: NOW, agencyId: 'ag_campaign_only', execution: { available: true } })).created, 0);
 assert.equal(objs(store.ACTIONS).length, 1);
 
+// A prior no-send reconciliation may have filled identity while classification
+// was disabled. It must finish that same event on a later pass, without a
+// duplicate REPLY_EVENTS row or action.
+store.REPLY_EVENTS = table(REPLY_EVENTS_HEADER, [{ ...objs(store.REPLY_EVENTS)[0], classification: 'OTHER_UNCLEAR', next_action: 'MANUAL_REVIEW', priority: 'CRITICAL', action_status: 'REVIEW', error: 'UNRESOLVED_INBOUND_UNMATCHED' }]);
+store.ACTIONS = table(ACTIONS_HEADER);
+const partialRecovery = await recoverUnresolvedReplyEvents({ repo, classify: true });
+assert.equal(partialRecovery.repaired, 1);
+assert.equal(objs(store.REPLY_EVENTS).length, 1);
+assert.equal(objs(store.REPLY_EVENTS)[0].classification, 'CALL_REQUESTED');
+assert.equal((await reconcileActionEngine(repo, { now: NOW, agencyId: 'ag_campaign_only', execution: { available: true } })).created, 1);
+assert.equal((await reconcileActionEngine(repo, { now: NOW, agencyId: 'ag_campaign_only', execution: { available: true } })).created, 0);
+assert.equal(objs(store.ACTIONS).length, 1);
+
 console.log('✅ Email reply → calling action → Calling Mode → outcome self-test passed');
