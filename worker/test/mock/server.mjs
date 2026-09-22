@@ -318,6 +318,13 @@ function enquiryPage(world, propertyId) {
           } else if (behaviour === 'uncertain') {
             document.querySelector('form').remove();
             document.body.insertAdjacentHTML('beforeend', '<p>Loading…</p>');
+          } else if (behaviour === 'delayed_banner') {
+            // What Rightmove actually does: the form goes, and the banner
+            // lands a moment later.
+            document.querySelector('form').remove();
+            setTimeout(() => {
+              document.body.insertAdjacentHTML('beforeend', '<p>Thanks, we\u2019ve got your enquiry.</p>');
+            }, 1200);
           } else if (behaviour === 'captcha') {
             document.getElementById('captcha-host').innerHTML =
               '<div style="width:400px;height:400px"><div><iframe src="https://www.google.com/recaptcha/api2/bframe?k=test" style="width:400px;height:400px"></iframe></div></div>';

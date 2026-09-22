@@ -441,13 +441,22 @@ const CONFIRMATION_TEXT = [
   /(enquiry|message|email) sent(?![a-z])/i,
   /we('ve| have) sent your (enquiry|details|message)/i,
   /thanks?[,!]? (for (your |getting in touch)|your (enquiry|message))/i,
+  // Rightmove's live banner, verbatim: "Thanks, we've got your enquiry."
+  // The apostrophe is normalised below, so this matches the curly form too.
+  /thanks?[,.!]*\s*we\s*'?\s*(ve|have)?\s*got your (enquiry|message|details)/i,
   /your (enquiry|message|details) (is|are) on (its|their) way/i,
   /(has|have) been (sent|passed|forwarded) (on )?to/i,
   /we('ve| have) passed your details/i,
 ];
 
 export function classifySubmissionPage({ url = '', text = '', formStillThere = true, errors = [] }) {
-  const flat = String(text).replace(/\s+/g, ' ');
+  // Normalise what varies between renderings of the same sentence: runs of
+  // whitespace, and curly apostrophes/quotes that do not match a typed one.
+  const flat = String(text)
+    .replace(/[\u2018\u2019\u02bc]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
 
   if (CONFIRMATION_URL.test(String(url))) return { kind: 'sent', snippet: flat.slice(0, 200) };
   const matched = CONFIRMATION_TEXT.find((pattern) => pattern.test(flat));
@@ -489,6 +498,7 @@ export async function readSubmissionPage(page, { layout = 'editable' } = {}) {
 export async function observeSubmissionOutcome(page, { timeout, layout = 'editable' }) {
   const deadline = Date.now() + timeout;
   let last = null;
+  let gone = null;
   while (Date.now() < deadline) {
     const challenge = await detectChallenge(page);
     if (challenge) return { outcome: 'challenge', challenge };
@@ -499,13 +509,20 @@ export async function observeSubmissionOutcome(page, { timeout, layout = 'editab
       const verdict = classifySubmissionPage(seen);
       if (verdict.kind === 'sent') return { outcome: 'sent', detail: verdict.snippet };
       if (verdict.kind === 'failed') return { outcome: 'failed', detail: verdict.snippet };
-      // The form disappearing without anything that reads as a confirmation is
-      // exactly the ambiguous case: the enquiry may well have gone.
-      if (verdict.kind === 'gone') {
-        return { outcome: 'uncertain', detail: `the form left the page without a confirmation message: ${verdict.snippet}`, page: seen };
-      }
+      // The form disappearing is NOT an answer. Rightmove removes the form
+      // first and renders its confirmation banner a moment later, so returning
+      // here reported a successful enquiry as uncertain. Keep polling for the
+      // banner and only give up when the whole window has elapsed.
+      if (verdict.kind === 'gone') gone = seen;
     }
     await page.waitForTimeout(500);
+  }
+  if (gone) {
+    return {
+      outcome: 'uncertain',
+      detail: `the form left the page and no confirmation appeared within ${Math.round(timeout / 1000)}s: ${gone.text.slice(0, 200)}`,
+      page: gone,
+    };
   }
   return { outcome: 'uncertain', detail: 'no confirmation and no error appeared before the timeout', page: last };
 }

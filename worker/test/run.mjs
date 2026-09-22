@@ -572,6 +572,32 @@ await test("Rightmove's confirmation wordings are recognised", async () => {
   assert.equal(classifySubmissionPage({ url: 'x', text: 'Loading…', formStillThere: false }).kind, 'gone');
 });
 
+await test("the live banner \"Thanks, we've got your enquiry.\" is a confirmation", async () => {
+  // Verbatim from a real Rightmove submission, plus the renderings that are
+  // the same sentence: curly apostrophe, collapsed whitespace, no full stop.
+  for (const text of [
+    "Thanks, we've got your enquiry.",
+    'Thanks, we\u2019ve got your enquiry.',
+    'Thanks,   we\u2019ve  got your enquiry',
+    "THANKS, WE'VE GOT YOUR ENQUIRY.",
+  ]) {
+    assert.equal(classifySubmissionPage({ url: 'x', text, formStillThere: false }).kind, 'sent', text);
+  }
+});
+
+await test('the banner rendering after the form is removed is still a confirmation', async () => {
+  const world = standardWorld();
+  // The real sequence: the form goes first, the banner appears a beat later.
+  world.submitBehaviour = 'delayed_banner';
+  const h = await buildHarness(world);
+  try {
+    await h.run({ batchSize: 1 });
+    assert.equal(h.world.probes.length, 1, 'the late banner was recognised, not called uncertain');
+    assert.equal(h.world.probes[0].probe_status, 'observing');
+    assert.equal(h.world.log.filter((e) => e.op === 'enquiry-submitted').length, 1, 'submitted exactly once');
+  } finally { await h.close(); }
+});
+
 await test('a confirmation reached after the human clears the CAPTCHA is recognised', async () => {
   const world = standardWorld();
   world.submitBehaviour = 'captcha';
