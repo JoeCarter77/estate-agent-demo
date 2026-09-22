@@ -21,6 +21,7 @@ picker (any agency — the ⌘K `lead-search` operation).
 | `lib/discovery-engine.mjs` | the **deterministic diagnosis**: `assessDimensions` → evidence status, `evaluateInterventions` → feasibility + dependency resolution, `computeEconomics`, `decideSuitability`, `buildPlan`, `diagnose`. No I/O, no model. |
 | `lib/discovery-pitch.mjs` | pitch input (structured, no customer PII), the deterministic template pitch, `validatePitch`, `generatePitch` (model via `lib/ai-client.mjs`, validated, template fallback). |
 | `lib/discovery-conclusion.mjs` | the **meeting conclusion**: grouped findings in the owner's words, the owner's agreement → recorded overrides, economics illustration (1–5 additional valuations), intervention groups, the **seven commercial focus areas** (`FOCUS_AREAS`, internal ranking) and the ONE **primary commercial project** they select (`buildProject`), the four-phase deployment built from its components, the **private pre-price checkpoint** (`buildCheckpoint`), the founding pilot, the seven client-facing screens (`presentationPayload`), and the optional validated AI polish. Deterministic; no model needed. |
+| `lib/discovery-conversation.mjs` | **conversation mode**: the private opening (`openingScript`), `TOPICS`, `TOPIC_FACTS`, `TOPIC_BRIDGES`, `ACKNOWLEDGEMENTS`, direction cues and the pure `conversationGuide()` the page mirrors. Speaking cues only — never an answer, never client-facing. |
 | `lib/discovery-store.mjs` | tabs `DISCOVERY_SESSIONS` (one row per session, patched in place; `conclusion_json` added later — an older header is extended in place) and `DISCOVERY_PITCHES` (one immutable row per pitch version). |
 | `lib/discovery-handlers.mjs` | `discovery-meetings`, `discovery-session` (GET); `discovery-setup`, `discovery-start`, `discovery-save`, `discovery-pitch`, `discovery-conclusion`, `discovery-conclusion-polish`, `discovery-outcome` (POST, Basic Auth + confirm tokens). |
 
@@ -35,33 +36,79 @@ in the page) keep it that way:
 | **Contextual wording** (`variants`) | A question carries alternative primary wording keyed to earlier answers ("You said it's mostly down to the negotiator remembering — if one gets forgotten, does anything pick it up?"). The wording used is saved as `asked_as` for the snapshot. |
 | **Option hiding** (`hide_when`) | An option an earlier answer has made redundant is not offered again (F2's "not much gets recorded" once F1 is weak/partial). |
 
-## The opening, the order and the section cues
+## The opening, the order and the section cues (questions v4)
 
-The meeting opens on the **commercial objective** (C1) — *"So just to start with the bigger picture, what's
-the main focus commercially for you at the moment? …"* — offering **more instructions · more valuations ·
-more buyer demand · greater team efficiency · something else**. Older values are never redefined:
-`win_instructions` ("winning more of the valuations we do") is a narrower objective than the new
-`more_instructions`, so it is kept as a `legacy` option — `optionOf()` still resolves its label, and
-`visibleOptions()` only offers a legacy value again to a session whose own answer already uses it.
+**Opening & framing** is a private stage (`opening`, stage 1) shown before any question on a new session:
+greeting and framing from `openingScript()` in `lib/discovery-conversation.mjs`, using the contact's first
+name when the stored name plausibly is one. The line *"I'll run you through a couple of things I've noticed
+from looking at other agencies in your area"* is offered **only** when `context.local_research` exists —
+other agencies in the same location that we have actually probed and graded (PROBES + INTELLIGENCE). The
+opening is returned as `opening` on the session read, never in the conclusion or presentation. START
+DISCOVERY (or Enter) moves to the commercial objective. Existing sessions keep their stored stage.
 
-C1 is followed by the **desired outcome** (C1a): *"And if we were having this conversation again in six
-months and things had gone really well, what would have changed for you?"* — free text with an **optional**
-numerical `target`. A number is never required; when none is given the target stays `null`, never zero. It
-reaches the conclusion as `objective.outcome` and is shown on the internal Today step only — their words
-about their own agency are private, not a claim on a client slide.
+Meeting order: **objective (C1) → commercial bottleneck → agency context → foundations → intelligence →
+commercial numbers → future pacing (C1a) → diagnosis**.
 
-Order: objective → outcome → obstacles → branches → enquiry volume → database size → CRM → CRM access, then
-foundations, then intelligence, then the numbers. `SECTION_TRANSITIONS` (registry, published in the
-registry payload) carries one **private speaking cue per section entered** — foundations, intelligence and
-the commercial numbers; the opening section has none. The page shows a cue once, on the first visible
-question of that section, and never in `presentationPayload` or the conclusion.
+- **C1** — *"So just to start with the bigger picture…"*, options more instructions · more valuations · more
+  buyer demand · greater team efficiency · something else. `win_instructions`, `fees`, `lettings` stay as
+  `legacy` options (readable, only re-offered to a session that chose them).
+- **Bottleneck** — one suggested route per objective: `C1b_instructions` (*"…getting enough valuations through
+  the door, or winning the instructions once you're there?"*), `C1b_demand`, `C1b_capacity`; then C2 with a
+  variant that follows on (*"What's currently stopping you getting more of those through the door?"*). C2 is
+  covered by `C1b_capacity`. The engine refines the working objective: more instructions + valuation volume →
+  `objective.priority = more_valuations`; + winning → `win_instructions`; "both"/no answer leaves it. The
+  stated objective and bottleneck are kept as `objective.stated_priority` / `objective.bottleneck`.
+- **Agency context** — C3 branches, C6 CRM, C7 access, C4 enquiries, C5 database. Prefilled values from the
+  agency record count as established and are not suggested again.
+- **Numbers** (C8–C11, section `value`) near the end; conversion derived from C8/C9.
+- **Future pacing** — C1a moved to section `future` (the last question): *"Thinking about everything we've
+  spoken about, if we managed to improve those areas, what would a really good next six months look like for
+  you?"* Free text, optional `target`, never required. Same id and answer shape, so older sessions that
+  answered it early read as before (shown as already covered).
 
-Other flow changes: the commercial-value numbers (C8–C11) are asked last (section `value`, stage 3) so the
-conversation runs priorities → operation → gaps → intelligence → value; "Next" steps over optional detail
-once a dimension has its cause and consequence; a blocked CRM opens `C7_block`, and "nobody's worked out
-how" turns the F2/I2/I3 block into an assessment item. Related dimensions stay distinct: F2 (can a person read
-the history) is never skipped because F1 (is it captured) was assessed; I2 (does the system connect events) is
-never skipped because F2 was strong — only the *matching* detail is carried.
+`SECTION_TRANSITIONS` carries one private cue for entering foundations, intelligence and the numbers. Future
+pacing has none — its question is the bridge. The page shows a cue once, on the first topic of a section
+nothing has yet been asked in.
+
+## Conversation mode (`lib/discovery-conversation.mjs`)
+
+The page no longer walks one question after another. Questions are grouped into **15 topics** (objective,
+bottleneck, agency, F1–F5, I1–I5, numbers, future). For the topic in front of Joe, `conversationGuide(topic,
+answers)` — pure, deterministic, mirrored by `guideFor()` in the page — returns:
+
+| part | source |
+|---|---|
+| topic heading + *what we're trying to understand* | `TOPICS` |
+| **what we already know** | `TOPIC_FACTS`: fixed sentences gated on specific earlier answers (same condition shape as coverage rules), `{Cn}` tokens filled from the answer; plus anything the owner volunteered about this topic earlier; plus questions covered by coverage rules (click → covered card → Ask anyway) |
+| **suggested transition** | `TOPIC_BRIDGES`, only before anything is asked in the topic |
+| **suggested opener / next question** | the first open, non-optional visible question, in its contextual wording (`variants`) |
+| **listen for** | `TOPICS[].listen_for` (two or three) |
+| **other directions, if useful** | up to three still-open questions as short cues (`QUESTION_CUES` / `ROLE_CUES`); required first, frequency / tried / example always marked optional |
+| **you might say** | `ACKNOWLEDGEMENTS`: short non-question speaking cues once the topic has an answer |
+| structured capture | the registry's own options, numbers, text and notes — unchanged persistence |
+
+Status per topic: `not_started` → `in_progress` → `enough` (a dimension with its evidence: verified strength,
+or weak/partial with cause + consequence, or unknown) → `done`. "Next" moves to the next open question in the
+topic, then the next topic; optional questions are never forced. **Follow the conversation**: "They mentioned
+another topic…" jumps to that topic, records the answer with `volunteered_in: <origin topic>` (persisted,
+validated against topic ids), and "Next / Back to the conversation" returns. A volunteered answer is an
+ordinary answer — it only becomes CONFIRMED with the cause and consequence the engine already requires.
+Nothing reads free speech; nothing is inferred from "don't know".
+
+Keys: 1–9 options · S simpler · E example · Enter next · N / → next topic · P previous topic · ← previous question.
+
+The follow-ups were reworded to sound natural (e.g. *"Is that something you've got a proper process for, or
+does it depend on who's dealing with them?"*, *"And does that cause you much of an issue in practice?"*, *"Is
+that something you see quite often?"*, *"Have you tried doing anything differently with that?"*, *"Can you
+think of a time that's happened recently?"*). I2 now asks the commercial question — *"If someone had a valuation
+with you last year and started enquiring again today, would anything bring them back to your attention as a
+potential seller?"* — so it never repeats F2 (can the history be read). F4 asks *"And would you normally know if
+one of those follow-ups hadn't happened?"* when follow-ups are already set every time. Option meanings are
+unchanged; the old wording survives in `asked_as` / the snapshot.
+
+The self-test's section 1c runs **the John conversation** in meeting order and asserts it yields the same
+diagnosis and the identical client project slide as the John fixture, plus strong foundations, vague answers,
+a genuine problem, rich/covered answers, no target and an older session.
 
 ## Evidence statuses (never upgraded by anything but a recorded override)
 
@@ -261,9 +308,10 @@ follow-up date is given. Completed sessions need `reopen:true` to edit.
 
 ## Page behaviour (`novus/meetings.html`)
 
-One question at a time; **Make simpler** / **Give an example** reveal the registry's alternative wording
-(keys `S` / `E`); options by click or keys `1–9`; `Enter`/`→` next, `←` back; **Don't know** and **Skip…**
-(with a reason) on every question. Left rail = section navigator with answer state; right rail = live diagnosis
+One conversational topic at a time (see *Conversation mode*); **Simpler** / **Example** reveal the registry's
+alternative wording (keys `S` / `E`); options by click or keys `1–9`; `Enter` next, `N`/`→` next topic, `P`
+previous topic; **Don't know** and **Skip…** (with a reason) on every question. Left rail = topic navigator
+with status; right rail (hidden by default, toggle remembered) = live diagnosis
 (dimension chips, suitability, interventions, economics, what we already know, meeting notes). Autosave 800 ms
 after any change (`discovery-save` recomputes the diagnosis server-side); a failed save is kept in
 `localStorage` and offered back on reopen. Local check: scratchpad `meetings-dev-server.mjs`

@@ -25,6 +25,7 @@ import {
   handleDiscoverySave, handleDiscoveryPitch, handleDiscoveryOutcome, handleDiscoveryConclusion, handleDiscoveryConclusionPolish,
   buildAgencyContext, cleanAnswers, sessionDiagnoses,
 } from '../lib/discovery-handlers.mjs';
+import { conversationGuide, openingScript, TOPICS, topicOf, TOPIC_FACTS, TOPIC_BRIDGES, ACKNOWLEDGEMENTS, OPENING } from '../lib/discovery-conversation.mjs';
 import { buildFindings, cleanConclusion, polishConclusion, validatePolishedText, presentationPayload, FOCUS_AREAS, CONCLUSION_STEPS, UNDERSTANDING_LEVELS, INTEREST_LEVELS, buildProject, buildSituation, PROJECT_TYPES } from '../lib/discovery-conclusion.mjs';
 
 let passed = 0;
@@ -123,9 +124,9 @@ console.log('\n1b. Opening questions, discovery order and section cues');
 
   // The desired outcome: free text, an OPTIONAL number, never required.
   const C1a = QUESTION_BY_ID.C1a;
-  assert.equal(C1a.type, 'text'); assert.equal(C1a.section, 'commercial');
-  assert.equal(C1a.primary, 'And if we were having this conversation again in six months and things had gone really well, what would have changed for you?');
-  assert.equal(C1a.simpler, 'What would a really successful next six months look like for the agency?');
+  assert.equal(C1a.type, 'text'); assert.equal(C1a.section, 'future', 'future pacing is asked at the end');
+  assert.equal(C1a.primary, "Thinking about everything we've spoken about, if we managed to improve those areas, what would a really good next six months look like for you?");
+  assert.equal(C1a.simpler, 'What would meaningful improvement look like for your agency over the next six months?');
   assert.ok(C1a.target && C1a.target.label, 'an optional numerical target is offered');
   assert.equal(C1a.required, false, 'never required');
   const words = diagnose({ answers: { C1: a('more_instructions'), C1a: { value: 'I would not be worrying about where next month\'s stock comes from', answered_at: 'x' } } });
@@ -143,14 +144,16 @@ console.log('\n1b. Opening questions, discovery order and section cues');
   assert.equal(projectFor('more_buyer_demand').type, 'incoming_demand', 'more buyer demand leads on the demand already coming in');
   assert.match(projectFor('more_instructions').title, /instructions/, 'more instructions is a project about instructions, not valuations');
 
-  // ORDER: objective, outcome, obstacles, branches, enquiries, database and
-  // CRM first; the commercial numbers last, after intelligence.
-  const order = QUESTIONS.filter((q) => !q.show_when && !q.dimension).map((q) => q.id);
-  assert.deepEqual(order.slice(0, 8), ['C1', 'C1a', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7'], 'the opening runs objective → outcome → obstacles → scale → demand → database → CRM');
+  // ORDER: objective → bottleneck → agency context (branches, CRM, enquiries,
+  // database) → foundations → intelligence → numbers → future pacing.
+  const order = QUESTIONS.filter((q) => !q.dimension).map((q) => q.id);
+  assert.deepEqual(order, ['C1', 'C1b_instructions', 'C1b_demand', 'C1b_capacity', 'C2', 'C3', 'C6', 'C7', 'C7_block', 'C4', 'C5', 'C8', 'C9', 'C10', 'C11', 'C1a']);
+  assert.equal(QUESTIONS[QUESTIONS.length - 1].id, 'C1a', 'the six-month question is the very last thing asked');
+  assert.equal(STAGE_SECTIONS.intelligence.at(-1), 'future');
   for (const id of ['C8', 'C9', 'C10', 'C11']) assert.equal(QUESTION_BY_ID[id].section, 'value', `${id} is asked in the commercial-numbers section`);
   const stageOf = (section) => Object.entries(STAGE_SECTIONS).find(([, list]) => list.includes(section))[0];
   assert.equal(stageOf('value'), 'intelligence', 'the numbers sit in the last stage');
-  assert.equal(STAGE_SECTIONS.intelligence.indexOf('value'), STAGE_SECTIONS.intelligence.length - 1, 'and after the intelligence questions');
+  assert.ok(STAGE_SECTIONS.intelligence.indexOf('value') > STAGE_SECTIONS.intelligence.indexOf('intelligence'), 'and after the intelligence questions');
   const numbersFirst = QUESTIONS.findIndex((q) => q.id === 'C8');
   assert.ok(QUESTIONS.findIndex((q) => q.id === 'I5') < numbersFirst, 'every intelligence question is asked before the numbers');
   // Conversion is not asked twice: it is computed once the volumes are known.
@@ -162,11 +165,10 @@ console.log('\n1b. Opening questions, discovery order and section cues');
   // SECTION TRANSITIONS: private, one per section entered, never for the
   // opening section, never in anything the client sees.
   assert.deepEqual(Object.keys(SECTION_TRANSITIONS), ['foundations', 'intelligence', 'value']);
-  assert.equal(SECTION_TRANSITIONS.foundations, "Okay, that gives me a good idea of where you're trying to get to. Just so I can understand what's happening underneath that, can I ask you a few questions about how things currently work across the agency — particularly how customer information gets recorded and followed up?");
-  assert.match(SECTION_TRANSITIONS.intelligence, /^Perfect\. So I've got a better picture of how the team currently operates\./);
-  assert.match(SECTION_TRANSITIONS.intelligence, /might otherwise get missed\.$/);
-  assert.match(SECTION_TRANSITIONS.value, /^Okay, that's useful\. I think I've got a much clearer picture now\./);
-  assert.match(SECTION_TRANSITIONS.value, /commercial context around what we've discussed\.$/);
+  assert.equal(SECTION_TRANSITIONS.foundations, "Okay, that gives me a good idea of what you're trying to achieve. Just so I understand what's happening underneath that, can I ask you a bit about how things currently work across the agency?");
+  assert.equal(SECTION_TRANSITIONS.intelligence, "Perfect. So I've got a better picture of how the team operates. The next thing I'm interested in is how you're finding opportunities within the enquiries and customers you've already got.");
+  assert.equal(SECTION_TRANSITIONS.value, "Okay, that's really useful. Just a few numbers before I bring everything together, so I can understand the commercial significance of what we've discussed.");
+  assert.equal(SECTION_TRANSITIONS.future, undefined, 'future pacing needs no separate cue — its question is the bridge');
   assert.equal(SECTION_TRANSITIONS.commercial, undefined, 'the meeting opens on the commercial section — there is nothing to bridge from');
   const louisSessionForCues = { session_id: 'dsc_cue', agency_id: 'ag_c', agency_name: 'TEST - Cues', contact_name: 'Sam Cue', answers: { ...ALL_WEAK, C1a: { value: 'Thirty valuations a month', target: 30, answered_at: 'x' } }, overrides: {}, notes: {} };
   // An OLDER session (questions v2: legacy objective, no desired outcome)
@@ -192,6 +194,188 @@ console.log('\n1b. Opening questions, discovery order and section cues');
   assert.ok(!JSON.stringify(oldLive.conclusion).includes(cueText[0].slice(0, 40)), 'nor the conclusion payload');
 
   ok('opening questions: the reworded objective with five options (old values still readable and still offered to the sessions that chose them), a free-text desired outcome with an optional target, the numbers asked last with conversion derived, and three private section cues');
+}
+
+// ── 1c. conversation mode ───────────────────────────────────────────────────
+console.log('\n1c. Conversation mode — opening, topics, context carried forward');
+{
+  const G = (topic, answers) => conversationGuide(topic, answers);
+  const pre = { C3: a(2, { source: 'AGENCIES', prefilled: true }), C6: a('reapit', { source: 'AGENCIES', prefilled: true }) };
+
+  // TOPICS cover every question exactly once, in meeting order.
+  const covered = TOPICS.flatMap((t) => t.questions);
+  assert.deepEqual([...covered].sort(), QUESTIONS.map((q) => q.id).sort(), 'every registry question belongs to exactly one topic');
+  assert.deepEqual(TOPICS.map((t) => t.id), ['objective', 'bottleneck', 'context', 'F1', 'F2', 'F3', 'F4', 'F5', 'I1', 'I2', 'I3', 'I4', 'I5', 'numbers', 'future']);
+  for (const t of TOPICS) { assert.ok(t.label && t.understand && t.listen_for.length >= 2 && t.listen_for.length <= 3, `${t.id} has a heading, a purpose and two or three things to listen for`); }
+  for (const f of [...TOPIC_FACTS, ...TOPIC_BRIDGES, ...ACKNOWLEDGEMENTS]) for (const c of [f.when].flat()) assert.ok(QUESTION_BY_ID[c.question], `condition references a real question (${c.question})`);
+
+  // OPENING: first name, framing, and the competitor line ONLY with real research.
+  const op = openingScript({ contact_name: 'John Example' });
+  assert.equal(op.greeting, "Hi John, how's it going? Appreciate you jumping on today.");
+  assert.equal(op.framing[0], "So John, just to give you a bit of context on how I thought we'd approach today.");
+  assert.equal(op.framing.at(-1), 'Sound fair?'); assert.equal(op.research, false);
+  assert.ok(!op.framing.some((p) => /other agencies in your area/.test(p)), 'no competitor insight is promised without research');
+  const opr = openingScript({ contact_name: 'John Example', local_research: { agencies: 3, location: 'Chelmsford' } });
+  assert.equal(opr.framing.at(-2), OPENING.research, 'the research line comes just before "Sound fair?" when research exists');
+  const anon = openingScript({ contact_name: '' });
+  assert.equal(anon.greeting, "Hi, how's it going? Appreciate you jumping on today."); assert.match(anon.framing[0], /^So, just to give you/);
+  assert.equal(openingScript({ contact_name: 'info@agency.co.uk' }).first_name, '', 'an email is never used as a name');
+
+  // ── THE JOHN CONVERSATION, in the order it actually happens ──
+  const J = { ...pre };
+  let g = G('objective', J);
+  assert.equal(g.next.id, 'C1'); assert.match(g.next.primary, /^So just to start with the bigger picture/);
+  J.C1 = a('more_instructions');
+  g = G('bottleneck', J);
+  assert.equal(g.next.id, 'C1b_instructions');
+  assert.equal(g.next.primary, "Is that more about getting enough valuations through the door, or winning the instructions once you're there?");
+  assert.ok(!visibleQuestions(J).some((q) => ['C1b_demand', 'C1b_capacity'].includes(q.id)), 'only the route for his objective is offered');
+  J.C1b_instructions = a('valuation_volume');
+  g = G('bottleneck', J);
+  assert.equal(g.next.id, 'C2'); assert.equal(g.next.primary, "What's currently stopping you getting more of those through the door?", 'the bottleneck follows on from what he just said');
+  // He volunteers the database while answering: recorded against its own topic.
+  J.C2 = m(['not_enough_opportunities', 'database']);
+  J.I3 = a('when_time', { volunteered_in: 'bottleneck', note: "Loads in the database, but the negotiators only work through them when they're quiet." });
+  assert.equal(diagnose({ answers: J }).assessments.I3.evidence_status, 'PROVISIONAL', 'volunteered information is not treated as a confirmed finding');
+  // Agency context: the record already says 2 branches on Reapit — not re-asked.
+  g = G('context', J);
+  assert.equal(g.next.id, 'C7', 'branches and CRM are established from the agency record, not asked again');
+  assert.deepEqual(g.established.map((e) => [e.id, e.prefilled]), [['C3', true], ['C6', true]]);
+  Object.assign(J, { C7: a('export'), C4: a(180), C5: a(5000) });
+  assert.equal(G('context', J).status, 'done');
+
+  // Foundations
+  Object.assign(J, strong('F1', 'consistently', 'yes_all'));
+  J.F2 = a('sometimes');
+  g = G('F2', J);
+  assert.equal(g.acknowledgement, "Right, so the information is there, but it's not always getting used.");
+  assert.equal(g.next.id, 'F2_cause'); assert.equal(g.status, 'in_progress');
+  Object.assign(J, { F2_cause: m(['scattered']), F2_consequence: m(['missed_context']) });
+  g = G('F2', J);
+  assert.equal(g.status, 'enough', 'a problem with its cause and consequence can be left without the optional questions');
+  assert.equal(g.next, null); assert.ok(g.directions.length && g.directions.every((d) => d.optional), 'what remains is offered only as optional directions');
+  J.F3 = a('task_every_time');
+  g = G('F3', J);
+  assert.equal(g.acknowledgement, "Okay, so your follow-up process sounds like something you've already got working.");
+  J.F3_verify = a('yes');
+  g = G('F4', J);
+  assert.ok(g.known.includes('A follow-up gets set every time.'));
+  assert.equal(g.next.id, 'F4'); assert.equal(g.next.primary, "And would you normally know if one of those follow-ups hadn't happened?", 'does not ask again whether reminders exist');
+  Object.assign(J, strong('F4', 'tracked_reviewed', 'report_or_alert'));
+  assert.equal(G('F4', J).status, 'done', 'accountability established — move on');
+  Object.assign(J, weak('F5', { primary: 'none', causes: ['not_recorded'] }, 'cant_judge'));
+
+  // Intelligence
+  g = G('I1', J);
+  assert.ok(g.known.includes('The selling situation gets recorded consistently.') && g.known.includes('Around 180 enquiries a month.'));
+  Object.assign(J, strong('I1', 'system_flags', 'identifies_routes'));
+  g = G('I2', J);
+  assert.ok(g.known.includes('Customer history is inconsistently recorded. Relevant information can be accessed when present.'), 'what we already know about his customer history');
+  assert.equal(g.bridge, "You mentioned earlier that customer history isn't always picked up consistently. I'm interested in what happens when one of those customers comes back into the market…");
+  assert.equal(g.next.id, 'I2');
+  assert.equal(g.next.primary, 'If someone had a valuation with you last year and started enquiring again today, would anything bring them back to your attention as a potential seller?');
+  assert.ok(!/connect things a customer has said/.test(JSON.stringify(g)), 'never the old abstract wording');
+  J.I2 = a('no');
+  g = G('I2', J);
+  assert.equal(g.acknowledgement, "Interesting. That's slightly different from the fresh enquiries we were talking about.");
+  assert.equal(g.bridge, '', 'the transition is only offered before the topic starts');
+  Object.assign(J, { I2_cause: m(['never_looked']), I2_consequence: m(['missed_reactivation']), I2_matching: a('mostly') });
+  g = G('I3', J);
+  assert.ok(g.established.some((e) => e.id === 'I3' && e.volunteered_in === 'bottleneck'), 'the volunteered answer is carried into the database topic');
+  assert.match(g.bridge, /^You mentioned earlier how the database gets worked/);
+  assert.equal(g.next.id, 'I3_cause', 'the database thread is followed, not restarted from the top');
+  assert.ok(g.known.includes("Said they can't get much out of the database.") && g.known.includes('About 5,000 contacts in the database.'));
+  Object.assign(J, { I3_cause: m(['no_time']), I3_consequence: m(['untouched_value']), I3_history: a('all_in_crm'), I3_quality: a('ok') });
+  g = G('I4', J);
+  assert.equal(g.next.primary, "You mentioned earlier that the team tends to work through the database when they've got time. How do they decide who's actually worth calling?");
+  Object.assign(J, strong('I4', 'scored', 'circumstances'));
+
+  // Numbers near the end; conversion worked out, not asked.
+  Object.assign(J, { C8: a(18), C9: a(6) });
+  g = G('numbers', J);
+  assert.ok(g.covered.some((c) => c.id === 'C11'), 'conversion is calculated, not asked'); assert.equal(g.next.id, 'C10');
+  J.C10 = a(4000);
+  // Future pacing LAST.
+  g = G('future', J);
+  assert.equal(g.next.id, 'C1a');
+  assert.equal(g.next.primary, "Thinking about everything we've spoken about, if we managed to improve those areas, what would a really good next six months look like for you?");
+  assert.ok(g.known.includes('Currently about 18 valuations a month.'));
+  J.C1a = a('Another five or six valuations a month', { target: 6 });
+
+  // SAME diagnosis and SAME project as the John fixture (which states his
+  // objective directly as more valuations).
+  const JOHN_FIXTURE = { ...COMMERCIAL, C1: a('more_valuations'), C1a: a('Another five or six valuations a month', { target: 6 }), C2: m(['database', 'not_enough_opportunities']), C4: a(180), C5: a(5000), C8: a(18), C9: a(6), C10: a(4000),
+    ...strong('F1', 'consistently', 'yes_all'), F2: a('sometimes'), F2_cause: m(['scattered']), F2_consequence: m(['missed_context']),
+    ...strong('F3', 'task_every_time', 'yes'), ...strong('F4', 'tracked_reviewed', 'report_or_alert'),
+    ...weak('F5', { primary: 'none', causes: ['not_recorded'] }, 'cant_judge'),
+    ...strong('I1', 'system_flags', 'identifies_routes'), ...strong('I4', 'scored', 'circumstances'),
+    ...weak('I2', { primary: 'no', causes: ['never_looked'] }, 'missed_reactivation', { I2_matching: a('mostly') }),
+    ...weak('I3', { primary: 'when_time', causes: ['no_time'] }, 'untouched_value', { I3_history: a('all_in_crm'), I3_quality: a('ok') }) };
+  const dj = diagnose({ answers: J }); const df = diagnose({ answers: JOHN_FIXTURE });
+  assert.equal(dj.objective.priority, 'more_valuations', 'valuation volume named as the bottleneck makes the working objective more valuations');
+  assert.equal(dj.objective.stated_priority, 'more_instructions'); assert.equal(dj.objective.bottleneck.label, 'Getting enough valuations through the door');
+  for (const d of DIMENSIONS) assert.equal(dj.assessments[d.id].evidence_status, df.assessments[d.id].evidence_status, `${d.id} evidence matches the fixture`);
+  assert.deepEqual(dj.proposed, df.proposed);
+  for (const id of ['F3', 'F4', 'I1']) assert.equal(dj.assessments[id].evidence_status, 'EXISTING_STRENGTH', `${id} is preserved as a strength`);
+  const sessionJ = { session_id: 'dsc_jc', agency_id: 'ag_j', agency_name: 'TEST - John', contact_name: 'John Example', answers: J, overrides: {}, notes: {} };
+  const liveJ = sessionDiagnoses(sessionJ); const liveF = sessionDiagnoses({ ...sessionJ, answers: JOHN_FIXTURE });
+  assert.equal(liveJ.conclusion.project.type, 'existing_customers');
+  assert.deepEqual(liveJ.presentation.screens[3], liveF.presentation.screens[3], 'the client project slide is identical');
+  assert.equal(liveJ.presentation.screens[3].headline, 'Generate more valuations from the customers you already have.');
+  assert.ok(!liveJ.conclusion.project.rule_ids.includes('I1'), 'no fresh-enquiry problem is invented');
+  // Everything conversational stays private.
+  const clientJs = JSON.stringify(liveJ.presentation) + JSON.stringify(liveJ.conclusion);
+  for (const x of [...op.framing.slice(1, 3), op.greeting, ...TOPIC_BRIDGES.map((b) => b.text), ...ACKNOWLEDGEMENTS.map((k) => k.text), ...TOPICS.map((t) => t.understand)]) assert.ok(!clientJs.includes(x.slice(0, 40)), `private cue leaked: ${x.slice(0, 40)}`);
+  ok('John: objective → valuation-volume bottleneck → the database thread he volunteered followed through, foundations not re-asked, history visibility kept apart from recognising a returning seller, working follow-up kept as a strength, numbers then his six-month ambition last — same diagnosis and the same project slide as the fixture');
+
+  // STRONG FOUNDATIONS: one verification each, then nothing left to suggest.
+  const sf = { ...pre, ...ALL_STRONG_F };
+  for (const d of ['F1', 'F2', 'F3', 'F4', 'F5']) { const x = G(d, sf); assert.equal(x.status, 'done'); assert.deepEqual(x.directions, []); assert.equal(x.next, null); }
+  ok('strong foundations: every foundation topic is done after one verification — no follow-ups pushed');
+
+  // VAGUE OWNER: "don't know" stays unknown; nothing is inferred from it.
+  const vague = { F3: a('unknown'), I3: a('unknown') };
+  assert.equal(G('F3', vague).status, 'done'); assert.equal(G('F4', vague).known.length, 0, 'an unknown answer produces no "what we know"');
+  assert.equal(diagnose({ answers: vague }).assessments.F3.evidence_status, 'UNKNOWN');
+  ok('vague answers: recorded as unknown, the topic can be left, and no fact or finding is inferred');
+
+  // A GENUINE PROBLEM that needs exploring, then can be left.
+  let gp = { F3: a('memory') };
+  g = G('F3', gp);
+  assert.equal(g.status, 'in_progress'); assert.equal(g.next.id, 'F3_cause');
+  assert.equal(g.next.primary, "Is that something you've got a proper process for, or does it depend on who's dealing with them?");
+  assert.deepEqual(g.directions.map((d) => [d.cue, d.optional]), [['Whether it has cost them business', false], ['Whether it happens often', true], ["Whether they've tried doing anything differently", true]], 'what is still needed first; the rest marked optional; never more than three');
+  gp = { ...gp, F3_cause: m(['no_process']), F3_consequence: m(['lost_valuations']) };
+  g = G('F3', gp);
+  assert.equal(g.status, 'enough'); assert.deepEqual(g.directions.map((d) => [d.cue, d.optional]), [['Whether it happens often', true], ["Whether they've tried doing anything differently", true], ['A recent example, in their words', true]]);
+  assert.equal(QUESTION_BY_ID.F3_frequency.primary, 'Is that something you see quite often?');
+  assert.equal(QUESTION_BY_ID.F3_tried.primary, 'Have you tried doing anything differently with that?');
+  assert.equal(QUESTION_BY_ID.F3_example.primary, "Can you think of a time that's happened recently?");
+  assert.ok(G('F4', gp).known.includes('Follow-ups depend on the negotiator remembering.'));
+  ok('a genuine problem: the next natural question is suggested until cause and consequence are in, then frequency, what they tried and an example are optional directions');
+
+  // RICH ANSWER covering several topics / a question ALREADY ANSWERED elsewhere.
+  const rich = { F3: a('nothing'), F3_cause: m(['unclear_owner']), F3_consequence: m(['lost_valuations']) };
+  g = G('F4', rich);
+  assert.ok(g.covered.some((c) => c.id === 'F4') && g.covered.some((c) => c.id === 'F4_cause') && g.covered.some((c) => c.id === 'F4_consequence'), 'the earlier answer covers accountability');
+  assert.notEqual(g.next?.id, 'F4', 'a covered question is not suggested');
+  assert.ok(isVisible(QUESTION_BY_ID.F4, { ...rich, F4: { reopened: true } }), 'but can still be asked anyway');
+  const cap = { C1: a('capacity'), C1b_capacity: m(['chasing_follow_ups', 'admin']) };
+  assert.ok(G('bottleneck', cap).covered.some((c) => c.id === 'C2'), 'the owner who said where the time goes is not asked the generic obstacle question');
+  assert.deepEqual(evaluateCoverage(cap).C2.derived.values, ['slipping_through', 'team_time']);
+  ok('rich answers: accountability covered by the follow-up answer and the obstacles covered by where the time goes — shown as covered, never re-asked, always reopenable');
+
+  // NO NUMERICAL TARGET, and an OLDER session.
+  const noTarget = { ...J, C1a: a('I just want to stop worrying about where next month\'s stock comes from') };
+  assert.equal(diagnose({ answers: noTarget }).objective.outcome.target, null); assert.equal(G('future', noTarget).status, 'done');
+  const older = { C1: a('win_instructions'), C1a: a('Thirty valuations a month', { target: 30 }), C2: m(['slipping_through']) };
+  assert.equal(topicOf('C1a'), 'future');
+  assert.equal(G('future', older).status, 'done', 'an older session that answered C1a early still has it — nothing is re-asked');
+  assert.equal(G('future', older).established[0].summary, 'Thirty valuations a month (target 30)');
+  assert.ok(!visibleQuestions(older).some((q) => q.id.startsWith('C1b_')), 'no bottleneck route is invented for a legacy objective');
+  assert.equal(diagnose({ answers: older }).objective.priority, 'win_instructions');
+  assert.equal(diagnose({ answers: older }).objective.bottleneck, null);
+  ok('no target stays null; an older session keeps its early C1a, its legacy objective and gets no invented bottleneck');
 }
 
 // ── 2. conditional logic ───────────────────────────────────────────────────
@@ -628,7 +812,7 @@ const flowIds = (answers) => visibleQuestions(answers).map((q) => q.id);
   assert.equal(dacc.assessments.F3.evidence_status, 'EXISTING_STRENGTH'); assert.equal(dacc.assessments.F4.evidence_status, 'CONFIRMED');
   assert.ok(dacc.proposed.includes('F4') && !dacc.proposed.includes('F3'));
   assert.ok(feas(dacc, 'F4').dependencies.some((x) => x.dimension === 'F3' && x.resolution === 'existing'));
-  assert.match(wordingFor(QUESTION_BY_ID.F4, { F3: a('task_every_time') }).primary, /^How do you make sure those follow-ups actually happen\?/);
+  assert.equal(wordingFor(QUESTION_BY_ID.F4, { F3: a('task_every_time') }).primary, "And would you normally know if one of those follow-ups hadn't happened?", 'reminders are known to exist — ask whether a missed one would be noticed, not whether they exist');
   ok('clear accountability problem: F3 preserved, F4 confirmed and proposed on top of it');
 
   // A sophisticated CRM: flags seller signals and changes, prioritises, but the
@@ -1168,6 +1352,7 @@ const workbook = () => ({
   assert.equal(row.agency_name, 'Alpha Estates'); assert.equal(row.contact_name, 'Jane Alpha'); assert.equal(row.meeting_at, iso(T0 + 2 * DAY)); assert.equal(row.source_call_id, 'cal_1');
   assert.equal(row.answers.C3.value, 2); assert.equal(row.answers.C3.source, 'AGENCIES'); assert.equal(row.answers.C3.prefilled, true);
   assert.equal(row.answers.C6.value, 'reapit'); assert.equal(row.questions_version, QUESTIONS_VERSION);
+  assert.equal(row.stage, 'opening', 'a new session opens on the private opening & framing screen');
   r = res(); await handleDiscoveryStart(req('POST', {}, { agency_id: 'ag_1' }), r);
   assert.equal(r.statusCode, 200); assert.equal(r.body.resumed, true); assert.equal(r.body.session_id, sessionId);
   r = res(); await handleDiscoveryStart(req('POST', {}, { agency_id: 'ag_2' }), r);
@@ -1180,6 +1365,19 @@ const workbook = () => ({
   r = res(); await handleDiscoverySession(req('GET', { session_id: sessionId }), r);
   assert.equal(r.statusCode, 200); assert.equal(r.body.context.agency_name, 'Alpha Estates'); assert.equal(r.body.registry.questions.length, QUESTIONS.length); assert.equal(r.body.registry.rules.length, 10);
   assert.equal(r.body.diagnosis.suitability.verdict, 'FURTHER_VALIDATION_REQUIRED'); assert.equal(r.body.registry_drift.questions, false);
+  assert.equal(r.body.opening.greeting, "Hi Jane, how's it going? Appreciate you jumping on today.");
+  assert.equal(r.body.opening.research, false, 'no other local agency has been researched, so no competitor line');
+  assert.ok(r.body.registry.conversation.topics.length === 15 && r.body.registry.conversation.facts.length > 10);
+  assert.equal(r.body.context.local_research, null);
+  const withLocal = structuredClone(tables);
+  withLocal.AGENCIES.rows.push(['ag_9', 'Gamma', 'Gamma', 'Chelmsford', '', '', '', '', '', '', iso(T0)]);
+  withLocal.PROBES.rows.push(['pr_9', 'RM-0009', 'ag_9', '', '', iso(T0), 'closed', iso(T0)]);
+  withLocal.INTELLIGENCE.rows.push(['int_9', 'ag_9', 'pr_9', 'B', '', '', '', '', iso(T0)]);
+  assert.deepEqual(buildAgencyContext(withLocal, 'ag_1').local_research, { agencies: 1, location: 'Chelmsford' }, 'a graded probe of another Chelmsford agency is genuine local research');
+  assert.equal(buildAgencyContext(withLocal, 'ag_2').local_research, null, 'but not for an agency in Brentwood');
+  assert.ok(!JSON.stringify(r.body.presentation || {}).includes('Appreciate you jumping on'));
+  const vol = cleanAnswers({ I3: { value: 'when_time', volunteered_in: 'bottleneck' }, I4: { value: 'judgement', volunteered_in: 'nonsense' } });
+  assert.equal(vol.I3.volunteered_in, 'bottleneck'); assert.equal(vol.I4.volunteered_in, undefined, 'only a real topic id is kept');
   r = res(); await handleDiscoverySession(req('GET', { agency_id: 'ag_1' }), r); assert.equal(r.body.session.session_id, sessionId);
   ok('session read returns the session, the prepopulated context, both registries and a live diagnosis');
 

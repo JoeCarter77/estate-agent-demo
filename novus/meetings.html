@@ -156,6 +156,43 @@
     .mini{font-size:11px;color:var(--ink-4);}
     kbd.k{font-family:var(--mono);font-size:10px;padding:1px 5px;border:1px solid var(--hair-2);border-radius:4px;color:var(--ink-4);}
 
+    /* ── conversation mode: one topic at a time ─────────────────────────── */
+    .cv .k{display:block;font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);margin-bottom:5px;}
+    .cv-strip{font-size:11.5px;color:var(--ink-4);margin-top:6px;} .cv-strip b{color:var(--ink-2);font-weight:600;}
+    .cv-head{font-family:var(--serif);font-size:22px;letter-spacing:-.016em;line-height:1.2;margin-top:10px;color:var(--ink);}
+    .cv-why{font-size:12.5px;color:var(--ink-3);margin-top:4px;line-height:1.5;}
+    .cv-known{margin-top:14px;padding:10px 14px;border:1px solid var(--hair);border-radius:var(--r-md);background:rgba(var(--ink-rgb),.02);}
+    .cv-known ul{margin:0;padding-left:16px;font-size:13px;line-height:1.55;color:var(--ink-2);}
+    .cv-known .vol{color:var(--ink-4);font-size:11px;}
+    .cv-cov{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+    .cv-bridge{margin-top:14px;font-size:14.5px;line-height:1.5;color:var(--ink-2);font-style:italic;border-left:2px solid var(--hair-2);padding-left:12px;}
+    .cv-ask{margin-top:14px;padding:14px 18px;border-left:2px solid var(--blue);background:rgba(var(--brand-rgb),.05);border-radius:0 var(--r-md) var(--r-md) 0;}
+    .cv-ask .k{color:var(--blue);}
+    .cv-ask .q-text{margin-top:0;font-size:21px;}
+    .cv-ask.editing{border-left-color:var(--hair-2);background:rgba(var(--ink-rgb),.02);} .cv-ask.editing .k{color:var(--ink-4);} .cv-ask.editing .q-text{font-size:18px;color:var(--ink-2);}
+    .cv-listen{margin-top:10px;font-size:12.5px;color:var(--ink-3);display:flex;gap:6px;flex-wrap:wrap;align-items:baseline;}
+    .cv-listen .k{display:inline;margin:0 4px 0 0;}
+    .cv-listen span.i{padding:2px 8px;border-radius:100px;border:1px solid var(--hair);}
+    .cv-row{margin-top:14px;}
+    .cv-chip{display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:12px;color:var(--ink-2);background:rgba(var(--ink-rgb),.03);border:1px solid var(--hair);border-radius:100px;padding:5px 11px;cursor:pointer;margin:0 6px 6px 0;text-align:left;}
+    .cv-chip:hover{border-color:var(--hair-2);color:var(--ink);} .cv-chip.on{border-color:var(--blue-line);background:var(--blue-tint);color:var(--ink);}
+    .cv-chip .o{font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-5);}
+    .cv-chip.est::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--blue);}
+    .cv-ack{margin-top:12px;font-family:var(--serif);font-size:16px;color:var(--ink-2);}
+    .cv-ack .k{font-family:var(--sans);}
+    .cv-return{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;padding:8px 12px;border:1px solid var(--amber-line);background:var(--amber-tint);border-radius:var(--r-md);font-size:12.5px;color:var(--ink-2);}
+    .cv-status{font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;padding:3px 8px;border-radius:100px;border:1px solid var(--hair);color:var(--ink-4);}
+    .cv-status.enough{color:var(--blue);border-color:var(--blue-line);background:var(--blue-tint);} .cv-status.done{color:var(--green,var(--blue));border-color:var(--blue-line);}
+    .rail-q .dot.part{background:transparent;box-shadow:inset 0 0 0 2px var(--blue);}
+    .rail-q .dot.enough{background:var(--blue);opacity:.6;}
+    .mention{font-size:11.5px;padding:5px 8px;max-width:240px;}
+    /* the private opening */
+    .opening .op-say{font-family:var(--serif);font-size:26px;line-height:1.3;letter-spacing:-.018em;color:var(--ink);margin-top:14px;}
+    .opening .op-frame{font-family:var(--serif);font-size:18px;line-height:1.55;color:var(--ink-2);margin-top:16px;}
+    .opening .op-frame p{margin:0 0 10px;}
+    .opening .op-meta{font-size:12px;color:var(--ink-4);margin-top:6px;}
+    .btn-start{font-size:15px;padding:12px 22px;margin-top:10px;}
+
     /* ── the meeting conclusion (stage 5) ─────────────────────────────── */
     .c-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:var(--s-4);}
     .c-steps{display:flex;gap:2px;border:1px solid var(--hair);border-radius:var(--r-md);overflow:auto hidden;background:rgba(var(--ink-rgb),.02);flex:1;min-width:min(100%,420px);}
@@ -491,7 +528,7 @@ const FEAS_LABEL = { FEASIBLE:'Feasible', FEASIBLE_WITH_FOUNDATION:'Feasible wit
 const DS_TONE = { IMPLEMENTED:'t-green', SUPPORTED_CONFIGURATION:'t-blue', REQUIRES_ASSESSMENT:'t-amber', PROPOSED:'t-grey', OUTSIDE_PILOT:'t-red' };
 const OUTCOME_TONE = { PILOT_AGREED:'t-green', PROPOSAL_REQUESTED:'t-blue', FOLLOW_UP_REQUIRED:'t-amber', TECHNICAL_ASSESSMENT_REQUIRED:'t-amber', FURTHER_DISCOVERY_REQUIRED:'t-amber', NOT_SUITABLE:'t-grey', NOT_INTERESTED:'t-red' };
 const ROLE_LABEL = { primary:'Primary question', verify:'Verification', cause:'Why is it happening', consequence:'What it costs', frequency:'How often', tried:'What they have tried', example:'A real example', detail:'Detail', context:'Commercial situation' };
-const STAGES = [ ['commercial','Situation'], ['foundations','Foundations'], ['intelligence','Intelligence'], ['diagnosis','Diagnosis'], ['conclusion','Conclusion'], ['outcome','Decision'] ];
+const STAGES = [ ['opening','Opening'], ['commercial','Situation'], ['foundations','Foundations'], ['intelligence','Intelligence'], ['diagnosis','Diagnosis'], ['conclusion','Conclusion'], ['outcome','Decision'] ];
 /* Sessions stored before the conclusion existed carry stage 'pitch'. */
 const stageKey = (id) => (id === 'pitch' ? 'conclusion' : id);
 
@@ -503,13 +540,16 @@ let STAGE = 'commercial';
 let CUR = '';            // current question id (stages 1–3)
 let ALT = {};            // question id -> 'simpler' | 'example' | ''
 let SKIPPING = '';       // question id whose skip-reason chooser is open
+/* Conversation mode: recording something the owner mentioned while talking
+   about ANOTHER topic — { topic, qid } to return to. */
+let RETURN_TO = null;
 let OVR_OPEN = '';       // dimension/rule whose override form is open
 let SAVE = { timer:null, dirty:false, inflight:false, failed:false, retry:null };
 let PITCH_VIEW = 0;      // index into S.pitches (0 = latest)
 let GEN = false;
 /* The meeting conclusion (stage 5): current step, open correction form, save state. */
 let CSTEP = 'today';
-let SIDE_HIDDEN = false;    // Live Diagnosis sidebar; default hidden on diagnosis/conclusion
+let SIDE_HIDDEN = true;     // Live Diagnosis sidebar; hidden by default, toggle remembered across stages
 let CORR = '';           // finding id whose correction form is open
 let CSAVE = { inflight:false };
 /* Presentation mode. `only` = this window IS the presentation (#present?id=…). */
@@ -616,8 +656,10 @@ async function openSession(sessionId, stage){
     S = await get(`${OP('discovery-session')}&session_id=${encodeURIComponent(sessionId)}`);
     STAGE = stageKey(stage || S.session.stage || 'commercial');
     if(S.session.status === 'COMPLETED' && !stage) STAGE = 'outcome';
-    SIDE_HIDDEN = ['diagnosis', 'conclusion'].includes(STAGE);
-    CSTEP = 'today'; CORR = '';
+    /* The conversation guide needs the width during a live call: the live
+       diagnosis starts hidden everywhere and the toggle is remembered. */
+    SIDE_HIDDEN = true;
+    CSTEP = 'today'; CORR = ''; RETURN_TO = null;
     CUR = '';
     PITCH_VIEW = 0;
     if(S.registry_drift?.questions || S.registry_drift?.rules) notice(`<b>This session was answered against an older question/rule set</b> (questions v${esc(S.session.questions_version)}, rules v${esc(S.session.rules_version)}; current v${esc(S.registry.questions_version)}/v${esc(S.registry.rules_version)}). Stored labels are shown from the session's snapshot where they differ.`, 'warn');
@@ -709,6 +751,94 @@ function explorationComplete(dim){
 }
 function skippable(q){ return Boolean(q.optional) && q.dimension && explorationComplete(q.dimension) && !isAnswered(A()[q.id]); }
 function nextUnanswered(stage){ const vs = visible(stage); return vs.find((q) => !isAnswered(A()[q.id]) && !A()[q.id]?.skipped && !skippable(q)) || vs[vs.length-1] || null; }
+const stageOfSection = (sec) => Object.entries(S.registry.stage_sections || {}).find(([, list]) => list.includes(sec))?.[0] || 'commercial';
+
+/* ═══ CONVERSATION MODE (mirrors lib/discovery-conversation.mjs) ════════
+   Questions are grouped into topics; for the topic in front of Joe the
+   guide says what we already know, the one natural thing to ask next, what
+   to listen for and up to three optional directions. Capture is still the
+   registry's own structured options and notes. Keep conversationGuide() in
+   the lib and guideFor() here in sync. */
+const CONV = () => S.registry.conversation || { topics:[], facts:[], bridges:[], acknowledgements:[], role_cues:{}, question_cues:{} };
+const TOPICS = () => CONV().topics;
+const TBY = (id) => TOPICS().find((t) => t.id === id);
+const topicOfQ = (qid) => TOPICS().find((t) => t.questions.includes(qid))?.id || '';
+const topicsIn = (stage) => { const secs = SECTIONS_OF(stage); return TOPICS().filter((t) => secs.includes(t.section)); };
+const stageOfTopic = (tid) => stageOfSection(TBY(tid)?.section);
+const holdsAll = (when, answers) => [].concat(when).every((c) => condHolds(c, answers));
+const isDone = (id) => isAnswered(A()[id]) || Boolean(A()[id]?.skipped);
+function cueFor(q){ return CONV().question_cues[q.id] || CONV().role_cues[q.role] || q.purpose; }
+function tokenValue(id, answers){
+  const q = QBY(id); const a = answers[id]; if(!q || !isAnswered(a)) return null;
+  if(q.type === 'number'){ const n = Number(a.value); return Number.isFinite(n) ? n.toLocaleString('en-GB') : null; }
+  const v = answerValues(a).filter((x) => x !== 'unknown'); if(!v.length) return null;
+  if(v[0] === 'other') return String(a.note||'').trim() || null;
+  return v.map((x) => (q.options||[]).find((o) => o.value === x)?.label || x).join(', ');
+}
+function fillTokens(s, answers){ let missing = false; const out = s.replace(/\{([A-Za-z0-9_]+)\}/g, (_, id) => { const v = tokenValue(id, answers); if(v === null) missing = true; return v ?? ''; }); return missing ? null : out; }
+function answerSummary(q, a){
+  if(!a) return '';
+  if(a.skipped) return `Skipped — ${a.skip_reason || 'no reason'}`;
+  if(q.type === 'number'){ if(!isAnswered(a)) return ''; const n = Number(a.value).toLocaleString('en-GB'); const unit = q.unit === 'branches' && Number(a.value) === 1 ? 'branch' : q.unit; return q.unit === '£' ? `£${n}` : `${n}${unit ? ` ${unit}` : ''}`; }
+  if(q.type === 'text') return [String(a.value||'').trim(), a.target !== undefined && a.target !== null ? `(target ${a.target})` : ''].filter(Boolean).join(' ');
+  return answerValues(a).map((v) => (v === 'other' && a.note ? a.note : (q.options||[]).find((o) => o.value === v)?.label || v)).join('; ');
+}
+function guideFor(tid){
+  const t = TBY(tid); if(!t) return null;
+  const eff = EFF(); const answers = eff.answers;
+  const inTopic = t.questions.map(QBY).filter(Boolean);
+  const vis = inTopic.filter((q) => isVisible(q));
+  const complete = t.dimension ? explorationComplete(t.dimension) : false;
+  const optionalNow = (q) => Boolean(q.optional) && Boolean(q.dimension) && complete;
+  const pending = vis.filter((q) => !isDone(q.id) && !optionalNow(q));
+  const optional = vis.filter((q) => !isDone(q.id) && optionalNow(q));
+  const established = vis.filter((q) => isDone(q.id)).map((q) => ({ id:q.id, summary: answerSummary(q, A()[q.id]), volunteered_in: A()[q.id]?.volunteered_in || '', prefilled: Boolean(A()[q.id]?.prefilled) }));
+  const started = established.some((e) => !e.volunteered_in);
+  let status = 'not_started';
+  if(established.length){
+    if(!pending.length) status = optional.length ? 'enough' : 'done';
+    else if(t.dimension){
+      const level = effectiveLevel(t.dimension); const verify = QBY(`${t.dimension}_verify`);
+      const primaryDone = isDone(t.dimension) || Boolean(eff.coverage[t.dimension]);
+      const enough = primaryDone && ((level === 'strong' && (!verify || isDone(verify.id))) || (['weak','partial'].includes(level) && complete) || level === 'unknown');
+      status = enough ? 'enough' : 'in_progress';
+    } else status = 'in_progress';
+  }
+  const next = pending[0] ? { id: pending[0].id, ...wordingFor(pending[0]) } : null;
+  const rest = [...pending.slice(1), ...optional];
+  const directions = [...rest.filter((q) => !q.optional), ...rest.filter((q) => q.optional)].map((q) => ({ id:q.id, cue: cueFor(q), optional: Boolean(q.optional) })).slice(0, 3);
+  const covered = inTopic.filter((q) => eff.coverage[q.id]).map((q) => ({ id:q.id, note: eff.coverage[q.id].note, basis: eff.coverage[q.id].basis }));
+  const known = [];
+  for(const f of CONV().facts){ if(known.length >= 4) break; if(!f.topics.includes(t.id) || !holdsAll(f.when, answers)) continue; const s = fillTokens(f.text, answers); if(s && !known.includes(s)) known.push(s); }
+  const bridge = started ? '' : (CONV().bridges.find((b) => b.topic === t.id && holdsAll(b.when, answers))?.text || '');
+  const acknowledgement = established.length ? (CONV().acknowledgements.find((x) => x.topic === t.id && holdsAll(x.when, answers))?.text || '') : '';
+  return { topic:t.id, label:t.label, section:t.section, understand:t.understand, listen_for:t.listen_for, status, next, directions, established, covered, known, bridge, acknowledgement,
+    has_questions: vis.length > 0, pending: pending.map((q) => q.id), visible: vis.map((q) => q.id) };
+}
+/* The question to land on for a topic: the suggested next one, else the first. */
+function landingFor(tid){ const g = guideFor(tid); return g?.next?.id || g?.visible?.[0] || TBY(tid)?.questions.find((id) => isCovered(id)) || ''; }
+function firstSuggested(stage){
+  const ts = topicsIn(stage).map((t) => guideFor(t.id)).filter((g) => g.has_questions);
+  const open = ts.find((g) => g.status === 'not_started' || g.status === 'in_progress') || ts.find((g) => g.next) || ts[0];
+  return open ? landingFor(open.topic) : '';
+}
+function goTopic(tid, { keepReturn = false } = {}){
+  if(!keepReturn) RETURN_TO = null;
+  const qid = landingFor(tid); const st = stageOfTopic(tid);
+  if(st !== STAGE) goStage(st, qid); else goQuestion(qid);
+}
+function stepTopic(dir){
+  const order = TOPICS().filter((t) => { const g = guideFor(t.id); return g.has_questions || g.covered.length; });
+  const i = order.findIndex((t) => t.id === topicOfQ(CUR));
+  const nx = order[i + dir];
+  RETURN_TO = null;
+  if(nx) goTopic(nx.id);
+  else if(dir > 0) goStage('diagnosis');
+  else goStage('opening');
+}
+/* Answers recorded while Joe followed the owner into another topic carry
+   where they were said, so that topic can pick the thread back up. */
+function markVolunteered(qid){ if(RETURN_TO && topicOfQ(qid) !== RETURN_TO.topic && A()[qid]) A()[qid].volunteered_in = RETURN_TO.topic; }
 
 /* ═══ DISCOVERY: SAVE ═══════════════════════════════════════════════════ */
 function markDirty(){ invalidateEff(); SAVE.dirty = true; renderSaveState(); if(SAVE.timer) clearTimeout(SAVE.timer); SAVE.timer = setTimeout(flush, 800); }
@@ -769,6 +899,7 @@ function renderWorkspace(){
 function stageDone(id){
   const d = S.diagnosis; if(!d) return false;
   if(['commercial','foundations','intelligence'].includes(id)){ const vs = visible(id); return vs.length > 0 && vs.every((q) => isAnswered(A()[q.id]) || A()[q.id]?.skipped); }
+  if(id === 'opening') return STAGE !== 'opening' && (S.session.stage !== 'opening' || Object.values(A()).some((a) => isAnswered(a) && !a.prefilled));
   if(id === 'diagnosis') return Boolean(S.conclusion?.understanding?.agreed || S.session.pitch_count);
   if(id === 'conclusion') return Boolean(S.conclusion?.understanding?.agreed);
   if(id === 'outcome') return S.session.status === 'COMPLETED';
@@ -786,9 +917,8 @@ function goStage(id, qid){
   const enteringConclusion = STAGE !== 'conclusion' && stageKey(id) === 'conclusion';
   STAGE = stageKey(id); CUR = qid || '';
   if(enteringConclusion) CSTEP = 'established';
-  SIDE_HIDDEN = ['diagnosis', 'conclusion'].includes(STAGE);
   applySideVisibility();
-  if(['commercial','foundations','intelligence'].includes(id) && !CUR) CUR = nextUnanswered(id)?.id || '';
+  if(['commercial','foundations','intelligence'].includes(id) && !CUR) CUR = firstSuggested(id) || '';
   S.session.stage = id; markDirty();
   history.replaceState(null, '', `#discovery?id=${encodeURIComponent(S.session.session_id)}&stage=${id}`);
   renderStages(); renderRail(); renderCentre();
@@ -804,23 +934,21 @@ function renderRail(){
     rail.innerHTML = `<div class="rail-h">Sections</div>${qStages.map((st) => { const vs = visible(st); const done = vs.filter((q) => isAnswered(A()[q.id]) || A()[q.id]?.skipped).length; const cov = coveredIn(st).length; return `<button class="rail-q" data-go-stage="${st}"><span class="dot${done === vs.length && vs.length ? ' answered' : ''}"></span><span class="lbl">${esc(STAGES.find((x) => x[0] === st)[1])} <span class="muted">${done}/${vs.length}${cov ? ` · ${cov} covered` : ''}</span></span></button>`; }).join('')}`;
     return;
   }
-  const vs = visible(STAGE);
-  const covered = coveredIn(STAGE);
-  const item = (q) => { const a = A()[q.id]; const st = a?.skipped ? 'skipped' : isAnswered(a) ? 'answered' : ''; const opt = q.optional && !isAnswered(a) ? (skippable(q) ? ' optional' : '') : ''; return `<button class="rail-q ${st}${CUR === q.id ? ' on' : ''}${opt}" data-go-q="${esc(q.id)}"><span class="dot"></span><span class="lbl">${esc(q.role === 'primary' || q.role === 'context' || (q.role === 'detail' && !q.dimension) ? wordingFor(q).primary : `${ROLE_LABEL[q.role] || q.role}${q.optional ? ' (optional)' : ''}`)}</span></button>`; };
-  const coveredItem = (q) => { const c = EFF().coverage[q.id]; return `<button class="rail-q covered${CUR === q.id ? ' on' : ''}" data-go-q="${esc(q.id)}" title="${esc(c.note)}"><span class="dot"></span><span class="lbl">Already covered — ${esc(q.role === 'primary' || q.role === 'context' ? q.purpose.replace(/\.$/, '') : (ROLE_LABEL[q.role] || q.role).toLowerCase())} <span class="muted">(from ${esc(c.basis.join(', '))})</span></span></button>`; };
+  /* Topics, not questions: one line per conversational topic. */
+  const cur = topicOfQ(CUR);
   let html = '';
   for(const secId of SECTIONS_OF(STAGE)){
     const sec = S.registry.sections.find((x) => x.id === secId);
+    const ts = TOPICS().filter((t) => t.section === secId).map((t) => guideFor(t.id)).filter((g) => g.has_questions || g.covered.length);
+    if(!ts.length) continue;
     html += `<div class="rail-h">${esc(sec?.label || secId)}</div>`;
-    const dims = S.registry.dimensions.filter((d) => d.section === secId);
-    const inSec = (q) => q.section === secId;
-    if(!dims.length){ html += vs.filter(inSec).map(item).join('') + covered.filter(inSec).map(coveredItem).join(''); continue; }
-    for(const d of dims){
-      const mine = vs.filter((q) => q.dimension === d.id);
-      const cov = covered.filter((q) => q.dimension === d.id);
-      const as = S.diagnosis?.assessments?.[d.id];
-      html += `<div class="rail-dim"><span>${esc(d.id)} · ${esc(d.label)}</span>${as ? pill(as.level === 'unknown' ? '?' : as.level, as.level === 'weak' ? 't-red' : as.level === 'partial' ? 't-amber' : as.level === 'strong' ? 't-green' : 't-grey', true) : ''}</div>` + mine.map(item).join('') + cov.map(coveredItem).join('');
-    }
+    html += ts.map((g) => {
+      const dot = ['done','enough'].includes(g.status) ? ' answered' : '';
+      const cls = g.status === 'in_progress' ? 'part' : g.status === 'enough' ? 'enough' : '';
+      const as = TBY(g.topic)?.dimension ? S.diagnosis?.assessments?.[g.topic] : null;
+      const lv = as && as.level !== 'unknown' ? pill(as.level, as.level === 'weak' ? 't-red' : as.level === 'partial' ? 't-amber' : 't-green', true) : '';
+      return `<button class="rail-q${dot}${cur === g.topic ? ' on' : ''}" data-go-topic="${esc(g.topic)}" type="button"><span class="dot ${cls}"></span><span class="lbl">${esc(g.label)}${g.covered.length ? ` <span class="muted">· ${g.covered.length} covered</span>` : ''}</span>${lv}</button>`;
+    }).join('');
   }
   html += `<div class="btnrow" style="margin-top:14px;padding:0 8px"><button class="btn btn-secondary btn-sm" data-go-stage="${STAGES[STAGES.findIndex((x) => x[0] === STAGE)+1][0]}" type="button">Next section &rarr;</button></div>`;
   rail.innerHTML = html;
@@ -832,58 +960,99 @@ function renderCentre(){
   if(STAGE === 'diagnosis') return renderDiagnosisSummary(el);
   if(STAGE === 'conclusion') return renderConclusion(el);
   if(STAGE === 'outcome') return renderOutcome(el);
-  const vs = visible(STAGE);
-  /* A covered question opened from the rail: show what covered it, offer to ask anyway. */
+  if(STAGE === 'opening') return renderOpening(el);
+  /* A covered question opened from "what we already know": show what covered it, offer to ask anyway. */
   if(CUR && isCovered(CUR) && SECTIONS_OF(STAGE).includes(QBY(CUR)?.section)){ renderCoveredCard(el, QBY(CUR)); return; }
-  if(!CUR || !vs.some((q) => q.id === CUR)) CUR = nextUnanswered(STAGE)?.id || vs[0]?.id || '';
+  let tid = topicOfQ(CUR);
+  if(!tid || !SECTIONS_OF(STAGE).includes(TBY(tid)?.section)){ CUR = firstSuggested(STAGE); tid = topicOfQ(CUR); }
+  let g = guideFor(tid);
+  if(!g){ el.innerHTML = `<div class="qcard">${emptyState('Nothing to ask here', 'Move to the next section.')}</div>`; return; }
+  if(!g.visible.includes(CUR)){ CUR = g.next?.id || g.visible[g.visible.length-1] || ''; }
   const q = QBY(CUR);
-  if(!q){ el.innerHTML = `<div class="qcard">${emptyState('Nothing to ask here', 'Move to the next section.')}</div>`; return; }
+  if(!q){ if(g.covered.length){ CUR = g.covered[0].id; renderCoveredCard(el, QBY(CUR)); return; } el.innerHTML = `<div class="qcard">${emptyState('Nothing to ask here', 'Move to the next topic.')}</div>`; return; }
   const a = A()[q.id] || {};
-  const idx = vs.findIndex((x) => x.id === q.id);
-  const dim = q.dimension ? S.registry.dimensions.find((d) => d.id === q.dimension) : null;
   const alt = ALT[q.id] || '';
   const snap = S.session.question_snapshot?.[q.id];
   const wording = wordingFor(q);
-  const primaryText = wording.primary;
   const values = answerValues(a);
   const opts = visibleOptions(q);
   const optHtml = (q.type === 'single' || q.type === 'multi') ? `<div class="opts${opts.length > 6 ? ' two' : ''}">${opts.map((o, i) => `<button class="opt${values.includes(o.value) ? ' on' : ''}" data-opt="${esc(o.value)}" type="button"><span class="key">${i+1 <= 9 ? i+1 : ''}</span><span>${esc(o.label)}</span>${o.level && o.level !== 'unknown' ? `<span class="lv">${esc(o.level)}</span>` : ''}${o.verdict ? `<span class="lv">${o.verdict === 'confirm' ? 'confirms' : 'gap'}</span>` : ''}</button>`).join('')}</div>` : '';
-  const numHtml = q.type === 'number' ? `<div class="numrow"><input class="input" id="q-num" type="number" inputmode="decimal" value="${a.value ?? ''}" placeholder="—" /><span class="unit">${esc(q.unit||'')}</span>${q.source_toggle ? `<span class="seg"><button type="button" data-src="actual" class="${a.source === 'actual' ? 'on' : ''}">Actual figure</button><button type="button" data-src="owner_estimate" class="${!a.source || a.source === 'owner_estimate' ? 'on' : ''}">Owner estimate</button></span>` : ''}${q.id === 'C11' && S.diagnosis?.economics?.baseline?.conversion_pct?.source === 'derived' ? `<span class="mini">derived: ${esc(S.diagnosis.economics.baseline.conversion_pct.value)}% (${esc(S.diagnosis.economics.baseline.conversion_pct.detail)})</span>` : ''}</div>` : '';
+  const numHtml = q.type === 'number' ? `<div class="numrow"><input class="input" id="q-num" type="number" inputmode="decimal" value="${a.value ?? ''}" placeholder="—" /><span class="unit">${esc(q.unit||'')}</span>${q.source_toggle ? `<span class="seg"><button type="button" data-src="actual" class="${a.source === 'actual' ? 'on' : ''}">Actual figure</button><button type="button" data-src="owner_estimate" class="${!a.source || a.source === 'owner_estimate' ? 'on' : ''}">Owner estimate</button></span>` : ''}</div>` : '';
   const textHtml = q.type === 'text' ? `<div class="q-notes"><textarea class="input block" id="q-text" placeholder="In their words…">${esc(a.value||'')}</textarea>${q.target ? `<div class="numrow" style="margin-top:8px"><span class="unit">${esc(q.target.label||'Optional target')}</span><input class="input" id="q-target" type="number" inputmode="decimal" style="max-width:140px" value="${a.target ?? ''}" placeholder="—" />${q.target.hint ? `<span class="mini">${esc(q.target.hint)}</span>` : ''}</div>` : ''}</div>` : '';
-  const explore = q.dimension && q.role !== 'primary' && q.role !== 'verify' ? S.diagnosis?.assessments?.[q.dimension] : null;
-  const exploreHint = explore ? (explore.exploration.complete ? `<span class="q-hint"><b>Enough to diagnose ${esc(q.dimension)}</b> — the rest is optional</span>` : `<span class="q-hint">Still needed for ${esc(q.dimension)}: ${esc(explore.exploration.missing.map((m) => m.endsWith('_cause') ? 'a cause' : 'a consequence').join(' and '))}</span>`) : '';
-  /* Private section transition: shown once, on the first visible question of
-     the section being entered — not before every question, and never part of
-     anything the client sees. */
-  const transition = (S.registry.section_transitions || {})[q.section];
-  const firstInSection = vs.find((x) => x.section === q.section)?.id === q.id;
-  const transitionHtml = transition && firstInSection
-    ? `<div class="script-block"><div class="script-label">Private — say this as you move on</div><div class="script-text">${esc(transition)}</div></div>`
-    : '';
-  el.innerHTML = `${transitionHtml}<div class="qcard">
-    <div class="q-eyebrow"><span>${esc(S.registry.sections.find((x) => x.id === q.section)?.label || q.section)}</span>${dim ? `<span>· ${esc(dim.id)} ${esc(dim.label)}</span>` : ''}<span class="role">· ${esc(ROLE_LABEL[q.role] || q.role)}${q.optional ? ' · optional' : ''}</span><span class="role" style="margin-left:auto">${idx+1} / ${vs.length}</span></div>
-    <div class="q-purpose">${esc(q.purpose||'')}</div>
-    <div class="q-text">${esc(primaryText)}</div>
-    ${alt === 'simpler' && q.simpler ? `<div class="q-alt"><span class="k">Simpler</span>${esc(q.simpler)}</div>` : ''}
-    ${alt === 'example' && q.example ? `<div class="q-alt"><span class="k">Example</span>${esc(q.example)}</div>` : ''}
-    <div class="q-tools">${q.simpler ? `<button class="btn btn-quiet btn-sm${alt === 'simpler' ? ' on' : ''}" data-alt="simpler" type="button">Make simpler <kbd class="k">S</kbd></button>` : ''}${q.example ? `<button class="btn btn-quiet btn-sm${alt === 'example' ? ' on' : ''}" data-alt="example" type="button">Give an example <kbd class="k">E</kbd></button>` : ''}</div>
-    ${a.prefilled ? `<div class="prefill">Prefilled from the agency record${a.source ? ` (${esc(a.source)})` : ''} — confirm or change</div>` : ''}
+
+  /* Private section transition: once, on the first topic of a section that
+     nothing has yet been asked in — never repeated, never client-facing. */
+  const transition = (S.registry.section_transitions || {})[g.section];
+  const secTopics = TOPICS().filter((t) => t.section === g.section).map((t) => guideFor(t.id)).filter((x) => x.has_questions);
+  const sectionUntouched = secTopics.every((x) => !x.established.some((e) => !e.volunteered_in && !e.prefilled));
+  const transitionHtml = transition && sectionUntouched && secTopics[0]?.topic === g.topic && !RETURN_TO
+    ? `<div class="script-block"><div class="script-label">Private — say this as you move on</div><div class="script-text">${esc(transition)}</div></div>` : '';
+
+  const all = TOPICS().filter((t) => { const x = guideFor(t.id); return x.has_questions || x.covered.length; });
+  const tIdx = all.findIndex((t) => t.id === g.topic);
+  const isSuggested = g.next?.id === q.id;
+  const editing = isDone(q.id);
+  const STATUS = { not_started:'', in_progress:'In progress', enough:'Enough to move on', done:'Covered' };
+  const objectiveBits = [];
+  { const c1 = A().C1; const o = QBY('C1'); if(isAnswered(c1) && c1.value !== 'unknown') objectiveBits.push(`Objective <b>${esc((o.options||[]).find((x) => x.value === c1.value)?.label || c1.value)}</b>`);
+    const b = A().C1b_instructions; if(isAnswered(b) && b.value !== 'unknown') objectiveBits.push(`bottleneck <b>${esc(answerSummary(QBY('C1b_instructions'), b).toLowerCase())}</b>`); }
+  const knownVol = g.established.filter((e) => e.volunteered_in);
+  const knownHtml = (g.known.length || knownVol.length || g.covered.length) ? `<div class="cv-known"><span class="k">What we already know</span>
+      ${g.known.length || knownVol.length ? `<ul>${g.known.map((k) => `<li>${esc(k)}</li>`).join('')}${knownVol.map((e) => `<li>${esc(e.summary)} <span class="vol">— mentioned while discussing ${esc(TBY(e.volunteered_in)?.label.toLowerCase() || 'an earlier topic')}</span></li>`).join('')}</ul>` : ''}
+      ${g.covered.length ? `<div class="cv-cov">${g.covered.map((c) => `<button class="cv-chip" data-go-q="${esc(c.id)}" type="button" title="${esc(c.note)}"><span class="o">covered</span>${esc(cueFor(QBY(c.id)))}</button>`).join('')}</div>` : ''}
+    </div>` : '';
+  const establishedHtml = g.established.length ? `<div class="cv-row"><span class="k">What we've established</span>${g.established.map((e) => `<button class="cv-chip est${e.id === q.id ? ' on' : ''}" data-go-q="${esc(e.id)}" type="button" title="Click to change">${esc(e.summary)}${e.prefilled ? ' <span class="o">agency record</span>' : ''}</button>`).join('')}</div>` : '';
+  const dirs = g.directions.filter((d) => d.id !== q.id);
+  const dirsHtml = dirs.length ? `<div class="cv-row"><span class="k">${isSuggested ? 'Other directions, if useful' : 'Still open'}</span>${dirs.map((d) => `<button class="cv-chip" data-go-q="${esc(d.id)}" type="button">${esc(d.cue)}${d.optional ? ' <span class="o">optional</span>' : ''}</button>`).join('')}${!isSuggested && g.next && g.next.id !== q.id ? `<button class="cv-chip" data-go-q="${esc(g.next.id)}" type="button">${esc(cueFor(QBY(g.next.id)))}</button>` : ''}</div>` : (!isSuggested && g.next && g.next.id !== q.id ? `<div class="cv-row"><span class="k">Still open</span><button class="cv-chip" data-go-q="${esc(g.next.id)}" type="button">${esc(cueFor(QBY(g.next.id)))}</button></div>` : '');
+  const mentionOpts = TOPICS().filter((t) => t.id !== g.topic && guideFor(t.id).has_questions && !['objective'].includes(t.id));
+  const returnHtml = RETURN_TO && RETURN_TO.topic !== g.topic ? `<div class="cv-return"><span>Recording something mentioned while discussing <b>${esc(TBY(RETURN_TO.topic)?.label || '')}</b> — it will be picked up when you reach this topic.</span><button class="btn btn-secondary btn-sm" data-return type="button">&larr; Back to ${esc(TBY(RETURN_TO.topic)?.label || 'the conversation')}</button></div>` : '';
+
+  el.innerHTML = `${transitionHtml}${returnHtml}<div class="qcard cv">
+    <div class="q-eyebrow"><span>${esc(S.registry.sections.find((x) => x.id === g.section)?.label || g.section)}</span><span class="role">· topic ${tIdx+1} of ${all.length}</span>${STATUS[g.status] ? `<span class="cv-status ${g.status}" style="margin-left:auto">${esc(STATUS[g.status])}</span>` : ''}</div>
+    ${objectiveBits.length && g.topic !== 'objective' ? `<div class="cv-strip">${objectiveBits.join(' · ')}</div>` : ''}
+    <div class="cv-head">${esc(g.label)}</div>
+    <div class="cv-why">${esc(g.understand)}</div>
+    ${knownHtml}
+    ${g.bridge && isSuggested ? `<div class="cv-bridge"><span class="k">Suggested transition</span>“${esc(g.bridge)}”</div>` : ''}
+    <div class="cv-ask${editing ? ' editing' : ''}"><span class="k">${editing ? 'Recorded — change if needed' : isSuggested ? (g.status === 'not_started' ? 'Suggested opener' : 'Suggested next question') : 'Asking'}${q.optional ? ' · optional' : ''}</span><div class="q-text">${esc(wording.primary)}</div>
+      ${alt === 'simpler' && q.simpler ? `<div class="q-alt"><span class="k">Simpler</span>${esc(q.simpler)}</div>` : ''}
+      ${alt === 'example' && q.example ? `<div class="q-alt"><span class="k">Example</span>${esc(q.example)}</div>` : ''}
+      <div class="q-tools">${q.simpler ? `<button class="btn btn-quiet btn-sm${alt === 'simpler' ? ' on' : ''}" data-alt="simpler" type="button">Simpler <kbd class="k">S</kbd></button>` : ''}${q.example ? `<button class="btn btn-quiet btn-sm${alt === 'example' ? ' on' : ''}" data-alt="example" type="button">Example <kbd class="k">E</kbd></button>` : ''}${wording.variant ? `<span class="mini" style="align-self:center">builds on an earlier answer</span>` : ''}</div>
+    </div>
+    <div class="cv-listen"><span class="k">Listen for</span>${g.listen_for.map((x) => `<span class="i">${esc(x)}</span>`).join('')}</div>
+    ${a.prefilled ? `<div class="prefill">From the agency record${a.source ? ` (${esc(a.source)})` : ''} — confirm or change; no need to ask if you already know</div>` : ''}
     ${a.reopened && !isAnswered(a) ? `<div class="note">Asked anyway — an earlier answer had covered this. Answer it, or leave it and the earlier answer stands.</div>` : ''}
-    ${wording.variant ? `<div class="mini" style="margin-top:8px">Builds on an earlier answer · <span class="muted">original: “${esc(q.primary)}”</span></div>` : ''}
     ${snap && snap.primary !== q.primary ? `<div class="note">Wording when answered: “${esc(snap.primary)}”</div>` : ''}
     ${optHtml}${numHtml}${textHtml}
-    ${q.allow_notes && q.type !== 'text' ? `<div class="q-notes"><textarea class="input block" id="q-note" placeholder="Owner's words / notes (optional)">${esc(a.note||'')}</textarea></div>` : ''}
+    ${q.allow_notes && q.type !== 'text' ? `<div class="q-notes"><textarea class="input block" id="q-note" placeholder="Their words / notes (optional)">${esc(a.note||'')}</textarea></div>` : ''}
     ${a.skipped ? `<div class="note">Skipped — ${esc(a.skip_reason || 'no reason')}. Answering will un-skip it.</div>` : ''}
+    ${establishedHtml}
+    ${g.acknowledgement ? `<div class="cv-ack"><span class="k">You might say</span>“${esc(g.acknowledgement)}”</div>` : ''}
+    ${dirsHtml}
     <div class="q-foot">
-      <div class="l"><button class="btn btn-quiet btn-sm" data-nav="back" type="button" ${idx === 0 ? 'disabled' : ''}>&larr; Back</button>${exploreHint}</div>
+      <div class="l"><button class="btn btn-quiet btn-sm" data-topic-step="-1" type="button">&larr; Previous topic</button>
+        ${mentionOpts.length ? `<select class="input mention" id="mention" title="The owner mentioned something that belongs to another topic — record it there, then come back"><option value="">They mentioned another topic…</option>${mentionOpts.map((t) => `<option value="${esc(t.id)}">${esc(t.label)}</option>`).join('')}</select>` : ''}</div>
       <div class="r">
         ${SKIPPING === q.id ? `<select class="input" id="skip-reason">${S.registry.skip_reasons.map((r) => `<option value="${esc(r.value)}">${esc(r.label)}</option>`).join('')}</select><button class="btn btn-secondary btn-sm" data-skip-confirm type="button">Skip</button><button class="btn btn-quiet btn-sm" data-skip-cancel type="button">Cancel</button>`
           : `${opts.some((o) => o.value === 'unknown') || q.type === 'number' || q.type === 'text' ? `<button class="btn btn-quiet btn-sm" data-unknown type="button">Don't know</button>` : ''}<button class="btn btn-quiet btn-sm" data-skip type="button">Skip…</button>`}
-        <button class="btn btn-primary btn-sm" data-nav="next" type="button">${idx === vs.length-1 ? 'Next section' : 'Next'} &rarr; <kbd class="k" style="color:inherit;border-color:rgba(255,255,255,.35)">↵</kbd></button>
+        <button class="btn btn-secondary btn-sm" data-nav="next" type="button">${RETURN_TO && RETURN_TO.topic !== g.topic ? 'Back to the conversation' : 'Next'} <kbd class="k">↵</kbd></button>
+        <button class="btn btn-primary btn-sm" data-topic-step="1" type="button">Next topic &rarr; <kbd class="k" style="color:inherit;border-color:rgba(255,255,255,.35)">N</kbd></button>
       </div>
     </div>
   </div>`;
-  if(q.type === 'number') $('q-num')?.focus();
+  if(q.type === 'number' && !editing) $('q-num')?.focus();
+}
+/* PRIVATE opening & framing — before the first commercial question. */
+function renderOpening(el){
+  const o = S.opening || { greeting:"Hi, how's it going? Appreciate you jumping on today.", framing:[], research:false };
+  const c = S.context || {};
+  el.innerHTML = `<div class="qcard opening">
+    <div class="q-eyebrow"><span>Private · Opening &amp; framing</span><span class="role">· never shown to the client</span></div>
+    <div class="op-say">“${esc(o.greeting)}”</div>
+    <div class="op-frame">${o.framing.map((p) => `<p>${esc(p)}</p>`).join('')}</div>
+    ${o.research ? `<div class="op-meta">Local research exists — ${esc(c.local_research?.agencies)} other ${esc(c.local_research?.location || '')} agenc${c.local_research?.agencies === 1 ? 'y' : 'ies'} probed and graded.</div>` : `<div class="op-meta">No local competitor research on file — so no promise of competitor insights.</div>`}
+    <div class="q-foot" style="justify-content:flex-start"><button class="btn btn-present btn-start" data-start-discovery type="button">START DISCOVERY &rarr; <kbd class="k" style="color:inherit;border-color:rgba(255,255,255,.35)">↵</kbd></button></div>
+  </div>`;
 }
 function renderCoveredCard(el, q){
   const c = EFF().coverage[q.id]; const d = c.derived;
@@ -907,21 +1076,34 @@ function setAnswer(q, patch){
   if(patch.keep_prefill){ delete next.keep_prefill; }
   const w = wordingFor(q); if(w.variant) next.asked_as = w.primary; else delete next.asked_as;
   A()[q.id] = next;
+  markVolunteered(q.id);
   markDirty();
 }
+/* Conversation navigation. "Next" moves to the next open question in the
+   topic (the answer just given can open or cover others, so the guide is
+   recomputed); once the topic has nothing required left it moves to the next
+   topic. Nothing forces the optional questions. While recording something
+   the owner volunteered about another topic, "Next" returns to where the
+   conversation was. */
 function currentQuestionNav(dir){
-  const vs = visible(STAGE); const i = vs.findIndex((q) => q.id === CUR);
-  if(dir === 'back'){ if(i > 0) goQuestion(vs[i-1].id); else if(i < 0 && vs.length) goQuestion(vs[vs.length-1].id); return; }
-  /* Visibility can change with the answer just given (a weak answer opens
-     the exploration, an answer can cover a later question), so recompute
-     before moving on — and step over optional detail once the dimension
-     already has what the diagnosis needs. */
-  const after = visible(STAGE); let j = after.findIndex((q) => q.id === CUR);
-  if(j < 0){ const nx = nextUnanswered(STAGE); if(nx){ goQuestion(nx.id); return; } }
-  let k = j + 1;
-  while(k < after.length && skippable(after[k])) k += 1;
-  if(k < after.length) goQuestion(after[k].id);
-  else { const n = STAGES[STAGES.findIndex((x) => x[0] === STAGE)+1]; if(n) goStage(n[0]); }
+  invalidateEff();
+  const tid = topicOfQ(CUR); const g = guideFor(tid);
+  if(dir === 'back'){
+    const i = g ? g.visible.indexOf(CUR) : -1;
+    if(i > 0) goQuestion(g.visible[i-1]); else stepTopic(-1);
+    return;
+  }
+  if(RETURN_TO && RETURN_TO.topic !== tid){ returnToConversation(); return; }
+  if(!g){ stepTopic(1); return; }
+  const i = g.pending.indexOf(CUR);
+  const nx = i >= 0 ? g.pending[i+1] : g.pending[0];
+  if(nx) goQuestion(nx); else stepTopic(1);
+}
+function returnToConversation(){
+  const back = RETURN_TO; RETURN_TO = null; if(!back) return;
+  const qid = back.qid && isVisible(QBY(back.qid) || {}) ? back.qid : landingFor(back.topic);
+  const st = stageOfTopic(back.topic);
+  if(st !== STAGE) goStage(st, qid); else goQuestion(qid);
 }
 
 /* Right rail: live diagnosis + what we already know + meeting notes. */
@@ -1216,7 +1398,7 @@ const clientHead = (sc) => `<div class="client"><div class="client-k">Client scr
 /* 1. Your agency today */
 function cStepToday(c){
   const sc = SCREEN('today'); const s = c.understanding.situation;
-  const revisit = (q) => `<button class="btn btn-quiet btn-sm" data-go-stage="${esc(QBY(q)?.section === 'value' ? 'intelligence' : 'commercial')}" data-q="${esc(q)}" type="button">ask</button>`;
+  const revisit = (q) => `<button class="btn btn-quiet btn-sm" data-go-stage="${esc(stageOfSection(QBY(q)?.section))}" data-q="${esc(q)}" type="button">ask</button>`;
   const fact = (l, e, q) => `<div class="f"><div class="l">${esc(l)}</div><div class="v${e.known ? '' : ' unk'}">${e.known ? esc(e.display) : 'not established'}</div>${e.known && e.source ? `<div class="mini">${esc(e.source.replace(/_/g,' '))}</div>` : (q ? `<div class="mini">${revisit(q)}</div>` : '')}</div>`;
   return `<div class="panel">${clientHead(sc)}
     <div class="say">${esc(c.understanding.opening)}</div>
@@ -1573,6 +1755,10 @@ document.addEventListener('click', async (e) => {
   const sb = t.closest('[data-stage]'); if(sb){ goStage(sb.dataset.stage); return; }
   const gs = t.closest('[data-go-stage]'); if(gs){ goStage(gs.dataset.goStage, gs.dataset.q || ''); return; }
   const gq = t.closest('[data-go-q]'); if(gq){ goQuestion(gq.dataset.goQ); return; }
+  const gt = t.closest('[data-go-topic]'); if(gt){ goTopic(gt.dataset.goTopic); return; }
+  const ts = t.closest('[data-topic-step]'); if(ts){ stepTopic(Number(ts.dataset.topicStep)); return; }
+  if(t.closest('[data-return]')){ returnToConversation(); return; }
+  if(t.closest('[data-start-discovery]')){ goStage('commercial'); return; }
   const rq = t.closest('[data-reopen-q]'); if(rq){ const id = rq.dataset.reopenQ; A()[id] = { ...(A()[id]||{}), reopened:true, answered_at:new Date().toISOString() }; markDirty(); goQuestion(id); renderSide(); return; }
   const dm = t.closest('[data-dim]'); if(dm){ goStage(S.registry.dimensions.find((x) => x.id === dm.dataset.dim)?.section, dm.dataset.dim); return; }
   const alt = t.closest('[data-alt]'); if(alt){ ALT[CUR] = ALT[CUR] === alt.dataset.alt ? '' : alt.dataset.alt; renderCentre(); return; }
@@ -1631,8 +1817,8 @@ document.addEventListener('input', (e) => {
   if(!S) return;
   const q = QBY(CUR);
   if(t.id === 'q-note' && q){ const a = A()[q.id] || {}; A()[q.id] = { ...a, note: t.value }; markDirty(); return; }
-  if(t.id === 'q-num' && q){ if(t.value === ''){ const a = A()[q.id]||{}; delete a.value; A()[q.id] = a; } else { const a = A()[q.id] || {}; A()[q.id] = { ...a, value: Number(t.value), source: a.source || 'owner_estimate', answered_at:new Date().toISOString() }; delete A()[q.id].skipped; delete A()[q.id].prefilled; } markDirty(); return; }
-  if(t.id === 'q-text' && q){ const a = A()[q.id] || {}; A()[q.id] = { ...a, value: t.value, answered_at:new Date().toISOString() }; delete A()[q.id].skipped; markDirty(); return; }
+  if(t.id === 'q-num' && q){ if(t.value === ''){ const a = A()[q.id]||{}; delete a.value; A()[q.id] = a; } else { const a = A()[q.id] || {}; A()[q.id] = { ...a, value: Number(t.value), source: a.source || 'owner_estimate', answered_at:new Date().toISOString() }; delete A()[q.id].skipped; delete A()[q.id].prefilled; markVolunteered(q.id); } markDirty(); return; }
+  if(t.id === 'q-text' && q){ const a = A()[q.id] || {}; A()[q.id] = { ...a, value: t.value, answered_at:new Date().toISOString() }; delete A()[q.id].skipped; markVolunteered(q.id); markDirty(); return; }
   if(t.id === 'q-target' && q){ const a = A()[q.id] || {}; if(t.value === ''){ const next = { ...a }; delete next.target; A()[q.id] = next; } else { A()[q.id] = { ...a, target: Number(t.value), answered_at:new Date().toISOString() }; delete A()[q.id].skipped; } markDirty(); return; }
   if(t.id === 'm-notes'){ S.session.notes = S.session.notes || {}; S.session.notes.meeting = t.value; markDirty(); return; }
   if(t.id === 'd-notes'){ S.session.notes = S.session.notes || {}; S.session.notes.diagnosis = t.value; markDirty(); return; }
@@ -1644,6 +1830,8 @@ document.addEventListener('input', (e) => {
 });
 document.addEventListener('change', (e) => {
   if(e.target.id === 'pitch-ver'){ PITCH_VIEW = Number(e.target.value); renderCentre(); }
+  /* The owner mentioned another topic: record it there, then come back. */
+  if(e.target.id === 'mention' && e.target.value && S){ const target = e.target.value; const origin = topicOfQ(CUR); RETURN_TO = { topic: origin, qid: CUR }; goTopic(target, { keepReturn:true }); }
 });
 document.addEventListener('keydown', (e) => {
   if(PRES.open){
@@ -1653,6 +1841,10 @@ document.addEventListener('keydown', (e) => {
     if(e.key === 'f' || e.key === 'F'){ presFullscreen(); return; }
     if(e.key === 'Home'){ PRES.slide = 0; renderPresentation(); return; }
     if(e.key === 'End'){ PRES.slide = 99; renderPresentation(); return; }
+    return;
+  }
+  if(S && VIEW === 'discovery' && STAGE === 'opening'){
+    if(e.key === 'Enter' && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){ e.preventDefault(); goStage('commercial'); }
     return;
   }
   if(!S || VIEW !== 'discovery' || !['commercial','foundations','intelligence'].includes(STAGE)) return;
@@ -1665,6 +1857,8 @@ document.addEventListener('keydown', (e) => {
   if(e.key === 'e' || e.key === 'E'){ document.querySelector('[data-alt="example"]')?.click(); return; }
   if(e.key === 'ArrowLeft'){ currentQuestionNav('back'); return; }
   if(e.key === 'ArrowRight'){ currentQuestionNav('next'); return; }
+  if(e.key === 'n' || e.key === 'N'){ stepTopic(1); return; }
+  if(e.key === 'p' || e.key === 'P'){ stepTopic(-1); return; }
 });
 $('refresh').addEventListener('click', () => { if(VIEW === 'discovery' && S) openSession(S.session.session_id, STAGE); else loadList(); });
 document.addEventListener('click', (e) => { if(!e.target.closest('.agency-search')) $('a-results').classList.add('hidden'); });
