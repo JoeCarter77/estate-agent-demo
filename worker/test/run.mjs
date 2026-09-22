@@ -369,6 +369,190 @@ await test('batch of two works two different agencies in order', async () => {
   } finally { await h.close(); }
 });
 
+// ── signed-in enquiry layout ───────────────────────────────────────────────
+
+console.log('\nsigned-in enquiry layout');
+
+const signedInWorld = (patch = {}) => Object.assign(standardWorld(), {
+  enquiryLayout: 'signed_in',
+  signedInIdentity: { ...APPROVED_IDENTITY },
+}, patch);
+
+await test('the signed-in layout is recognised and probed to completion', async () => {
+  const h = await buildHarness(signedInWorld());
+  try {
+    await h.run({ batchSize: 1 });
+    assert.equal(h.world.probes.length, 1, 'the signed-in form produced a probe');
+    assert.equal(h.world.probes[0].probe_status, 'observing');
+    const enquiry = h.world.log.find((entry) => entry.op === 'enquiry-submitted');
+    assert.ok(enquiry, 'the enquiry was submitted');
+    assert.equal(enquiry.layout, 'signed_in');
+    assert.ok(h.logs.some((line) => /signed-in summary/.test(line)), 'the layout was reported in the log');
+  } finally { await h.close(); }
+});
+
+await test('Edit is never clicked when the signed-in details already match', async () => {
+  const h = await buildHarness(signedInWorld());
+  try {
+    await h.run({ batchSize: 1 });
+    assert.equal(h.world.log.filter((entry) => entry.op === 'enquiry-edit-clicked').length, 0,
+      'the operator left the matching details alone');
+    assert.equal(h.world.probes.length, 1);
+  } finally { await h.close(); }
+});
+
+await test('a signed-in account that is not the probe identity stops for a human', async () => {
+  const h = await buildHarness(signedInWorld({
+    signedInIdentity: { firstName: 'Someone', lastName: 'Else', email: 'someone.else@example.com', phone: '07000000000' },
+  }));
+  try {
+    const run = h.run({ batchSize: 1 });
+    await waitFor(() => h.state.data.current.needs_human, 25000);
+    const detail = h.state.data.current.needs_human.detail;
+    assert.equal(h.state.data.current.needs_human.reason, 'unexpected_form');
+    assert.match(detail, /signed_in/, 'the escalation names the layout it saw');
+    assert.match(detail, /someone\.else@example\.com/, 'it names the account actually on screen');
+    assert.equal(h.state.data.current.submission.state, 'none', 'nothing was submitted');
+    assert.equal(h.world.log.filter((e) => e.op === 'enquiry-edit-clicked').length, 0, 'Edit was not clicked to paper over it');
+    assert.equal(h.world.probes.length, 0);
+    h.orchestrator.release({ outcome: 'abandon' });
+    await h.orchestrator.emergencyStop();
+    await run.catch(() => {});
+  } finally { await h.close(); }
+});
+
+await test('a signed-in enquiry with no seller declaration is refused', async () => {
+  const h = await buildHarness(signedInWorld({ signedInDeclaration: 'none' }));
+  try {
+    const run = h.run({ batchSize: 1 });
+    await waitFor(() => h.state.data.current.needs_human, 25000);
+    assert.equal(h.state.data.current.needs_human.reason, 'unexpected_form');
+    assert.match(h.state.data.current.needs_human.detail, /not yet on the market/i);
+    assert.equal(h.world.probes.length, 0, 'an enquiry without the declaration is not the approved probe');
+    h.orchestrator.release({ outcome: 'abandon' });
+    await h.orchestrator.emergencyStop();
+    await run.catch(() => {});
+  } finally { await h.close(); }
+});
+
+await test('a signed-in layout that still asks the seller question has it set', async () => {
+  const h = await buildHarness(signedInWorld({ signedInDeclaration: 'select' }));
+  try {
+    await h.run({ batchSize: 1 });
+    const enquiry = h.world.log.find((entry) => entry.op === 'enquiry-submitted');
+    assert.equal(enquiry.sellingSituation, 'pr_not_on_mrk');
+    assert.equal(h.world.probes.length, 1);
+  } finally { await h.close(); }
+});
+
+await test('CAPTCHA handling still works on the signed-in layout', async () => {
+  const h = await buildHarness(signedInWorld({ submitBehaviour: 'captcha' }));
+  try {
+    const run = h.run({ batchSize: 1 });
+    await waitFor(() => h.state.data.current.needs_human, 25000);
+    assert.equal(h.state.data.current.needs_human.reason, 'captcha');
+    assert.equal(h.state.data.current.agency_id, 'ag-alpha-1');
+    assert.ok(h.browser.rightmoveTabs().length > 0, 'the tab is preserved for the human');
+    assert.equal(h.world.probes.length, 0);
+    h.orchestrator.release({ outcome: 'abandon' });
+    await h.orchestrator.emergencyStop();
+    await run.catch(() => {});
+  } finally { await h.close(); }
+});
+
+await test('an uncertain signed-in submission is still never retried', async () => {
+  const h = await buildHarness(signedInWorld({ submitBehaviour: 'uncertain' }));
+  try {
+    const run = h.run({ batchSize: 1 });
+    await waitFor(() => h.state.data.current.needs_human, 25000);
+    assert.equal(h.state.data.current.needs_human.reason, 'uncertain_submission');
+    assert.equal(h.state.data.current.submission.attempts, 1);
+    assert.equal(h.world.log.filter((e) => e.op === 'enquiry-submitted').length, 1, 'submitted exactly once');
+    assert.equal(h.world.probes.length, 0);
+    h.orchestrator.release({ outcome: 'abandon' });
+    await h.orchestrator.emergencyStop();
+    await run.catch(() => {});
+  } finally { await h.close(); }
+});
+
+await test('a dry run on the signed-in layout still never clicks Send', async () => {
+  const h = await buildHarness(signedInWorld(), { liveSubmit: false });
+  try {
+    await h.run({ batchSize: 1 });
+    assert.equal(h.world.log.filter((e) => e.op === 'enquiry-submitted').length, 0, 'Send was never clicked');
+    assert.equal(h.world.probes.length, 0, 'a dry run creates no probe');
+    assert.ok(h.logs.some((line) => /DRY RUN/.test(line)));
+  } finally { await h.close(); }
+});
+
+// ── pacing ─────────────────────────────────────────────────────────────────
+
+console.log('\npacing');
+
+await test('the cooldown defaults to the 30-60 second range and is randomised', async () => {
+  const { loadConfig, cooldownMs } = await import('../src/config.mjs');
+  const config = loadConfig({});
+  assert.equal(config.cooldown.minSeconds, 30);
+  assert.equal(config.cooldown.maxSeconds, 60);
+  assert.equal(cooldownMs(config, () => 0), 30000);
+  assert.equal(cooldownMs(config, () => 1), 60000);
+  assert.equal(cooldownMs(config, () => 0.5), 45000);
+});
+
+await test('the cooldown range is configurable and can be switched off', async () => {
+  const { loadConfig, cooldownMs } = await import('../src/config.mjs');
+  const tuned = loadConfig({ NOVUS_OPERATOR_COOLDOWN_MIN_SECONDS: '45', NOVUS_OPERATOR_COOLDOWN_MAX_SECONDS: '90' });
+  assert.equal(cooldownMs(tuned, () => 0), 45000);
+  assert.equal(cooldownMs(tuned, () => 1), 90000);
+  const off = loadConfig({ NOVUS_OPERATOR_COOLDOWN_MIN_SECONDS: '0', NOVUS_OPERATOR_COOLDOWN_MAX_SECONDS: '0' });
+  assert.equal(cooldownMs(off), 0, 'zero means no wait, for tests and for a deliberate override');
+});
+
+await test('the operator waits between consecutive enquiries and reports it', async () => {
+  const world = standardWorld();
+  world.agencies = world.agencies.filter((a) => ['ag-alpha-1', 'ag-second-7'].includes(a.agency_id));
+  const h = await buildHarness(world, { cooldownSeconds: 2 });
+  try {
+    const started = Date.now();
+    const run = h.run({ batchSize: 2 });
+    await waitFor(() => h.state.data.run.cooldown_until, 30000);
+    // The countdown is visible to the panel while it is happening.
+    const remaining = Date.parse(h.state.data.run.cooldown_until) - Date.now();
+    assert.ok(remaining > 0 && remaining <= 2500, `cooldown_until is a live countdown (${remaining}ms)`);
+    await run;
+    assert.equal(h.world.probes.length, 2);
+    assert.ok(Date.now() - started >= 2000, 'the second enquiry waited for the cooldown');
+    assert.equal(h.state.data.run.cooldown_until, '', 'the countdown is cleared once it has elapsed');
+  } finally { await h.close(); }
+});
+
+await test('the cooldown does not run after the final enquiry of a batch', async () => {
+  const world = standardWorld();
+  world.agencies = [world.agencies[0]];
+  const h = await buildHarness(world, { cooldownSeconds: 10 });
+  try {
+    const started = Date.now();
+    await h.run({ batchSize: 1 });
+    assert.equal(h.world.probes.length, 1);
+    assert.ok(Date.now() - started < 9000, 'no pointless wait after the last probe');
+  } finally { await h.close(); }
+});
+
+await test('an emergency stop interrupts a cooldown instead of waiting it out', async () => {
+  const world = standardWorld();
+  world.agencies = world.agencies.filter((a) => ['ag-alpha-1', 'ag-second-7'].includes(a.agency_id));
+  const h = await buildHarness(world, { cooldownSeconds: 30 });
+  try {
+    const run = h.run({ batchSize: 2 });
+    await waitFor(() => h.state.data.run.cooldown_until, 30000);
+    const stoppedAt = Date.now();
+    await h.orchestrator.emergencyStop();
+    await run.catch(() => {});
+    assert.ok(Date.now() - stoppedAt < 5000, 'the stop was honoured during the wait');
+    assert.equal(h.world.probes.length, 1, 'the second enquiry never went out');
+  } finally { await h.close(); }
+});
+
 // ── control API (what the Prober panel talks to) ───────────────────────────
 
 console.log('\ncontrol API');

@@ -52,6 +52,7 @@ export function createControlServer({ config, state, orchestrator, browser }) {
         pid: process.pid,
         since: run.started_at,
         stop_reason: run.stop_reason,
+        cooldown_until: run.cooldown_until || '',
       },
       current: {
         agency_id: current.agency_id,

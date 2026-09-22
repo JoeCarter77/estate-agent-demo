@@ -79,6 +79,7 @@ function emptyState() {
       started_at: '',
       stop_reason: '',
       live_submit: false,
+      cooldown_until: '',
     },
     current: emptyTransaction(),
     counters: {

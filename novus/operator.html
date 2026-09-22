@@ -2089,8 +2089,12 @@ load(false);
 
     $('au-status').className = 'pill ' + (STATUS_TONE[worker.status] || 't-blue');
     $('au-status-text').textContent = worker.status || 'stopped';
-    $('au-mode-note').textContent = worker.live_submit
-      ? '' : '  \u00b7  dry run \u2014 Send is never clicked';
+    // A paced wait between enquiries must look like waiting, not like hanging.
+    const coolingFor = worker.cooldown_until
+      ? Math.max(0, Math.round((Date.parse(worker.cooldown_until) - Date.now()) / 1000)) : 0;
+    $('au-mode-note').textContent = coolingFor
+      ? '  \u00b7  pacing \u2014 next agency in ' + coolingFor + 's'
+      : (worker.live_submit ? '' : '  \u00b7  dry run \u2014 Send is never clicked');
 
     $('au-agency').textContent = current.agency_name || current.agency_id || '\u2014';
     $('au-agency').classList.toggle('muted', !current.agency_id);

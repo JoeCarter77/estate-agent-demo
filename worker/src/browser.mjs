@@ -102,6 +102,19 @@ export class OperatorBrowser {
     } catch { return ''; }
   }
 
+  // A screenshot AND the page's own HTML. When an enquiry layout is refused,
+  // the screenshot says what the human saw and the HTML says what the operator
+  // saw — which is what is actually needed to teach it a new layout.
+  async saveFormEvidence(page, name) {
+    const shot = await this.saveEvidence(page, name);
+    try {
+      fs.mkdirSync(this.config.evidenceDir, { recursive: true });
+      const file = path.join(this.config.evidenceDir, `${Date.now()}-${name.replace(/[^a-z0-9._-]/gi, '_')}.html`);
+      fs.writeFileSync(file, await page.content());
+      return file;
+    } catch { return shot; }
+  }
+
   // Evidence for step 8 ("record evidence of success") and for any escalation.
   async saveEvidence(page, name) {
     try {

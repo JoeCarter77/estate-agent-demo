@@ -11,7 +11,7 @@ import { NovusClient } from '../src/novus-client.mjs';
 import { Orchestrator } from '../src/orchestrator.mjs';
 import { APPROVED_IDENTITY } from './mock/fixtures.mjs';
 
-export async function buildHarness(fixture, { liveSubmit = true, quiet = true, statePath = null } = {}) {
+export async function buildHarness(fixture, { liveSubmit = true, quiet = true, statePath = null, cooldownSeconds = 0 } = {}) {
   const world = createMockWorld(fixture);
   const mock = await startMockServer(world);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'novus-operator-'));
@@ -26,6 +26,9 @@ export async function buildHarness(fixture, { liveSubmit = true, quiet = true, s
     NOVUS_OPERATOR_HEADLESS: '1',
     NOVUS_OPERATOR_CHANNEL: process.env.NOVUS_TEST_CHANNEL || 'chrome',
     NOVUS_OPERATOR_AI: '0',
+    // Pacing is off by default in tests; the pacing suite sets it explicitly.
+    NOVUS_OPERATOR_COOLDOWN_MIN_SECONDS: String(cooldownSeconds),
+    NOVUS_OPERATOR_COOLDOWN_MAX_SECONDS: String(cooldownSeconds),
     NOVUS_OPERATOR_LIVE_SUBMIT: liveSubmit ? '1' : '0',
     NOVUS_PROBE_FIRST_NAME: APPROVED_IDENTITY.firstName,
     NOVUS_PROBE_LAST_NAME: APPROVED_IDENTITY.lastName,

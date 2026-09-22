@@ -93,6 +93,39 @@ exactly one commercial signal:
 Anything else on the form that disagrees with the approved identity is a hard
 stop, never an overwrite.
 
+## The two enquiry layouts
+
+Rightmove renders the enquiry form two ways and the operator handles both:
+
+* **Signed out** — editable inputs (`#firstName`, `#email`, `#phone.number`,
+  `#sellingSituationType`). The operator fills them from the configured
+  identity and sets the declaration.
+* **Signed in** — the account's name, email and telephone as read-only text
+  with an **Edit** control and no `#email` input. There is nothing to fill, so
+  the operator *verifies*: it reads the enquiry region and checks the displayed
+  name, email and telephone against the configured probe identity, confirms the
+  "not yet on the market" declaration (set if still asked as a select, accepted
+  if shown back as text), and finds the Send control.
+
+**Edit is never clicked.** When the details already match there is nothing to
+change; when they do not, the signed-in account is not the probe identity, and
+that is an escalation rather than something to rewrite in a Rightmove profile.
+
+The identity check matches against your configured values rather than against
+Rightmove class names, so a redesigned wrapper cannot break it. If a layout is
+refused anyway, the operator saves a screenshot **and** the page's HTML into
+`.state/evidence/` and names the file in the escalation.
+
+## Pacing
+
+`NOVUS_OPERATOR_COOLDOWN_MIN_SECONDS` / `_MAX_SECONDS` (default 30–60) put a
+randomised wait between one confirmed enquiry and the next agency. It runs only
+after an enquiry actually went out, never after the last probe of a batch,
+after a skip, or after a dry run. Pause and emergency stop are honoured during
+it, and the panel shows the countdown so a waiting worker does not look like a
+hung one. It is a delay and nothing else: it retries nothing and does not
+interact with verification.
+
 ## Human intervention
 
 The worker pauses, keeps every tab exactly where it is, sends a macOS

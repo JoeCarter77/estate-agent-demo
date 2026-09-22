@@ -179,13 +179,55 @@ export async function openEnquiryForm(page) {
   await page.waitForLoadState('domcontentloaded').catch(() => {});
   await dismissCookieBanner(page);
 
-  const ready = await page.locator('#email').first().isVisible({ timeout: 20000 }).catch(() => false);
+  // TWO LAYOUTS. Signed out, Rightmove renders editable inputs (#email and
+  // friends). Signed in, it renders the account's details as text with an Edit
+  // control and no #email input at all. Waiting only for #email made a
+  // perfectly healthy signed-in form look like an unexpected page.
+  const ready = await page.waitForFunction(() => {
+    const editable = document.querySelector('#email');
+    if (editable && editable.offsetParent !== null) return true;
+    const send = [...document.querySelectorAll('button')]
+      .some((button) => button.matches('[data-testid="submitButton"]')
+        || /^send( (email|enquiry|message))?$/i.test((button.innerText || '').trim()));
+    return send;
+  }, undefined, { timeout: 20000 }).then(() => true).catch(() => false);
+
   if (!ready) {
     const challenge = await detectChallenge(page);
     if (challenge) return { ok: false, challenge };
     return { ok: false, reason: `the enquiry form did not appear (now at ${page.url()})` };
   }
-  return { ok: true, url: page.url() };
+  return { ok: true, url: page.url(), layout: await detectEnquiryLayout(page) };
+}
+
+// Which of the two enquiry layouts is on screen. Decided from the DOM, never
+// from an assumption about whether the session is signed in.
+export async function detectEnquiryLayout(page) {
+  return page.evaluate(() => {
+    const email = document.querySelector('#email');
+    const usable = email && !email.disabled && !email.readOnly && email.offsetParent !== null;
+    if (usable) return 'editable';
+    const send = [...document.querySelectorAll('button')]
+      .some((button) => button.matches('[data-testid="submitButton"]')
+        || /^send( (email|enquiry|message))?$/i.test((button.innerText || '').trim()));
+    return send ? 'signed_in' : 'unknown';
+  }).catch(() => 'unknown');
+}
+
+// The part of the page that IS the enquiry, for the signed-in layout. Anchored
+// on the send control so it does not depend on a class name, and widened only
+// as far as a form/section/main — never the whole document, or the agent's
+// own contact details elsewhere on the page could satisfy the identity check.
+function enquiryRegionText(page) {
+  return page.evaluate(() => {
+    const send = [...document.querySelectorAll('button')]
+      .find((button) => button.matches('[data-testid="submitButton"]')
+        || /^send( (email|enquiry|message))?$/i.test((button.innerText || '').trim()));
+    const region = send?.closest('form, section, main, [class*="contact"], [class*="enquiry"]')
+      || send?.parentElement?.parentElement
+      || document.body;
+    return (region.innerText || '').replace(/\u00a0/g, ' ');
+  }).catch(() => '');
 }
 
 // STEP 7 — verify the form carries the approved identity and the approved
@@ -193,7 +235,12 @@ export async function openEnquiryForm(page) {
 // supply is filled from the SAME configured probe identity that the existing
 // probe-create endpoint stamps onto the PROBES row. Anything that disagrees
 // with that identity is a hard stop, not an overwrite.
-export async function verifyAndPrepareEnquiry(page, { identity, propertyId }) {
+export async function verifyAndPrepareEnquiry(page, { identity, propertyId, layout = null }) {
+  const actualLayout = layout || await detectEnquiryLayout(page);
+  if (actualLayout === 'signed_in') return verifySignedInEnquiry(page, { identity, propertyId });
+  if (actualLayout === 'unknown') {
+    return { ok: false, layout: 'unknown', reason: 'the enquiry page is neither the editable form nor the signed-in summary' };
+  }
   const before = await readEnquiryForm(page);
   const conflicts = [];
   const check = (field, expected, actual) => {
@@ -206,11 +253,11 @@ export async function verifyAndPrepareEnquiry(page, { identity, propertyId }) {
   check('last name', identity.lastName, before.lastName);
   check('email', identity.email, before.email);
   check('phone', identity.phone, before.phone);
-  if (conflicts.length) return { ok: false, reason: 'enquiry form does not match the approved probe identity', conflicts, before };
+  if (conflicts.length) return { ok: false, layout: 'editable', reason: 'enquiry form does not match the approved probe identity', conflicts, before };
 
   // The form belongs to the property we chose.
   if (propertyId && before.propertyId && before.propertyId !== propertyId) {
-    return { ok: false, reason: `the enquiry form is for property ${before.propertyId}, not ${propertyId}`, before };
+    return { ok: false, layout: 'editable', reason: `the enquiry form is for property ${before.propertyId}, not ${propertyId}`, before };
   }
 
   await page.locator('#firstName').fill(identity.firstName);
@@ -225,18 +272,14 @@ export async function verifyAndPrepareEnquiry(page, { identity, propertyId }) {
   // agency: it is the browser-side twin of the VENDOR_DECLARATION the existing
   // probe-create endpoint writes into PROBES.enquiry_text — "has a property to
   // sell, yes, it is not yet on the market".
-  const selling = page.locator('#sellingSituationType');
-  if (await selling.count()) {
-    await selling.selectOption(SELLING_SITUATION_NOT_ON_MARKET);
-  } else {
-    return { ok: false, reason: 'the enquiry form has no seller-situation field — its layout is not the approved one', before };
-  }
+  const declaration = await ensureSellerDeclaration(page);
+  if (!declaration.ok) return { ok: false, layout: 'editable', reason: declaration.reason, before };
 
   // A free valuation is a DIFFERENT commercial signal and is deliberately not
   // part of the approved enquiry. Leave it alone; refuse if it arrives ticked.
   const valuation = page.locator('#valuationRequested');
   if (await valuation.count() && await valuation.isChecked()) {
-    return { ok: false, reason: 'the form arrived with "Get a free valuation" already ticked, which is not the approved enquiry', before };
+    return { ok: false, layout: 'editable', reason: 'the form arrived with "Get a free valuation" already ticked, which is not the approved enquiry', before };
   }
 
   const after = await readEnquiryForm(page);
@@ -246,8 +289,108 @@ export async function verifyAndPrepareEnquiry(page, { identity, propertyId }) {
     && digits(after.phone) === digits(identity.phone)
     && after.sellingSituation === SELLING_SITUATION_NOT_ON_MARKET
     && after.valuationRequested === false;
-  if (!ok) return { ok: false, reason: 'the enquiry form did not hold the approved values after filling', before, after };
-  return { ok: true, before, after };
+  if (!ok) return { ok: false, layout: 'editable', reason: 'the enquiry form did not hold the approved values after filling', before, after };
+  return { ok: true, layout: 'editable', before, after };
+}
+
+// THE SIGNED-IN LAYOUT. Rightmove shows the account's own name, email and
+// telephone as text with an Edit control instead of inputs. There is nothing to
+// fill, so this VERIFIES rather than writes — and it does so by looking for the
+// configured probe identity in what the page displays, which needs no knowledge
+// of Rightmove's class names and cannot be fooled by a renamed wrapper.
+//
+// Edit is deliberately never clicked. When the details already match there is
+// nothing to change, and when they do not, the account on screen is not the
+// probe identity — that is an escalation, never something to silently rewrite
+// in somebody's Rightmove profile.
+export async function verifySignedInEnquiry(page, { identity, propertyId }) {
+  const text = await enquiryRegionText(page);
+  const shown = {
+    emails: [...new Set(text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g) || [])],
+    phones: [...new Set((text.match(/(?:\+44|0)\s?\d[\d\s()-]{7,}\d/g) || []).map((value) => value.trim()))],
+  };
+  const conflicts = [];
+
+  const wantEmail = String(identity.email || '').trim().toLowerCase();
+  if (wantEmail && !shown.emails.some((value) => value.toLowerCase() === wantEmail)) {
+    conflicts.push(shown.emails.length
+      ? `email: the signed-in enquiry shows ${shown.emails.join(', ')}, approved identity is "${identity.email}"`
+      : `email: the signed-in enquiry shows no email address, approved identity is "${identity.email}"`);
+  }
+
+  const wantPhone = digits(identity.phone);
+  if (wantPhone && !shown.phones.some((value) => digits(value) === wantPhone)) {
+    conflicts.push(shown.phones.length
+      ? `telephone: the signed-in enquiry shows ${shown.phones.join(', ')}, approved identity is "${identity.phone}"`
+      : `telephone: the signed-in enquiry shows no telephone number, approved identity is "${identity.phone}"`);
+  }
+
+  // The name is displayed as free text, so it is matched as a whole name and as
+  // its two parts, both case- and spacing-insensitive.
+  const flat = text.toLowerCase().replace(/\s+/g, ' ');
+  const first = String(identity.firstName || '').trim().toLowerCase();
+  const last = String(identity.lastName || '').trim().toLowerCase();
+  const nameShown = (first && last && flat.includes(`${first} ${last}`))
+    || (first && last && flat.includes(first) && flat.includes(last));
+  if (first && last && !nameShown) {
+    conflicts.push(`name: the signed-in enquiry does not display "${identity.firstName} ${identity.lastName}"`);
+  }
+
+  if (conflicts.length) {
+    return { ok: false, layout: 'signed_in', reason: 'the signed-in enquiry does not match the approved probe identity', conflicts, shown };
+  }
+
+  const urlPropertyId = new URL(page.url()).searchParams.get('propertyId') || '';
+  if (propertyId && urlPropertyId && urlPropertyId !== propertyId) {
+    return { ok: false, layout: 'signed_in', reason: `the enquiry form is for property ${urlPropertyId}, not ${propertyId}`, shown };
+  }
+
+  const declaration = await ensureSellerDeclaration(page, text);
+  if (!declaration.ok) return { ok: false, layout: 'signed_in', reason: declaration.reason, shown };
+
+  const valuation = page.locator('#valuationRequested');
+  if (await valuation.count() && await valuation.isChecked()) {
+    return { ok: false, layout: 'signed_in', reason: 'the enquiry arrived with "Get a free valuation" already ticked, which is not the approved enquiry', shown };
+  }
+
+  return { ok: true, layout: 'signed_in', shown, declaration: declaration.how };
+}
+
+// THE SELLER SIGNAL, in either layout. Fixed, never chosen by the operator and
+// never varied per agency: the browser-side twin of the VENDOR_DECLARATION the
+// existing probe-create endpoint writes into PROBES.enquiry_text — "has a
+// property to sell, yes, it is not yet on the market".
+//
+// Three ways it can be satisfied, in decreasing order of directness. If none of
+// them holds, the caller escalates: an enquiry that does not carry the seller
+// declaration is not the approved probe and must not be sent.
+export async function ensureSellerDeclaration(page, regionText = '') {
+  const select = page.locator('#sellingSituationType');
+  if (await select.count()) {
+    await select.selectOption(SELLING_SITUATION_NOT_ON_MARKET).catch(() => {});
+    const value = await select.inputValue().catch(() => '');
+    if (value === SELLING_SITUATION_NOT_ON_MARKET) return { ok: true, how: 'select' };
+    return { ok: false, reason: `the seller-situation field would not take the approved value (it reads "${value}")` };
+  }
+
+  // A select that is present but differently identified: match on the option
+  // text Rightmove uses, not on an id.
+  const byOption = await page.evaluate((wanted) => {
+    for (const element of document.querySelectorAll('select')) {
+      const option = [...element.options].find((candidate) => /not yet on the market/i.test(candidate.text));
+      if (!option) continue;
+      element.value = option.value;
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      return { matched: true, value: option.value, wanted };
+    }
+    return { matched: false };
+  }, SELLING_SITUATION_NOT_ON_MARKET).catch(() => ({ matched: false }));
+  if (byOption.matched) return { ok: true, how: 'select-by-option-text' };
+
+  // Already declared, and shown back as text — the signed-in summary case.
+  if (/not yet on the market/i.test(regionText)) return { ok: true, how: 'displayed' };
+
+  return { ok: false, reason: 'the enquiry carries no "property to sell, not yet on the market" declaration, so it is not the approved probe enquiry' };
 }
 
 function digits(value) { return String(value || '').replace(/\D/g, '').replace(/^44/, '0'); }
@@ -278,9 +421,11 @@ export async function readEnquiryForm(page) {
 
 // STEP 8 — submit and wait for a DEFINITIVE result. Three outcomes only:
 // sent, failed, uncertain. "The button was clicked" is never a success.
-export async function submitEnquiry(page, { timeout }) {
+export async function submitEnquiry(page, { timeout, layout = 'editable' }) {
   const submit = page.locator('button[data-testid="submitButton"]').first();
-  const fallback = page.getByRole('button', { name: /^Send email$/i }).first();
+  // The signed-in layout labels the same control "Send enquiry" on some
+  // variants, so the fallback matches the family rather than one exact string.
+  const fallback = page.getByRole('button', { name: /^Send( (email|enquiry|message))?$/i }).first();
   const button = (await submit.count()) ? submit : fallback;
   if (!(await button.count())) return { outcome: 'failed', detail: 'no submit control on the enquiry form' };
 
@@ -291,7 +436,7 @@ export async function submitEnquiry(page, { timeout }) {
     const challenge = await detectChallenge(page);
     if (challenge) return { outcome: 'challenge', challenge };
 
-    const verdict = await page.evaluate(() => {
+    const verdict = await page.evaluate((mode) => {
       const text = (document.body?.innerText || '').replace(/\s+/g, ' ');
       if (/your (enquiry|email|message) (has been |was )?sent|thanks? for (your )?(enquiry|getting in touch)|we've sent your (enquiry|details)|email sent/i.test(text)) {
         return { kind: 'sent', snippet: text.slice(0, 200) };
@@ -300,11 +445,17 @@ export async function submitEnquiry(page, { timeout }) {
       // enquiry demonstrably did not leave.
       const errors = [...document.querySelectorAll('[class*="error"], [role="alert"], .form-error')]
         .map((el) => (el.innerText || '').trim()).filter(Boolean);
-      const formStillThere = Boolean(document.querySelector('#email'));
+      // "Is the enquiry still on screen?" must be asked in the layout's own
+      // terms: the signed-in form has no #email input, and treating its absence
+      // as the form vanishing reported every signed-in submission as uncertain.
+      const formStillThere = mode === 'signed_in'
+        ? [...document.querySelectorAll('button')].some((element) => element.matches('[data-testid="submitButton"]')
+            || /^send( (email|enquiry|message))?$/i.test((element.innerText || '').trim()))
+        : Boolean(document.querySelector('#email'));
       if (formStillThere && errors.length) return { kind: 'failed', snippet: errors.join(' | ').slice(0, 300) };
       if (!formStillThere) return { kind: 'gone', snippet: text.slice(0, 200) };
       return null;
-    }).catch(() => null);
+    }, layout).catch(() => null);
 
     if (verdict?.kind === 'sent') return { outcome: 'sent', detail: verdict.snippet };
     if (verdict?.kind === 'failed') return { outcome: 'failed', detail: verdict.snippet };

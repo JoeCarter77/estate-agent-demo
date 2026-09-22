@@ -22,6 +22,7 @@ import { isProbeRecordedAsSent } from './novus-client.mjs';
 import { describeIntervention, notifyIntervention } from './notify.mjs';
 import { assessListing, classifyUnknownPage } from './ai.mjs';
 import { recoveryPlan } from './state.mjs';
+import { cooldownMs } from './config.mjs';
 
 class EmergencyStop extends Error {}
 class HumanNeeded extends Error {
@@ -203,6 +204,12 @@ export class Orchestrator {
       // one instead of re-serving the same agency forever.
       if (outcome === 'dry_run') done += 1;
 
+      // PACING. Only after an enquiry actually went out, and only when there is
+      // another one coming: nothing is gained by making the operator wait after
+      // the last probe of a batch, after a skip, or after a dry run that sent
+      // nothing at all.
+      if (outcome === 'completed' && done < batch) await this.cooldown();
+
       const workedId = this.lastAgencyId || '';
       if (workedId && workedId === lastAgencyId && !['completed', 'skipped', 'dry_run'].includes(outcome)) {
         repeats += 1;
@@ -320,15 +327,27 @@ export class Orchestrator {
       if (form.challenge) throw new HumanNeeded(form.challenge.kind, form.challenge.detail);
       throw new HumanNeeded('unexpected_form', form.reason);
     }
+    // Rightmove renders the enquiry two ways: editable inputs when signed out,
+    // and the account's details as read-only text with an Edit control when
+    // signed in. Both are legitimate; which one is on screen decides how the
+    // identity is checked and how "still on screen" is judged after Send.
+    const layout = form.layout || 'editable';
+    this.log(`[operator] enquiry form: ${layout === 'signed_in' ? 'signed-in summary' : 'editable fields'}`);
     this.state.stage('form_open');
 
     // STEP 7 — verify the approved identity and seller signal.
     const prepared = await verifyAndPrepareEnquiry(propertyPage, {
       identity: this.config.identity,
       propertyId: propertyIdOf(property.url),
+      layout,
     });
     if (!prepared.ok) {
-      throw new HumanNeeded('unexpected_form', [prepared.reason, ...(prepared.conflicts || [])].join(' — '));
+      // Keep the page itself, not just a sentence about it: if the layout has
+      // moved again, this is what says how, without another live run to find out.
+      const dump = await this.browser.saveFormEvidence(propertyPage, `form-${this.state.data.current.agency_id}`);
+      throw new HumanNeeded('unexpected_form',
+        [`${prepared.reason} (layout: ${prepared.layout || layout})`, ...(prepared.conflicts || []), dump ? `saved: ${dump}` : '']
+          .filter(Boolean).join(' — '));
     }
     this.state.stage('form_verified');
     await this.checkpoint();
@@ -344,7 +363,7 @@ export class Orchestrator {
     }
 
     this.state.markSubmitInFlight();              // on disk BEFORE the click
-    const result = await submitEnquiry(propertyPage, { timeout: this.config.timeouts.submitResult });
+    const result = await submitEnquiry(propertyPage, { timeout: this.config.timeouts.submitResult, layout });
 
     if (result.outcome === 'challenge') {
       // STEP 9 — never circumvent, never retry to avoid it, never drop the
@@ -352,7 +371,7 @@ export class Orchestrator {
       // happened, so after release the outcome is re-read rather than re-sent.
       const released = await this.waitForRelease(result.challenge.kind, result.challenge.detail);
       if (released === 'abandon') return 'abandoned';
-      const after = await submitEnquiry(propertyPage, { timeout: this.config.timeouts.submitResult })
+      const after = await submitEnquiry(propertyPage, { timeout: this.config.timeouts.submitResult, layout })
         .catch(() => ({ outcome: 'uncertain', detail: 'could not re-read the page after the challenge' }));
       if (after.outcome !== 'sent') {
         this.state.stage('submitting');
@@ -450,6 +469,26 @@ export class Orchestrator {
       }
     }
     throw new HumanNeeded('uncertain_suitability', 'neither the deterministic rules nor the model could confirm a suitable residential sale listing');
+  }
+
+  // A plain wait between confirmed enquiries. It retries nothing, touches no
+  // verification and is not a way around one; it only spaces the batch out.
+  // Pause and emergency stop are honoured every quarter second, and the panel
+  // shows the countdown so a waiting operator never looks like a hung one.
+  async cooldown() {
+    const waitMs = cooldownMs(this.config);
+    if (waitMs <= 0) return;
+    const until = Date.now() + waitMs;
+    this.state.setRun({ cooldown_until: new Date(until).toISOString() });
+    this.log(`[operator] pacing: waiting ${Math.round(waitMs / 1000)}s before the next agency`);
+    try {
+      while (Date.now() < until) {
+        await this.checkpoint();
+        await new Promise((resolve) => setTimeout(resolve, Math.min(250, until - Date.now())));
+      }
+    } finally {
+      this.state.setRun({ cooldown_until: '' });
+    }
   }
 
   async triageUnknownPage(page) {

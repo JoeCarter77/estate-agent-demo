@@ -34,6 +34,10 @@ export function createMockWorld(fixture = {}) {
     // Test levers.
     submitBehaviour: fixture.submitBehaviour || 'success',  // success | failure | uncertain | captcha
     prefillEnquiry: fixture.prefillEnquiry || null,
+    // 'editable' (signed out) or 'signed_in' (details shown as text + Edit).
+    enquiryLayout: fixture.enquiryLayout || 'editable',
+    signedInIdentity: fixture.signedInIdentity || null,
+    signedInDeclaration: fixture.signedInDeclaration ?? 'displayed',
     blockPopups: Boolean(fixture.blockPopups),
     log: [],
   };
@@ -185,7 +189,74 @@ function propertyPage(world, propertyId) {
   `, `<link rel="canonical" href="${canonical}">`);
 }
 
+// THE SIGNED-IN LAYOUT, as Rightmove renders it for an authenticated account:
+// the details are text with an Edit control, there is no #email input, and the
+// seller declaration is shown back rather than asked again.
+function signedInEnquiryPage(world, propertyId) {
+  const property = world.properties[propertyId];
+  if (!property) return null;
+  const who = world.signedInIdentity || {};
+  const behaviour = world.submitBehaviour;
+  const declaration = world.signedInDeclaration;
+  return page('Property for sale', `
+    <h1>Contact ${property.branchName}</h1>
+    <section class="contactForm_wrapper__x1y2">
+      <h2>Your details</h2>
+      <div class="contactForm_detailsSummary__a9b8">
+        <p class="contactForm_name__k3l4">${who.firstName || ''} ${who.lastName || ''}</p>
+        <p class="contactForm_email__m5n6">${who.email || ''}</p>
+        <p class="contactForm_phone__o7p8">${who.phone || ''}</p>
+        <button type="button" id="edit-details">Edit</button>
+      </div>
+      ${declaration === 'select' ? `
+      <label for="sellingSituationType">I have a property to sell</label>
+      <select id="sellingSituationType" name="sellingSituationType">
+        <option value="">Please select</option><option value="no">No</option>
+        <option value="pr_not_on_mrk">Yes, it is not yet on the market</option>
+      </select>` : ''}
+      ${declaration === 'displayed' ? '<p class="contactForm_declared__q9r0">Property to sell: Yes, it is not yet on the market</p>' : ''}
+      <button type="button" data-testid="submitButton">Send email</button>
+    </section>
+    <div id="captcha-host"></div>
+    <script>
+      const behaviour = ${JSON.stringify(behaviour)};
+      document.getElementById('edit-details').addEventListener('click', () => {
+        window.__editClicked = (window.__editClicked || 0) + 1;
+        navigator.sendBeacon('/mock/enquiry-edit-clicked', '{}');
+      });
+      document.querySelector('[data-testid="submitButton"]').addEventListener('click', () => {
+        window.__submitted = (window.__submitted || 0) + 1;
+        const sel = document.getElementById('sellingSituationType');
+        navigator.sendBeacon('/mock/enquiry-submitted', JSON.stringify({
+          layout: 'signed_in',
+          propertyId: new URLSearchParams(location.search).get('propertyId'),
+          firstName: ${JSON.stringify(who.firstName || '')}, lastName: ${JSON.stringify(who.lastName || '')},
+          email: ${JSON.stringify(who.email || '')}, phone: ${JSON.stringify(who.phone || '')},
+          sellingSituation: sel ? sel.value : 'displayed:pr_not_on_mrk',
+          valuationRequested: false,
+        }));
+        setTimeout(() => {
+          if (behaviour === 'success') {
+            document.body.innerHTML = '<h1>Your enquiry has been sent</h1>';
+          } else if (behaviour === 'failure') {
+            const el = document.createElement('div');
+            el.className = 'form-error'; el.setAttribute('role','alert');
+            el.textContent = 'Please check your details';
+            document.querySelector('section').prepend(el);
+          } else if (behaviour === 'uncertain') {
+            document.querySelector('section').remove();
+            document.body.insertAdjacentHTML('beforeend', '<p>Loading…</p>');
+          } else if (behaviour === 'captcha') {
+            document.getElementById('captcha-host').innerHTML =
+              '<div style="width:400px;height:400px"><div><iframe src="https://www.google.com/recaptcha/api2/bframe?k=test" style="width:400px;height:400px"></iframe></div></div>';
+          }
+        }, 150);
+      });
+    </script>`);
+}
+
 function enquiryPage(world, propertyId) {
+  if (world.enquiryLayout === 'signed_in') return signedInEnquiryPage(world, propertyId);
   const property = world.properties[propertyId];
   if (!property) return null;
   const pre = world.prefillEnquiry || {};
@@ -258,6 +329,13 @@ export function startMockServer(world) {
       res.writeHead(status, { 'Content-Type': type, 'Content-Length': Buffer.byteLength(body) });
       res.end(body);
     };
+
+    if (url.pathname === '/mock/enquiry-edit-clicked') {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      world.log.push({ op: 'enquiry-edit-clicked' });
+      res.writeHead(204); return res.end();
+    }
 
     if (url.pathname === '/mock/enquiry-submitted') {
       const chunks = [];

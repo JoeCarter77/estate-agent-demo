@@ -77,6 +77,15 @@ export function loadConfig(env = process.env) {
     allowedAgencyIds: String(env.NOVUS_OPERATOR_ALLOWED_AGENCIES || '')
       .split(',').map((s) => s.trim()).filter(Boolean),
 
+    // PACING. A pause between one confirmed enquiry and the next agency, so a
+    // batch arrives at a human rhythm rather than as a burst. It is a delay and
+    // nothing more: it does not retry, does not touch verification, and is not
+    // a way around anything. Each wait is a fresh random value in the range.
+    cooldown: {
+      minSeconds: Math.max(0, Number(env.NOVUS_OPERATOR_COOLDOWN_MIN_SECONDS ?? 30)),
+      maxSeconds: Math.max(0, Number(env.NOVUS_OPERATOR_COOLDOWN_MAX_SECONDS ?? 60)),
+    },
+
     aiModel: env.NOVUS_OPERATOR_AI_MODEL || 'claude-sonnet-5',
     aiEnabled: bool(env.NOVUS_OPERATOR_AI, true),
 
@@ -86,6 +95,15 @@ export function loadConfig(env = process.env) {
       submitResult: Number(env.NOVUS_OPERATOR_SUBMIT_TIMEOUT || 40000),
     },
   };
+}
+
+// A single wait, in milliseconds. Exported so the pacing rule can be tested
+// without waiting for it.
+export function cooldownMs(config, random = Math.random) {
+  const min = Math.min(config.cooldown.minSeconds, config.cooldown.maxSeconds);
+  const max = Math.max(config.cooldown.minSeconds, config.cooldown.maxSeconds);
+  if (max <= 0) return 0;
+  return Math.round((min + random() * (max - min)) * 1000);
 }
 
 export function assertConfig(config) {

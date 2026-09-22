@@ -241,6 +241,8 @@
     .pres-body.top{justify-content:flex-start;overflow:hidden;}
     .pres-card.simple{padding:3.2cqh 2.2cqw;gap:1.6cqh;} .pres-card.simple .h{font-size:2.1cqw;} .pres-card.simple p{font-size:1.45cqw;line-height:1.5;}
     .pres-card.simple p.ctx{font-size:1.15cqw;color:rgba(147,196,255,.85);margin-top:-.6cqh;}
+    .pres-project{margin-bottom:2.6cqh;} .pres-project .h{font-size:2.6cqw;font-weight:600;color:#fff;line-height:1.25;letter-spacing:-.01em;} .pres-project p{margin-top:1.2cqh;font-size:1.5cqw;line-height:1.5;color:rgba(241,237,230,.85);max-width:80%;} .pres-project p.amb{font-size:1.25cqw;color:rgba(147,196,255,.9);margin-top:.8cqh;}
+    .pres-project + .pres-cols .pres-card.simple{padding:2.4cqh 1.8cqw;gap:1.2cqh;} .pres-project + .pres-cols .pres-card.simple .h{font-size:1.7cqw;} .pres-project + .pres-cols .pres-card.simple p{font-size:1.25cqw;}
     .pres-ongoing{margin-top:2.4cqh;font-size:1.3cqw;line-height:1.5;color:rgba(241,237,230,.72);border-top:1px solid rgba(241,237,230,.12);padding-top:1.8cqh;}
     .pres-cols.dense .pres-card ul{font-size:1.05cqw;} .pres-cols.dense .pres-card{padding:1.8cqh 1.5cqw;}
     .pres-price{margin-top:.5cqh;}
@@ -1284,33 +1286,35 @@ function implHtml(r){
       <div><div class="k">If the preferred route is unavailable</div><div style="font-size:12.5px;line-height:1.55;color:var(--ink-2)">${esc(r.fallback)}</div><div class="k" style="margin-top:8px">Scope limitations</div>${ul(r.limits)}</div>
     </div></div>`;
 }
-const EMPTY_FOCUS_GUIDANCE = { name:'', why_selected:[], say_aloud:'', talking_points:[], what_we_implement:[], need_from_agency:[], team_change:[], conditions:[], questions:[], fallbacks:[], implementation:[] };
-/* The private guidance for one focus area: why it was chosen (from their own
-   answers), what to say aloud, what we'd build, what we need, what changes
-   for their team, the technical conditions, the objections and the fallback
-   if the preferred route isn't available. None of it reaches the client. */
-function focusGuidanceHtml(pg){
+/* The private guidance for the ONE project: why we're proposing it (from
+   their own answers), how to say it, what we'd build, what we need, what
+   stays, how the ongoing service works, what we measure, the technical
+   conditions, fallbacks and objections. None of it reaches the client. */
+function projectGuidanceHtml(pg){
+  if(!pg) return '';
   const conds = (pg.conditions||[]).map((x) => `${x.kind === 'depends' ? 'Depends on' : x.kind === 'delivery' ? 'Delivery' : 'Confirm'}: ${x.text}`);
-  return `${fold('Private — why this area, and how to say it', `${pg.say_aloud ? `<div class="say">${esc(pg.say_aloud)}</div>` : ''}<div class="k">Why it was selected</div>${ul(pg.why_selected||[])}<div class="k" style="margin-top:8px">Talking points</div>${ul(pg.talking_points||[])}`, true)}
-    ${fold('Private — what we\'d implement, and what we need', `<div class="two"><div><div class="k">What we\'d actually implement</div>${ul(pg.what_we_implement||[])}</div><div><div class="k">What we\'d need from the agency</div>${ul(pg.need_from_agency||[])}</div><div style="grid-column:1 / -1"><div class="k">What changes for their team</div>${(pg.team_change||[]).map((t) => `<div style="font-size:12.5px;line-height:1.55;color:var(--ink-2);margin-bottom:6px"><b>${esc(t.name)}.</b> ${esc(t.text)}</div>`).join('') || '<div class="muted mini">—</div>'}</div></div>`)}
-    ${fold(`Private — conditions & dependencies${conds.length ? ` (${conds.length})` : ''}`, ul(conds))}
+  const impl = [...(pg.foundations||[]).map((f) => f.implementation), ...(pg.components||[]).flatMap((c) => c.implementation)].filter(Boolean);
+  return `${fold('Private — why this project, and how to say it', `${pg.say_aloud ? `<div class="say">${esc(pg.say_aloud)}</div>` : ''}<div class="k">Why we're proposing it</div>${ul(pg.why||[])}<div class="k" style="margin-top:8px">The discovery answers behind it</div>${ul(pg.supporting_answers||[])}<div class="k" style="margin-top:8px">How it addresses their objective</div><div style="font-size:12.5px;line-height:1.55;color:var(--ink-2)">${esc(pg.objective_link||'')}</div>`, true)}
+    ${fold('Private — what we\'d implement, and what we need', `<div class="two"><div><div class="k">What we'd actually implement</div>${ul(pg.what_we_implement||[])}</div><div><div class="k">Data, systems and permissions</div>${ul(pg.data_access||[])}</div><div><div class="k">What we'd need from their team</div>${ul(pg.need_from_team||[])}</div><div><div class="k">Existing processes we'd preserve</div>${ul(pg.preserved||[])}</div><div style="grid-column:1 / -1"><div class="k">What changes for their team</div>${(pg.team_change||[]).map((t) => `<div style="font-size:12.5px;line-height:1.55;color:var(--ink-2);margin-bottom:6px"><b>${esc(t.name)}.</b> ${esc(t.text)}</div>`).join('') || '<div class="muted mini">—</div>'}</div></div>`)}
+    ${fold('Private — the ongoing service, and what we measure', `<div class="two"><div><div class="k">How the ongoing service works</div>${ul(pg.ongoing||[])}</div><div><div class="k">What we'd measure</div>${ul(pg.measures||[])}</div></div>`)}
+    ${fold(`Private — technical conditions & fallbacks${conds.length ? ` (${conds.length})` : ''}`, `${ul(conds)}<div class="k" style="margin-top:8px">If the preferred route isn't available</div>${(pg.fallbacks||[]).map((f) => `<div style="font-size:12.5px;line-height:1.55;color:var(--ink-2);margin-bottom:6px"><b>${esc(f.name)}.</b> ${esc(f.text)}</div>`).join('') || '<div class="muted mini">—</div>'}`)}
     ${fold('Private — questions & objections', qa(pg.questions||[]))}
-    ${fold('Private — if the preferred route isn\'t available', (pg.fallbacks||[]).length ? `${(pg.fallbacks||[]).map((f) => `<div style="font-size:12.5px;line-height:1.55;color:var(--ink-2);margin-bottom:6px"><b>${esc(f.name)}.</b> ${esc(f.text)}</div>`).join('')}` : '<div class="muted mini">—</div>')}
-    ${fold('Full implementation detail (per component)', (pg.implementation||[]).map(implHtml).join(''))}`;
+    ${fold('Full implementation detail (per component)', impl.map(implHtml).join(''))}
+    ${(pg.future_scope||[]).length ? `<div class="mini" style="margin-top:8px">Future scope, not led with: ${esc(pg.future_scope.map((x) => `${x.name} (${x.rule_ids.join(', ')})`).join('; '))}</div>` : ''}`;
 }
 function cStepHelp(c){
-  const sc = SCREEN('help'); const gd = c.guidance?.help || {};
-  const card = (g, k) => { const pg = gd[g.id] || EMPTY_FOCUS_GUIDANCE; return `<div class="sol">
-      <div class="sol-n">0${k+1}</div><div class="sol-h">${esc(g.heading)}</div><div class="sol-s">${esc(g.sentence)}</div>
-      ${g.context ? `<div class="sol-s" style="color:var(--blue)">${esc(g.context)}</div>` : ''}
-      ${pg.name ? `<div class="mini" style="margin-top:6px">Focus area: ${esc(pg.name)}</div>` : ''}
-      ${focusGuidanceHtml(pg)}
-    </div>`; };
+  const sc = SCREEN('help'); const pg = c.guidance?.project || null;
   return `<div class="panel">${clientHead(sc)}
-    ${(sc.cards||[]).length ? sc.cards.map(card).join('') : `<div class="say">${esc(sc.next_step||c.next_step)}</div>`}
+    ${sc.headline ? `<div class="sol">
+      <div class="sol-h" style="font-size:17px">${esc(sc.headline)}</div><div class="sol-s">${esc(sc.description)}</div>
+      ${sc.ambition ? `<div class="sol-s" style="color:var(--blue)">${esc(sc.ambition)}</div>` : ''}
+      ${pg ? `<div class="mini" style="margin-top:6px">Project: ${esc(pg.name)}</div>` : ''}
+    </div>
+    ${(sc.components||[]).map((g, k) => `<div class="sol"><div class="sol-n">0${k+1}</div><div class="sol-h">${esc(g.heading)}</div><div class="sol-s">${esc(g.sentence)}</div></div>`).join('')}
+    ${sc.setup ? `<div class="note">${esc(sc.setup)}</div>` : ''}
     ${sc.ongoing ? `<div class="note">${esc(sc.ongoing)}</div>` : ''}
-    ${(sc.preserved||[]).length && (sc.cards||[]).length ? `<div class="note">What already works stays as it is: ${esc(sc.preserved.join(', ').toLowerCase())}.</div>` : ''}
-    ${c.changes.other_groups.length ? `<div class="mini">Also in the plan, not led with: ${esc(c.changes.other_groups.map((g) => `${g.title} (${g.rules.map((r) => r.rule_id).join(', ')})`).join('; '))}</div>` : ''}
+    ${(sc.preserved||[]).length ? `<div class="note">What already works stays as it is: ${esc(sc.preserved.join(', ').toLowerCase())}.</div>` : ''}
+    ${projectGuidanceHtml(pg)}` : `<div class="say">${esc(sc.next_step||c.next_step)}</div>`}
   </div>`;
 }
 
@@ -1319,7 +1323,7 @@ function cStepHelp(c){
    Two questions, in order: did it land, and do they want it? What they
    answer decides whether the price is put to them at all. */
 function cStepCheckpoint(c){
-  const k = c.checkpoint; const gd = c.guidance?.help || {};
+  const k = c.checkpoint; const pg = c.guidance?.project || null;
   const levels = S.registry.understanding_levels || []; const labels = S.registry.understanding_labels || {};
   const interests = S.registry.interest_levels || []; const ilabels = S.registry.interest_labels || {};
   const concernIds = new Set(k.concerns.map((x) => x.id));
@@ -1328,7 +1332,7 @@ function cStepCheckpoint(c){
     <div class="client"><div class="client-k">Private — the client still sees your 60-day deployment</div><div class="client-t">Understanding &amp; implementation interest</div><div class="client-s">Ask both before any price. Nothing on this step is ever shown to them.</div></div>
     <div class="say q">${esc(k.understanding_cue)}</div>
     <div class="fa">${levels.map((lv) => `<button class="btn btn-secondary btn-sm${k.understanding === lv ? ' on' : ''}" data-cp-understanding="${esc(lv)}" type="button">${esc(labels[lv] || lv)}</button>`).join('')}</div>
-    ${k.explanation_needed ? `<div class="note">They want more explanation — open the focus-area guidance below and go back over it before you ask the second question.</div>` : ''}
+    ${k.explanation_needed ? `<div class="note">They want more explanation — open the project guidance below and go back over it before you ask the second question.</div>` : ''}
     <div class="say q" style="margin-top:16px">${esc(k.interest_cue)}</div>
     <div class="fa">${interests.map((lv) => `<button class="btn btn-secondary btn-sm${k.interest === lv ? ' on' : ''}" data-cp-interest="${esc(lv)}" type="button">${esc(ilabels[lv] || lv)}</button>`).join('')}</div>
     ${k.response ? `<div class="say" style="margin-top:14px">${esc(k.response)}</div>` : ''}
@@ -1340,8 +1344,8 @@ function cStepCheckpoint(c){
       <textarea class="input block" id="cp-notes" style="min-height:56px;margin-top:8px;font-size:12.5px" placeholder="Optional — what they actually said">${esc(k.notes||'')}</textarea>
       <div class="btnrow" style="margin-top:8px"><button class="btn btn-primary btn-sm" data-cp-save type="button">Save checkpoint</button></div>
     </div>
-    ${open.length ? `<div class="note" style="margin-top:14px">They're not there yet — the private guidance for each focus area is below. Answer what they raised, don't re-pitch.</div>
-      ${open.map((id) => `<div class="sol"><div class="sol-h">${esc(gd[id]?.heading || id)}</div>${focusGuidanceHtml(gd[id] || EMPTY_FOCUS_GUIDANCE)}</div>`).join('')}` : ''}
+    ${open.length && pg ? `<div class="note" style="margin-top:14px">They're not there yet — the private guidance for the project is below. Answer what they raised, don't re-pitch.</div>
+      <div class="sol"><div class="sol-h">${esc(pg.title)}</div>${projectGuidanceHtml(pg)}</div>` : ''}
     <div class="btnrow" style="margin-top:14px">
       ${k.show_pilot ? `<button class="btn btn-primary btn-sm" data-cstep="pilot" type="button">The founding pilot &rarr;</button>` : ''}
       ${k.interest === 'NO' ? `<button class="btn btn-secondary btn-sm" data-go-stage="outcome" type="button">Record the decision without a price &rarr;</button>` : ''}
@@ -1440,9 +1444,9 @@ function presSlideHtml(sc, i){
         <div class="out"><div class="o"><div class="v">${esc(row.monthly)}</div><div class="l">a month</div></div><div class="o"><div class="v">${esc(row.annual)}</div><div class="l">a year, if sustained</div></div></div></div>
       <div class="pres-note">${esc(sc.label)}. ${esc(sc.footnote)}</div></div>`;
   }
-  if(sc.id === 'help') return `${head(sc.subtitle)}<div class="pres-body">${sc.cards.length ? `<div class="pres-cols" style="--n:${sc.cards.length}">${sc.cards.map((g, k) => `<div class="pres-card simple"><div class="num">0${k+1}</div><div class="h">${esc(g.heading)}</div><p>${esc(g.sentence)}</p>${g.context ? `<p class="ctx">${esc(g.context)}</p>` : ''}</div>`).join('')}</div>` : `<div class="pres-next">${esc(sc.next_step)}</div>`}
-      ${sc.ongoing ? `<div class="pres-ongoing">${esc(sc.ongoing)}</div>` : ''}
-      ${sc.preserved.length && sc.cards.length ? `<div class="pres-note">What already works stays as it is: ${esc(sc.preserved.join(', ').toLowerCase())}.</div>` : ''}</div>`;
+  if(sc.id === 'help') return `${head(sc.subtitle)}<div class="pres-body">${sc.headline ? `<div class="pres-project"><div class="h">${esc(sc.headline)}</div><p>${esc(sc.description)}</p>${sc.ambition ? `<p class="amb">${esc(sc.ambition)}</p>` : ''}</div>
+      <div class="pres-cols" style="--n:${sc.components.length}">${sc.components.map((g, k) => `<div class="pres-card simple"><div class="num">0${k+1}</div><div class="h">${esc(g.heading)}</div><p>${esc(g.sentence)}</p></div>`).join('')}</div>` : `<div class="pres-next">${esc(sc.next_step)}</div>`}
+      ${sc.ongoing ? `<div class="pres-ongoing">${esc(sc.ongoing)}</div>` : ''}</div>`;
   if(sc.id === 'needs') return `${head(sc.subtitle)}<div class="pres-body"><div class="pres-cols" style="--n:3">${sc.cards.map((g, k) => `<div class="pres-card simple"><div class="num">0${k+1}</div><div class="h">${esc(g.heading)}</div><p>${esc(g.sentence)}</p></div>`).join('')}</div></div>`;
   if(sc.id === 'deployment') return `${head(sc.subtitle)}<div class="pres-body">${sc.proposed ? `<div class="pres-timeline">${sc.phases.map((p) => `<div class="pres-phase"><div class="w">${esc(p.title)}</div><div class="h">${esc(p.heading)}</div><p>${esc(p.summary)}</p></div>`).join('')}</div><div class="pres-note">${esc(sc.caveat)}</div>` : `<div class="pres-next">${esc(S.presentation.screens.find((x) => x.id === 'pilot')?.next_step || '')}</div>`}</div>`;
   if(sc.id === 'pilot') return `${head('')}<div class="pres-body top">${sc.proposed ? `<div class="pres-price"><span class="p">${esc(sc.price)}</span><span class="d">all-in · ${esc(sc.duration)} · no long-term commitment</span></div>
