@@ -147,7 +147,7 @@ console.log('\n1b. Opening questions, discovery order and section cues');
   // ORDER: objective → bottleneck → agency context (branches, CRM, enquiries,
   // database) → foundations → intelligence → numbers → future pacing.
   const order = QUESTIONS.filter((q) => !q.dimension).map((q) => q.id);
-  assert.deepEqual(order, ['C1', 'C1b_instructions', 'C1b_demand', 'C1b_capacity', 'C2', 'C3', 'C6', 'C7', 'C7_block', 'C4', 'C5', 'C8', 'C9', 'C10', 'C11', 'C1a']);
+  assert.deepEqual(order, ['C1', 'C1b_instructions', 'C1b_demand', 'C1b_capacity', 'C2', 'C12', 'C12_selection', 'C12_consistency', 'C12_existing', 'C12_output', 'C12_change', 'C12_exhausted', 'C12_results', 'C12_belief', 'C3', 'C6', 'C7', 'C7_block', 'C4', 'C5', 'C8', 'C9', 'C10', 'C11', 'C1a']);
   assert.equal(QUESTIONS[QUESTIONS.length - 1].id, 'C1a', 'the six-month question is the very last thing asked');
   assert.equal(STAGE_SECTIONS.intelligence.at(-1), 'future');
   for (const id of ['C8', 'C9', 'C10', 'C11']) assert.equal(QUESTION_BY_ID[id].section, 'value', `${id} is asked in the commercial-numbers section`);
@@ -205,7 +205,7 @@ console.log('\n1c. Conversation mode — opening, topics, context carried forwar
   // TOPICS cover every question exactly once, in meeting order.
   const covered = TOPICS.flatMap((t) => t.questions);
   assert.deepEqual([...covered].sort(), QUESTIONS.map((q) => q.id).sort(), 'every registry question belongs to exactly one topic');
-  assert.deepEqual(TOPICS.map((t) => t.id), ['objective', 'bottleneck', 'context', 'F1', 'F2', 'F3', 'F4', 'F5', 'I1', 'I2', 'I3', 'I4', 'I5', 'numbers', 'future']);
+  assert.deepEqual(TOPICS.map((t) => t.id), ['objective', 'bottleneck', 'strategy', 'context', 'F1', 'F2', 'F3', 'F4', 'F5', 'I1', 'I2', 'I3', 'I4', 'I5', 'numbers', 'future']);
   for (const t of TOPICS) { assert.ok(t.label && t.understand && t.listen_for.length >= 2 && t.listen_for.length <= 3, `${t.id} has a heading, a purpose and two or three things to listen for`); }
   for (const f of [...TOPIC_FACTS, ...TOPIC_BRIDGES, ...ACKNOWLEDGEMENTS]) for (const c of [f.when].flat()) assert.ok(QUESTION_BY_ID[c.question], `condition references a real question (${c.question})`);
 
@@ -1284,6 +1284,127 @@ console.log('\n5d. Primary commercial project, personalised deployment and the p
   ok('pre-price checkpoint: private cues recorded as understanding + interest with concerns and notes; yes goes to the unchanged £1,500 slide, potentially opens the implementation guidance, no records the outcome without a price, and none of it is on a client screen');
 }
 
+// ── 5e. commercial strategy and the personalised NOVUS explanation ─────────
+console.log('\n5e. Commercial strategy and the personalised explanation');
+{
+  const G = (topic, answers) => conversationGuide(topic, answers);
+  const W = (answers) => wordingFor(QUESTION_BY_ID.C12, answers).primary;
+  // PART 1: the strategy question follows the objective, and their own ambition.
+  assert.equal(W({ C1: a('more_valuations') }), "If you wanted to generate a few more valuations a month from the customers and enquiries you've already got, how would you go about doing that at the moment?");
+  assert.equal(W({ C1: a('more_valuations'), C1a: a('Another five or six valuations a month', { target: 6 }) }), "If you wanted another five or six valuations a month from the customers you've already got, how would you go about generating those at the moment?");
+  assert.equal(W({ C1: a('more_valuations'), C1a: a('Thirty a month', { target: 30 }) }), W({ C1: a('more_valuations') }), 'a bare target is never read as "another N" — it may be a total');
+  assert.match(W({ C1: a('capacity') }), /^If you wanted to get more out of the team you've already got/, 'team efficiency is not forced into a valuations question');
+  assert.match(W({ C1: a('more_instructions'), C1b_instructions: a('winning_instructions') }), /^If you wanted to win a few more of the valuations you're already doing/, 'conversion owners get a conversion question');
+  assert.equal(G('strategy', { C1: a('more_valuations') }).next.id, 'C12', 'the strategy topic comes straight after the bottleneck');
+  assert.deepEqual(TOPICS.slice(0, 4).map((t) => t.id), ['objective', 'bottleneck', 'strategy', 'context']);
+
+  // PART 2: follow the answer.
+  const follow = (approach) => G('strategy', { C1: a('more_valuations'), C12: m([approach]) }).next;
+  assert.deepEqual([follow('call_old_valuations').id, follow('call_old_valuations').primary], ['C12_selection', 'Okay, and how would you decide which of those people are worth speaking to first?']);
+  assert.deepEqual([follow('crm_identifies').id, follow('crm_identifies').primary], ['C12_existing', 'Interesting. What does it currently identify for you, and what happens when it finds someone?']);
+  assert.deepEqual([follow('negotiators_database').id, follow('negotiators_database').primary], ['C12_consistency', "Is that something you're doing consistently already, or more when the team has time?"]);
+  assert.deepEqual([follow('more_enquiries').id, follow('more_enquiries').primary], ['C12_exhausted', "Do you feel you've already exhausted the potential within the customers you've got, or is that something you haven't really established?"]);
+  // Reuse the dimensions — nothing asked twice, in either direction.
+  let cov = evaluateCoverage({ C12: m(['call_old_valuations']), C12_selection: a('judgement') });
+  assert.equal(cov.I4.derived.value, 'judgement', 'how they pick who to call IS I4');
+  cov = evaluateCoverage({ C12: m(['negotiators_database']), C12_consistency: a('when_time') });
+  assert.equal(cov.I3.derived.value, 'when_time', '"when the team has time" IS the I3 answer');
+  assert.equal(evaluateCoverage({ C12: m(['negotiators_database']), C12_consistency: a('consistently') }).I3, undefined, 'consistent calling is not upgraded into a verified systematic strength — I3 is still asked');
+  assert.equal(evaluateCoverage({ I3: a('when_time', { volunteered_in: 'bottleneck' }), C12: m(['negotiators_database']) }).C12_consistency.derived.value, 'when_time', 'already volunteered → not asked again');
+  assert.equal(G('strategy', { C12: m(['negotiators_database']), C12_consistency: a('consistently') }).acknowledgement, "Okay, so that's already a regular part of how you work.", 'a working process is acknowledged, not probed for a weakness');
+  ok('strategy: the question follows the objective and their own words, the follow-up follows their answer, and selection / consistency are the I4 / I3 answers — never asked twice');
+
+  // PART 3: sophisticated CRM with no incremental gap → the no-fit outcome stands.
+  const crmRoute = { C12: m(['crm_identifies']), C12_existing: a('finds_and_routes') };
+  let g = G('strategy', { C1: a('more_valuations'), ...crmRoute });
+  assert.equal(g.next.id, 'C12_output'); assert.equal(g.acknowledgement, "Right — so that side is already covered. What I'm really interested in is what it's producing.");
+  const noGapAnswers = { ...COMMERCIAL, ...ALL_STRONG_F, ...ALL_STRONG_I, ...crmRoute, C12_output: a(5), C12_change: m(['nothing_needed']), C12_belief: a('yes') };
+  g = G('strategy', noGapAnswers);
+  assert.equal(g.status, 'done'); assert.equal(g.acknowledgement, "Sounds like that's genuinely working for you.");
+  assert.ok(g.covered.some((x) => x.id === 'C12_results'), 'the number they gave already says it is measured');
+  const noGap = conclude({ ...louisSession, answers: noGapAnswers });
+  assert.equal(noGap.c.mode, 'NO_PITCH'); assert.deepEqual(noGap.agreed.proposed, [], 'the strategy route invents no weakness');
+  assert.equal(noGap.c.explanation, null, 'no project → no explanation of one');
+  assert.equal(noGap.agreed.objective.strategy.output_per_month, 5);
+  ok('sophisticated CRM: the result is investigated (what it finds, what it produces, what they would change), and with no incremental gap the no-fit outcome is preserved');
+
+  // PART 4–6: the personalised explanation, from the SAME project and scope.
+  const JOHN_X = { ...COMMERCIAL, C1a: a('Another five or six valuations a month', { target: 6 }), C2: m(['database', 'not_enough_opportunities']), C4: a(180), C5: a(5000), C8: a(18), C9: a(6), C10: a(4000),
+    C12: m(['negotiators_database']), C12_consistency: a('when_time', { note: "We'd get Sarah ringing round the old valuations on a Friday" }),
+    ...strong('F1', 'consistently', 'yes_all'), F2: a('sometimes'), F2_cause: m(['scattered']), F2_consequence: m(['missed_context']),
+    ...strong('F3', 'task_every_time', 'yes'), ...strong('F4', 'tracked_reviewed', 'report_or_alert'), ...weak('F5', { primary: 'none', causes: ['not_recorded'] }, 'cant_judge'),
+    ...strong('I1', 'system_flags', 'identifies_routes'), ...strong('I4', 'scored', 'circumstances'),
+    ...weak('I2', { primary: 'no', causes: ['never_looked'] }, 'missed_reactivation', { I2_matching: a('mostly') }),
+    I3_cause: m(['no_time']), I3_consequence: m(['untouched_value']), I3_history: a('all_in_crm'), I3_quality: a('ok') };
+  const consistent = (x) => {
+    const e = x.c.explanation;
+    assert.ok(e.words >= 100 && e.words <= 160, `100–160 spoken words (${e.words})`);
+    assert.ok(e.rule_ids.every((id) => x.c.project.rule_ids.includes(id) && x.c.pilot.scope_rule_ids.includes(id)), 'only what the project and the pilot scope contain');
+    if (!e.rule_ids.includes('I1')) assert.ok(!/read each enquiry|selling signals/.test(e.text), 'no incoming-enquiry promise outside the scope');
+    assert.ok(!/integrat|guarantee|AI-powered|cutting-edge|revolution/i.test(e.text), 'no integration promise, no marketing claims');
+    const pj = JSON.stringify(x.p);
+    for (const para of [...e.paragraphs, ...x.c.explanation_provisional.paragraphs]) assert.ok(!pj.includes(para.slice(0, 50)), 'the explanation never reaches the client screens');
+  };
+  const john = conclude({ ...louisSession, contact_name: 'John Example', answers: JOHN_X });
+  assert.equal(john.c.project.type, 'existing_customers'); assert.equal(john.agreed.assessments.I3.derived?.rule_id || john.agreed.coverage.I3?.rule_id, 'I3_from_C12_consistency', 'his database answer came from the strategy conversation');
+  const je = john.c.explanation;
+  assert.equal(je.paragraphs[0], 'So the way NOVUS would work for you, John, is alongside the Reapit setup you\'ve already got.');
+  assert.match(je.text, /previous valuations and existing customers sitting in your database, particularly people whose circumstances may have changed/);
+  assert.match(je.text, /identify suitable people worth speaking to again, connect previous customer history with new activity where possible and get those opportunities in front of your team/);
+  assert.match(je.text, /Your existing follow-up process sounds like something you've already got working, so we wouldn't be looking to replace that\./);
+  assert.match(je.text, /generate more valuations from the demand you've already got, rather than simply relying on more incoming enquiries\.$/);
+  consistent(john);
+  assert.ok(!JSON.stringify(john.p).includes('Sarah ringing round'), 'strategy notes stay private');
+  assert.ok(john.c.guidance.project.supporting_answers.some((x) => /How they'd get more today: "get the negotiators calling through the database"/.test(x)), 'the strategy is in the private guidance');
+  ok(`John (${je.words} words): alongside Reapit → the database and returning customers → how we'd find and connect them → his follow-up kept → more valuations from demand he already has`);
+
+  // Strong foundations, weak progression / incoming gap / measurement: each its own explanation.
+  const prog = conclude({ ...louisSession, answers: { ...COMMERCIAL, ...strong('F1', 'consistently', 'yes_all'), ...strong('F2', 'yes_easily', 'yes'), ...ALL_STRONG_I, ...weak('F3', { primary: 'memory', causes: ['no_process'] }, 'lost_valuations'), ...weak('F4', { primary: 'nothing', causes: ['no_overdue_view'] }, 'missed_sellers') } });
+  assert.equal(prog.c.project.type, 'conversion'); consistent(prog);
+  assert.match(prog.c.explanation.text, /clear next step and someone responsible for it/); assert.match(prog.c.explanation.text, /already good at spotting sellers in new enquiries/);
+  assert.ok(!/previous valuations|history with new activity/.test(prog.c.explanation.text), 'nothing about intelligence they already have');
+  const enq = conclude({ ...louisSession, answers: { ...COMMERCIAL, ...ALL_STRONG_F, ...ALL_STRONG_I, ...weak('I1', { primary: 'ad_hoc', causes: ['nothing_reads'] }, 'lost_valuations', { I1_volume: a(30) }) } });
+  assert.equal(enq.c.project.type, 'incoming_demand'); consistent(enq);
+  assert.match(enq.c.explanation.text, /buyers in your 250 enquiries a month who mention they've got somewhere to sell/);
+  assert.ok(!/previous valuations and existing customers/.test(enq.c.explanation.text));
+  const meas = conclude({ ...louisSession, answers: { ...COMMERCIAL, C1: a('win_instructions'), ...strong('F1', 'consistently', 'yes_all'), ...strong('F2', 'yes_easily', 'yes'), ...strong('F3', 'task_every_time', 'yes'), ...strong('F4', 'tracked_reviewed', 'report_or_alert'), ...weak('F5', { primary: 'none', causes: ['no_stages'] }, 'cant_judge'), ...strong('I1', 'system_flags', 'identifies_routes'), ...strong('I2', 'flags_changes', 'yes'), ...strong('I3', 'systematic', 'know_results'), ...strong('I4', 'scored', 'circumstances'), ...weak('I5', { primary: 'no_learning', causes: ['no_outcomes'] }, 'keep_failing') } });
+  assert.equal(meas.c.project.type, 'visibility'); consistent(meas);
+  assert.match(meas.c.explanation.text, /follow each seller opportunity through to valuation and instruction/);
+  assert.match(meas.c.explanation.text, /on evidence rather than impression\.$/);
+  for (const x of [je, prog.c.explanation, enq.c.explanation, meas.c.explanation]) assert.equal(new Set([je.text, prog.c.explanation.text, enq.c.explanation.text, meas.c.explanation.text]).size, 4);
+  ok('weak progression, missed incoming sellers and a measurement problem each get their own explanation of their own project — never a list of every weakness');
+
+  // A technical check is said as a check.
+  assert.ok(je.checks.some((id) => ['I2', 'I3'].includes(id)));
+  assert.match(je.text, /The first step would be checking what we can reliably get out of Reapit, so I wouldn't want to promise anything on the historical side until we've seen that\./);
+  assert.equal(enq.c.explanation.checks.length, 0); assert.ok(!/wouldn't want to promise/.test(enq.c.explanation.text), 'no hedge where nothing needs checking');
+  ok('an intervention needing technical validation is explained as something we check first, not a promise');
+
+  // The owner corrects a finding → the explanation is rebuilt from the agreed diagnosis.
+  const fI2 = john.c.understanding.findings.find((f) => f.dimensions.some((d) => d.dimension === 'I2'));
+  const corrected = conclude({ ...louisSession, contact_name: 'John Example', answers: JOHN_X }, { agreement: { [fI2.id]: { status: 'CORRECTED', dropped: ['I2'], note: 'Reapit does flag returning customers' } } });
+  assert.ok(!corrected.c.project.rule_ids.includes('I2'));
+  assert.ok(!/circumstances may have changed|history with new activity/.test(corrected.c.explanation.text), 'the corrected area is no longer explained');
+  consistent(corrected);
+  // …and a rule taken out of the pilot scope is not promised either.
+  const scoped = conclude({ ...louisSession, contact_name: 'John Example', answers: JOHN_X }, { scope_rule_ids: john.c.project.rule_ids.filter((id) => id !== 'I2') });
+  assert.ok(!scoped.c.explanation.rule_ids.includes('I2') && !/history with new activity/.test(scoped.c.explanation.text));
+  ok('a corrected finding or a narrowed scope changes the explanation to match the agreed project');
+
+  // Mid-discovery: "so what does NOVUS actually do?"
+  const early = conclude({ ...louisSession, answers: { C1: a('more_valuations'), C6: a('reapit'), ...weak('I3', { primary: 'when_time', causes: ['no_time'] }, 'untouched_value'), F3: a('task_every_time'), F3_verify: a('yes'), F4: a('tracked_reviewed'), F4_verify: a('report_or_alert'), I2: a('no') } });
+  const pe = early.c.explanation_provisional;
+  assert.ok(pe.provisional && pe.words <= 110, `short (${pe.words} words)`);
+  assert.match(pe.text, /where I'd look first is the customers already sitting in your database/, 'a confirmed gap is named');
+  assert.match(pe.text, /There may also be something in people whose circumstances change without coming back to the team's attention, though I'd want to understand that properly first/, 'a provisional one is hedged');
+  assert.match(pe.text, /follow-up process sounds like something you've already got working/);
+  assert.ok(!/enquir(y|ies) who|buyers who mention/.test(pe.text), 'nothing unestablished is claimed');
+  const blank = conclude({ ...louisSession, answers: { C1: a('more_valuations') } }).c.explanation_provisional;
+  assert.match(blank.text, /I don't want to guess where that would matter for you yet/);
+  assert.ok(!JSON.stringify(early.p).includes(pe.paragraphs[0].slice(0, 40)));
+  ok('asked mid-discovery: a short private answer naming only what is established, hedging what is provisional, guessing nothing');
+}
+
 // ── 6. handlers end to end against an in-memory workbook ──────────────────
 console.log('\n6. Handlers and persistence');
 function makeStore(initial) {
@@ -1367,7 +1488,7 @@ const workbook = () => ({
   assert.equal(r.body.diagnosis.suitability.verdict, 'FURTHER_VALIDATION_REQUIRED'); assert.equal(r.body.registry_drift.questions, false);
   assert.equal(r.body.opening.greeting, "Hi Jane, how's it going? Appreciate you jumping on today.");
   assert.equal(r.body.opening.research, false, 'no other local agency has been researched, so no competitor line');
-  assert.ok(r.body.registry.conversation.topics.length === 15 && r.body.registry.conversation.facts.length > 10);
+  assert.ok(r.body.registry.conversation.topics.length === 16 && r.body.registry.conversation.facts.length > 10);
   assert.equal(r.body.context.local_research, null);
   const withLocal = structuredClone(tables);
   withLocal.AGENCIES.rows.push(['ag_9', 'Gamma', 'Gamma', 'Chelmsford', '', '', '', '', '', '', iso(T0)]);

@@ -543,6 +543,7 @@ let SKIPPING = '';       // question id whose skip-reason chooser is open
 /* Conversation mode: recording something the owner mentioned while talking
    about ANOTHER topic — { topic, qid } to return to. */
 let RETURN_TO = null;
+let EXPLAIN_OPEN = false;  // the private "what does NOVUS do?" answer, mid-discovery
 let OVR_OPEN = '';       // dimension/rule whose override form is open
 let SAVE = { timer:null, dirty:false, inflight:false, failed:false, retry:null };
 let PITCH_VIEW = 0;      // index into S.pitches (0 = latest)
@@ -732,7 +733,11 @@ function isVisible(q){
   if(r.any) return answerValues(a).some((v) => r.any.includes(v));
   return true;
 }
-function wordingFor(q){ const eff = EFF(); for(const [i, v] of (q.variants||[]).entries()){ if(condHolds(v.when, eff.answers)) return { primary: v.primary, variant: v.id || `v${i+1}` }; } return { primary: q.primary, variant:'' }; }
+/* Mirrors fillWording()/ambitionPhrase(): {C1a.ambition} is the owner's own
+   "another five or six"; unresolvable → that variant is skipped. */
+function ambitionPhrase(a){ const m = String(a?.value||'').trim().match(/\b((?:another|an extra|a further|extra)\s+[a-z0-9\s-]{1,30}?)\s+valuations?\b/i); return m ? m[1].toLowerCase().replace(/\s+/g, ' ') : ''; }
+function fillWording(s, answers){ let missing = false; const out = String(s).replace(/\{([A-Za-z0-9_]+)\.ambition\}/g, (_, id) => { const p = ambitionPhrase(answers[id]); if(!p) missing = true; return p; }); return missing ? null : out; }
+function wordingFor(q){ const eff = EFF(); for(const [i, v] of (q.variants||[]).entries()){ if(![].concat(v.when).every((c) => condHolds(c, eff.answers))) continue; const p = fillWording(v.primary, eff.answers); if(p !== null) return { primary: p, variant: v.id || `v${i+1}` }; } return { primary: q.primary, variant:'' }; }
 /* Mirrors visibleOptions() in lib/discovery-questions.mjs: a `legacy` option
    exists so an older stored answer stays readable, and is only offered again
    to a session whose own answer already uses it. */
@@ -1007,7 +1012,12 @@ function renderCentre(){
   const mentionOpts = TOPICS().filter((t) => t.id !== g.topic && guideFor(t.id).has_questions && !['objective'].includes(t.id));
   const returnHtml = RETURN_TO && RETURN_TO.topic !== g.topic ? `<div class="cv-return"><span>Recording something mentioned while discussing <b>${esc(TBY(RETURN_TO.topic)?.label || '')}</b> — it will be picked up when you reach this topic.</span><button class="btn btn-secondary btn-sm" data-return type="button">&larr; Back to ${esc(TBY(RETURN_TO.topic)?.label || 'the conversation')}</button></div>` : '';
 
-  el.innerHTML = `${transitionHtml}${returnHtml}<div class="qcard cv">
+  /* "So what does NOVUS actually do?" asked mid-discovery: a short PRIVATE
+     answer from what has been established so far (server-built, refreshed on
+     every save) — hedged where something is only provisional. */
+  const pe = S.conclusion?.explanation_provisional;
+  const explainHtml = EXPLAIN_OPEN && pe ? `<div class="script-block"><div class="script-label">Private — if they ask what NOVUS does (provisional, from what's established so far)</div><div class="script-text">${pe.paragraphs.map((x) => `<p>${esc(x)}</p>`).join('')}</div><div class="mini" style="margin-top:8px">${esc(pe.words)} words · the full explanation comes at the conclusion, once they've agreed the diagnosis. <button class="btn btn-quiet btn-sm" data-explain type="button">Close</button></div></div>` : '';
+  el.innerHTML = `${transitionHtml}${returnHtml}${explainHtml}<div class="qcard cv">
     <div class="q-eyebrow"><span>${esc(S.registry.sections.find((x) => x.id === g.section)?.label || g.section)}</span><span class="role">· topic ${tIdx+1} of ${all.length}</span>${STATUS[g.status] ? `<span class="cv-status ${g.status}" style="margin-left:auto">${esc(STATUS[g.status])}</span>` : ''}</div>
     ${objectiveBits.length && g.topic !== 'objective' ? `<div class="cv-strip">${objectiveBits.join(' · ')}</div>` : ''}
     <div class="cv-head">${esc(g.label)}</div>
@@ -1031,6 +1041,7 @@ function renderCentre(){
     ${dirsHtml}
     <div class="q-foot">
       <div class="l"><button class="btn btn-quiet btn-sm" data-topic-step="-1" type="button">&larr; Previous topic</button>
+        <button class="btn btn-quiet btn-sm${EXPLAIN_OPEN ? ' on' : ''}" data-explain type="button" title="A short private answer if the owner asks what NOVUS does">What does NOVUS do?</button>
         ${mentionOpts.length ? `<select class="input mention" id="mention" title="The owner mentioned something that belongs to another topic — record it there, then come back"><option value="">They mentioned another topic…</option>${mentionOpts.map((t) => `<option value="${esc(t.id)}">${esc(t.label)}</option>`).join('')}</select>` : ''}</div>
       <div class="r">
         ${SKIPPING === q.id ? `<select class="input" id="skip-reason">${S.registry.skip_reasons.map((r) => `<option value="${esc(r.value)}">${esc(r.label)}</option>`).join('')}</select><button class="btn btn-secondary btn-sm" data-skip-confirm type="button">Skip</button><button class="btn btn-quiet btn-sm" data-skip-cancel type="button">Cancel</button>`
@@ -1498,9 +1509,17 @@ function projectGuidanceHtml(pg){
     ${fold('Full implementation detail (per component)', impl.map(implHtml).join(''))}
     ${(pg.future_scope||[]).length ? `<div class="mini" style="margin-top:8px">Future scope, not led with: ${esc(pg.future_scope.map((x) => `${x.name} (${x.rule_ids.join(', ')})`).join('; '))}</div>` : ''}`;
 }
+/* The PERSONALISED explanation of NOVUS: private speaking guidance built
+   from the same agreed project and pilot scope as the slide — offered once
+   the owner has agreed the diagnosis, rebuilt if they correct a finding. */
+function explanationHtml(c){
+  const x = c.explanation; if(!x) return '';
+  if(!c.understanding?.agreed) return `<div class="note">The personalised explanation of NOVUS appears here once they've agreed the diagnosis.</div>`;
+  return `<div class="script-block"><div class="script-label">Private — how NOVUS would work for ${esc(c.understanding.situation.agency_name || 'them')} (${esc(x.words)} words)</div><div class="script-text">${x.paragraphs.map((p) => `<p>${esc(p)}</p>`).join('')}</div></div>`;
+}
 function cStepHelp(c){
   const sc = SCREEN('help'); const pg = c.guidance?.project || null;
-  return `<div class="panel">${clientHead(sc)}
+  return `${explanationHtml(c)}<div class="panel">${clientHead(sc)}
     ${sc.headline ? `<div class="sol">
       <div class="sol-h" style="font-size:17px">${esc(sc.headline)}</div><div class="sol-s">${esc(sc.description)}</div>
       ${pg ? `<div class="mini" style="margin-top:6px">Project: ${esc(pg.name)}</div>` : ''}
@@ -1758,6 +1777,7 @@ document.addEventListener('click', async (e) => {
   const gt = t.closest('[data-go-topic]'); if(gt){ goTopic(gt.dataset.goTopic); return; }
   const ts = t.closest('[data-topic-step]'); if(ts){ stepTopic(Number(ts.dataset.topicStep)); return; }
   if(t.closest('[data-return]')){ returnToConversation(); return; }
+  if(t.closest('[data-explain]')){ EXPLAIN_OPEN = !EXPLAIN_OPEN; renderCentre(); if(EXPLAIN_OPEN) window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
   if(t.closest('[data-start-discovery]')){ goStage('commercial'); return; }
   const rq = t.closest('[data-reopen-q]'); if(rq){ const id = rq.dataset.reopenQ; A()[id] = { ...(A()[id]||{}), reopened:true, answered_at:new Date().toISOString() }; markDirty(); goQuestion(id); renderSide(); return; }
   const dm = t.closest('[data-dim]'); if(dm){ goStage(S.registry.dimensions.find((x) => x.id === dm.dataset.dim)?.section, dm.dataset.dim); return; }

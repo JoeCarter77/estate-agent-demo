@@ -70,6 +70,34 @@ commercial numbers → future pacing (C1a) → diagnosis**.
 pacing has none — its question is the bridge. The page shows a cue once, on the first topic of a section
 nothing has yet been asked in.
 
+## Commercial strategy (questions v5)
+
+Straight after the bottleneck, topic **"How they'd do it today"** asks how they would CURRENTLY generate the
+extra result with what they already have — to understand their strategy, not to make them admit a problem.
+`C12` (multi) follows the objective: valuations by default; *"get more out of the team"* for capacity; *"win a
+few more of the valuations you're already doing"* for conversion; and their OWN words when C1a was already
+recorded as "another five or six valuations…" (`{C1a.ambition}`; a bare target is never read as an increase).
+Conditional follow-ups: old valuations → `C12_selection` (= I4, both directions via coverage); negotiators /
+database → `C12_consistency` (= I3 when_time / campaigns / not_used — "consistently" is never upgraded to a
+verified strength); CRM already finds sellers → `C12_existing` → `C12_output` (valuations a month) →
+`C12_change` (investigates the RESULT, not missing features); more enquiries → `C12_exhausted` (not_worked →
+I3 not_used); `C12_results`, `C12_belief`. Stored in `diagnosis.objective.strategy`; shown only in the private
+project guidance ("the discovery answers behind it"). With a strong CRM and no incremental gap the engine's
+NO_PITCH outcome stands — the strategy answers never create a finding.
+
+## The personalised NOVUS explanation (private)
+
+`buildExplanation()` in `lib/discovery-conclusion.mjs` → `conclusion.explanation`: ~100–160 spoken words in five
+moves — alongside their CRM/team → where the value is → how we'd go after it → what stays (up to two adjacent
+strengths) → their objective. Built ONLY from the agreed project, restricted to `project.rule_ids ∩
+pilot.scope_rule_ids`, so it cannot promise anything the slide, roadmap or scope left out; rebuilt on every
+correction. Rules still needing a technical check (REQUIRES_ASSESSMENT, or data-dependent I2/I3/F2 without
+confirmed CRM export/API) are said as a check ("The first step would be checking what we can reliably get out of
+Reapit…"). Shown on the Project step once the diagnosis is agreed. `provisionalExplanation()` →
+`conclusion.explanation_provisional`: the short answer to "what does NOVUS actually do?" mid-discovery (button in
+the topic card footer) — CONFIRMED gaps named, PROVISIONAL ones hedged, nothing unknown claimed. Neither is in
+`presentationPayload` (asserted in selftest 5e).
+
 ## Conversation mode (`lib/discovery-conversation.mjs`)
 
 The page no longer walks one question after another. Questions are grouped into **15 topics** (objective,
