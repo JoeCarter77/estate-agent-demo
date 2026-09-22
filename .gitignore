@@ -6,3 +6,5 @@ dump-*.html
 .DS_Store
 .vercel
 .claude
+worker/.state/
+worker/node_modules/

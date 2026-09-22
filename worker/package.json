@@ -1,0 +1,13 @@
+{
+  "name": "novus-probe-operator",
+  "private": true,
+  "type": "module",
+  "description": "Local browser worker that drives the existing NOVUS Prober and the authorised Rightmove enquiry workflow. It creates no probe records of its own — every backend effect goes through the existing /novus/probe UI.",
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "node test/run.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.55.0"
+  }
+}

@@ -266,6 +266,101 @@
             </div>
           </div>
         </div>
+        <!-- ══ AUTONOMOUS PROBING ═══════════════════════════════════════════
+             AN ADDITIONAL OPERATING MODE, NOT A REPLACEMENT. Everything above
+             this block still works exactly as it did: Start probing, the
+             queue table and the per-agency Probe buttons are untouched, and a
+             manual probe is still the reference implementation.
+
+             The controls below talk to a LOCAL browser worker on this machine
+             (worker/ in the repository), not to a Vercel function. A
+             long-lived browser cannot live in a serverless invocation, and a
+             CAPTCHA can only be handed to a human who is sitting at the same
+             browser. The worker in turn drives this very Prober — it clicks
+             Create probe and Mark as sent on /novus/probe like a person, so
+             there is exactly one implementation of "probe sent".
+             ═══════════════════════════════════════════════════════════════ -->
+        <div class="section" id="auto-section">
+          <div class="section-head">
+            <div class="section-title">Autonomous probing</div>
+            <div class="section-note">A local browser worker drives this same Prober. The manual flow above is unchanged.</div>
+          </div>
+
+          <div id="auto-offline" class="banner warn">
+            <span>No browser worker is reachable on this machine. Start it with
+              <span class="mono">cd worker &amp;&amp; npm start</span>, then paste the control token it prints.</span>
+          </div>
+
+          <div id="auto-intervention" class="banner err hidden"></div>
+
+          <div class="card">
+            <div class="card-body">
+              <div class="probe-stats" style="margin-bottom:18px;">
+                <div class="probe-stat"><div class="n" id="au-completed">&mdash;</div><div class="l">Completed probes</div></div>
+                <div class="probe-stat"><div class="n" id="au-skipped">&mdash;</div><div class="l">Skipped agencies</div></div>
+                <div class="probe-stat"><div class="n" id="au-failed">&mdash;</div><div class="l">Failed attempts</div></div>
+                <div class="probe-stat"><div class="n" id="au-interventions">&mdash;</div><div class="l">Interventions needed</div></div>
+              </div>
+
+              <dl class="kv">
+                <dt>Worker status</dt><dd><span class="pill t-amber" id="au-status"><span id="au-status-text">offline</span></span>
+                  <span class="muted" id="au-mode-note"></span></dd>
+                <dt>Current agency</dt><dd id="au-agency" class="muted">&mdash;</dd>
+                <dt>Workflow stage</dt><dd id="au-stage" class="mono">&mdash;</dd>
+                <dt>Property</dt><dd id="au-property" class="mono muted">&mdash;</dd>
+                <dt>Enquiry</dt><dd id="au-submission" class="muted">&mdash;</dd>
+                <dt>Last success</dt><dd id="au-last" class="muted">&mdash;</dd>
+                <dt>AI usage</dt><dd id="au-ai" class="muted">&mdash;</dd>
+              </dl>
+
+              <div class="btnrow" style="margin-top:18px;">
+                <div class="field" style="margin:0;">
+                  <label class="field-l" for="au-batch">Batch size</label>
+                  <input class="input" id="au-batch" type="number" min="1" max="50" value="5" style="width:96px;" />
+                </div>
+                <div class="field" style="margin:0;">
+                  <label class="field-l" for="au-daily">Daily probe limit</label>
+                  <input class="input" id="au-daily" type="number" min="1" max="200" value="25" style="width:110px;" />
+                </div>
+              </div>
+
+              <div class="btnrow">
+                <button class="btn btn-primary" id="au-start" type="button">Start autonomous probing</button>
+                <button class="btn btn-secondary" id="au-pause" type="button">Pause</button>
+                <button class="btn btn-secondary" id="au-resume" type="button">Resume</button>
+                <button class="btn btn-secondary" id="au-stop-after" type="button">Stop after current agency</button>
+                <button class="btn btn-danger" id="au-emergency" type="button">Emergency stop</button>
+              </div>
+
+              <div class="btnrow hidden" id="au-release-row">
+                <button class="btn btn-primary" id="au-release" type="button">I have finished &mdash; release the session</button>
+                <button class="btn btn-secondary" id="au-abandon" type="button">Abandon this agency</button>
+              </div>
+
+              <div id="au-err" class="formerr"></div>
+
+              <div class="hintbox" style="margin-top:16px;">
+                Live enquiry submission is controlled by the worker, not by this page. Until
+                <span class="mono">NOVUS_OPERATOR_LIVE_SUBMIT</span> is enabled for an authorised agency the worker
+                verifies and fills the Rightmove form but never clicks <b>Send</b>, and creates no probe.
+              </div>
+            </div>
+          </div>
+
+          <div class="card flat" id="au-token-card" style="margin-top:14px;">
+            <div class="card-body">
+              <div class="field" style="margin:0;">
+                <label class="field-l" for="au-token">Worker control token</label>
+                <input class="input block" id="au-token" type="password" autocomplete="off" spellcheck="false"
+                  placeholder="Paste the token printed by the worker" />
+                <div class="field-note">Held in this browser only. The worker listens on loopback and refuses every
+                  request without it, so a page you happen to have open cannot start a probing run.</div>
+              </div>
+              <div class="btnrow"><button class="btn btn-secondary btn-sm" id="au-token-save" type="button">Save token</button></div>
+            </div>
+          </div>
+        </div>
+
         <div class="section">
           <div class="section-head">
             <div class="section-title">In the queue</div>
@@ -1934,6 +2029,167 @@ document.addEventListener('keydown', (e) => {
 
 showView(routeFromHash(), { push:false });
 load(false);
+</script>
+
+<!-- ══ AUTONOMOUS PROBING — CONTROL CLIENT ══════════════════════════════════
+     Self-contained on purpose: it shares no state with the Command Centre's
+     own script, so nothing above can break because of it and removing this
+     block restores the page to exactly what it was.
+
+     It polls a LOCAL worker over loopback. That is a cross-origin request from
+     an https page to http://127.0.0.1, which browsers permit because loopback
+     is a trustworthy origin, but which also triggers the Private Network
+     Access preflight — the worker answers it explicitly. If the worker is not
+     running, every control stays disabled and the panel says so; it never
+     pretends a run is in progress.
+     ═══════════════════════════════════════════════════════════════════════ -->
+<script>
+(function autonomousProbing(){
+  const WORKER = 'http://127.0.0.1:8787';
+  const TOKEN_KEY = 'novus.operator.token';
+  const $ = (id) => document.getElementById(id);
+  if (!$('auto-section')) return;
+
+  let token = '';
+  try { token = localStorage.getItem(TOKEN_KEY) || ''; } catch (e) {}
+  if (token) $('au-token').value = token;
+
+  const STAGE_WORDS = {
+    idle:'idle', loading_queue:'loading the next agency', agency_loaded:'agency loaded',
+    branch_open:'reading the agency\u2019s Rightmove page', property_selected:'opening the property',
+    property_open:'property open', url_captured:'property URL captured', form_open:'enquiry form open',
+    form_verified:'enquiry verified', submitting:'submitting the enquiry', submitted:'enquiry sent',
+    probe_created:'probe created', marked_sent:'marked as sent', skipping:'skipping the agency',
+    needs_human:'waiting for you', failed:'failed',
+  };
+  const SUBMISSION_WORDS = {
+    none:'not submitted', in_flight:'submitted, outcome NOT confirmed',
+    sent:'confirmed sent', failed:'rejected by Rightmove',
+  };
+  const STATUS_TONE = { running:'t-green', paused:'t-amber', stopping_after_agency:'t-amber',
+    needs_human:'t-red', stopped:'t-blue', offline:'t-amber' };
+
+  function showErr(message){ const el=$('au-err'); el.textContent=message||''; el.classList.toggle('show', Boolean(message)); }
+  function esc(value){ return String(value==null?'':value).replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+  function paintOffline(){
+    $('auto-offline').classList.remove('hidden');
+    $('au-status').className = 'pill t-amber';
+    $('au-status-text').textContent = 'offline';
+    $('au-mode-note').textContent = '';
+    ['au-start','au-pause','au-resume','au-stop-after','au-emergency','au-release','au-abandon']
+      .forEach((id) => { $(id).disabled = true; });
+  }
+
+  function paint(snapshot){
+    $('auto-offline').classList.add('hidden');
+    const worker = snapshot.worker || {};
+    const current = snapshot.current || {};
+    const counters = snapshot.counters || {};
+
+    $('au-status').className = 'pill ' + (STATUS_TONE[worker.status] || 't-blue');
+    $('au-status-text').textContent = worker.status || 'stopped';
+    $('au-mode-note').textContent = worker.live_submit
+      ? '' : '  \u00b7  dry run \u2014 Send is never clicked';
+
+    $('au-agency').textContent = current.agency_name || current.agency_id || '\u2014';
+    $('au-agency').classList.toggle('muted', !current.agency_id);
+    $('au-stage').textContent = STAGE_WORDS[current.stage] || current.stage || '\u2014';
+    $('au-property').textContent = current.property_url || '\u2014';
+    $('au-property').classList.toggle('muted', !current.property_url);
+
+    // NEVER says "sent" unless the worker recorded a confirmed outcome.
+    $('au-submission').textContent = SUBMISSION_WORDS[current.submission] || '\u2014';
+    $('au-submission').classList.toggle('muted', current.submission === 'none');
+
+    $('au-last').textContent = snapshot.last_success || '\u2014';
+    $('au-last').classList.toggle('muted', !snapshot.last_success);
+
+    const ai = snapshot.ai || {};
+    $('au-ai').textContent = ai.calls
+      ? ai.calls + ' call' + (ai.calls === 1 ? '' : 's') + ' \u00b7 '
+        + (ai.input_tokens + ai.output_tokens) + ' tokens \u00b7 $' + Number(ai.cost_usd || 0).toFixed(4)
+      : 'no model calls this run';
+    $('au-ai').classList.toggle('muted', !ai.calls);
+
+    $('au-completed').textContent = counters.completed ?? 0;
+    $('au-skipped').textContent = counters.skipped ?? 0;
+    $('au-failed').textContent = counters.failed ?? 0;
+    $('au-interventions').textContent = counters.interventions ?? 0;
+
+    const intervention = snapshot.intervention;
+    const box = $('auto-intervention');
+    box.classList.toggle('hidden', !intervention);
+    if (intervention) {
+      box.innerHTML = '<span><b>' + esc(intervention.reason.replace(/_/g,' ')) + '</b> \u2014 '
+        + esc(intervention.agency_name || intervention.agency_id || 'unknown agency')
+        + '<br>' + esc(intervention.detail || '')
+        + '<br><span class="mono">enquiry: ' + esc(SUBMISSION_WORDS[intervention.submission] || 'unknown') + '</span></span>';
+    }
+    $('au-release-row').classList.toggle('hidden', !intervention);
+
+    const running = worker.status === 'running';
+    const paused = worker.status === 'paused';
+    const busy = running || paused || worker.status === 'stopping_after_agency';
+    $('au-start').disabled = busy || Boolean(intervention);
+    $('au-pause').disabled = !running;
+    $('au-resume').disabled = !paused;
+    $('au-stop-after').disabled = !busy;
+    $('au-emergency').disabled = false;
+    $('au-release').disabled = !intervention;
+    $('au-abandon').disabled = !intervention;
+  }
+
+  async function poll(){
+    try {
+      const response = await fetch(WORKER + '/status', { mode: 'cors' });
+      if (!response.ok) throw new Error('status ' + response.status);
+      paint(await response.json());
+    } catch (e) { paintOffline(); }
+  }
+
+  async function command(path, body){
+    if (!token) { showErr('Paste the worker control token first.'); return; }
+    showErr('');
+    try {
+      const response = await fetch(WORKER + path, {
+        method: 'POST', mode: 'cors',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify(body || {}),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || ('Request failed (' + response.status + ')'));
+      if (data.error) showErr(data.error);
+      paint(data);
+    } catch (e) { showErr(e.message); }
+  }
+
+  $('au-token-save').addEventListener('click', () => {
+    token = $('au-token').value.trim();
+    try { localStorage.setItem(TOKEN_KEY, token); } catch (e) {}
+    showErr(token ? '' : 'Token cleared.');
+    poll();
+  });
+  $('au-start').addEventListener('click', () => command('/start', {
+    batch_size: Number($('au-batch').value) || 5,
+    daily_limit: Number($('au-daily').value) || 25,
+    live_submit: true,
+  }));
+  $('au-pause').addEventListener('click', () => command('/pause'));
+  $('au-resume').addEventListener('click', () => command('/resume'));
+  $('au-stop-after').addEventListener('click', () => command('/stop-after-agency'));
+  $('au-emergency').addEventListener('click', () => {
+    if (window.confirm('Emergency stop: abandon the run and close the operator browser? Anything already submitted stays on the record.')) command('/emergency-stop');
+  });
+  $('au-release').addEventListener('click', () => command('/release', { outcome: 'resume' }));
+  $('au-abandon').addEventListener('click', () => {
+    if (window.confirm('Abandon this agency? The operator will move on and will not resubmit anything for it.')) command('/release', { outcome: 'abandon' });
+  });
+
+  paintOffline();
+  poll();
+  setInterval(poll, 2000);
+})();
 </script>
 </body>
 </html>

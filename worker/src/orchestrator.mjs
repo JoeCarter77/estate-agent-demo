@@ -1,0 +1,537 @@
+// worker/src/orchestrator.mjs — the twelve-step workflow, as a state machine.
+//
+// Reads top to bottom in the order of the manual process it replaces. Every
+// backend effect is produced by clicking the existing NOVUS Prober; nothing in
+// here writes to Sheets, invents a probe id, or reimplements "sent".
+//
+// THREE RULES THAT OVERRIDE EVERYTHING ELSE
+//   1. An enquiry whose outcome is not definitively known is never retried.
+//      It becomes a human-review item with the agency preserved.
+//   2. State reaches disk BEFORE the irreversible action, never after.
+//   3. A human intervention never discards the agency. Pausing keeps the tab,
+//      the property and the submission state exactly as they are.
+
+import {
+  verifyBranchPage, readBranchCandidates, openProperty, openEnquiryForm,
+  verifyAndPrepareEnquiry, submitEnquiry, propertyIdOf,
+} from './rightmove.mjs';
+import { chooseListing } from './suitability.mjs';
+import { ProberPage } from './novus-prober.mjs';
+import { detectChallenge } from './browser.mjs';
+import { isProbeRecordedAsSent } from './novus-client.mjs';
+import { describeIntervention, notifyIntervention } from './notify.mjs';
+import { assessListing, classifyUnknownPage } from './ai.mjs';
+import { recoveryPlan } from './state.mjs';
+
+class EmergencyStop extends Error {}
+class HumanNeeded extends Error {
+  constructor(reason, detail) { super(`${reason}: ${detail}`); this.reason = reason; this.detail = detail; }
+}
+
+// A skip is a HARD DELETE of the AGENCIES row. It is only ever automatic for
+// the cases below, each of which is decided from an explicit, countable fact on
+// the page — never from a model's opinion and never from an absence of data.
+const AUTO_SKIP = {
+  lettings_only: 'Lettings only',
+  no_sales_listings: 'Lettings only',
+  bad_branch_page: 'Bad Rightmove listing',
+};
+
+export class Orchestrator {
+  constructor({ config, state, browser, novus, log = console.log }) {
+    this.config = config;
+    this.state = state;
+    this.browser = browser;
+    this.novus = novus;
+    this.log = log;
+    this.prober = null;
+    this.emergency = false;
+    this.releaseResolver = null;
+    this.loopPromise = null;
+  }
+
+  // ── run control (what the NOVUS panel drives) ────────────────────────────
+
+  async start({ batchSize, dailyLimit, liveSubmit }) {
+    if (this.loopPromise) return { ok: false, error: 'the operator is already running' };
+    const plan = recoveryPlan(this.state.data.current);
+    if (plan.action === 'human') {
+      this.raiseHuman(plan.reason, plan.detail || plan.reason);
+      return { ok: false, error: `human review is outstanding: ${plan.reason}` };
+    }
+    this.emergency = false;
+    this.state.setRun({
+      mode: 'running',
+      batch_size: Number(batchSize) || this.config.defaultBatchSize,
+      daily_limit: Number(dailyLimit) || this.config.dailyProbeLimit,
+      started_at: new Date().toISOString(),
+      stop_reason: '',
+      live_submit: Boolean(liveSubmit) && this.config.liveSubmit,
+    });
+    this.loopPromise = this.loop(plan).catch((error) => {
+      this.log('[operator] run ended with error:', error.message);
+      this.state.setRun({ mode: 'stopped', stop_reason: error.message });
+    }).finally(() => { this.loopPromise = null; });
+    return { ok: true, recovery: plan };
+  }
+
+  pause() { if (this.state.data.run.mode === 'running') this.state.setRun({ mode: 'paused' }); return { ok: true }; }
+
+  resume() {
+    if (this.state.data.run.mode === 'paused') this.state.setRun({ mode: 'running' });
+    return { ok: true };
+  }
+
+  stopAfterAgency() { this.state.setRun({ mode: 'stopping_after_agency' }); return { ok: true }; }
+
+  // EMERGENCY STOP. Aborts at the next checkpoint and closes the browser. It
+  // does NOT clear the transaction: if an enquiry was in flight when it was
+  // pressed, that stays on the record and the next start goes to human review.
+  async emergencyStop() {
+    this.emergency = true;
+    this.state.setRun({ mode: 'stopped', stop_reason: 'emergency stop' });
+    if (this.releaseResolver) { this.releaseResolver('abort'); this.releaseResolver = null; }
+    await this.browser.close().catch(() => {});
+    return { ok: true };
+  }
+
+  // The human has finished the challenge and hands the session back (step 9.7).
+  release({ outcome = 'resume' } = {}) {
+    if (!this.state.data.current.needs_human) return { ok: false, error: 'nothing is waiting for you' };
+    if (outcome === 'abandon') {
+      this.state.clearHuman();
+      this.state.fail('abandoned by operator after human review');
+      this.state.finishCycle('abandoned');
+      this.state.setRun({ mode: 'running' });
+      if (this.releaseResolver) { this.releaseResolver('abandon'); this.releaseResolver = null; }
+      return { ok: true, outcome: 'abandon' };
+    }
+    this.state.clearHuman();
+    this.state.setRun({ mode: 'running' });
+    if (this.releaseResolver) { this.releaseResolver('resume'); this.releaseResolver = null; }
+    return { ok: true, outcome: 'resume' };
+  }
+
+  // ── checkpoints ──────────────────────────────────────────────────────────
+
+  async checkpoint() {
+    if (this.emergency) throw new EmergencyStop('emergency stop');
+    while (this.state.data.run.mode === 'paused') {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      if (this.emergency) throw new EmergencyStop('emergency stop');
+    }
+  }
+
+  raiseHuman(reason, detail) {
+    this.state.requireHuman(reason, detail);
+    notifyIntervention(describeIntervention(reason, detail, this.state.data.current));
+  }
+
+  // Blocks until the human releases the session. The browser stays open and
+  // every tab stays exactly where it is — that is the whole point.
+  async waitForRelease(reason, detail) {
+    this.raiseHuman(reason, detail);
+    const outcome = await new Promise((resolve) => { this.releaseResolver = resolve; });
+    if (outcome === 'abort') throw new EmergencyStop('emergency stop during human review');
+    return outcome;
+  }
+
+  // ── the run loop ─────────────────────────────────────────────────────────
+
+  async loop(plan) {
+    await this.browser.launch();
+    const page = await this.browser.novusTab();
+    this.prober = new ProberPage(page, this.config);
+
+    let done = 0;
+    const batch = this.state.data.run.batch_size;
+    // The queue re-serves any agency whose probe_sent is still blank, which is
+    // correct — but it means an agency the operator cannot finish would come
+    // back forever. Count how many times the same agency is handed over
+    // without progress and stop rather than spin.
+    let lastAgencyId = '';
+    let repeats = 0;
+
+    // RECOVERY. Finish what the previous process left behind before touching
+    // the queue, so a crash can never strand a sent enquiry without a probe.
+    if (plan.action === 'resume_create_probe' || plan.action === 'resume_mark_sent' || plan.action === 'close_cycle') {
+      this.log(`[operator] recovering: ${plan.reason}`);
+      const recovered = await this.recover(plan);
+      if (recovered) done += 1;
+    } else if (plan.action === 'restart_agency') {
+      this.log(`[operator] ${plan.reason}`);
+      this.state.finishCycle('abandoned');
+    }
+
+    while (done < batch) {
+      await this.checkpoint();
+      if (this.state.data.run.mode === 'stopping_after_agency') break;
+
+      if (this.state.completedToday() >= this.state.data.run.daily_limit) {
+        this.state.setRun({ mode: 'stopped', stop_reason: 'daily probe limit reached' });
+        break;
+      }
+
+      let outcome;
+      try {
+        outcome = await this.cycle();
+      } catch (error) {
+        if (error instanceof EmergencyStop) { this.log('[operator] emergency stop'); return; }
+        if (error instanceof HumanNeeded) {
+          const action = await this.waitForRelease(error.reason, error.detail);
+          if (action === 'abandon') { outcome = 'abandoned'; }
+          else { continue; }                        // retry the same agency
+        } else {
+          this.state.fail(error.message);
+          this.state.finishCycle('failed');
+          this.log('[operator] cycle failed:', error.message);
+          outcome = 'failed';
+          if (this.state.data.counters.failed % 3 === 0) {
+            const released = await this.waitForRelease('repeated_failure', error.message);
+            if (released === 'abandon') outcome = 'abandoned';
+          }
+        }
+      }
+
+      if (outcome === 'queue_empty') {
+        this.state.setRun({ mode: 'stopped', stop_reason: 'the probe queue is exhausted' });
+        return;
+      }
+      if (outcome === 'completed') done += 1;
+      // A dry run works a whole agency and deliberately stops before Send. It
+      // counts against the batch so a dry run is bounded exactly like a live
+      // one instead of re-serving the same agency forever.
+      if (outcome === 'dry_run') done += 1;
+
+      const workedId = this.lastAgencyId || '';
+      if (workedId && workedId === lastAgencyId && !['completed', 'skipped', 'dry_run'].includes(outcome)) {
+        repeats += 1;
+        if (repeats >= 2) {
+          this.state.setRun({ mode: 'stopped', stop_reason: `stopped: ${workedId} could not be completed after ${repeats + 1} attempts` });
+          return;
+        }
+      } else {
+        repeats = 0;
+      }
+      lastAgencyId = workedId;
+    }
+
+    if (this.state.data.run.mode !== 'stopped') {
+      this.state.setRun({
+        mode: 'stopped',
+        stop_reason: this.state.data.run.mode === 'stopping_after_agency'
+          ? 'stopped after the current agency' : 'batch complete',
+      });
+    }
+  }
+
+  // Resume a half-finished transaction without re-submitting anything.
+  async recover(plan) {
+    const current = this.state.data.current;
+    await this.prober.openAgency(current.agency_id).catch(() => {});
+    if (plan.action === 'close_cycle') { this.state.finishCycle('completed'); return true; }
+    if (plan.action === 'resume_create_probe') {
+      const created = await this.createProbeAndMarkSent(current.property_url);
+      return created === 'completed';
+    }
+    if (plan.action === 'resume_mark_sent') {
+      // The probe exists. Reopen it by probe_id so Mark as sent acts on the
+      // very row the previous process created, never a second one.
+      const page = await this.browser.novusTab();
+      await page.goto(`${this.config.novusBaseUrl}/novus/probe?probe_id=${encodeURIComponent(current.probe_id)}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('#view-ready', { timeout: this.config.timeouts.control });
+      return (await this.finishMarkSent()) === 'completed';
+    }
+    return false;
+  }
+
+  // ── one agency, steps 1 → 12 ─────────────────────────────────────────────
+
+  async cycle() {
+    // STEP 1 — Start probing / next eligible agency.
+    this.state.stage('loading_queue');
+    const loaded = await this.prober.startProbing();
+    if (loaded.empty) return 'queue_empty';
+    if (loaded.error) throw new Error(loaded.error);
+
+    // The dry-run guard: until live submission is authorised for a named test
+    // agency, the operator refuses to work any other agency's enquiry.
+    if (!this.state.data.run.live_submit && this.config.allowedAgencyIds.length
+        && !this.config.allowedAgencyIds.includes(loaded.agencyId)) {
+      throw new Error(`agency ${loaded.agencyId} is outside the authorised test set; live submission is not enabled`);
+    }
+
+    this.lastAgencyId = loaded.agencyId;
+    const agency = await this.novus.agency(loaded.agencyId).then((d) => d.agency).catch(() => ({}));
+    this.state.beginAgency({
+      agency_id: loaded.agencyId,
+      agency_name: loaded.agencyName || agency.agency_name || '',
+      agency_updated_at: agency.updated_at || '',
+      branch_url: loaded.branchUrl || agency.rightmove_sales_branch_url || '',
+    });
+    this.log(`[operator] agency: ${this.state.data.current.agency_name} (${loaded.agencyId})`);
+    await this.checkpoint();
+
+    // STEP 2 — the agency's Rightmove branch page, in its own tab.
+    const branchPage = await this.acquireBranchTab();
+    const verified = await verifyBranchPage(branchPage, {
+      branchUrl: this.state.data.current.branch_url,
+      agencyName: this.state.data.current.agency_name,
+    });
+    if (!verified.ok) {
+      const challenge = await detectChallenge(branchPage);
+      if (challenge) throw new HumanNeeded(challenge.kind, challenge.detail);
+      // Deterministic detection found nothing it recognises, so the page is
+      // genuinely unfamiliar. This is the one place a model is asked to name a
+      // page, and it can only choose between escalating and carrying on — it
+      // is never allowed to decide that an agency should be deleted.
+      const triage = await this.triageUnknownPage(branchPage);
+      throw new HumanNeeded(triage?.situation && triage.requires_human ? triage.situation : 'agency_page_unavailable',
+        triage?.reason ? `${verified.reason} — ${triage.reason}` : verified.reason);
+    }
+    this.state.stage('branch_open');
+    await this.checkpoint();
+
+    // STEP 3 — choose a suitable residential sales listing, or skip.
+    const chosen = await this.selectProperty(branchPage, verified);
+    if (chosen === 'skipped') return 'skipped';
+    await this.checkpoint();
+
+    // STEP 4 & 5 — open it, verify ownership, capture the canonical URL.
+    const { page: propertyPage } = await this.browser.openInNewTab(
+      () => branchPage.evaluate((href) => window.open(href, '_blank'), chosen.href),
+      { fallbackUrl: chosen.href },
+    );
+    if (!propertyPage) throw new HumanNeeded('agency_page_unavailable', 'the property tab would not open');
+    this.state.stage('property_selected');
+
+    const property = await openProperty(propertyPage, { agencyName: this.state.data.current.agency_name, branchId: verified.branchId });
+    if (!property.ok) {
+      if (property.challenge) throw new HumanNeeded(property.challenge.kind, property.challenge.detail);
+      throw new HumanNeeded('uncertain_suitability', property.reason);
+    }
+    this.state.stage('url_captured', { property_url: property.url, property_title: property.title });
+    this.log(`[operator] property: ${property.url}`);
+    await this.checkpoint();
+
+    // STEP 6 — the enquiry form.
+    const form = await openEnquiryForm(propertyPage);
+    if (!form.ok) {
+      if (form.challenge) throw new HumanNeeded(form.challenge.kind, form.challenge.detail);
+      throw new HumanNeeded('unexpected_form', form.reason);
+    }
+    this.state.stage('form_open');
+
+    // STEP 7 — verify the approved identity and seller signal.
+    const prepared = await verifyAndPrepareEnquiry(propertyPage, {
+      identity: this.config.identity,
+      propertyId: propertyIdOf(property.url),
+    });
+    if (!prepared.ok) {
+      throw new HumanNeeded('unexpected_form', [prepared.reason, ...(prepared.conflicts || [])].join(' — '));
+    }
+    this.state.stage('form_verified');
+    await this.checkpoint();
+
+    // STEP 8 — submit, and wait for a definitive result.
+    if (!this.state.data.run.live_submit) {
+      this.log('[operator] DRY RUN — the enquiry form is verified and filled; Send was not clicked.');
+      await this.browser.saveEvidence(propertyPage, `dryrun-${this.state.data.current.agency_id}`);
+      this.state.fail('dry run: live submission is not authorised, so this agency was not probed');
+      await this.browser.closeRightmoveTabs();
+      this.state.finishCycle('abandoned');
+      return 'dry_run';
+    }
+
+    this.state.markSubmitInFlight();              // on disk BEFORE the click
+    const result = await submitEnquiry(propertyPage, { timeout: this.config.timeouts.submitResult });
+
+    if (result.outcome === 'challenge') {
+      // STEP 9 — never circumvent, never retry to avoid it, never drop the
+      // agency. The submission stays in_flight because the click already
+      // happened, so after release the outcome is re-read rather than re-sent.
+      const released = await this.waitForRelease(result.challenge.kind, result.challenge.detail);
+      if (released === 'abandon') return 'abandoned';
+      const after = await submitEnquiry(propertyPage, { timeout: this.config.timeouts.submitResult })
+        .catch(() => ({ outcome: 'uncertain', detail: 'could not re-read the page after the challenge' }));
+      if (after.outcome !== 'sent') {
+        this.state.stage('submitting');
+        throw new HumanNeeded('uncertain_submission', after.detail || 'the outcome after the challenge is unknown');
+      }
+      result.outcome = 'sent';
+      result.detail = after.detail;
+    }
+
+    if (result.outcome === 'uncertain') {
+      throw new HumanNeeded('uncertain_submission', result.detail);
+    }
+    if (result.outcome === 'failed') {
+      // A definitive rejection means the enquiry demonstrably did not leave, so
+      // nothing is at risk — but it also means the approved configuration no
+      // longer satisfies the form. Retrying the agency would just send the same
+      // rejected enquiry again, so this escalates on the first occurrence.
+      this.state.settleSubmission('failed', { detail: result.detail });
+      throw new HumanNeeded('unexpected_form', `Rightmove rejected the enquiry: ${result.detail}`);
+    }
+
+    const evidence = await this.browser.saveEvidence(propertyPage, `sent-${this.state.data.current.agency_id}`);
+    this.state.settleSubmission('sent', { evidence, detail: result.detail });
+    this.log('[operator] enquiry confirmed sent');
+
+    // STEPS 10, 11, 12.
+    return this.createProbeAndMarkSent(property.url);
+  }
+
+  // STEP 2's tab handling. probe.html already calls window.open on the branch
+  // URL as the agency loads, so the usual case is adopting that popup. When the
+  // popup was blocked, the explicit button is clicked instead — the spec's
+  // "recover safely" path, not an abandoned agency.
+  async acquireBranchTab() {
+    const branchUrl = this.state.data.current.branch_url;
+    const existing = this.browser.rightmoveTabs()
+      .find((page) => /\/estate-agents\/agent\//i.test(page.url()));
+    if (existing) return existing;
+    const { page } = await this.browser.openInNewTab(
+      () => this.prober.branchLink().click({ timeout: 8000 }),
+      { fallbackUrl: branchUrl },
+    );
+    if (!page) throw new HumanNeeded('agency_page_unavailable', `could not open ${branchUrl}`);
+    return page;
+  }
+
+  // STEP 3 proper. Deterministic first; the model is consulted only when the
+  // deterministic pass produced no confident answer at all.
+  async selectProperty(branchPage, verified) {
+    const read = await readBranchCandidates(branchPage);
+
+    if (read.lettingsOnly) return this.skip('lettings_only', `${read.toRentCount} to rent, 0 for sale`);
+    if (read.forSaleCount === 0) return this.skip('no_sales_listings', 'the branch page reports 0 properties for sale');
+
+    const saleCandidates = read.candidates.filter((c) => !c.channel || c.channel === 'RES_BUY');
+    if (!saleCandidates.length) {
+      if (read.candidates.length === 0 && read.forSaleCount === null) {
+        throw new HumanNeeded('agency_page_unavailable', 'the branch page showed no property list at all');
+      }
+      return this.skip('no_sales_listings', 'no residential sales listings on the branch page');
+    }
+
+    const decision = chooseListing(saleCandidates);
+    if (decision.chosen) {
+      this.log(`[operator] chose ${decision.chosen.propertyType} — ${decision.chosen.address} (${decision.assessment.reason})`);
+      return decision.chosen;
+    }
+
+    // Every candidate was either unsuitable or unreadable. If some were merely
+    // unreadable, ask the model about them; if all were plainly unsuitable
+    // (land, commercial), that is a verified ineligibility and a safe skip.
+    if (!decision.uncertain.length) {
+      const categories = [...new Set(decision.all.map((row) => row.assessment.category))];
+      if (categories.every((c) => c === 'land')) return this.skip('no_sales_listings', 'the branch sells land only');
+      if (categories.every((c) => c === 'commercial')) return this.skip('no_sales_listings', 'the branch sells commercial property only');
+      // Mixed unsuitable types: not a clean, single verified reason. Escalate
+      // rather than hard-delete an agency on a judgement call.
+      throw new HumanNeeded('uncertain_suitability', `no ordinary residential sale found; categories seen: ${categories.join(', ')}`);
+    }
+
+    if (!this.config.aiEnabled) {
+      throw new HumanNeeded('uncertain_suitability', 'listing types were unreadable and AI assessment is disabled');
+    }
+    const screenshot = await this.browser.screenshotBase64(branchPage);
+    for (const candidate of decision.uncertain.slice(0, 3)) {
+      const assessment = await assessListing({
+        model: this.config.aiModel,
+        text: `${candidate.propertyType}\n${candidate.address}\n${candidate.price}\n${candidate.text}`,
+        screenshotBase64: screenshot,
+      });
+      this.state.recordAi(assessment.usage);
+      if (assessment.verdict === 'suitable') {
+        this.log(`[operator] AI accepted ${candidate.address}: ${assessment.reason}`);
+        return candidate;
+      }
+    }
+    throw new HumanNeeded('uncertain_suitability', 'neither the deterministic rules nor the model could confirm a suitable residential sale listing');
+  }
+
+  async triageUnknownPage(page) {
+    if (!this.config.aiEnabled) return null;
+    try {
+      const [text, screenshot] = await Promise.all([
+        page.evaluate(() => (document.body?.innerText || '').slice(0, 4000)).catch(() => ''),
+        this.browser.screenshotBase64(page),
+      ]);
+      const verdict = await classifyUnknownPage({ model: this.config.aiModel, url: page.url(), text, screenshotBase64: screenshot });
+      this.state.recordAi(verdict.usage);
+      return verdict;
+    } catch (error) {
+      this.log('[operator] page triage unavailable:', error.message);
+      return null;
+    }
+  }
+
+  async skip(reasonKey, detail) {
+    const label = AUTO_SKIP[reasonKey];
+    if (!label) throw new HumanNeeded('uncertain_suitability', detail);
+    this.log(`[operator] skipping ${this.state.data.current.agency_name}: ${detail}`);
+    await this.browser.closeRightmoveTabs();               // 3.1
+    this.state.stage('skipping');
+    const page = await this.browser.novusTab();            // 3.2
+    await page.bringToFront().catch(() => {});
+    const result = await this.prober.skipAgency(label);    // 3.3 → 3.5
+    if (!result.ok) throw new HumanNeeded('agency_page_unavailable', `Skip agency failed: ${result.error}`);
+    this.state.finishCycle('skipped');
+    await this.prober.waitForAgencyLoaded().catch(() => {});  // 3.6
+    return 'skipped';
+  }
+
+  // STEPS 10–12.
+  async createProbeAndMarkSent(propertyUrl) {
+    await this.browser.closeRightmoveTabs();               // 10.1
+    const page = await this.browser.novusTab();
+    await page.bringToFront().catch(() => {});
+
+    // The Prober tab may have drifted; re-open the agency so #url and
+    // #create-btn are the controls for THIS agency.
+    const current = this.state.data.current;
+    if (!/agency_id=/.test(page.url()) || !page.url().includes(encodeURIComponent(current.agency_id))) {
+      await this.prober.openAgency(current.agency_id);
+    }
+
+    const created = await this.prober.createProbe(propertyUrl);   // 10.3–10.5
+    if (!created.ok) throw new HumanNeeded('probe_not_recorded', `Create probe failed after the enquiry was sent: ${created.error}`);
+    const probeId = await this.prober.currentProbeId();
+    this.state.stage('probe_created', { probe_id: probeId || '', probe_reference: created.reference });
+    this.log(`[operator] probe created: ${created.reference}`);
+
+    // STEP 11's pre-flight checks, on the Probe ready screen itself.
+    if (created.agency && current.agency_id && created.agency !== current.agency_id) {
+      throw new HumanNeeded('probe_not_recorded', `the Probe ready screen shows agency ${created.agency}, expected ${current.agency_id}`);
+    }
+    if (this.config.identity.email && created.email && created.email !== this.config.identity.email) {
+      throw new HumanNeeded('probe_not_recorded', `the probe was stamped with ${created.email}, not the identity the enquiry used`);
+    }
+    return this.finishMarkSent();
+  }
+
+  async finishMarkSent() {
+    await this.checkpoint();
+    const probeId = this.state.data.current.probe_id || await this.prober.currentProbeId();
+    const marked = await this.prober.markAsSent();
+    if (!marked.ok) throw new HumanNeeded('probe_not_recorded', marked.error);
+    this.state.stage('marked_sent', { marked_sent: true, probe_id: probeId || this.state.data.current.probe_id });
+
+    // "Verify that the actual existing backend records the probe as sent."
+    // Read the PROBES row back through the same route the UI used.
+    if (probeId) {
+      const probe = await this.novus.probe(probeId).then((d) => d.probe).catch(() => null);
+      if (!isProbeRecordedAsSent(probe)) {
+        throw new HumanNeeded('probe_not_recorded', `PROBES ${probeId} is not observing after Mark as sent (status ${probe?.probe_status || 'unknown'})`);
+      }
+      this.log(`[operator] NOVUS confirms ${probeId} observing until ${probe.observation_deadline}`);
+    } else {
+      this.log('[operator] probe_id was not readable from the page; relying on the UI transition only');
+    }
+
+    this.state.finishCycle('completed');                   // 12.1
+    return 'completed';
+  }
+}
