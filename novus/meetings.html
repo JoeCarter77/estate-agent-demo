@@ -28,6 +28,18 @@
     .ws{display:grid;grid-template-columns:230px minmax(0,1fr) 300px;gap:var(--s-4);align-items:start;}
     @media (max-width:1180px){.ws{grid-template-columns:200px minmax(0,1fr);} .ws-right{grid-column:1 / -1;}}
     @media (max-width:820px){.ws{grid-template-columns:1fr;} .ws-left{display:none;}}
+    .ws.side-off{grid-template-columns:230px minmax(0,1fr);}
+    .ws.side-off .ws-right{display:none;}
+    @media (max-width:1180px){.ws.side-off{grid-template-columns:200px minmax(0,1fr);}}
+    /* ── simplified diagnosis review ──────────────────────────────────── */
+    .rev-facts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0 14px;}
+    .rev-facts .f{border:1px solid var(--hair);border-radius:var(--r-md);padding:10px 12px;}
+    .rev-facts .f .l{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);}
+    .rev-facts .f .v{font-family:var(--serif);font-size:20px;margin-top:4px;} .rev-facts .f .v.unk{color:var(--ink-5);font-size:14px;}
+    .rev-find{border:1px solid var(--hair);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;background:rgba(var(--ink-rgb),.02);}
+    .rev-find .h{font-weight:600;font-size:14px;} .rev-find .s{font-size:12.5px;color:var(--ink-2);margin-top:4px;line-height:1.5;}
+    .rev-check{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--hair-soft);font-size:13px;color:var(--ink-2);}
+    .rev-check:last-child{border-bottom:none;}
     .ws-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:var(--s-4);}
     .ws-title{font-family:var(--serif);font-size:26px;font-weight:400;letter-spacing:-.02em;line-height:1.1;}
     .ws-meta{font-size:12px;color:var(--ink-4);margin-top:6px;display:flex;gap:14px;flex-wrap:wrap;}
@@ -202,6 +214,12 @@
     .fold ul{margin:0;padding-left:16px;font-size:12.5px;line-height:1.6;color:var(--ink-2);} .fold .k{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);margin-bottom:4px;}
     .qa{padding:8px 0;border-bottom:1px solid var(--hair-soft);} .qa .q{font-weight:600;font-size:13px;} .qa .a{font-size:12.5px;line-height:1.6;color:var(--ink-2);margin-top:3px;}
     .impl{border:1px solid var(--hair);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;} .impl-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;font-weight:600;margin-bottom:4px;}
+    .script-block{border:1px solid var(--blue-line);border-radius:var(--r-lg);background:var(--blue-tint);padding:16px 20px;margin-bottom:16px;}
+    .script-block.agreed{border-color:var(--blue-line);background:linear-gradient(180deg,var(--blue-tint-2),var(--blue-tint));margin-top:16px;margin-bottom:0;}
+    .script-label{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--blue);margin-bottom:8px;}
+    .script-text{font-family:var(--serif);font-size:18px;line-height:1.55;letter-spacing:-.012em;color:var(--ink);}
+    .script-text p{margin:0 0 10px;} .script-text p:last-child{margin-bottom:0;}
+    .script-block .btn-present{margin-top:14px;}
 
     /* ── presentation mode ─────────────────────────────────────────────── */
     #present{position:fixed;inset:0;z-index:1000;background:#05070D;display:none;align-items:center;justify-content:center;color:#F1EDE6;font-family:var(--sans);}
@@ -395,6 +413,7 @@
             <div class="ws-meta" id="d-meta"></div>
           </div>
           <div class="btnrow" style="margin:0">
+            <button class="btn btn-quiet btn-sm" id="side-toggle" type="button">Show live diagnosis</button>
             <a class="btn btn-quiet btn-sm" id="d-history" href="#" target="_blank" rel="noopener">Full timeline &#8599;</a>
           </div>
         </div>
@@ -471,6 +490,7 @@ let PITCH_VIEW = 0;      // index into S.pitches (0 = latest)
 let GEN = false;
 /* The meeting conclusion (stage 5): current step, open correction form, save state. */
 let CSTEP = 'today';
+let SIDE_HIDDEN = false;    // Live Diagnosis sidebar; default hidden on diagnosis/conclusion
 let CORR = '';           // finding id whose correction form is open
 let CSAVE = { inflight:false };
 /* Presentation mode. `only` = this window IS the presentation (#present?id=…). */
@@ -577,6 +597,7 @@ async function openSession(sessionId, stage){
     S = await get(`${OP('discovery-session')}&session_id=${encodeURIComponent(sessionId)}`);
     STAGE = stageKey(stage || S.session.stage || 'commercial');
     if(S.session.status === 'COMPLETED' && !stage) STAGE = 'outcome';
+    SIDE_HIDDEN = ['diagnosis', 'conclusion'].includes(STAGE);
     CSTEP = 'today'; CORR = '';
     CUR = '';
     PITCH_VIEW = 0;
@@ -720,7 +741,7 @@ function renderWorkspace(){
     s.status === 'COMPLETED' ? pill('completed', 't-grey', true) : '',
   ].filter(Boolean).join('');
   $('d-history').href = agencyLink(s.agency_id);
-  renderStages(); renderRail(); renderCentre(); renderSide(); renderSaveState();
+  renderStages(); renderRail(); renderCentre(); renderSide(); renderSaveState(); applySideVisibility();
 }
 function stageDone(id){
   const d = S.diagnosis; if(!d) return false;
@@ -733,8 +754,17 @@ function stageDone(id){
 function renderStages(){
   $('d-stages').innerHTML = STAGES.map(([id, label], i) => `<button class="stage-btn${STAGE === id ? ' on' : ''}${stageDone(id) ? ' done' : ''}" data-stage="${id}" type="button"><span class="n">${i+1}</span>${esc(label)}</button>`).join('');
 }
+function applySideVisibility(){
+  const ws = document.querySelector('.ws'); if(!ws) return;
+  ws.classList.toggle('side-off', SIDE_HIDDEN);
+  const btn = $('side-toggle'); if(btn) btn.textContent = SIDE_HIDDEN ? 'Show live diagnosis' : 'Hide live diagnosis';
+}
 function goStage(id, qid){
+  const enteringConclusion = STAGE !== 'conclusion' && stageKey(id) === 'conclusion';
   STAGE = stageKey(id); CUR = qid || '';
+  if(enteringConclusion) CSTEP = 'established';
+  SIDE_HIDDEN = ['diagnosis', 'conclusion'].includes(STAGE);
+  applySideVisibility();
   if(['commercial','foundations','intelligence'].includes(id) && !CUR) CUR = nextUnanswered(id)?.id || '';
   S.session.stage = id; markDirty();
   history.replaceState(null, '', `#discovery?id=${encodeURIComponent(S.session.session_id)}&stage=${id}`);
@@ -776,7 +806,7 @@ function renderRail(){
 /* Centre: one question at a time, or the stage panel. */
 function renderCentre(){
   const el = $('d-centre');
-  if(STAGE === 'diagnosis') return renderDiagnosis(el);
+  if(STAGE === 'diagnosis') return renderDiagnosisSummary(el);
   if(STAGE === 'conclusion') return renderConclusion(el);
   if(STAGE === 'outcome') return renderOutcome(el);
   const vs = visible(STAGE);
@@ -898,6 +928,36 @@ function renderSide(){
 }
 
 /* ═══ STAGE 4: DIAGNOSIS ════════════════════════════════════════════════ */
+/* The default view is a one-screen review, for a quick check between the
+   questions and the meeting conclusion — not a technical readout. It reuses
+   the SAME conclusion data the client presentation is built from (never a
+   second summarisation), and keeps the full diagnostic detail one click away. */
+function renderDiagnosisSummary(el){
+  const d = S.diagnosis; const su = d.suitability; const c = S.conclusion;
+  if(!c){ el.innerHTML = `<div class="panel">${emptyState('Nothing to review yet', 'Answer a few discovery questions first.')}</div>`; return; }
+  const today = SCREEN('today'); const established = SCREEN('established');
+  const checks = [...new Set([...(d.blockers||[]), ...(d.validation||[])])].slice(0, 3);
+  const primaryLabel = su.pitch_pilot ? 'Continue to meeting conclusion' : su.verdict === 'FURTHER_VALIDATION_REQUIRED' ? 'Continue — what to confirm' : 'Continue — not proposing a pilot';
+  el.innerHTML = `
+    <div class="panel">
+      <div class="panel-t">Commercial situation</div>
+      <div class="rev-facts">${(today.facts||[]).map((f) => `<div class="f"><div class="l">${esc(f.label)}</div><div class="v">${esc(f.value)}</div></div>`).join('')}</div>
+      ${today.objective ? `<div class="kv"><div class="k">Objective</div><div>${esc(today.objective)}${(today.obstacles||[]).length ? ` · in the way: ${esc(today.obstacles.join(', '))}` : ''}</div></div>` : ''}
+    </div>
+    <div class="panel">
+      <div class="panel-t">Main findings <span class="muted" style="font-size:12px">${established.findings.length}</span></div>
+      ${established.findings.length ? established.findings.map((f) => `<div class="rev-find"><div class="h">${esc(f.title)}${f.hedged ? ' <span class="mini">(to confirm)</span>' : ''}</div><div class="s">${esc(f.points.join('. '))}${f.points.length ? '.' : ''}</div></div>`).join('') : `<div class="note">No weak or partial dimension with a cause and consequence established yet.</div>`}
+    </div>
+    ${checks.length ? `<div class="panel"><div class="panel-t">Worth checking</div>${checks.map((x) => `<div class="rev-check">${esc(x)}</div>`).join('')}</div>` : ''}
+    <div class="suit ${SUIT_CLASS[su.verdict]}" style="padding:14px 16px;margin-bottom:0"><div class="v">${esc(SUIT_LABEL[su.verdict])}</div></div>
+    <div class="btnrow split" style="margin-top:14px">
+      <button class="btn btn-secondary" data-go-stage="intelligence" type="button">&larr; Back to questions</button>
+      <button class="btn btn-primary" data-go-stage="conclusion" type="button">${esc(primaryLabel)} &rarr;</button>
+    </div>
+    <details class="panel" style="padding:0;margin-top:14px"><summary style="padding:14px 24px;cursor:pointer;font-size:13px;color:var(--ink-3)">Full diagnosis / technical reference — findings, evidence, overrides, interventions, economics, deployment rules</summary><div id="diag-full" style="padding:0 24px 12px"></div></details>`;
+  renderDiagnosis($('diag-full'), { embedded: true });
+}
+
 function findingHtml(a){
   const ov = S.session.overrides?.[a.dimension];
   const open = OVR_OPEN === a.dimension;
@@ -978,7 +1038,7 @@ async function generatePitch(){
     const out = await post(OP('discovery-pitch'), { session_id: S.session.session_id, confirm:'GENERATE_PITCH' });
     S.pitches.unshift(out.pitch); S.session.pitch_count = out.pitch.version; S.session.latest_pitch_id = out.pitch.pitch_id; S.diagnosis = out.diagnosis; PITCH_VIEW = 0;
     notice(out.pitch.source === 'TEMPLATE' ? `<b>Deterministic template stored</b> — the model's wording ${out.ai_error ? `was not used: ${esc(out.ai_error)}` : 'was unavailable'}. The discovery data is intact; regenerate when ready.` : (out.ai_error ? `<b>Model output partly replaced by the template:</b> ${esc(out.ai_error)}` : ''), 'warn');
-    STAGE = 'conclusion'; renderStages(); renderRail(); renderCentre(); renderSide();
+    STAGE = 'conclusion'; SIDE_HIDDEN = true; CSTEP = 'established'; renderStages(); renderRail(); renderCentre(); renderSide(); applySideVisibility();
   }catch(err){ notice(`<b>Pitch not generated.</b> ${esc(err.message)} — nothing was lost; the diagnosis is saved.`, 'err'); }
   finally{ GEN = false; }
 }
@@ -1154,6 +1214,7 @@ function cStepEstablished(c){
     </div>`;
   };
   return `<div class="panel">${clientHead(sc)}
+    <div class="script-block"><div class="script-label">Before you ask — say this</div><div class="script-text">${esc(u.script)}</div></div>
     ${u.findings.length ? u.findings.map(findingHtml).join('') : `<div class="note">No weak or partial dimension with a cause and consequence yet — nothing to reflect back.${c.mode !== 'PILOT' ? ' Say so plainly.' : ''}</div>`}
     ${u.outside_scope.length ? `<div class="note">Also heard, but not something NOVUS fixes: ${esc(u.outside_scope.map((x) => `${x.label} — ${x.note}`).join(' '))}</div>` : ''}
     <div class="say q" style="margin-top:14px">${esc(u.closing)}</div>
@@ -1163,6 +1224,7 @@ function cStepEstablished(c){
       ${c.polish ? `<button class="btn btn-quiet btn-sm" data-unpolish type="button">Use plain wording</button>` : ''}
     </div>
     ${c.polish?.issues?.length ? `<div class="mini" style="margin-top:6px">Rejected polish: ${esc(c.polish.issues.join('; '))}</div>` : ''}
+    ${u.agreed ? `<div class="script-block agreed"><div class="script-label">They've agreed — say this, then share your screen</div><div class="script-text">${u.after_agreement_script.split('\n\n').map((para) => `<p>${esc(para)}</p>`).join('')}</div><button class="btn btn-present" data-present-from="opportunity" type="button">Present to client — start on the commercial opportunity &rarr;</button></div>` : ''}
   </div>`;
 }
 
@@ -1271,13 +1333,15 @@ function presChannel(){
     if(m.type === 'state' && m.presentation){ S.presentation = m.presentation; S.conclusion = m.conclusion || S.conclusion; if(m.diagnosis) S.diagnosis = m.diagnosis; if(PRES.open) renderPresentation(); if(STAGE === 'conclusion' && !PRES.only) renderCentre(); }
   };
 }
-function openPresentation({ fullscreen = true } = {}){
+function openPresentation({ fullscreen = true, screenId } = {}){
   if(!S?.presentation) return;
   presChannel();
-  try{ const saved = Number(sessionStorage.getItem(presKey())); if(Number.isFinite(saved) && saved >= 0) PRES.slide = saved; }catch{}
+  if(screenId){ const idx = S.presentation.screens.findIndex((x) => x.id === screenId); if(idx >= 0) PRES.slide = idx; }
+  else{ try{ const saved = Number(sessionStorage.getItem(presKey())); if(Number.isFinite(saved) && saved >= 0) PRES.slide = saved; }catch{} }
   PRES.open = true; $('present').classList.add('on'); document.body.classList.add('presenting');
   renderPresentation();
   if(fullscreen) presFullscreen();
+  try{ PRES.channel?.postMessage({ type:'slide', slide: PRES.slide }); }catch{}
 }
 function presFullscreen(){
   const el = $('present');
@@ -1409,6 +1473,7 @@ document.addEventListener('click', async (e) => {
     return;
   }
   const nav = t.closest('.nav-item[data-view]'); if(nav){ setHash('#meetings'); route(); return; }
+  if(t.id === 'side-toggle'){ SIDE_HIDDEN = !SIDE_HIDDEN; applySideVisibility(); return; }
   if(t.id === 'setup-btn'){ t.disabled = true; try{ await post(OP('discovery-setup'), { confirm:'SETUP_DISCOVERY' }); await loadList(); }catch(err){ showErr(err.message); } return; }
   const st = t.closest('[data-start]'); if(st){ $('a-results').classList.add('hidden'); $('a-search').value = ''; setHash(`#start?agency=${encodeURIComponent(st.dataset.start)}`); route(); return; }
   if(!S) return;
@@ -1447,6 +1512,7 @@ document.addEventListener('click', async (e) => {
   /* meeting conclusion */
   const cs = t.closest('[data-cstep]'); if(cs){ goCStep(cs.dataset.cstep); return; }
   if(t.closest('[data-present]')){ openPresentation(); return; }
+  const pf = t.closest('[data-present-from]'); if(pf){ openPresentation({ screenId: pf.dataset.presentFrom }); return; }
   if(t.closest('[data-pres-window]')){ presOpenWindow(); return; }
   const ag = t.closest('[data-agree]'); if(ag){ CORR = ''; setAgreement(ag.dataset.agree, { status:'AGREED', dropped:[] }); return; }
   const rj = t.closest('[data-reject]'); if(rj){ CORR = ''; setAgreement(rj.dataset.reject, { status:'REJECTED', dropped:[], present:false }); return; }

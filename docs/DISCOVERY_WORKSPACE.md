@@ -109,7 +109,7 @@ rewritten, and an operator override always wins over the owner's remark.
 |---|---|---|
 | **Confirm understanding** | "Right {name}, correct me if I'm wrong…", the situation in their numbers (branches, CRM, enquiries, database, valuations, instructions, fee, conversion — unknown stays unknown), the two or three problems grouped by theme (capture F1+F2 · progress F3+F4 · opportunities I1–I4 · measure F5+I5), ranked by evidence, commercial consequence and the owner's priority, each in the owner's own answers ("mostly, but some gets missed"), hedged with "I think" when provisional; "Is that a fair reflection…?" | **Agree** · **Correct…** (untick the parts that are not a problem + their words) · **Not a problem** · *Show in presentation* · *They agreed with all of it* |
 | **Commercial opportunity** | fee × conversion = expected gross fee income per additional valuation; selector 1–5 with monthly and annual figures, labelled *Illustration, not a forecast* (Louis: £4,500 × 30% = £1,350; 2/month = £2,700 / £32,400) | the selector (persisted) |
-| **What NOVUS would change** | 2–3 groups from the agreed findings and the selected rules: problem · proposed change · commercial effect (+ how measured) · preserved · has to be true (assessment items, unknown dependencies, blockers, delivery caveats). Weak foundations appear only where the intelligence work needs them; strong ones are listed as reused | — (recomputed on every correction) |
+| **How NOVUS would help** | up to 3 cards in a fixed IMPLEMENTATION SEQUENCE (`buildSolutionSequence`, `lib/discovery-conclusion.mjs`) — foundations/connect (F1+F2) → identify opportunities (I1–I3) → progress & measure (F3–F5, I4–I5) — never the highest-ranked problems. Each stage's sentence is built ONLY from its selected rules' `spoken_change`, names the agency's own CRM where the rule touches it, and hedges with "once we've confirmed…" when a rule still needs a technical assessment; a stage with nothing selected but an existing strength becomes a reuse sentence ("Your X already work well, so we'd reuse…") instead of disappearing | — (recomputed on every correction) |
 | **60-day deployment** | Week 1 / Week 2 / Weeks 3–4 / Weeks 5–8, headings adapted (reuse vs foundations, first workflow), one-paragraph summary from `templatePlan` with rule ids replaced by plain names, implementation detail expandable | — |
 | **Founding pilot** | £1,500 all-in · 60 days · scope ticks (default = everything proposed) · included · success criteria from the scope's measurements · day-45/60 review · no long-term commitment · a short pricing script | scope ticks (persisted; the Decision stage defaults to them) |
 
@@ -123,6 +123,15 @@ change sentences and returns rewordings; each is validated (no longer than the o
 guarantees/marketing/jargon, no figures, no rule ids, no bullets) and stored with its original — a polished
 sentence is applied only while its deterministic original is unchanged, so a correction drops stale polish.
 Failure or rejection leaves the plain wording.
+
+The **confirm-understanding step** opens with a deterministic PRIVATE speaking script
+(`understanding.script`, `buildTransitionScript`) — the opening line, the known demand figures, the finding
+titles in one spoken sentence, then the closing question — built only from real figures/findings, never a
+model. Once every finding is agreed, a second fixed script (`understanding.after_agreement_script`,
+`SCREEN_SHARE_SCRIPT`) appears with a dedicated **Present to client — start on the commercial opportunity**
+button that opens the presentation straight on that slide (`openPresentation({ screenId })`), skipping the
+agency-overview/established slides already covered verbally. Neither script is ever part of
+`presentationPayload`.
 
 **Present to client** opens a full-screen, 16:9, NOVUS-branded presentation of seven screens rendered from
 `presentationPayload` (server-built; no rule ids, evidence codes, notes, scripts or controls; only findings
@@ -145,6 +154,18 @@ changes for the team, dependencies/validation, the fallback if the preferred rou
 limits) and *questions & objections* (only those relevant to the selected rules); per "needs" card the
 precise access / setup / act items for this agency; and closing guidance + likely objections for the pilot.
 The full diagnosis stays available at the bottom of every step as "Full diagnosis / technical reference".
+
+## Diagnosis stage (stage 4) — a one-screen review, not a technical readout
+
+The default Diagnosis view (`renderDiagnosisSummary`) reuses the same conclusion data as the presentation —
+commercial situation and objective (the "Your agency today" screen's facts), the 2–3 main findings (the
+"What we've established" screen's wording), and up to three "Worth checking" items (`diagnosis.blockers` +
+`diagnosis.validation`) — with one primary action, "Continue to meeting conclusion" (which lands on the
+Established step, see above). The full findings/evidence/overrides/interventions/economics/plan content is
+unchanged and one click away in "Full diagnosis / technical reference" (`renderDiagnosis(el, {embedded:true})`,
+same function, same override controls, reused rather than duplicated). The Live Diagnosis sidebar is hidden
+by default on the Diagnosis and Conclusion stages (`SIDE_HIDDEN`, toggled by the "Show/Hide live diagnosis"
+button in the workspace header) and shown by default elsewhere.
 
 ## Plan and outcome
 

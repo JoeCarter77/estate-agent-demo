@@ -621,8 +621,11 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   // The presentation payload carries nothing internal.
   assert.equal(p.screens.length, 7); assert.deepEqual(p.screens.map((x) => x.id), ['today', 'established', 'opportunity', 'help', 'needs', 'deployment', 'pilot']);
   assert.ok(p.screens[3].cards.length >= 2 && p.screens[3].cards.length <= 3, 'at most three solution cards');
-  for (const card of p.screens[3].cards) { assert.ok(card.heading.length < 45); assert.match(card.sentence, /^We'd .+\.$/); assert.equal(card.sentence.split(/(?<=[.!?])\s+/).length, 1, 'one sentence'); }
-  assert.match(p.screens[3].cards[0].sentence, /read every incoming enquiry/);
+  assert.deepEqual(p.screens[3].cards.map((x) => x.id), ['foundations', 'identify', 'progress'], 'the implementation sequence, not the highest-ranked problems');
+  for (const card of p.screens[3].cards) { assert.ok(card.heading.length < 55); assert.ok(/\.$/.test(card.sentence) && card.sentence.split(/(?<=[.!?])\s+/).length <= 2, 'concise — one or two sentences'); }
+  assert.match(p.screens[3].cards[0].sentence, /gets recorded in Reapit/, 'the foundations card names the CRM it would connect to');
+  assert.match(p.screens[3].cards[1].sentence, /read every incoming enquiry/, 'the identify card leads with the seller-signal work');
+  assert.match(p.screens[3].cards[2].sentence, /dated next step|track every seller/, 'the progress card is about progressing and measuring');
   assert.equal(p.screens[4].cards.length, 3); assert.equal(p.screens[4].cards[0].heading, 'Access to the relevant systems & information');
   assert.match(p.screens[4].cards[2].sentence, /records what they hear about selling/, 'third card adapted because capture (F1) is in scope');
   assert.equal(p.screens[5].title, 'Your first 60 days');
@@ -634,22 +637,29 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
     assert.ok(g.talking_points.length >= 3 && g.talking_points[0].startsWith('Why it matters here: you told me'), 'talking points start from their words');
     assert.ok(g.talking_points.some((x) => /Why that's more valuations/.test(x)), 'connected to the commercial objective');
     assert.ok(g.implementation.length >= 1 && g.implementation.every((r) => r.configure.length && r.systems_data.length && r.novus.length && r.agency.length && r.team_change && r.fallback && r.limits.length && r.delivery_status_label), 'implementation answers from the rule registry');
-    assert.ok(g.implementation.every((r) => c.pilot.scope_rule_ids.includes(r.rule_id) || c.changes.groups.find((x) => x.id === card.id).rules.some((y) => y.rule_id === r.rule_id)), 'only selected rules');
+    assert.ok(g.implementation.every((r) => c.pilot.scope_rule_ids.includes(r.rule_id)), 'only selected rules');
     assert.ok(g.questions.length >= 5 && g.questions.every((x) => x.q && x.a.length > 40));
   }
-  assert.ok(gd.help.opportunities.questions.some((x) => /database is a mess/.test(x.q)) && !gd.help.measure.questions.some((x) => /database is a mess/.test(x.q)), 'only relevant questions');
-  assert.match(gd.help.opportunities.questions.find((x) => /Reapit/.test(x.q)).a, /You said we can get an export/);
+  assert.ok(gd.help.identify.questions.some((x) => /database is a mess/.test(x.q)) && !gd.help.progress.questions.some((x) => /database is a mess/.test(x.q)), 'only relevant questions');
+  assert.match(gd.help.identify.questions.find((x) => /Reapit/.test(x.q)).a, /You said we can get an export/);
   assert.ok(gd.needs.access.length >= 3 && gd.needs.setup.length >= 3 && gd.needs.act.length >= 3);
   assert.ok(gd.needs.access.some((x) => /CRM: Reapit/.test(x)));
   assert.equal(gd.pilot.closing[0], c.pilot.pricing_script); assert.ok(gd.pilot.questions.some((x) => /guaranteeing/.test(x.q) && /No —/.test(x.a)));
-  assert.ok(!JSON.stringify(p).includes('Why it matters here') && !JSON.stringify(p).includes(gd.help.opportunities.questions[0].a), 'private guidance never reaches the client screens');
+  assert.ok(!JSON.stringify(p).includes('Why it matters here') && !JSON.stringify(p).includes(gd.help.identify.questions[0].a), 'private guidance never reaches the client screens');
   assert.ok(p.screens[4].cards.every((x) => ['access', 'setup', 'act'].includes(x.id)));
   assert.deepEqual(leak(p), [], `presentation leaks: ${leak(p).join(', ')}`);
   assert.ok(!JSON.stringify(p).includes(c.pilot.pricing_script), 'the pricing script is not on a client screen');
   assert.equal(p.screens[1].findings.length, 3, 'before any agreement every finding is presentable');
   assert.equal(p.screens[2].per_valuation, '£1,350'); assert.equal(p.screens[2].rows[1].monthly, '£2,700'); assert.equal(p.screens[2].rows[1].annual, '£32,400');
   assert.equal(p.screens[6].price, '£1,500');
-  ok('presentation payload: six screens, no rule ids, evidence codes, notes, scripts or controls; economics and price as figures');
+  // The private discovery-to-pitch transition scripts: deterministic, from
+  // real figures and real findings, never on a client screen.
+  assert.match(c.understanding.script, /^Right Louis, I think I've got a pretty good picture/);
+  assert.match(c.understanding.script, /250 enquiries a month/); assert.match(c.understanding.script, /5,000 contacts in the database/);
+  assert.match(c.understanding.script, /Is that a fair reflection, or is there anything you'd change\?$/);
+  assert.match(c.understanding.after_agreement_script, /^Perfect\. Based on that/); assert.match(c.understanding.after_agreement_script, /share my screen/);
+  assert.ok(!JSON.stringify(p).includes(c.understanding.script) && !JSON.stringify(p).includes(c.understanding.after_agreement_script), 'the private scripts never reach the client screens');
+  ok('presentation payload: seven screens, no rule ids, evidence codes, notes, scripts or controls; economics and price as figures; the private transition scripts stay off the client screens');
 }
 {
   // Owner corrections recompute the deployment without touching the answers.
@@ -675,9 +685,11 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   assert.equal(p.screens[1].findings[1].corrected, 'History is fine in Reapit once you know the name');
   assert.equal(p.screens[1].findings[1].points.length, 1, 'the dropped part is not presented');
   assert.deepEqual(leak(p), []);
-  assert.ok(!('measure' in c.guidance.help) && !p.screens[3].cards.some((x) => x.id === 'measure'), 'a rejected finding leaves both the client card and the private guidance');
-  assert.ok(!c.guidance.help.capture.implementation.some((r) => r.rule_id === 'F2') && !c.guidance.needs.access.some((x) => /customer history/.test(x)), 'the dropped part leaves the implementation answers and the needs');
-  assert.match(c.guidance.help.capture.talking_points[0], /History is fine in Reapit/, 'the owner\'s correction is in the talking points');
+  assert.ok(!c.guidance.help.progress.implementation.some((r) => ['F5', 'I5'].includes(r.rule_id)), 'a rejected finding leaves the implementation answers for its rules');
+  assert.ok(!c.guidance.help.foundations.implementation.some((r) => r.rule_id === 'F2') && !c.guidance.needs.access.some((x) => /customer history/.test(x)), 'the dropped part leaves the implementation answers and the needs');
+  assert.match(c.guidance.help.foundations.talking_points[0], /History is fine in Reapit/, 'the owner\'s correction is in the talking points');
+  const foundationsCard = p.screens[3].cards.find((x) => x.id === 'foundations');
+  assert.ok(foundationsCard && !/customer.s history in one place/.test(foundationsCard.sentence) && /customer context/i.test(foundationsCard.sentence), 'the corrected part becomes a reuse clause on the client card, not a proposed change');
   // Operator's own override wins over the owner's remark.
   const withOp = conclude({ ...louisSession, overrides: { F2: { evidence_status: 'CONFIRMED', level: 'weak', reason: 'Saw the duplicate mess on screen' } } }, { agreement });
   assert.equal(withOp.agreed.assessments.F2.evidence_status, 'CONFIRMED');
@@ -702,7 +714,14 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   assert.ok(p.screens[3].preserved.length === 5 && p.screens[3].cards.every((x) => !/capture|record/.test(x.heading)));
   assert.match(p.screens[4].cards[2].sentence, /^Your team contacts the relevant customers and records the outcomes/, 'no capture work → the plain third card');
   assert.deepEqual(leak(p), []);
-  ok('strong-foundation agency: findings and changes on the intelligence side only, all five foundations preserved and reused, week 1 says so');
+  // The implementation sequence is genuinely different from Louis's, not the
+  // same three cards restated: the foundations card reuses rather than
+  // builds, and the sentences name different rules.
+  const louisCards = conclude(louisSession).p.screens[3].cards;
+  assert.notEqual(p.screens[3].cards[0].heading, louisCards[0].heading, 'foundations heading differs: reuse vs build');
+  assert.notEqual(p.screens[3].cards[0].sentence, louisCards[0].sentence);
+  assert.match(p.screens[3].cards[0].sentence, /information capture and customer context already work well/);
+  ok('strong-foundation agency: findings and changes on the intelligence side only, all five foundations preserved and reused, week 1 says so; the help slide is genuinely different from Louis\'s');
 
   // Incomplete information: no numbers, one finding, hedged; no pilot ask.
   const inc = conclude({ ...louisSession, answers: { C1: a('more_valuations'), F1: a('patchy'), F1_cause: m(['time']), F3: a('memory') } });
@@ -751,17 +770,18 @@ const leak = (obj) => { const js = JSON.stringify(obj); return [/\b[FI][1-5]\b/.
   const { c } = conclude(louisSession);
   const good = async ({ prompt }) => { const inp = JSON.parse(prompt.slice(prompt.indexOf('\n\n') + 2)); return { findings: inp.findings.map((f) => ({ id: f.id, text: f.text.replace(/Mainly because/g, 'That comes down to') })), changes: inp.changes.map((x) => ({ id: x.id, text: x.text })) }; };
   let out = await polishConclusion({ conclusion: c, call: good });
-  assert.equal(out.rejected, 0); assert.equal(out.accepted, c.understanding.findings.length + c.changes.groups.length);
+  assert.equal(out.rejected, 0); assert.equal(out.accepted, c.understanding.findings.length + c.solutions.length);
   const polished = conclude(louisSession, { polish: out.polish }).c;
   assert.ok(polished.understanding.findings.some((f) => /That comes down to/.test(f.statement_polished)) && polished.polish.applied === out.accepted);
   assert.ok(polished.understanding.findings.every((f) => f.statement === c.understanding.findings.find((x) => x.id === f.id).statement), 'the deterministic statement is kept alongside');
-  // A correction changes the original → the polish for that finding is stale and dropped.
+  assert.ok(polished.solutions.every((st) => st.sentence_polished === undefined || st.sentence_polished.length > 0), 'solution sentences can be polished too');
+  // A correction changes the original → the polish for that stage is stale and dropped.
   const stale = conclude(louisSession, { polish: out.polish, agreement: { capture: { status: 'CORRECTED', dropped: ['F2'], note: 'x' } } }).c;
-  assert.ok(stale.changes.groups.find((g) => g.id === 'capture') ? stale.changes.groups.find((g) => g.id === 'capture').change_polished === undefined : true);
+  assert.ok(stale.solutions.find((st) => st.id === 'foundations') ? stale.solutions.find((st) => st.id === 'foundations').sentence_polished === undefined : true);
   assert.ok(stale.polish.stale >= 1);
   const bad = async ({ prompt }) => { const inp = JSON.parse(prompt.slice(prompt.indexOf('\n\n') + 2)); return { findings: inp.findings.map((f, i) => ({ id: f.id, text: i === 0 ? `${f.text} We guarantee £40,000 a year.` : i === 1 ? 'Too short? Sure. F1 is broken.' : f.text })), changes: inp.changes.map((x) => ({ id: x.id, text: `${x.text} It leverages cutting-edge AI-powered intelligence.` })) }; };
   out = await polishConclusion({ conclusion: c, call: bad });
-  assert.ok(out.rejected >= 2 + c.changes.groups.length && out.accepted === 1, JSON.stringify(out.polish.issues));
+  assert.ok(out.rejected >= 2 + c.solutions.length && out.accepted === 1, JSON.stringify(out.polish.issues));
   assert.ok(out.polish.issues.some((i) => /guarantee/.test(i)) && out.polish.issues.some((i) => /figure/.test(i)) && out.polish.issues.some((i) => /rule id/.test(i)) && out.polish.issues.some((i) => /marketing/.test(i)));
   out = await polishConclusion({ conclusion: c, call: async () => { throw new Error('simulated outage'); } });
   assert.equal(out.accepted, 0); assert.match(out.error, /simulated outage/);
