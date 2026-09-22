@@ -11,7 +11,10 @@
 // by reading the PROBES row back (novus-client.isProbeRecordedAsSent) rather
 // than by the button click.
 
-import { execFile } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const INTERVENTIONS = {
   captcha: {
@@ -68,24 +71,64 @@ export function describeIntervention(reason, detail, current) {
   };
 }
 
-let lastBanner = '';
+const source = path.join(path.dirname(fileURLToPath(import.meta.url)), 'macos-notifier.swift');
+const app = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), '.state', 'NOVUS Operator.app');
+const executable = path.join(app, 'Contents', 'MacOS', 'NOVUS Operator');
+const children = new Set();
+process.on('exit', () => { for (const child of children) child.kill(); });
 
-export function notifyDesktop({ title, body }) {
-  if (process.platform !== 'darwin') { console.warn('[notify]', title, '—', body); return; }
-  const key = `${title}::${body}`;
-  if (key === lastBanner) return;            // never spam the same banner twice
-  lastBanner = key;
-  const escape = (value) => String(value).replace(/["\\]/g, '\\$&');
-  const script = `display notification "${escape(body)}" with title "NOVUS operator" subtitle "${escape(title)}" sound name "Submarine"`;
-  execFile('osascript', ['-e', script], (error) => {
-    if (error) console.warn('[notify] banner failed:', error.message);
-  });
+function notifierExecutable() {
+  if (fs.existsSync(executable) && fs.statSync(executable).mtimeMs >= fs.statSync(source).mtimeMs) return executable;
+  fs.mkdirSync(path.dirname(executable), { recursive: true });
+  fs.writeFileSync(path.join(app, 'Contents', 'Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>uk.co.novus.operator-notifier</string>
+<key>CFBundleName</key><string>NOVUS Operator</string>
+<key>CFBundleExecutable</key><string>NOVUS Operator</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>LSUIElement</key><true/>
+</dict></plist>`);
+  const built = `${executable}.new`;
+  const moduleCache = path.join(app, 'Contents', 'ModuleCache');
+  fs.mkdirSync(moduleCache, { recursive: true });
+  execFileSync('swiftc', ['-module-cache-path', moduleCache, source, '-o', built], { stdio: 'pipe', timeout: 120000 });
+  fs.renameSync(built, executable);
+  return executable;
 }
 
-export function notifyIntervention(intervention) {
+export function prepareNotifications() {
+  if (process.platform !== 'darwin') return;
+  try { notifierExecutable(); }
+  catch (error) { console.warn('[notify] macOS notifier is unavailable:', error.message); }
+}
+
+export function notifyDesktop({ title, body, onClick }) {
+  if (process.platform !== 'darwin') { console.warn('[notify]', title, '—', body); return; }
+  try {
+    const child = spawn(notifierExecutable(), [String(title), String(body)], { stdio: ['ignore', 'pipe', 'pipe'] });
+    children.add(child);
+    let output = '';
+    child.stdout.on('data', (chunk) => {
+      output += chunk.toString();
+      if (output.includes('CLICK')) {
+        output = '';
+        Promise.resolve(onClick?.()).catch((error) => console.warn('[notify] could not focus Chrome:', error.message));
+      }
+    });
+    child.stderr.on('data', (chunk) => console.warn('[notify]', chunk.toString().trim()));
+    child.on('exit', (code) => { children.delete(child); if (code && code !== 0) console.warn('[notify] native notification exited:', code); });
+    child.on('error', (error) => console.warn('[notify] native notification failed:', error.message));
+  } catch (error) {
+    console.warn('[notify] native notification could not start:', error.message);
+  }
+}
+
+export function notifyIntervention(intervention, { onClick } = {}) {
   console.warn(`\n[HUMAN NEEDED] ${intervention.title}\n  agency : ${intervention.agency}\n  stage  : ${intervention.stage}\n  do     : ${intervention.action}\n  detail : ${intervention.detail}\n`);
   notifyDesktop({
     title: intervention.title,
     body: `${intervention.agency} — ${intervention.action}`,
+    onClick,
   });
 }

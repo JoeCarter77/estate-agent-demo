@@ -80,6 +80,19 @@ await test('worker interruption DURING submission never resubmits', async () => 
   assert.equal(plan.reason, 'uncertain_submission');
 });
 
+await test('release after a worker restart cannot clear an uncertain Send', async () => {
+  const h = await buildHarness(standardWorld());
+  try {
+    h.state.beginAgency({ agency_id: 'ag-alpha-1', agency_name: 'Alpha Residential' });
+    h.state.markSubmitInFlight();
+    h.state.requireHuman('uncertain_submission', 'outcome unknown');
+    const released = h.orchestrator.release({ outcome: 'resume' });
+    assert.equal(released.ok, false);
+    assert.equal(h.state.data.current.submission.attempts, 1);
+    assert.equal(h.state.data.run.mode, 'needs_human');
+  } finally { await h.close(); }
+});
+
 await test('worker interruption after submission resumes at Create probe', async () => {
   const plan = recoveryPlan(tx({ stage: 'submitted', submission: { state: 'sent' } }));
   assert.equal(plan.action, 'resume_create_probe');
@@ -309,6 +322,44 @@ await test('a CAPTCHA pauses the worker and preserves the agency and tabs', asyn
   } finally { await h.close(); }
 });
 
+await test('an unexpected browser error pauses with the agency and Chrome intact', async () => {
+  const h = await buildHarness(standardWorld());
+  const original = h.browser.openBackgroundTab.bind(h.browser);
+  let once = true;
+  h.browser.openBackgroundTab = async (url) => {
+    if (once) { once = false; throw new Error('mock browser fault'); }
+    return original(url);
+  };
+  try {
+    const run = h.run({ batchSize: 1 });
+    await waitFor(() => h.state.data.current.needs_human?.reason === 'repeated_failure', 10000);
+    assert.equal(h.state.data.current.agency_id, 'ag-alpha-1');
+    assert.equal(h.state.data.run.mode, 'needs_human');
+    assert.ok(h.browser.context, 'Chrome remains open');
+    h.orchestrator.release({ outcome: 'abandon' });
+    await run;
+  } finally { await h.close(); }
+});
+
+await test('recording failure after Send resumes without a second enquiry', async () => {
+  const h = await buildHarness(standardWorld());
+  const original = h.orchestrator.createProbeAndMarkSent.bind(h.orchestrator);
+  let once = true;
+  h.orchestrator.createProbeAndMarkSent = async (url) => {
+    if (once) { once = false; throw new Error('mock NOVUS recording fault'); }
+    return original(url);
+  };
+  try {
+    const run = h.run({ batchSize: 1 });
+    await waitFor(() => h.state.data.current.needs_human?.reason === 'repeated_failure', 15000);
+    assert.equal(h.state.data.current.submission.state, 'sent');
+    h.orchestrator.release({ outcome: 'resume' });
+    await run;
+    assert.equal(h.world.log.filter((entry) => entry.op === 'enquiry-submitted').length, 1);
+    assert.equal(h.world.probes.length, 1);
+  } finally { await h.close(); }
+});
+
 await test('recovery after a crash following submission creates the probe without resubmitting', async () => {
   const world = standardWorld();
   const h = await buildHarness(world);
@@ -512,6 +563,23 @@ await test('a dry run on the signed-in layout still never clicks Send', async ()
 // ── pacing ─────────────────────────────────────────────────────────────────
 
 console.log('\npacing');
+
+await test('major-action pacing is configurable and interruptible', async () => {
+  const { loadConfig } = await import('../src/config.mjs');
+  const { Orchestrator } = await import('../src/orchestrator.mjs');
+  assert.equal(loadConfig({}).actionDelayMs, 750);
+  assert.equal(loadConfig({ NOVUS_OPERATOR_ACTION_DELAY_MS: '1200' }).actionDelayMs, 1200);
+  assert.equal(loadConfig({ NOVUS_OPERATOR_ACTION_DELAY_MS: '0' }).actionDelayMs, 0);
+  const state = { data: { run: { mode: 'running' } } };
+  const operator = new Orchestrator({ config: { actionDelayMs: 80 }, state, browser: {}, novus: {} });
+  const started = Date.now();
+  await operator.pace();
+  assert.ok(Date.now() - started >= 70, 'a major-action gap actually waits');
+  state.data.run.mode = 'paused';
+  const waiting = operator.pace();
+  setTimeout(() => { state.data.run.mode = 'running'; }, 100);
+  await waiting;
+});
 
 await test('the cooldown defaults to the 30-60 second range and is randomised', async () => {
   const { loadConfig, cooldownMs } = await import('../src/config.mjs');

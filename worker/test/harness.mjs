@@ -29,6 +29,7 @@ export async function buildHarness(fixture, { liveSubmit = true, quiet = true, s
     // Pacing is off by default in tests; the pacing suite sets it explicitly.
     NOVUS_OPERATOR_COOLDOWN_MIN_SECONDS: String(cooldownSeconds),
     NOVUS_OPERATOR_COOLDOWN_MAX_SECONDS: String(cooldownSeconds),
+    NOVUS_OPERATOR_ACTION_DELAY_MS: '0',
     NOVUS_OPERATOR_LIVE_SUBMIT: liveSubmit ? '1' : '0',
     NOVUS_PROBE_FIRST_NAME: APPROVED_IDENTITY.firstName,
     NOVUS_PROBE_LAST_NAME: APPROVED_IDENTITY.lastName,
@@ -47,6 +48,7 @@ export async function buildHarness(fixture, { liveSubmit = true, quiet = true, s
   const orchestrator = new Orchestrator({
     config, state, browser, novus,
     log: (...args) => { logs.push(args.join(' ')); if (!quiet) console.log(...args); },
+    notify: () => {},
   });
 
   await browser.launch();

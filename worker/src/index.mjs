@@ -11,7 +11,7 @@ import { OperatorBrowser } from './browser.mjs';
 import { NovusClient } from './novus-client.mjs';
 import { Orchestrator } from './orchestrator.mjs';
 import { createControlServer } from './control-server.mjs';
-import { describeIntervention, notifyIntervention } from './notify.mjs';
+import { describeIntervention, notifyIntervention, prepareNotifications } from './notify.mjs';
 
 loadRepoEnv();
 const config = loadConfig();
@@ -21,6 +21,7 @@ const state = new OperatorState(config.statePath);
 const browser = new OperatorBrowser(config);
 const novus = new NovusClient(config);
 const orchestrator = new Orchestrator({ config, state, browser, novus });
+prepareNotifications();
 
 // A worker that starts on top of an unsettled transaction says so immediately,
 // on the console and on the laptop, instead of waiting to be asked.
@@ -30,7 +31,9 @@ if (plan.action === 'human') {
     || { reason: plan.reason, detail: plan.detail || '', since: new Date().toISOString() };
   state.setRun({ mode: 'needs_human' });
   state.save();
-  notifyIntervention(describeIntervention(plan.reason, plan.detail || plan.reason, state.data.current));
+  notifyIntervention(describeIntervention(plan.reason, plan.detail || plan.reason, state.data.current), {
+    onClick: () => browser.focusInterventionTab(state.data.current),
+  });
 } else if (state.data.run.mode !== 'stopped') {
   state.setRun({ mode: 'stopped', stop_reason: 'worker restarted' });
 }

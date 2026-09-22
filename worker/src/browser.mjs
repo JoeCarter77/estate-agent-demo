@@ -13,17 +13,20 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 export class OperatorBrowser {
   constructor(config) {
     this.config = config;
     this.context = null;
     this.novusPage = null;
+    this.preparedNovusPages = new WeakSet();
   }
 
   async launch() {
     if (this.context) return this.context;
     fs.mkdirSync(this.config.profileDir, { recursive: true });
+    const frontmost = process.platform === 'darwin' ? frontmostPid() : 0;
     this.context = await chromium.launchPersistentContext(this.config.profileDir, {
       headless: this.config.headless,
       channel: this.config.channel || undefined,
@@ -37,7 +40,57 @@ export class OperatorBrowser {
     });
     this.context.setDefaultTimeout(this.config.timeouts.control);
     this.context.setDefaultNavigationTimeout(this.config.timeouts.nav);
+    // Chrome can activate on its first launch. Return focus to the application
+    // the operator was using; subsequent tabs are created in the background.
+    if (frontmost && frontmost !== this.chromePid()) activatePid(frontmost);
     return this.context;
+  }
+
+  chromePid() {
+    if (process.platform !== 'darwin') return 0;
+    try {
+      const lines = execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' }).split('\n');
+      const profile = `--user-data-dir=${this.config.profileDir}`;
+      const line = lines.find((entry) => entry.includes(profile) && !entry.includes('--type='));
+      return Number(line?.trim().split(/\s+/, 1)[0]) || 0;
+    } catch { return 0; }
+  }
+
+  async focusInterventionTab(current = {}) {
+    const tabs = this.rightmoveTabs();
+    const propertyId = /\/properties\/(\d+)/.exec(current.property_url || '')?.[1];
+    const page = (propertyId && tabs.find((tab) => tab.url().includes(`propertyId=${propertyId}`)
+      || tab.url().includes(`/properties/${propertyId}`)))
+      || tabs.find((tab) => tab.url().split('#')[0] === (current.branch_url || '').split('#')[0])
+      || tabs.at(-1) || await this.novusTab();
+    await page.bringToFront(); // Only a notification click may do this.
+    const pid = this.chromePid();
+    if (pid) activatePid(pid);
+  }
+
+  // CDP's background target avoids the foreground activation caused by
+  // window.open and Playwright's newPage. The page stays in the same persistent
+  // context, with the same Rightmove login and normal Playwright control.
+  async openBackgroundTab(url) {
+    await this.launch();
+    const anchor = await this.novusTab();
+    const before = new Set(this.context.pages());
+    const cdp = await this.context.newCDPSession(anchor);
+    // Start blank: an initial URL passed to Target.createTarget can navigate
+    // before Playwright's context routing is attached (including the test's
+    // live-Rightmove blockade). Navigate only through the attached Page.
+    try { await cdp.send('Target.createTarget', { url: 'about:blank', background: true }); }
+    finally { await cdp.detach(); }
+    const deadline = Date.now() + this.config.timeouts.nav;
+    while (Date.now() < deadline) {
+      const page = this.context.pages().find((candidate) => !before.has(candidate) && !candidate.isClosed());
+      if (page) {
+        await page.goto(url, { waitUntil: 'domcontentloaded' });
+        return page;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error(`Background tab did not open: ${url}`);
   }
 
   async close() {
@@ -52,6 +105,17 @@ export class OperatorBrowser {
     if (this.novusPage && !this.novusPage.isClosed()) return this.novusPage;
     const existing = this.context.pages().find((page) => !page.isClosed());
     this.novusPage = existing || (await this.context.newPage());
+    if (!this.preparedNovusPages.has(this.novusPage)) {
+      // The existing Prober auto-opens a branch tab. Only in this worker tab,
+      // suppress that popup; acquireBranchTab opens the same URL in a Chrome
+      // background target. The manual Prober remains untouched.
+      await this.novusPage.addInitScript(() => {
+        const original = window.open.bind(window);
+        window.open = (url, ...args) => /rightmove\.co\.uk\/estate-agents\/agent\//i.test(String(url || ''))
+          ? null : original(url, ...args);
+      });
+      this.preparedNovusPages.add(this.novusPage);
+    }
     return this.novusPage;
   }
 
@@ -146,6 +210,20 @@ export class OperatorBrowser {
       return file;
     } catch { return ''; }
   }
+}
+
+function frontmostPid() {
+  try {
+    const code = 'function run() { ObjC.import("AppKit"); return $.NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier; }';
+    return Number(execFileSync('osascript', ['-l', 'JavaScript', '-e', code], { encoding: 'utf8' }).trim()) || 0;
+  } catch { return 0; }
+}
+
+function activatePid(pid) {
+  try {
+    const code = `function run() { ObjC.import("AppKit"); return $.NSRunningApplication.runningApplicationWithProcessIdentifier(${pid}).activateWithOptions(0); }`;
+    execFileSync('osascript', ['-l', 'JavaScript', '-e', code], { stdio: 'ignore' });
+  } catch { /* focus restoration is best effort */ }
 }
 
 // CAPTCHA / verification detection. Deterministic first — a visible reCAPTCHA

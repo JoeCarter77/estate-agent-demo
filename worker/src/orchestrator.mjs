@@ -39,12 +39,13 @@ const AUTO_SKIP = {
 };
 
 export class Orchestrator {
-  constructor({ config, state, browser, novus, log = console.log }) {
+  constructor({ config, state, browser, novus, log = console.log, notify = notifyIntervention }) {
     this.config = config;
     this.state = state;
     this.browser = browser;
     this.novus = novus;
     this.log = log;
+    this.notify = notify;
     this.prober = null;
     this.emergency = false;
     this.releaseResolver = null;
@@ -133,13 +134,23 @@ export class Orchestrator {
       this.state.clearHuman();
       this.state.fail('abandoned by operator after human review');
       this.state.finishCycle('abandoned');
-      this.state.setRun({ mode: 'running' });
+      this.state.setRun({ mode: this.releaseResolver ? 'running' : 'stopped' });
       if (this.releaseResolver) { this.releaseResolver('abandon'); this.releaseResolver = null; }
       return { ok: true, outcome: 'abandon' };
     }
+    if (!this.releaseResolver && this.state.data.current.submission.state === 'in_flight') {
+      return { ok: false, error: 'this worker restarted after Send; confirm Rightmove’s success or abandon the agency. It cannot resubmit or infer the result.' };
+    }
     this.state.clearHuman();
-    this.state.setRun({ mode: 'running' });
-    if (this.releaseResolver) { this.releaseResolver('resume'); this.releaseResolver = null; }
+    if (this.releaseResolver) {
+      this.state.setRun({ mode: 'running' });
+      this.releaseResolver('resume'); this.releaseResolver = null;
+    } else {
+      const current = this.state.data.current;
+      this.state.stage(current.submission.state === 'sent'
+        ? (current.probe_id ? 'probe_created' : 'submitted') : 'failed');
+      this.state.setRun({ mode: 'stopped', stop_reason: 'session released — press Start to continue safely' });
+    }
     return { ok: true, outcome: 'resume' };
   }
 
@@ -155,7 +166,9 @@ export class Orchestrator {
 
   raiseHuman(reason, detail) {
     this.state.requireHuman(reason, detail);
-    notifyIntervention(describeIntervention(reason, detail, this.state.data.current));
+    this.notify(describeIntervention(reason, detail, this.state.data.current), {
+      onClick: () => this.browser.focusInterventionTab(this.state.data.current),
+    });
   }
 
   // Blocks until the human releases the session. The browser stays open and
@@ -211,21 +224,20 @@ export class Orchestrator {
         if (error instanceof HumanNeeded) {
           const action = await this.waitForRelease(error.reason, error.detail);
           if (action === 'abandon') { outcome = 'abandoned'; }
-          else if (this.state.data.current.submission.state !== 'none') {
-            // Retrying means running the agency again from step 1, which would
-            // reach the enquiry form a second time. That is only ever safe when
-            // Send has not been pressed for this agency.
-            this.log('[operator] not restarting this agency: Send has already been pressed for it');
-            outcome = 'abandoned';
-          } else { continue; }                      // retry the same agency
+          else if (this.state.data.current.submission.state === 'sent') outcome = await this.resumeSentWork();
+          else if (this.state.data.current.submission.state === 'in_flight') {
+            outcome = await this.resumeUncertainWork(error.detail);
+          } else if (this.state.data.current.submission.state === 'failed') outcome = 'abandoned';
+          else { continue; }                      // no Send: retry the same agency
         } else {
-          this.state.fail(error.message);
-          this.state.finishCycle('failed');
           this.log('[operator] cycle failed:', error.message);
-          outcome = 'failed';
-          if (this.state.data.counters.failed % 3 === 0) {
+          if (this.state.data.current.submission.state === 'in_flight') {
+            outcome = await this.resumeUncertainWork(error.message);
+          } else {
             const released = await this.waitForRelease('repeated_failure', error.message);
             if (released === 'abandon') outcome = 'abandoned';
+            else if (this.state.data.current.submission.state === 'sent') outcome = await this.resumeSentWork();
+            else continue;
           }
         }
       }
@@ -268,6 +280,39 @@ export class Orchestrator {
     }
   }
 
+  async resumeSentWork() {
+    // Continue only with NOVUS recording. No path here returns to the form.
+    while (true) {
+      try {
+        const current = this.state.data.current;
+        if (current.marked_sent) {
+          if (current.probe_id) {
+            const probe = await this.novus.probe(current.probe_id).then((data) => data.probe).catch(() => null);
+            if (!isProbeRecordedAsSent(probe)) {
+              throw new HumanNeeded('probe_not_recorded', `PROBES ${current.probe_id} is still not observing; check NOVUS before releasing`);
+            }
+          }
+          this.state.finishCycle('completed');
+          return 'completed';
+        }
+        if (current.probe_id) return (await this.finishMarkSent()) === 'completed' ? 'completed' : 'abandoned';
+        return this.createProbeAndMarkSent(current.property_url);
+      } catch (error) {
+        const released = await this.waitForRelease(error.reason || 'probe_not_recorded', error.detail || error.message);
+        if (released === 'abandon') return 'abandoned';
+      }
+    }
+  }
+
+  async resumeUncertainWork(detail) {
+    const page = this.browser.rightmoveTabs().at(-1);
+    if (page) return this.resolveUncertainSubmission(page, 'editable', detail, this.state.data.current.property_url);
+    const released = await this.waitForRelease('uncertain_submission', `${detail} — the submitted tab is no longer open`);
+    if (released === 'abandon') return 'abandoned';
+    if (this.state.data.current.submission.state === 'sent') return this.resumeSentWork();
+    return this.resumeUncertainWork(detail);
+  }
+
   // Resume a half-finished transaction without re-submitting anything.
   async recover(plan) {
     const current = this.state.data.current;
@@ -297,6 +342,7 @@ export class Orchestrator {
 
   async cycle() {
     // STEP 1 — Start probing / next eligible agency.
+    await this.pace();
     this.state.stage('loading_queue');
     const loaded = await this.prober.startProbing();
     if (loaded.empty) return 'queue_empty';
@@ -318,7 +364,7 @@ export class Orchestrator {
       branch_url: loaded.branchUrl || agency.rightmove_sales_branch_url || '',
     });
     this.log(`[operator] agency: ${this.state.data.current.agency_name} (${loaded.agencyId})`);
-    await this.checkpoint();
+    await this.pace();
 
     // STEP 2 — the agency's Rightmove branch page, in its own tab.
     const branchPage = await this.acquireBranchTab();
@@ -338,22 +384,19 @@ export class Orchestrator {
         triage?.reason ? `${verified.reason} — ${triage.reason}` : verified.reason);
     }
     this.state.stage('branch_open');
-    await this.checkpoint();
+    await this.pace();
 
     // STEP 3 — choose a suitable residential sales listing, or skip.
     const chosen = await this.selectProperty(branchPage, verified);
     if (chosen === 'skipped') return 'skipped';
-    await this.checkpoint();
+    await this.pace();
 
     // STEP 4 & 5 — open it, verify ownership, capture the canonical URL.
     // Only the tab holding the listing that was chosen will do. Matching on the
     // property id means a stray tab — an interstitial, or the Prober's own
     // branch popup arriving late — can never be mistaken for it.
     const chosenId = propertyIdOf(chosen.href);
-    const { page: propertyPage } = await this.browser.openInNewTab(
-      () => branchPage.evaluate((href) => window.open(href, '_blank'), chosen.href),
-      { fallbackUrl: chosen.href, matches: (url) => !chosenId || propertyIdOf(url) === chosenId },
-    );
+    const propertyPage = await this.browser.openBackgroundTab(chosen.href);
     if (!propertyPage) throw new HumanNeeded('agency_page_unavailable', 'the property tab would not open');
     this.state.stage('property_selected');
 
@@ -370,7 +413,7 @@ export class Orchestrator {
     }
     this.state.stage('url_captured', { property_url: property.url, property_title: property.title });
     this.log(`[operator] property: ${property.url}`);
-    await this.checkpoint();
+    await this.pace();
 
     // STEP 6 — the enquiry form.
     const form = await openEnquiryForm(propertyPage);
@@ -385,6 +428,7 @@ export class Orchestrator {
     const layout = form.layout || 'editable';
     this.log(`[operator] enquiry form: ${layout === 'signed_in' ? 'signed-in summary' : 'editable fields'}`);
     this.state.stage('form_open');
+    await this.pace();
 
     // STEP 7 — verify the approved identity and seller signal.
     const prepared = await verifyAndPrepareEnquiry(propertyPage, {
@@ -401,7 +445,7 @@ export class Orchestrator {
           .filter(Boolean).join(' — '));
     }
     this.state.stage('form_verified');
-    await this.checkpoint();
+    await this.pace();
 
     // STEP 8 — submit, and wait for a definitive result.
     if (!this.state.data.run.live_submit) {
@@ -506,9 +550,11 @@ export class Orchestrator {
       }
       reason = `still not confirmed after release: ${seen.detail}`;
     }
-    // Out of rechecks. The agency is preserved and nothing was resubmitted.
-    this.state.requireHuman('uncertain_submission', reason);
-    return 'abandoned';
+    // Keep the agency paused even after several inconclusive rechecks.
+    const released = await this.waitForRelease('uncertain_submission', reason);
+    if (released === 'abandon') return 'abandoned';
+    if (this.state.data.current.submission.state === 'sent') return this.resumeSentWork();
+    return this.resolveUncertainSubmission(page, layout, reason, propertyUrl);
   }
 
   // STEP 2's tab handling. probe.html already calls window.open on the branch
@@ -518,14 +564,10 @@ export class Orchestrator {
   async acquireBranchTab() {
     const branchUrl = this.state.data.current.branch_url;
     const existing = this.browser.rightmoveTabs()
-      .find((page) => /\/estate-agents\/agent\//i.test(page.url()));
+      .find((page) => page.url().split('#')[0] === branchUrl.split('#')[0]);
     if (existing) return existing;
-    const { page } = await this.browser.openInNewTab(
-      () => this.prober.branchLink().click({ timeout: 8000 }),
-      { fallbackUrl: branchUrl, matches: (url) => /\/estate-agents\/agent\//i.test(url) },
-    );
-    if (!page) throw new HumanNeeded('agency_page_unavailable', `could not open ${branchUrl}`);
-    return page;
+    if (!/^https?:\/\//i.test(branchUrl)) throw new HumanNeeded('agency_page_unavailable', `invalid branch URL: ${branchUrl}`);
+    return this.browser.openBackgroundTab(branchUrl);
   }
 
   // STEP 3 proper. Deterministic first; the model is consulted only when the
@@ -601,6 +643,16 @@ export class Orchestrator {
     }
   }
 
+  // Page-specific waits above establish readiness; this adds a small,
+  // interruptible gap only between the major actions.
+  async pace() {
+    const until = Date.now() + (this.config.actionDelayMs || 0);
+    do {
+      await this.checkpoint();
+      if (Date.now() < until) await new Promise((resolve) => setTimeout(resolve, Math.min(200, until - Date.now())));
+    } while (Date.now() < until);
+  }
+
   async triageUnknownPage(page) {
     if (!this.config.aiEnabled) return null;
     try {
@@ -624,7 +676,6 @@ export class Orchestrator {
     await this.browser.closeRightmoveTabs();               // 3.1
     this.state.stage('skipping');
     const page = await this.browser.novusTab();            // 3.2
-    await page.bringToFront().catch(() => {});
     const result = await this.prober.skipAgency(label);    // 3.3 → 3.5
     if (!result.ok) throw new HumanNeeded('agency_page_unavailable', `Skip agency failed: ${result.error}`);
     this.state.finishCycle('skipped');
@@ -636,7 +687,6 @@ export class Orchestrator {
   async createProbeAndMarkSent(propertyUrl) {
     await this.browser.closeRightmoveTabs();               // 10.1
     const page = await this.browser.novusTab();
-    await page.bringToFront().catch(() => {});
 
     // The Prober tab may have drifted; re-open the agency so #url and
     // #create-btn are the controls for THIS agency.

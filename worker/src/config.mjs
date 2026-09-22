@@ -85,6 +85,7 @@ export function loadConfig(env = process.env) {
       minSeconds: Math.max(0, Number(env.NOVUS_OPERATOR_COOLDOWN_MIN_SECONDS ?? 30)),
       maxSeconds: Math.max(0, Number(env.NOVUS_OPERATOR_COOLDOWN_MAX_SECONDS ?? 60)),
     },
+    actionDelayMs: Math.max(0, Number(env.NOVUS_OPERATOR_ACTION_DELAY_MS ?? 750)),
 
     aiModel: env.NOVUS_OPERATOR_AI_MODEL || 'claude-sonnet-5',
     aiEnabled: bool(env.NOVUS_OPERATOR_AI, true),

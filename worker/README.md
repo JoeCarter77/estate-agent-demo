@@ -118,6 +118,12 @@ refused anyway, the operator saves a screenshot **and** the page's HTML into
 
 ## Pacing
 
+`NOVUS_OPERATOR_ACTION_DELAY_MS` (default 750 ms; `0` disables it) spaces the
+major actions: loading the next agency, opening its branch, choosing and opening
+a property, opening and preparing the enquiry form, and submitting. The worker
+still waits for the relevant page or control to become ready first. These short
+gaps honour Pause and emergency stop.
+
 `NOVUS_OPERATOR_COOLDOWN_MIN_SECONDS` / `_MAX_SECONDS` (default 30–60) put a
 randomised wait between one confirmed enquiry and the next agency. It runs only
 after an enquiry actually went out, never after the last probe of a batch,
@@ -135,6 +141,12 @@ CAPTCHA · expired Rightmove sign-in · unexpected verification · unavailable
 agency page · uncertain property suitability · unexpected enquiry form ·
 uncertain submission result · repeated browser failure · a probe NOVUS did not
 record as sent.
+
+The notification is sent by a small local macOS helper built from
+`src/macos-notifier.swift` when the worker starts. Allow **NOVUS Operator**
+notifications if macOS asks. Clicking the notification selects the held
+Rightmove tab and activates this worker's Chrome instance; routine navigation
+keeps Chrome in the background. The existing persistent Chrome profile is used.
 
 Finish whatever is needed in the operator's own browser window, then press
 **I have finished — release the session**. The operator then RE-READS the page;
