@@ -8,3 +8,4 @@ dump-*.html
 .claude
 worker/.state/
 worker/node_modules/
+docs/commercial-reset/cohorts/

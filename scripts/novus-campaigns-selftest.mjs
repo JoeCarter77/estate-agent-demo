@@ -260,7 +260,7 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
   const call = async (method, operation, body, query = {}, headers = {}) => { const res = response(); await handler({ method, query: { novus_operation: operation, ...query }, headers: { authorization: basic, ...headers }, body }, res); return res; };
 
   // Fake Instantly. Records every write so the test can assert what was sent.
-  const instantly = { campaigns: new Map(), leads: new Map(), calls: [], failNextAdd: false, activated: [], paused: [] };
+  const instantly = { campaigns: new Map(), leads: new Map(), calls: [], failNextAdd: false, dropSequenceOnCreate: true, activated: [], paused: [] };
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (url, init = {}) => {
     const u = new URL(url);
@@ -269,7 +269,7 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
     instantly.calls.push({ path: u.pathname, method: init.method, body });
     const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status });
     if (init.method === 'GET' && u.pathname === '/api/v2/campaigns') return json({ items: [...instantly.campaigns.values()], next_starting_after: null });
-    if (init.method === 'POST' && u.pathname === '/api/v2/campaigns') { const id = `ic_${instantly.campaigns.size + 1}`; const c = { id, name: body.name, status: 0, email_list: body.email_list, daily_limit: body.daily_limit, sequences: body.sequences, stop_on_reply: body.stop_on_reply }; instantly.campaigns.set(id, c); return json(c); }
+    if (init.method === 'POST' && u.pathname === '/api/v2/campaigns') { const id = `ic_${instantly.campaigns.size + 1}`; const c = { ...body, id, status: 0 }; if (instantly.dropSequenceOnCreate) { c.sequences = []; instantly.dropSequenceOnCreate = false; } instantly.campaigns.set(id, c); return json(c); }
     const m = u.pathname.match(/^\/api\/v2\/campaigns\/([^/]+)(\/activate|\/pause)?$/);
     if (m && m[1] !== 'analytics') {
       const c = instantly.campaigns.get(m[1]); if (!c) return json({ statusCode: 404, error: 'Not Found', message: 'no campaign' }, 404);
@@ -321,6 +321,13 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
   assert.equal(store.CAMPAIGN_MEMBERS[1][0], 'SCHEMA NOTE');
   ok('setup creates the three tabs with header + SCHEMA NOTE rows');
 
+  const quotaError = Object.assign(new Error('RESOURCE_EXHAUSTED'), { statusCode: 429 });
+  __setRepoForTests({ ...repo, getTable: async (tab) => { if (tab === 'CONTACTS') throw quotaError; return repo.getTable(tab); } });
+  res = await call('POST', 'campaign-audience', { campaign_type: 'ENQUIRY_FOLLOWUP', filters: {} });
+  assert.equal(res.statusCode, 429); assert.match(res.body.error, /could not be verified/);
+  __setRepoForTests(repo);
+  ok('a quota error in an optional audience tab fails closed instead of making a partial audience');
+
   res = await call('POST', 'campaign-audience', { campaign_type: 'ENQUIRY_FOLLOWUP', filters: { include_risky: true }, policy: { allow_risky_email: true } });
   assert.equal(res.statusCode, 200); assert.equal(res.body.selected, 5);
   assert.equal(res.body.summary.READY, 2); assert.equal(res.body.summary.WARNING, 2); assert.equal(res.body.summary.BLOCKED, 1);
@@ -331,7 +338,7 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
   const sending = { email_list: ['joe@novushq.co.uk'], daily_limit: 30 };
   res = await call('POST', 'campaign-create', { name: 'Enquiry → Quick Call V1', sequence, sending, filters: { include_risky: true }, policy: { allow_risky_email: true } });
   assert.equal(res.statusCode, 400); assert.match(res.body.error, /confirm/);
-  res = await call('POST', 'campaign-create', { confirm: 'CREATE_CAMPAIGN', name: 'Enquiry → Quick Call V1', campaign_type: 'ENQUIRY_FOLLOWUP', sequence, sending, filters: { include_risky: true }, policy: { allow_risky_email: true } });
+  res = await call('POST', 'campaign-create', { confirm: 'CREATE_CAMPAIGN', confirm_recipient_count: 5, name: 'Enquiry → Quick Call V1', campaign_type: 'ENQUIRY_FOLLOWUP', sequence, sending, filters: { include_risky: true }, policy: { allow_risky_email: true } });
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   const campaignId = res.body.campaign_id;
   assert.equal(res.body.members, 5);
@@ -363,6 +370,8 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
   const instantlyId = res.body.instantly_campaign_id;
   const createCall = instantly.calls.find((c) => c.path === '/api/v2/campaigns' && c.method === 'POST');
   assert.equal(createCall.body.name, 'Enquiry → Quick Call V1'); assert.equal(createCall.body.sequences[0].steps[0].delay, 3);
+  assert.equal(instantly.calls.filter((c) => c.path === `/api/v2/campaigns/${instantlyId}` && c.method === 'PATCH').length, 1, 'a shell-only create is repaired once before enrolment');
+  assert.equal(instantly.campaigns.get(instantlyId).sequences[0].steps.length, 2);
   assert.deepEqual(createCall.body.email_list, ['joe@novushq.co.uk']);
   const addCall = instantly.calls.find((c) => c.path === '/api/v2/leads/add');
   assert.deepEqual(addCall.body.leads.map((l) => l.email), ['jane@alpha.co.uk', 'kim@zeta.co.uk']); assert.equal(addCall.body.skip_if_in_campaign, true);
@@ -399,6 +408,8 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
   assert.equal(res.statusCode, 200, JSON.stringify(res.body)); assert.equal(res.body.success, true); assert.equal(res.body.pushed, 2); assert.equal(res.body.warnings_held, 0);
   const retryAdd = instantly.calls.slice(callsBefore).find((c) => c.path === '/api/v2/leads/add');
   assert.deepEqual(retryAdd.body.leads.map((l) => l.email).sort(), ['info@beta.co.uk', 'sam@gamma.co.uk']);
+  assert.equal(instantly.campaigns.get(instantlyId).sequences[0].steps.length, 2, 'repeat push does not append sequence steps');
+  assert.equal(instantly.calls.slice(callsBefore).filter((c) => c.method === 'PATCH' && c.path === `/api/v2/campaigns/${instantlyId}`).length, 0, 'matching provider sequence is not rewritten');
   res = await call('GET', 'campaign-detail', null, { campaign_id: campaignId });
   assert.equal(res.body.members.filter((m) => m.member_status === 'PUSHED').length, 4); assert.equal(res.body.campaign.last_error, '');
   ok('retrying a push is idempotent: only PUSH_FAILED members are re-sent, the error clears');
@@ -406,6 +417,14 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
   // Launch: needs acknowledge=true, then activates exactly once.
   res = await call('POST', 'campaign-launch', { confirm: 'LAUNCH_CAMPAIGN', campaign_id: campaignId });
   assert.equal(res.statusCode, 400);
+  const remoteBeforeLaunch = instantly.campaigns.get(instantlyId);
+  const approvedBody = remoteBeforeLaunch.sequences[0].steps[0].variants[0].body;
+  remoteBeforeLaunch.sequences[0].steps[0].variants[0].body = 'Changed copy';
+  res = await call('POST', 'campaign-launch', { confirm: 'LAUNCH_CAMPAIGN', campaign_id: campaignId, acknowledge: true });
+  assert.equal(res.statusCode, 409); assert.match(res.body.error, /step 1 body/);
+  assert.equal(instantly.activated.length, 0);
+  remoteBeforeLaunch.sequences[0].steps[0].variants[0].body = approvedBody;
+  ok('launch blocks material provider copy drift after a successful push');
   res = await call('POST', 'campaign-launch', { confirm: 'LAUNCH_CAMPAIGN', campaign_id: campaignId, acknowledge: true });
   assert.equal(res.statusCode, 200, JSON.stringify(res.body)); assert.equal(res.body.status, 'ACTIVE');
   assert.deepEqual(instantly.activated, [instantlyId]);
@@ -508,7 +527,7 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
   store.PROBES.push(['pr_7', 'RM-0007', 'ag_7', 'rightmove', '10 High Street, London', '10 High Street', iso(T0 - 8 * DAY), 'closed', 'FALSE', iso(T0 - DAY), iso(T0 - 8 * DAY), 'Declared: has a property to sell, not yet on the market.']);
   res = await call('POST', 'campaign-create', { confirm: 'CREATE_CAMPAIGN', name: PROBE_CALL_CAMPAIGN_NAME, campaign_type: PROBE_CALL_CAMPAIGN_TYPE, sequence: PROBE_CALL_SEQUENCE, sending, filters: {} });
   assert.equal(res.statusCode, 400); assert.match(res.body.error, /explicit agency ID cohort/);
-  res = await call('POST', 'campaign-create', { confirm: 'CREATE_CAMPAIGN', name: PROBE_CALL_CAMPAIGN_NAME, campaign_type: PROBE_CALL_CAMPAIGN_TYPE, sequence: PROBE_CALL_SEQUENCE, sending, filters: { agency_ids: ['ag_7'] } });
+  res = await call('POST', 'campaign-create', { confirm: 'CREATE_CAMPAIGN', confirm_recipient_count: 1, name: PROBE_CALL_CAMPAIGN_NAME, campaign_type: PROBE_CALL_CAMPAIGN_TYPE, sequence: PROBE_CALL_SEQUENCE, sending, filters: { agency_ids: ['ag_7'] } });
   assert.equal(res.statusCode, 200, JSON.stringify(res.body)); assert.equal(res.body.summary.READY, 1);
   const probeCampaignId = res.body.campaign_id;
   const remoteProbeCampaign = { id: 'ic_probe', ...buildInstantlyCampaignPayload({ name: PROBE_CALL_CAMPAIGN_NAME, sequence: PROBE_CALL_SEQUENCE, schedule: { name: 'NOVUS working hours', from: '09:00', to: '17:00', timezone: 'Europe/Isle_of_Man', days: { 0: false, 1: true, 2: true, 3: true, 4: true, 5: true, 6: false } }, sending: { email_list: ['joe@novushq.co.uk'], daily_limit: 30, stop_on_reply: true, stop_on_auto_reply: false, open_tracking: true, link_tracking: false, text_only: false } }), status: 0 };
@@ -517,7 +536,7 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
   const beforeRecovery = instantly.calls.filter((item) => item.path === '/api/v2/leads/add').length;
   remoteProbeCampaign.stop_on_reply = false;
   res = await call('POST', 'campaign-push', { confirm: 'PUSH_TO_INSTANTLY', campaign_id: probeCampaignId });
-  assert.equal(res.statusCode, 502); assert.match(res.body.error, /draft copy/);
+  assert.equal(res.statusCode, 502); assert.match(res.body.error, /Instantly read-back differs: stop_on_reply/);
   remoteProbeCampaign.stop_on_reply = true;
   res = await call('POST', 'campaign-push', { confirm: 'PUSH_TO_INSTANTLY', campaign_id: probeCampaignId });
   assert.equal(res.statusCode, 200, JSON.stringify(res.body)); assert.equal(res.body.skipped, 1);
@@ -782,7 +801,7 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
     const u = new URL(url); const body = init.body ? JSON.parse(init.body) : null;
     apiCalls.push({ path: u.pathname, method: init.method, query: Object.fromEntries(u.searchParams) });
     const json = (o, status = 200) => new Response(JSON.stringify(o), { status });
-    if (init.method === 'POST' && u.pathname === '/api/v2/campaigns') { const id = `poll_ic_${instantly.campaigns.size + 1}`; const c = { id, name: body.name, status: 0, email_list: body.email_list, daily_limit: body.daily_limit }; instantly.campaigns.set(id, c); return json(c); }
+    if (init.method === 'POST' && u.pathname === '/api/v2/campaigns') { const id = `poll_ic_${instantly.campaigns.size + 1}`; const c = { ...body, id, status: 0 }; instantly.campaigns.set(id, c); return json(c); }
     const m = u.pathname.match(/^\/api\/v2\/campaigns\/([^/]+)(\/activate|\/pause)?$/);
     if (m && m[1] !== 'analytics') {
       const c = instantly.campaigns.get(m[1]); if (!c) return json({ statusCode: 404, error: 'Not Found', message: 'no campaign' }, 404);
@@ -811,7 +830,7 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
   // ag_1 (Jane Smith, jane@alpha.co.uk) is a clean, never-contacted, closed-
   // probe, personalised, VALID-email agency — the same one section 2 proves
   // reads READY for a fresh ENQUIRY_FOLLOWUP campaign.
-  res = await call('POST', 'campaign-create', { confirm: 'CREATE_CAMPAIGN', name: 'Growth Plan Poll Test', campaign_type: 'ENQUIRY_FOLLOWUP', sequence: { steps: [{ subject: 'Hi {{firstName}}', body: 'Hello' }] }, sending: { email_list: ['joe@novushq.co.uk'] }, filters: { agency_ids: ['ag_1'] } });
+  res = await call('POST', 'campaign-create', { confirm: 'CREATE_CAMPAIGN', confirm_recipient_count: 1, name: 'Growth Plan Poll Test', campaign_type: 'ENQUIRY_FOLLOWUP', sequence: { steps: [{ subject: 'Hi {{firstName}}', body: 'Hello' }] }, sending: { email_list: ['joe@novushq.co.uk'] }, filters: { agency_ids: ['ag_1'] } });
   assert.equal(res.statusCode, 200, JSON.stringify(res.body)); assert.equal(res.body.summary.READY, 1);
   const campaignId = res.body.campaign_id;
   res = await call('POST', 'campaign-push', { confirm: 'PUSH_TO_INSTANTLY', campaign_id: campaignId });

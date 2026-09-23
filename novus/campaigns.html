@@ -170,26 +170,34 @@
         </div>
         <div class="wiz">
           <div class="wiz-rail" id="wiz-rail">
-            <button class="wiz-step on" data-step="audience" type="button"><span class="n">1</span><span><span class="t">Audience</span><span class="s" id="ws-audience">Filters + eligibility</span></span></button>
-            <button class="wiz-step" data-step="sequence" type="button"><span class="n">2</span><span><span class="t">Sequence</span><span class="s" id="ws-sequence">Emails + delays</span></span></button>
-            <button class="wiz-step" data-step="sending" type="button"><span class="n">3</span><span><span class="t">Sending</span><span class="s" id="ws-sending">Accounts + schedule</span></span></button>
-            <button class="wiz-step" data-step="review" type="button"><span class="n">4</span><span><span class="t">Review</span><span class="s" id="ws-review">Create the draft</span></span></button>
+            <button class="wiz-step on" data-step="campaign" type="button"><span class="n">1</span><span><span class="t">Select campaign</span><span class="s">Preset or custom</span></span></button>
+            <button class="wiz-step" data-step="audience" type="button"><span class="n">2</span><span><span class="t">Select audience</span><span class="s" id="ws-audience">Cohort + eligibility</span></span></button>
+            <button class="wiz-step" data-step="settings" type="button"><span class="n">3</span><span><span class="t">Review settings</span><span class="s" id="ws-sequence">Sequence + sending</span></span></button>
+            <button class="wiz-step" data-step="review" type="button"><span class="n">4</span><span><span class="t">Create draft</span><span class="s" id="ws-review">Confirm recipients</span></span></button>
           </div>
           <div>
+            <div class="wiz-pane on" id="wp-campaign">
+              <div class="card"><div class="card-body">
+                <div class="fl">Campaign</div>
+                <input class="input" id="f-name" type="text" placeholder="Campaign name, e.g. Enquiry → Quick Call V1" />
+                <select class="input" id="f-type">
+                  <option value="FOUNDING_PILOT_OUTCOME">Founding pilot · A1 outcome-led (no probe)</option>
+                  <option value="FOUNDING_PILOT_OUTCOME_UPFRONT">Founding pilot · A2 outcome-led, refund upfront (no probe)</option>
+                  <option value="FOUNDING_PILOT_PROBE">Founding pilot · B probe-led</option>
+                  <option value="PROBE_FIVE_MINUTE_CALL">Probe-led 5-minute call</option>
+                  <option value="ENQUIRY_FOLLOWUP">Enquiry follow-up (copy refers to the probe)</option>
+                  <option value="GENERAL">General (no probe required)</option>
+                </select>
+                <p class="small-note" id="cohort-note">Selecting a founding pilot loads its prepared cohort.</p>
+              </div></div>
+              <div class="wiz-foot"><span class="spacer"></span><button class="btn btn-primary" data-next="audience" type="button">Next: audience →</button></div>
+            </div>
             <!-- 1 · AUDIENCE -->
-            <div class="wiz-pane on" id="wp-audience">
+            <div class="wiz-pane" id="wp-audience">
               <div class="aud">
                 <div class="aud-filters" id="aud-filters">
-                  <div class="fl">Campaign</div>
-                  <input class="input" id="f-name" type="text" placeholder="Campaign name, e.g. Enquiry → Quick Call V1" />
-                  <select class="input" id="f-type">
-                    <option value="FOUNDING_PILOT_OUTCOME">Founding pilot · A1 outcome-led (no probe)</option>
-                    <option value="FOUNDING_PILOT_OUTCOME_UPFRONT">Founding pilot · A2 outcome-led, refund upfront (no probe)</option>
-                    <option value="FOUNDING_PILOT_PROBE">Founding pilot · B probe-led</option>
-                    <option value="PROBE_FIVE_MINUTE_CALL">Probe-led 5-minute call</option>
-                    <option value="ENQUIRY_FOLLOWUP">Enquiry follow-up (copy refers to the probe)</option>
-                    <option value="GENERAL">General (no probe required)</option>
-                  </select>
+                  <div id="custom-audience-mode" style="display:none"><div class="fl">Audience source</div><select class="input" id="f-audience_mode"><option value="MANUAL">Manually selected agencies</option><option value="FILTERS">Advanced filters</option></select><input class="input" id="f-agency_ids" type="text" placeholder="Agency IDs, comma-separated" /></div>
+                  <details id="advanced-filters"><summary class="fl" style="cursor:pointer">Advanced Filters</summary>
                   <div class="fl">Contact</div>
                   <label class="ck"><input type="checkbox" id="f-email_exists" checked /> Email exists</label>
                   <label class="ck"><input type="checkbox" id="f-valid" checked /> VALID email</label>
@@ -214,7 +222,6 @@
                   <label class="ck"><input type="checkbox" id="f-include_opted_out" /> Include opted out (always blocked)</label>
                   <label class="ck"><input type="checkbox" id="f-include_bounced" /> Include bounced (always blocked)</label>
                   <div class="fl">Agency</div>
-                  <input class="input" id="f-agency_ids" type="text" placeholder="Controlled cohort: agency IDs, comma-separated" />
                   <input class="input" id="f-agency_name" type="text" placeholder="Agency name contains…" />
                   <input class="input" id="f-location" type="text" list="dl-locations" placeholder="Location contains…" /><datalist id="dl-locations"></datalist>
                   <input class="input" id="f-crm" type="text" list="dl-crms" placeholder="CRM contains…" /><datalist id="dl-crms"></datalist>
@@ -230,6 +237,7 @@
                   <label class="ck"><input type="checkbox" id="p-block_active_followup" checked /> Block active follow-ups</label>
                   <label class="ck"><input type="checkbox" id="p-block_meeting_booked" checked /> Block meeting booked</label>
                   <div class="btnrow"><button class="btn btn-quiet btn-sm" id="f-reset" type="button">Reset filters</button></div>
+                  </details>
                 </div>
                 <div>
                   <div class="aud-counts">
@@ -248,22 +256,22 @@
                   </div>
                 </div>
               </div>
-              <div class="wiz-foot"><span class="hint">Blocked leads can never be pushed. Warnings need an explicit acknowledgement before push.</span><span class="spacer"></span>
-                <button class="btn btn-primary" data-next="sequence" type="button">Next: sequence →</button></div>
+              <div class="wiz-foot"><button class="btn btn-quiet" data-next="campaign" type="button">← Campaign</button><span class="spacer"></span>
+                <button class="btn btn-primary" data-next="settings" type="button">Next: settings →</button></div>
             </div>
 
             <!-- 2 · SEQUENCE -->
-            <div class="wiz-pane" id="wp-sequence">
+            <div class="wiz-pane" id="wp-settings">
+            <div id="wp-sequence">
               <div class="section-head"><div class="section-title">Sequence</div>
                 <div class="section-note">Plain text; line breaks are preserved. Instantly merge fields and NOVUS variables are inserted with the chips.</div>
                 <button class="section-link" id="seq-add" type="button">+ Add follow-up</button></div>
               <div class="seq" id="seq"></div>
-              <div class="wiz-foot"><button class="btn btn-quiet" data-next="audience" type="button">← Audience</button><span class="spacer"></span>
-                <button class="btn btn-primary" data-next="sending" type="button">Next: sending →</button></div>
             </div>
 
             <!-- 3 · SENDING -->
-            <div class="wiz-pane" id="wp-sending">
+            <div id="wp-sending" style="margin-top:var(--s-5)">
+              <div class="section-head"><div class="section-title">Sending settings</div><span class="section-note" id="ws-sending"></span></div>
               <div class="an-grid">
                 <div class="card"><div class="card-head"><div class="card-title">Sending accounts</div><div class="card-note" id="acct-note"></div></div>
                   <div class="card-body" id="accts"></div></div>
@@ -289,20 +297,22 @@
                     </div></div></div>
                 </div>
               </div>
-              <div class="wiz-foot"><button class="btn btn-quiet" data-next="sequence" type="button">← Sequence</button><span class="spacer"></span>
+              <div class="wiz-foot"><button class="btn btn-quiet" data-next="audience" type="button">← Audience</button><span class="spacer"></span>
                 <button class="btn btn-primary" data-next="review" type="button">Next: review →</button></div>
+            </div>
             </div>
 
             <!-- 4 · REVIEW -->
             <div class="wiz-pane" id="wp-review">
               <div class="ledger" id="review"></div>
+              <label class="ck"><input type="checkbox" id="confirm-recipient-count" /> I confirm the final recipient count shown above.</label>
               <div class="gate blue">
                 <div class="t">Create the draft in NOVUS</div>
                 <div class="s">Nothing is sent and nothing reaches Instantly yet. The audience is rebuilt server-side and stored with each lead's eligibility decision.
                   Push and Launch are separate, confirmed steps on the campaign page.</div>
                 <div class="btnrow"><button class="btn btn-primary" id="create-btn" type="button">Create draft campaign</button><span class="hint" id="create-err" style="color:var(--red)"></span></div>
               </div>
-              <div class="wiz-foot"><button class="btn btn-quiet" data-next="sending" type="button">← Sending</button></div>
+              <div class="wiz-foot"><button class="btn btn-quiet" data-next="settings" type="button">← Settings</button></div>
             </div>
           </div>
         </div>
@@ -458,6 +468,8 @@ function readFilters(){
   f.verification = $('f-valid').checked ? ['VALID'] : ['VALID','RISKY','UNKNOWN','INVALID','ACCEPT_ALL',''];
   if(!$('f-valid').checked) f.email_exists = $('f-email_exists').checked;
   f.exclude_agency_ids = [...WIZ.excluded];
+  if(presetFor($('f-type').value)?.cohort) f.agency_ids = [];
+  else if($('f-audience_mode').value === 'FILTERS') f.agency_ids = [];
   return f;
 }
 function readPolicy(){
@@ -466,21 +478,22 @@ function readPolicy(){
   p.requires_probe = $('f-type').value !== 'GENERAL';
   return p;
 }
-function scheduleAudience(){ if(WIZ.timer) clearTimeout(WIZ.timer); WIZ.timer = setTimeout(previewAudience, 250); }
+function scheduleAudience(){ if(WIZ.timer) clearTimeout(WIZ.timer); ++WIZ.seq; WIZ.audience = null; $('confirm-recipient-count').checked = false; $('a-selected').textContent = '—'; $('a-note').textContent = 'Updating…'; WIZ.timer = setTimeout(previewAudience, 800); }
 async function previewAudience(){
   const seq = ++WIZ.seq;
+  WIZ.audience = null; $('confirm-recipient-count').checked = false;
   $('a-note').textContent = 'Updating…';
   try{
-    const data = await post(OP('campaign-audience'), { campaign_type: $('f-type').value, filters: readFilters(), policy: readPolicy(), limit: 400 });
+    const data = await post(OP('campaign-audience'), { campaign_type: $('f-type').value, audience_source: $('f-audience_mode').value, filters: readFilters(), policy: readPolicy(), limit: 400 });
     if(seq !== WIZ.seq) return;
     WIZ.audience = data; renderAudience();
-  }catch(err){ if(seq === WIZ.seq) $('a-note').textContent = `Preview failed: ${err.message}`; }
+  }catch(err){ if(seq === WIZ.seq){ WIZ.audience = null; $('a-selected').textContent = '—'; $('a-note').textContent = `Audience unavailable: ${err.message}. Draft creation is blocked.`; } }
 }
 function renderAudience(){
   const a = WIZ.audience; if(!a) return;
   const s = a.summary; const labels = LIST?.enums?.reason_labels || {};
   $('a-selected').innerHTML = `${esc(a.selected)}`;
-  $('a-line').innerHTML = `<b style="color:var(--blue-hi)">${esc(s.READY)} ready</b> · <span style="color:var(--amber)">${esc(s.WARNING)} warning</span> · <span style="color:var(--red)">${esc(s.BLOCKED)} blocked</span> · of ${esc(a.total_agencies)} agencies`;
+  $('a-line').innerHTML = `<b>${esc(a.cohort?.label || (a.audience_source === 'MANUAL' ? 'Manually selected agencies' : 'Filter-generated audience'))}</b>${a.cohort ? ` · ${esc(a.cohort.count)} in prepared cohort` : ''}<br/><b style="color:var(--blue-hi)">${esc(s.READY)} ready</b> · <span style="color:var(--amber)">${esc(s.WARNING)} warning</span> · <span style="color:var(--red)">${esc(s.BLOCKED)} blocked</span>`;
   $('a-reasons').innerHTML = s.reason_breakdown.length
     ? s.reason_breakdown.map((r) => `<div class="aud-reason ${r.severity === 'BLOCK' ? 'block' : 'warn'}"><span class="ic">${r.severity === 'BLOCK' ? '⛔' : '⚠️'}</span><span>${esc(r.label)}</span><span class="cnt">${esc(r.count)}</span></div>`).join('') + `<div class="aud-reason ok"><span class="ic">✅</span><span>Eligible to add</span><span class="cnt">${esc(s.READY)}</span></div>`
     : `<div class="aud-reason ok"><span class="ic">✅</span><span>Eligible to add</span><span class="cnt">${esc(s.READY)}</span></div>`;
@@ -549,7 +562,8 @@ function renderReview(){
     ['Sequence', WIZ.steps.map((st, i) => `${i === 0 ? 'Email 1' : `+${st.delay_days}d follow-up ${i}`}: <span class="muted">${esc(st.subject)}</span>`).join('<br/>')],
     ['Sending accounts', snd.email_list.length ? snd.email_list.map((e) => `<span class="mono">${esc(e)}</span>`).join(', ') : '<span style="color:var(--red)">none selected</span>'],
     ['Schedule', `${esc(Object.entries(sch.days).filter(([,v]) => v).map(([d]) => dayNames[d]).join(' '))} · ${esc(sch.from)}–${esc(sch.to)} UK${sch.start_date ? ` · from ${esc(sch.start_date)}` : ''} · ${esc(snd.daily_limit)}/day${snd.stop_on_reply ? ' · stops on reply' : ''}`],
-    ['Total selected', a ? `<b>${esc(a.selected)}</b> agencies` : '<span class="muted">no preview</span>'],
+    ['Audience', a ? `<b>${esc(a.cohort?.label || (a.audience_source === 'MANUAL' ? 'Manually selected' : 'Filter-generated'))}</b>` : '<span class="muted">unverified</span>'],
+    ['Final recipient count', a ? `<b>${esc(a.selected)}</b> agencies` : '<span class="muted">no preview</span>'],
     ['Eligible', a ? `<b style="color:var(--blue-hi)">${esc(s.READY)} READY</b> <span class="muted">— only these are pushed by default</span>` : ''],
     ['Warnings', a ? `<span style="color:var(--amber)">${esc(s.WARNING)}</span> <span class="muted">— pushed only after explicit acknowledgement on the campaign page</span>` : ''],
     ['Blocked', a ? `<span style="color:var(--red)">${esc(s.BLOCKED)}</span> <span class="muted">— never pushed</span>` : ''],
@@ -561,8 +575,8 @@ function renderReview(){
 function wizStep(step){
   WIZ.step = step;
   document.querySelectorAll('.wiz-step').forEach((el) => { el.classList.toggle('on', el.dataset.step === step); });
-  ['audience','sequence','sending','review'].forEach((s) => $('wp-'+s).classList.toggle('on', s === step));
-  if(step === 'sending' && !ACCOUNTS) loadAccounts();
+  ['campaign','audience','settings','review'].forEach((s) => $('wp-'+s).classList.toggle('on', s === step));
+  if(step === 'settings' && !ACCOUNTS) loadAccounts();
   if(step === 'review') renderReview();
   window.scrollTo(0, 0);
 }
@@ -570,15 +584,24 @@ function bootWizard(){
   WIZ.booted = true; WIZ.steps = defaultSteps(); WIZ.emailList = new Set();
   if(presetFor($('f-type').value)) $('f-name').value = presetFor($('f-type').value).name;
   $('days').innerHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => `<label class="${i >= 1 && i <= 5 ? 'on' : ''}"><input type="checkbox" data-day="${i}" ${i >= 1 && i <= 5 ? 'checked' : ''} />${d}</label>`).join('');
-  renderSequence(); previewAudience(); wizStep('audience');
+  updateAudienceMode(); renderSequence(); previewAudience(); wizStep('campaign');
+}
+function updateAudienceMode(){
+  const prepared = Boolean(presetFor($('f-type').value)?.cohort);
+  $('custom-audience-mode').style.display = prepared ? 'none' : '';
+  $('advanced-filters').style.display = prepared ? 'none' : '';
+  $('cohort-note').textContent = prepared ? 'The prepared cohort is selected on the server. Agency IDs are never loaded into this page.' : 'Choose manual agency IDs or a filter-generated audience.';
+  $('f-agency_ids').style.display = !prepared && $('f-audience_mode').value === 'MANUAL' ? '' : 'none';
 }
 async function createCampaign(){
   const btn = $('create-btn'); const err = $('create-err'); err.textContent = '';
   if(!$('f-name').value.trim()){ err.textContent = 'Give the campaign a name (Audience step).'; return; }
   if(!readSending().email_list.length){ err.textContent = 'Choose at least one sending account.'; return; }
+  if(!WIZ.audience?.selected){ err.textContent = 'Audience is unverified or empty. Refresh the preview first.'; return; }
+  if(!$('confirm-recipient-count').checked){ err.textContent = `Confirm the final count of ${WIZ.audience.selected} agencies.`; return; }
   btn.disabled = true; btn.textContent = 'Creating…';
   try{
-    const data = await post(OP('campaign-create'), { confirm:'CREATE_CAMPAIGN', name: $('f-name').value.trim(), campaign_type: $('f-type').value, sequence: readSequence(), schedule: readSchedule(), sending: readSending(), filters: readFilters(), policy: readPolicy() });
+    const data = await post(OP('campaign-create'), { confirm:'CREATE_CAMPAIGN', confirm_recipient_count: WIZ.audience.selected, name: $('f-name').value.trim(), campaign_type: $('f-type').value, audience_source: $('f-audience_mode').value, sequence: readSequence(), schedule: readSchedule(), sending: readSending(), filters: readFilters(), policy: readPolicy() });
     WIZ.booted = false; WIZ.excluded = new Set(); WIZ.audience = null; $('f-name').value = '';
     await loadList(true);
     showView('campaign', { id: data.campaign_id });
@@ -963,14 +986,14 @@ document.addEventListener('click', async (e) => {
 });
 document.addEventListener('input', (e) => {
   const t = e.target;
-  if(t.closest('#aud-filters') && t.id !== 'f-name'){ scheduleAudience(); return; }
+  if((t.closest('#aud-filters') || t.closest('#custom-audience-mode')) && t.id !== 'f-name'){ scheduleAudience(); return; }
   if(t.dataset.subject !== undefined){ WIZ.steps[Number(t.dataset.subject)].subject = t.value; return; }
   if(t.dataset.body !== undefined){ WIZ.steps[Number(t.dataset.body)].body = t.value; return; }
   if(t.dataset.delay !== undefined){ WIZ.steps[Number(t.dataset.delay)].delay_days = Math.max(1, Number(t.value)||1); return; }
   if(t.dataset.acct !== undefined){ if(t.checked) WIZ.emailList.add(t.dataset.acct); else WIZ.emailList.delete(t.dataset.acct); $('ws-sending').textContent = `${WIZ.emailList.size} account${WIZ.emailList.size===1?'':'s'} · ${$('s-daily_limit').value}/day`; return; }
   if(t.id === 's-daily_limit'){ $('ws-sending').textContent = `${WIZ.emailList.size} account${WIZ.emailList.size===1?'':'s'} · ${t.value}/day`; }
 });
-document.addEventListener('change', (e) => { if(e.target.id === 'f-type'){ WIZ.steps = defaultSteps(); $('f-name').value = presetFor(e.target.value)?.name || ''; renderSequence(); } if(e.target.closest('#aud-filters') && e.target.id !== 'f-name') scheduleAudience(); });
+document.addEventListener('change', (e) => { if(e.target.id === 'f-type'){ WIZ.steps = defaultSteps(); $('f-name').value = presetFor(e.target.value)?.name || ''; renderSequence(); updateAudienceMode(); scheduleAudience(); } if(e.target.id === 'f-audience_mode') updateAudienceMode(); if((e.target.closest('#aud-filters') || e.target.closest('#custom-audience-mode')) && e.target.id !== 'f-name') scheduleAudience(); });
 $('refresh').addEventListener('click', () => { loadList(true); if(VIEW === 'campaign' && DETAIL_ID) loadDetail(DETAIL_ID, false); });
 
 const first = routeFromHash();

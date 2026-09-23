@@ -2,6 +2,7 @@
 // Founding-pilot acquisition test: three locked presets (A1 outcome-led, A2
 // refund upfront, B probe-led) on the existing campaign layer. No network, no Sheets.
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   FOUNDING_OUTCOME_TYPE, FOUNDING_OUTCOME_NAME, FOUNDING_OUTCOME_SEQUENCE,
   FOUNDING_OUTCOME_UPFRONT_TYPE, FOUNDING_OUTCOME_UPFRONT_NAME, FOUNDING_OUTCOME_UPFRONT_SEQUENCE,
@@ -19,6 +20,8 @@ import { probeCallMetrics } from '../lib/probe-call-analytics.mjs';
 import { REPLY_EVENTS_HEADER } from '../lib/reply-router.mjs';
 import { buildCallingWorkspace } from '../lib/calling-queue.mjs';
 import { createMemoryClaimStore, __setClaimStoreForTests } from '../lib/reply-claim.mjs';
+import { preparedCohort } from '../lib/campaign-cohorts.mjs';
+import { instantlyConfigurationDifferences } from '../lib/campaign-handlers.mjs';
 
 let checks = 0;
 const check = (label, fn) => { fn(); checks += 1; console.log(`  ✓ ${label}`); };
@@ -39,6 +42,35 @@ console.log('1. Copy and presets');
 const all = (seq) => seq.steps.map((s) => `${s.variants[0].subject}\n${s.variants[0].body}`).join('\n');
 const body = (seq, i) => seq.steps[i].variants[0].body;
 const ARMS = [FOUNDING_OUTCOME_SEQUENCE, FOUNDING_OUTCOME_UPFRONT_SEQUENCE, FOUNDING_PROBE_SEQUENCE];
+const privateFiles = ['cohort-a1-refund-later.txt', 'cohort-a2-refund-upfront.txt', 'cohort-b-probe-led.txt'];
+const privateIds = await Promise.all(privateFiles.map(async (filename) => (await readFile(new URL(`../docs/commercial-reset/cohorts/${filename}`, import.meta.url), 'utf8')).split(/[\s,]+/).filter(Boolean)));
+const privateEnv = Object.fromEntries(['A1', 'A2', 'B'].map((key, i) => [`NOVUS_FOUNDING_COHORT_${key}_IDS`, privateIds[i].join(',')]));
+await assert.rejects(() => preparedCohort(FOUNDING_OUTCOME_TYPE, {}), /not configured/);
+await assert.rejects(() => preparedCohort(FOUNDING_OUTCOME_TYPE, { ...privateEnv, NOVUS_FOUNDING_COHORT_A1_IDS: 'ag_dummy' }), /incomplete/);
+await assert.rejects(() => preparedCohort(FOUNDING_OUTCOME_TYPE, { ...privateEnv, NOVUS_FOUNDING_COHORT_B_IDS: [privateIds[0][0], ...privateIds[2].slice(1)].join(',') }), /overlapping/);
+Object.assign(process.env, privateEnv);
+const cohorts = await Promise.all([FOUNDING_OUTCOME_TYPE, FOUNDING_OUTCOME_UPFRONT_TYPE, FOUNDING_PROBE_TYPE].map((type) => preparedCohort(type)));
+check('prepared cohorts contain 75, 75 and 55 unique, separate agency IDs', () => {
+  assert.deepEqual(cohorts.map((c) => c.count), [75, 75, 55]);
+  cohorts.forEach((cohort, i) => assert.deepEqual(cohort.ids, privateIds[i]));
+  const ids = cohorts.flatMap((c) => c.ids);
+  assert.equal(new Set(ids).size, ids.length);
+});
+check('provider read-back detects missing steps, changed copy, timing, threading and sending settings', () => {
+  const expected = buildInstantlyCampaignPayload({ name: FOUNDING_OUTCOME_NAME, sequence: FOUNDING_OUTCOME_SEQUENCE, schedule: DEFAULT_SCHEDULE, sending: { ...DEFAULT_SENDING, email_list: ['joe@novushq.co.uk'] } });
+  const remote = structuredClone(expected);
+  assert.deepEqual(instantlyConfigurationDifferences(expected, remote), []);
+  remote.sequences[0].steps[0].variants[0].body = `<div>${remote.sequences[0].steps[0].variants[0].body}</div>`;
+  assert.deepEqual(instantlyConfigurationDifferences(expected, remote), []);
+  remote.sequences[0].steps[2].variants[0].body += ' Changed';
+  remote.sequences[0].steps[1].variants[0].subject = 'New thread';
+  remote.sequences[0].steps[0].delay = 9;
+  remote.daily_limit = 100;
+  const differences = instantlyConfigurationDifferences(expected, remote);
+  for (const part of ['step 3 body 1', 'step 2 subject 1', 'step 1 delay', 'daily_limit']) assert.ok(differences.includes(part), part);
+  remote.sequences[0].steps.pop();
+  assert.ok(instantlyConfigurationDifferences(expected, remote).includes('step count'));
+});
 check('all three founding arms are registered, locked, storable and in one cohort', () => {
   for (const type of [FOUNDING_OUTCOME_TYPE, FOUNDING_OUTCOME_UPFRONT_TYPE, FOUNDING_PROBE_TYPE, PROBE_CALL_CAMPAIGN_TYPE]) {
     assert.ok(isLockedCampaignType(type)); assert.ok(CAMPAIGN_TYPES.includes(type));

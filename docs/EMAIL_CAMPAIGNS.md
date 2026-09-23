@@ -199,6 +199,15 @@ against the live workbook at push time.
 
 ## Locked presets
 
+The A1, A2 and B founding audiences are private Production environment
+variables: `NOVUS_FOUNDING_COHORT_A1_IDS`, `NOVUS_FOUNDING_COHORT_A2_IDS`, and
+`NOVUS_FOUNDING_COHORT_B_IDS`. Set each as a Vercel **Secret** using the exact
+comma-separated IDs from the corresponding ignored file in
+`docs/commercial-reset/cohorts/`. The required counts are 75, 75 and 55, with
+no overlap. Missing or malformed configuration blocks preview and creation.
+The local files must never be committed to the public repository. A new
+production deployment is required after adding or changing the variables.
+
 `lib/campaign-presets.mjs` registers the campaign types whose name, copy,
 delays and safety policy are fixed in code: `PROBE_FIVE_MINUTE_CALL`
 (`lib/probe-call-campaign.mjs`) and the founding-pilot A/B test,
