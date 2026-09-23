@@ -64,6 +64,8 @@
         <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg><span>Campaigns</span></button>
       <button class="nav-item" data-view="new-campaign" type="button">
         <svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span>New Campaign</span></button>
+      <a class="nav-item" href="/novus/operator.html#email-actions">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/><path d="M15 16l2 2 4-4"/></svg><span>Email Actions</span><span class="nav-badge zero" id="b-email-actions">0</span></a>
     </div>
 
     <div class="nav-group">
@@ -181,6 +183,9 @@
                   <div class="fl">Campaign</div>
                   <input class="input" id="f-name" type="text" placeholder="Campaign name, e.g. Enquiry → Quick Call V1" />
                   <select class="input" id="f-type">
+                    <option value="FOUNDING_PILOT_OUTCOME">Founding pilot · A1 outcome-led (no probe)</option>
+                    <option value="FOUNDING_PILOT_OUTCOME_UPFRONT">Founding pilot · A2 outcome-led, refund upfront (no probe)</option>
+                    <option value="FOUNDING_PILOT_PROBE">Founding pilot · B probe-led</option>
                     <option value="PROBE_FIVE_MINUTE_CALL">Probe-led 5-minute call</option>
                     <option value="ENQUIRY_FOLLOWUP">Enquiry follow-up (copy refers to the probe)</option>
                     <option value="GENERAL">General (no probe required)</option>
@@ -351,7 +356,7 @@ function emptyState(t, s){ return `<div class="empty"><div class="empty-ic"><svg
 const STATUS_TONE = { DRAFT:'t-grey', ACTIVE:'t-green', PAUSED:'t-amber', COMPLETED:'t-blue', ERROR:'t-red' };
 const ELIG_CLASS = { READY:'e-ready', WARNING:'e-warning', BLOCKED:'e-blocked' };
 const MEMBER_TONE = { SELECTED:'t-grey', PUSHED:'t-blue', SKIPPED:'t-amber', PUSH_FAILED:'t-red', EXCLUDED:'t-grey' };
-const agencyLink = (id) => `/novus/operator.html#leads?agency=${encodeURIComponent(id)}`;
+const agencyLink = (id) => `/novus/operator.html#leads?agency=${encodeURIComponent(id)}&pane=profile`;
 function reasonsHtml(row, labels){
   const w = (row.warnings||[]).filter((c) => labels[c]).map((c) => `<span class="w">${esc(labels[c])}</span>`);
   const b = (row.blocks||[]).filter((c) => labels[c]).map((c) => `<span class="b">${esc(labels[c])}</span>`);
@@ -444,7 +449,9 @@ const WIZ = { booted:false, step:'audience', audience:null, excluded:new Set(), 
 const FILTER_IDS = ['email_exists','include_risky','contact_kind','owner_identified','contact_name','contact_role','probe_sent','probe_completed','probe_not_compromised','never_emailed','max_prior_emails','last_emailed_before','replied_before','positive_reply','negative_reply','spoken_to','in_active_campaign','include_opted_out','include_bounced','agency_ids','agency_name','location','crm','branch_count_min','branch_count_max'];
 const POLICY_IDS = ['cooling_days','allow_risky_email','allow_generic_email','require_owner_contact','block_active_campaign','block_prior_negative','block_active_conversation','block_active_followup','block_meeting_booked'];
 const VARS = ['{{firstName}}','{{agency}}','{{property}}','{{companyName}}','{{property_street}}','{{probe_date}}','{{probe_time}}','{{email_observation}}','{{email_commercial_hook}}','{{demo_url}}'];
-const typeLabel = (type) => type === 'PROBE_FIVE_MINUTE_CALL' ? 'Probe-led 5-minute call' : type === 'GENERAL' ? 'General' : 'Enquiry follow-up';
+// Locked presets (copy, name and safety policy fixed server-side).
+const presetFor = (type) => (LIST?.enums?.presets || {})[type] || null;
+const typeLabel = (type) => presetFor(type)?.label || (type === 'PROBE_FIVE_MINUTE_CALL' ? 'Probe-led 5-minute call' : type === 'GENERAL' ? 'General' : 'Enquiry follow-up');
 function readFilters(){
   const f = {};
   for(const id of FILTER_IDS){ const el = $('f-'+id); if(!el) continue; f[id] = el.type === 'checkbox' ? el.checked : el.value; }
@@ -492,14 +499,15 @@ function renderAudience(){
   $('ws-audience').textContent = `${a.selected} selected · ${s.READY} ready`;
 }
 function defaultSteps(){
-  if($('f-type').value === 'PROBE_FIVE_MINUTE_CALL') return (LIST?.enums?.probe_call_sequence?.steps||[]).map((s)=>({subject:s.variants[0].subject, body:s.variants[0].body, delay_days:s.delay_days}));
+  const preset = presetFor($('f-type').value);
+  if(preset) return (preset.sequence?.steps||[]).map((s)=>({subject:s.variants[0].subject, body:s.variants[0].body, delay_days:s.delay_days}));
   return [
     { subject: 'Your enquiry on {{property_street}}', body: 'Hi {{firstName}},\n\nI sent an enquiry to {{companyName}} about {{property_street}} on {{probe_date}} at {{probe_time}}.\n\n{{email_observation}}\n\n{{email_commercial_hook}}\n\nI put what I found into a two-minute demo for you: {{demo_url}}\n\nWorth a quick call?\n\nJoe', delay_days: 0 },
     { subject: 'Re: Your enquiry on {{property_street}}', body: 'Hi {{firstName}},\n\nJust making sure this reached you — the demo is here: {{demo_url}}\n\nJoe', delay_days: 3 },
   ];
 }
 function renderSequence(){
-  const fixed = $('f-type').value === 'PROBE_FIVE_MINUTE_CALL';
+  const fixed = Boolean(presetFor($('f-type').value)) || $('f-type').value === 'PROBE_FIVE_MINUTE_CALL';
   $('seq-add').disabled = fixed;
   $('seq').innerHTML = WIZ.steps.map((s, i) => `<div class="seq-step" data-i="${i}">
     <div class="seq-head"><span class="t">${i === 0 ? 'Email 1' : `Follow-up ${i}`}</span>
@@ -560,7 +568,7 @@ function wizStep(step){
 }
 function bootWizard(){
   WIZ.booted = true; WIZ.steps = defaultSteps(); WIZ.emailList = new Set();
-  if($('f-type').value === 'PROBE_FIVE_MINUTE_CALL') $('f-name').value = LIST?.enums?.probe_call_name || 'NOVUS — Probe-Led 5-Minute Call';
+  if(presetFor($('f-type').value)) $('f-name').value = presetFor($('f-type').value).name;
   $('days').innerHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => `<label class="${i >= 1 && i <= 5 ? 'on' : ''}"><input type="checkbox" data-day="${i}" ${i >= 1 && i <= 5 ? 'checked' : ''} />${d}</label>`).join('');
   renderSequence(); previewAudience(); wizStep('audience');
 }
@@ -739,9 +747,9 @@ function paneHtml(c){
         ${[['Pushed', m.pushed, ''], ['Contacted', m.contacted, rate(m.contacted, m.pushed)], ['Opened', m.opens, rate(m.opens, m.contacted)], ['Replied', m.replies, rate(m.replies, m.contacted)], ['Positive', m.positive, rate(m.positive, m.replies)], ['Meetings', m.meetings, rate(m.meetings, m.contacted)]].map(([l, n, r]) => `<div class="fstep" style="cursor:default"><div class="fstep-l">${esc(l)}</div><div class="fstep-n">${esc(n)}</div><div class="fstep-r">${esc(r)}</div></div>`).join('')}
       </div>
       <div class="an-grid">
-        ${pcm?`<div class="card"><div class="card-head"><div class="card-title">Probe-led acquisition</div><div class="card-note">Attributed to this campaign</div></div><div class="card-body"><dl class="kv">
+        ${pcm?`<div class="card"><div class="card-head"><div class="card-title">Acquisition funnel</div><div class="card-note">Attributed to this campaign</div></div><div class="card-body"><dl class="kv">
           <dt>Actual sends</dt><dd>${esc(pcm.actual_emails_sent)}</dd><dt>Delivered</dt><dd>${pcm.delivered_emails==null?'—':esc(pcm.delivered_emails)}</dd>
-          <dt>Interested replies</dt><dd>${esc(pcm.interested_replies)}</dd><dt>Explicit numbers</dt><dd>${esc(pcm.explicit_phone_replies)}</dd>
+          <dt>Human replies</dt><dd>${pcm.human_replies==null?'—':esc(pcm.human_replies)}</dd><dt>Interested replies</dt><dd>${esc(pcm.interested_replies)}</dd><dt>Explicit numbers</dt><dd>${esc(pcm.explicit_phone_replies)}</dd>
           <dt>Critical call actions</dt><dd>${esc(pcm.critical_call_actions)}</dd><dt>Calls attempted</dt><dd>${esc(pcm.critical_calls_attempted)}</dd>
           <dt>Owners reached</dt><dd>${esc(pcm.owners_reached)}</dd><dt>Meetings booked</dt><dd>${esc(pcm.meetings_booked)}</dd>
           <dt>Meetings attended</dt><dd>${esc(pcm.meetings_attended)}</dd><dt>Pilots agreed</dt><dd>${esc(pcm.pilots_agreed)}</dd>
@@ -962,7 +970,7 @@ document.addEventListener('input', (e) => {
   if(t.dataset.acct !== undefined){ if(t.checked) WIZ.emailList.add(t.dataset.acct); else WIZ.emailList.delete(t.dataset.acct); $('ws-sending').textContent = `${WIZ.emailList.size} account${WIZ.emailList.size===1?'':'s'} · ${$('s-daily_limit').value}/day`; return; }
   if(t.id === 's-daily_limit'){ $('ws-sending').textContent = `${WIZ.emailList.size} account${WIZ.emailList.size===1?'':'s'} · ${t.value}/day`; }
 });
-document.addEventListener('change', (e) => { if(e.target.id === 'f-type'){ WIZ.steps = defaultSteps(); $('f-name').value = e.target.value === 'PROBE_FIVE_MINUTE_CALL' ? (LIST?.enums?.probe_call_name || 'NOVUS — Probe-Led 5-Minute Call') : ''; renderSequence(); } if(e.target.closest('#aud-filters') && e.target.id !== 'f-name') scheduleAudience(); });
+document.addEventListener('change', (e) => { if(e.target.id === 'f-type'){ WIZ.steps = defaultSteps(); $('f-name').value = presetFor(e.target.value)?.name || ''; renderSequence(); } if(e.target.closest('#aud-filters') && e.target.id !== 'f-name') scheduleAudience(); });
 $('refresh').addEventListener('click', () => { loadList(true); if(VIEW === 'campaign' && DETAIL_ID) loadDetail(DETAIL_ID, false); });
 
 const first = routeFromHash();

@@ -71,6 +71,8 @@
         <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg><span>Campaigns</span></a>
       <a class="nav-item" href="/novus/campaigns.html#new">
         <svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span>New Campaign</span></a>
+      <a class="nav-item" href="/novus/operator.html#email-actions">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/><path d="M15 16l2 2 4-4"/></svg><span>Email Actions</span><span class="nav-badge zero" id="b-email-actions">0</span></a>
     </div>
 
     <div class="nav-group">
@@ -420,25 +422,31 @@ const BUCKET_LABEL = { 1: 'Callback overdue', 2: 'Callback due today', 3: 'No-an
    main script. Only {{first_name}} is substituted (via scriptHtml). */
 const GATEKEEPER_SCRIPT = `# GATEKEEPER
 
-JOE: Hi, is {{first_name}} around at all?
+Hi, is {{first_name}} around at all?
 
 If they ask who's calling:
 
-JOE: Yeah, Joe here.
+It's [your name] from NOVUS.
 
 If they ask what it's regarding:
 
-JOE: Slightly strange one actually — I put an enquiry through to you guys a few days ago and just wanted to ask him about something I noticed with it.
+We help independent agents get more valuations from the enquiries and contacts they already have. We've got a founding offer I'd like to run past {{first_name}}. It's a two-minute call.
 
-If they push:
+If they ask you to send an email:
 
-JOE: Nothing urgent — it was just something around how the enquiry was handled. I wanted to get his take on it directly.
+Of course. What's the best email for {{first_name}}? And when's a good time to catch them? It's much quicker to explain in two minutes than in an email.
+
+If they say {{first_name}} doesn't take these calls:
+
+Understood. Who looks after valuations and new business there? (Record the name as a referral.)
 
 If unavailable:
 
-JOE: No worries. When's usually the best time to catch him?`;
+No worries. When's usually the best time to catch them?`;
 
 /* ── helpers ────────────────────────────────────────────────────────── */
+/* The one lead profile (Command Centre drawer). New tab from Calling Mode so a live call is never interrupted. */
+const profileLink = (id) => `/novus/operator.html#leads?agency=${encodeURIComponent(id)}&pane=profile`;
 function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function dash(v){ return (v==null||v==='')?'&mdash;':esc(v); }
 function pill(text, tone, bare){ return `<span class="pill ${tone||'t-grey'}${bare?' bare':''}">${esc(text)}</span>`; }
@@ -543,7 +551,7 @@ function renderCalling(){
   $('q-note').textContent = `${q.length} in order · ${c.scheduled_later||0} scheduled for later · ${c.suppressed||0} suppressed · ${c.no_phone||0} without a usable number`;
   $('q-funnel').innerHTML = funnelHtml(WS.funnel||{});
   $('q-rows').innerHTML = q.slice(0, 300).map((l) => `<tr data-id="${esc(l.agency_id)}">
-    <td><div class="t-name">${dash(l.agency_name)}</div><div class="t-sub">${dash(l.location)}</div></td>
+    <td><div class="t-name">${dash(l.agency_name)} <a class="muted" href="${profileLink(l.agency_id)}" target="_blank" rel="noopener" title="Full lead profile" style="font-size:11px">profile ↗</a></div><div class="t-sub">${dash(l.location)}</div></td>
     <td><div>${dash(l.contact_name)}</div><div class="t-sub">${dash(l.contact_role)}</div></td>
     <td class="mono nowrap">${dash(l.phone)}</td>
     <td class="col-md">${l.last_call ? `${esc(outcomeLabel(l.last_call.outcome))}<div class="t-sub">${esc(ago(l.last_call.at))}</div>` : '<span class="muted">&mdash;</span>'}</td>
@@ -591,7 +599,7 @@ function callActionHtml(a){
         ${a.priority==='CRITICAL'?pill('CRITICAL','t-red',true):''}
         ${pill(a.kind==='EMAIL_REPLY'?'call requested':a.kind==='RETRY'?'retry':a.kind==='CALLBACK'?'callback':'call', a.kind==='EMAIL_REPLY'?'t-green':a.kind==='CALLBACK'?'t-amber':'t-blue', true)}
         ${a.suppressed?pill('suppressed','t-red',true):''}${a.no_phone?pill('no number','t-red',true):''}</div>
-      <div class="task-who"><b>${dash(a.agency_name)}</b> &middot; ${dash(a.contact_name)}${a.contact_role?` <span class="muted">(${esc(a.contact_role)})</span>`:''} &middot; <span class="mono">${dash(a.phone)}</span></div>
+      <div class="task-who"><b>${dash(a.agency_name)}</b> <a class="muted" href="${profileLink(a.agency_id)}" target="_blank" rel="noopener" title="Full lead profile" style="font-size:11px">profile ↗</a> &middot; ${dash(a.contact_name)}${a.contact_role?` <span class="muted">(${esc(a.contact_role)})</span>`:''} &middot; <span class="mono">${dash(a.phone)}</span></div>
       <div class="task-why">${a.kind==='EMAIL_REPLY'?`${a.reply_received_at?`Replied ${esc(ago(a.reply_received_at))} &middot; `:''}${a.campaign_name?`Source: ${esc(a.campaign_name)} &middot; `:''}${a.property?`Property: ${esc(a.property)} &middot; `:''}${a.probe_reference?`Probe: ${esc(a.probe_reference)} &middot; `:''}${a.reply_text?`“${esc(a.reply_text)}”`:''}${a.timing?.language?` &middot; Timing: ${esc(a.timing.language)}`:''}${a.needs_review?` &middot; <b>Review number or timing</b>`:''}`:`${a.previous_outcome?`Last time: ${esc(outcomeLabel(a.previous_outcome))} &middot; `:''}${a.attempts||0} previous attempt${a.attempts===1?'':'s'}${a.note?` &middot; ${esc(a.note)}`:''}`}</div>
     </div>
     <div class="task-side"><div class="task-when ${over?'due':''}">${esc(a.group==='overdue'?when(a.due_at):time)}</div>
@@ -799,7 +807,7 @@ function tick(){ const el=$('cm-timer'); if(!el||!CALL) return; const from=Date.
 
 function renderModeHead(){
   const l = CALL.lead; const s = currentScript();
-  $('cm-name').innerHTML = `${esc(l.contact_name||(l.unidentified?'Unknown caller':'Unknown contact'))}${l.contact_role?`<small>${esc(l.contact_role)}</small>`:''}<small>${esc(l.agency_name)}</small>`
+  $('cm-name').innerHTML = `${esc(l.contact_name||(l.unidentified?'Unknown caller':'Unknown contact'))}${l.contact_role?`<small>${esc(l.contact_role)}</small>`:''}<small>${esc(l.agency_name)}${l.agency_id?` <a href="${profileLink(l.agency_id)}" target="_blank" rel="noopener" title="Open the full lead profile in a new tab">Profile ↗</a>`:''}</small>`
     + (CALL.inbound ? ` <span class="pill t-blue bare" style="vertical-align:middle;margin-left:8px">callback</span>` : '')
     + (CALL.inbound && (l.unidentified || CALL.stage!=='done') ? ` <button class="btn btn-quiet btn-sm" id="cm-link" type="button" style="vertical-align:middle;margin-left:6px" title="Associate this call and number with a lead">${l.unidentified?'Link to lead':'Change lead'}</button>` : '');
   const ctx = l.context||{};

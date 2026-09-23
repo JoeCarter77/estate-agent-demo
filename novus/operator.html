@@ -69,6 +69,8 @@
         <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg><span>Campaigns</span></a>
       <a class="nav-item" href="/novus/campaigns.html#new">
         <svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span>New Campaign</span></a>
+      <button class="nav-item" data-view="email-actions" type="button">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/><path d="M15 16l2 2 4-4"/></svg><span>Email Actions</span><span class="nav-badge zero" id="b-email-actions">0</span></button>
     </div>
 
     <div class="nav-group">
@@ -187,6 +189,19 @@
         </div>
         <div class="tabs" id="ac-tabs"></div>
         <div class="card"><div class="tasks" id="ac-list"></div></div>
+      </section>
+
+      <!-- ══ EMAIL ACTIONS ═════════════════════════════════════════════ -->
+      <section class="view" id="v-email-actions">
+        <div class="page-head">
+          <h1 class="page-title">Email actions</h1>
+          <p class="page-sub">Every email conversation that needs you, interested prospects first. Open a row to read
+            the thread and reply in it without leaving this page. The same shared actions also appear in
+            <button class="section-link" data-goto="actions" type="button" style="margin:0;padding:0">Actions&nbsp;&rarr;</button>;
+            calls are in <a class="section-link" href="/novus/calling.html#call-actions" style="margin:0;padding:0">Call Actions&nbsp;&rarr;</a>.</p>
+        </div>
+        <div class="tabs" id="ea-tabs"></div>
+        <div class="card"><div class="tasks" id="ea-list"></div></div>
       </section>
 
       <!-- ══ FUTURE ACTIONS ════════════════════════════════════════════ -->
@@ -481,7 +496,7 @@
     <div class="dr-pills" id="d-pills"></div>
   </div>
   <div class="dr-tabs" id="d-tabs">
-    <button class="dr-tab on" data-pane="summary" type="button">Summary</button>
+    <button class="dr-tab on" data-pane="summary" type="button">Profile</button>
     <button class="dr-tab" data-pane="conversation" type="button">Conversation</button>
     <button class="dr-tab" data-pane="history" type="button">History</button>
     <button class="dr-tab" data-pane="probe" type="button">Probe</button>
@@ -592,6 +607,8 @@ const CONTACT_TONE  = { OWNER_DIRECT:'t-violet', NAMED_HUMAN:'t-blue', GENERIC:'
 /* Actions workspace tabs. Types are canonical; grouping is presentation. */
 const ACTION_TABS = [
   { key:'all',       label:'All',        types:null },
+  /* Clear interest from a prospect (server flag next_action.interested). */
+  { key:'interested', label:'Interested', types:null, interested:true },
   { key:'replies',   label:'Replies',    types:['HUMAN_REPLY','REPLY','EMAIL'] },
   { key:'calls',     label:'Calls',      types:['CALL_PROSPECT','RETRY_CALL','CALL'] },
   { key:'reviews',   label:'Reviews',    types:['MANUAL_REVIEW','RESOLVE_EXCEPTION','REVIEW'] },
@@ -640,6 +657,7 @@ function actionLabel(t){ return ACTION_LABEL[t] || String(t||'').replace(/_/g,' 
 const REASON_WORDS = {
   QUESTION:'a question', OTHER_UNCLEAR:'unclear', NOT_NOW:'not right now', OPT_OUT:'an opt-out',
   NOT_INTERESTED:'not interested', POSITIVE_SEND_DEMO:'a demo request', POSITIVE_MEETING:'a meeting request',
+  POSITIVE_INTEREST:'interested', INFO_REQUESTED:'a request for information',
   OOO_AUTOMATED:'an out-of-office auto-reply',
   SEND_DEMO:'send demo', HUMAN_REPLY:'reply to prospect', CALL_PROSPECT:'call prospect', RETRY_CALL:'retry call',
   MEETING_BOOKED:'meeting booked', SEQUENCE_RUNNING:'in sequence', READY:'ready', SENT:'sent', ERROR:'error',
@@ -704,8 +722,8 @@ function demoState(lead){
    Hash routes over one document. Navigation only changes which view is
    rendered — it never posts, deletes, sends or mutates anything.          */
 
-const VIEWS = ['overview','actions','future','pipeline','prober','leads','analytics','exceptions'];
-const VIEW_TITLE = { overview:'Overview', actions:'Actions', future:'Future actions', pipeline:'Pipeline',
+const VIEWS = ['overview','actions','email-actions','future','pipeline','prober','leads','analytics','exceptions'];
+const VIEW_TITLE = { overview:'Overview', actions:'Actions', 'email-actions':'Email actions', future:'Future actions', pipeline:'Pipeline',
   prober:'Prober', leads:'Leads', analytics:'Analytics', exceptions:'Exceptions' };
 let VIEW = 'overview';
 
@@ -716,9 +734,12 @@ function routeFromHash(){
 /* Deep link from the campaigns page / timeline: #leads?agency=<agency_id>
    opens that lead's drawer on the History pane once the feed has loaded.
    Consumed once; the hash is then reduced to the plain view. */
+let PENDING_PANE = '';
 function pendingAgencyFromHash(){
   const q = String(window.location.hash || '').split('?')[1] || '';
-  const id = new URLSearchParams(q).get('agency') || '';
+  const params = new URLSearchParams(q);
+  const id = params.get('agency') || '';
+  PENDING_PANE = params.get('pane') || '';
   if(id) history.replaceState(null, '', `${location.pathname}#${routeFromHash()}`);
   return id;
 }
@@ -752,6 +773,7 @@ function renderBadges(){
     el.classList.toggle('hot', Boolean(hot) && n > 0);
   };
   set('b-actions', dueActions().length, true);
+  set('b-email-actions', emailActions().filter(isDueNow).length, true);
   set('b-future', futureActions().length, false);
   set('b-prober', COUNTS.probe_queue ?? COUNTS.ready_to_probe ?? 0, false);
   set('b-leads', LEADS.length, false);
@@ -761,6 +783,7 @@ function renderBadges(){
 function renderView(){
   if(VIEW === 'overview')   renderOverview();
   if(VIEW === 'actions')    renderActions();
+  if(VIEW === 'email-actions') renderEmailActions();
   if(VIEW === 'future')     renderFuture();
   if(VIEW === 'pipeline')   renderPipeline();
   if(VIEW === 'prober')     renderProber();
@@ -926,10 +949,12 @@ function taskHtml(lead){
       <div class="task-top">
         <div class="task-what">${esc(actionLabel(a.type))}</div>
         ${stagePill(lead.current_stage)}
+        ${a.interested ? pill('interested', 't-green', true) : ''}
         ${lead.priority && lead.priority !== 'NORMAL' ? pill(lead.priority.toLowerCase(), PRIORITY_TONE[lead.priority], true) : ''}
       </div>
       <div class="task-who"><b>${dash(lead.agency_name)}</b> &middot; ${esc(contact)}</div>
       <div class="task-why">${dash(humaniseReason(a.reason || lead.current_stage_reason))}</div>
+      ${a.interested && lead.reply.text ? `<div class="quote" style="margin-top:6px;max-height:4.9em;overflow:hidden">${esc(lead.reply.text)}</div>` : ''}
     </div>
     <div class="task-side">
       <div class="task-when ${due.cls}">${esc(due.text)}</div>
@@ -949,12 +974,12 @@ function renderActions(){
   const later = futureActions().length;
   const sortLeads = sortLeadActions();
   $('ac-tabs').innerHTML = ACTION_TABS.map((t) => {
-    const n = t.sortLeads ? sortLeads.length : (t.types ? all.filter((l) => t.types.includes(l.next_action.type)).length : all.length);
+    const n = t.sortLeads ? sortLeads.length : t.interested ? all.filter((l) => l.next_action.interested).length : (t.types ? all.filter((l) => t.types.includes(l.next_action.type)).length : all.length);
     return `<button class="tab ${t.key === ACTION_TAB ? 'on' : ''}" data-actiontab="${t.key}" type="button">
       ${esc(t.label)}<span class="tab-n">${n}</span></button>`;
   }).join('');
   const tab = ACTION_TABS.find((t) => t.key === ACTION_TAB) || ACTION_TABS[0];
-  const rows = tab.sortLeads ? sortLeads : (tab.types ? all.filter((l) => tab.types.includes(l.next_action.type)) : all);
+  const rows = tab.sortLeads ? sortLeads : tab.interested ? all.filter((l) => l.next_action.interested) : (tab.types ? all.filter((l) => tab.types.includes(l.next_action.type)) : all);
   $('ac-list').innerHTML = rows.length
     ? rows.map(taskHtml).join('')
     : emptyState(tab.sortLeads ? 'Nothing to sort' : (all.length ? 'Nothing in this tab' : 'Nothing is due now'),
@@ -962,6 +987,66 @@ function renderActions(){
           : (all.length ? 'Other tabs still have work due.'
               : (later ? `${later} ${later === 1 ? 'action is' : 'actions are'} scheduled for later — they are in Future actions. Ready-to-probe agencies are in the Prober.`
                        : 'Ready-to-probe agencies are in the Prober, not here.')));
+}
+
+/* ── EMAIL ACTIONS ──────────────────────────────────────────────────────
+   The shared ACTIONS ledger (server verdict needs_human) narrowed to work
+   done by email. Nothing is re-derived: rows are the same leads the Actions
+   tab shows, and opening one opens the same drawer on its Conversation. */
+const EMAIL_ACTION_TYPES = new Set(['HUMAN_REPLY','REPLY','EMAIL','MANUAL_REVIEW','SEND_INFORMATION','SEND_DEMO',
+  'SET_NEXT_STEP','FOLLOW_UP','FOLLOW_UP_CONVERSATION','DEMO_UNOPENED_FOLLOWUP','DEMO_OPENED_FOLLOWUP']);
+const EMAIL_TABS = [
+  { key:'all',        label:'Needs you',            test:(l) => isDueNow(l) },
+  { key:'interested', label:'Interested',           test:(l) => isDueNow(l) && l.next_action.interested },
+  { key:'info',       label:'Information requests', test:(l) => isDueNow(l) && ['SEND_INFORMATION','SEND_DEMO'].includes(l.next_action.type) },
+  { key:'questions',  label:'Questions & objections', test:(l) => isDueNow(l) && ['HUMAN_REPLY','REPLY','EMAIL'].includes(l.next_action.type) && !l.next_action.interested },
+  { key:'review',     label:'Manual review',        test:(l) => isDueNow(l) && l.next_action.type === 'MANUAL_REVIEW' },
+  { key:'followups',  label:'Follow-ups',           test:(l) => isDueNow(l) && ['SET_NEXT_STEP','FOLLOW_UP','FOLLOW_UP_CONVERSATION','DEMO_UNOPENED_FOLLOWUP','DEMO_OPENED_FOLLOWUP'].includes(l.next_action.type) },
+  { key:'scheduled',  label:'Scheduled',            test:(l) => !isDueNow(l) },
+];
+let EMAIL_TAB = 'all';
+function emailActions(){
+  return manualActions().filter((l) => EMAIL_ACTION_TYPES.has(l.next_action.type))
+    .sort((a, b) => (b.next_action.interested === true) - (a.next_action.interested === true));
+}
+function replyCampaign(lead){
+  try { return JSON.parse(lead.reply.notes || '{}').source_campaign_name || ''; } catch { return ''; }
+}
+function emailRowHtml(lead){
+  const a = lead.next_action || {};
+  const due = dueState(a.due_at);
+  const r = lead.reply || {};
+  const campaign = replyCampaign(lead);
+  return `<div class="task" data-id="${esc(lead.agency_id)}" data-open-pane="conversation">
+    <div class="task-rail ${due.cls}"></div>
+    <div class="task-main">
+      <div class="task-top">
+        <div class="task-what">${esc(actionLabel(a.type))}</div>
+        ${a.interested ? pill('interested', 't-green', true) : ''}
+        ${lead.priority && lead.priority !== 'NORMAL' ? pill(lead.priority.toLowerCase(), PRIORITY_TONE[lead.priority], true) : ''}
+        ${r.classification && !a.interested ? pill(humaniseReason(r.classification), 't-grey', true) : ''}
+      </div>
+      <div class="task-who"><b>${dash(lead.agency_name)}</b> &middot; ${esc(lead.contact.name || lead.contact.email || 'no named contact')}${campaign ? ` &middot; <span class="muted">${esc(campaign)}</span>` : ''}</div>
+      ${r.text ? `<div class="quote" style="margin-top:6px;max-height:4.9em;overflow:hidden">${esc(r.text)}</div>` : `<div class="task-why">${dash(humaniseReason(a.reason))}</div>`}
+    </div>
+    <div class="task-side">
+      <div class="task-when ${due.cls}">${esc(due.text)}</div>
+      ${r.received_at ? `<div class="task-when" style="font-weight:500">Replied ${esc(when(r.received_at))}</div>` : ''}
+      <div class="btnrow"><button class="btn btn-primary btn-sm open-reply" data-agency="${esc(lead.agency_id)}" type="button">Open &amp; reply</button>
+        ${a.id ? `<button class="btn btn-quiet btn-sm action-complete" data-action="${esc(a.id)}" type="button">Complete</button>
+        <button class="btn btn-quiet btn-sm action-snooze" data-action="${esc(a.id)}" type="button">Snooze</button>` : ''}</div>
+    </div></div>`;
+}
+function renderEmailActions(){
+  if(!LOADED){ $('ea-list').innerHTML = skeletonRows(4); return; }
+  const all = emailActions();
+  $('ea-tabs').innerHTML = EMAIL_TABS.map((t) => `<button class="tab ${t.key === EMAIL_TAB ? 'on' : ''}" data-emailtab="${t.key}" type="button">
+      ${esc(t.label)}<span class="tab-n">${all.filter(t.test).length}</span></button>`).join('');
+  const tab = EMAIL_TABS.find((t) => t.key === EMAIL_TAB) || EMAIL_TABS[0];
+  const rows = all.filter(tab.test);
+  $('ea-list').innerHTML = rows.length ? rows.map(emailRowHtml).join('')
+    : emptyState(tab.key === 'scheduled' ? 'Nothing scheduled' : 'No email conversations need you',
+        tab.key === 'scheduled' ? 'No email follow-up is waiting on a future date.' : 'New replies appear here after each sync.');
 }
 
 /* ── FUTURE ACTIONS ──────────────────────────────────────────────────────
@@ -1428,12 +1513,15 @@ function renderDrawerPane(){
   document.querySelectorAll('.dr-tab').forEach((t) => t.classList.toggle('on', t.dataset.pane === DRAWER_PANE));
   if(DRAWER_PANE === 'conversation'){
     $('d-body').innerHTML = `<div id="conv-body"></div>`;
-    /* ONE conversation GET, for THIS lead, only once its tab is open. */
-    if(lead.outbound_id){
-      CONV_LEAD = { outbound_id: lead.outbound_id, agency_name: lead.agency_name };
-      loadConversation(lead.outbound_id, lead.agency_name);
+    /* ONE conversation GET, for THIS lead, only once its tab is open. A
+       legacy journey is keyed by its OUTBOUND row; a campaign-layer lead has
+       none and is keyed by agency (the server resolves its campaign member). */
+    if(lead.outbound_id || lead.reply.received_at){
+      CONV_LEAD = { query: lead.outbound_id ? `outbound_id=${encodeURIComponent(lead.outbound_id)}` : `agency_id=${encodeURIComponent(lead.agency_id)}`,
+        key: lead.outbound_id || `agency:${lead.agency_id}`, agency_name: lead.agency_name };
+      loadConversation(CONV_LEAD.query, lead.agency_name);
     } else {
-      $('conv-body').innerHTML = '<div class="note">No outreach journey yet, so there is no Instantly conversation to show.</div>';
+      $('conv-body').innerHTML = '<div class="note">No email conversation with this agency yet.</div>';
     }
     return;
   }
@@ -1442,12 +1530,8 @@ function renderDrawerPane(){
   if(DRAWER_PANE === 'demo')    { $('d-body').innerHTML = paneDemo(lead); return; }
   if(DRAWER_PANE === 'actions') { $('d-body').innerHTML = paneActions(lead); return; }
   $('d-body').innerHTML = paneSummary(lead)
-    + (lead.reply.text ? blk('Latest reply', kv([
-        ['Received', dash(when(lead.reply.received_at))],
-        ['Classification', dash(lead.reply.classification)],
-        ['Confidence', dash(lead.reply.confidence)],
-        ['Suppression', dash(lead.reply.suppression_type)],
-      ]) + `<div class="quote">${esc(lead.reply.text)}</div>`) : '');
+    + '<div id="profile-body"><div class="note">Loading everything NOVUS holds for this agency…</div></div>';
+  loadProfile(lead.agency_id);
 }
 
 /* ═══ HISTORY — the full chronological story for one agency ═══════════
@@ -1472,41 +1556,150 @@ function timelineHtml(entries){
   }
   return `<div class="tl">${out.join('')}</div>`;
 }
+/* ONE lead-timeline read per agency backs both the Profile and History panes
+   (lib/lead-timeline.mjs: buildLeadTimeline + buildLeadProfile). Short-lived
+   and dropped on any send/refresh so a new email or call shows next open. */
+const LEAD_DATA = new Map();
+function leadData(agencyId){
+  const hit = LEAD_DATA.get(agencyId);
+  if(hit && Date.now() - hit.at < 30000) return hit.promise;
+  const promise = fetch(`/api/novus/personalisation?novus_operation=lead-timeline&agency_id=${encodeURIComponent(agencyId)}`, { headers:{ Accept:'application/json' } })
+    .then(async (res) => { const data = await res.json(); if(!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`); return data; });
+  LEAD_DATA.set(agencyId, { at: Date.now(), promise });
+  promise.catch(() => LEAD_DATA.delete(agencyId));
+  return promise;
+}
+
+const HIST_FILTERS = [
+  ['all','All', null], ['email','Emails', ['campaign','reply','sales','outbound']], ['call','Calls', ['call']],
+  ['probe','Probes', ['probe','communication']], ['action','Actions', ['action']], ['meeting','Meetings', ['meeting','demo']],
+];
+let HIST_FILTER = 'all';
+let HIST_DATA = null;
+function paintHistory(){
+  const body = $('hist-body');
+  if(!body || !HIST_DATA) return;
+  const data = HIST_DATA;
+  const camps = (data.campaigns || []).length
+    ? blk('Campaigns', kv(data.campaigns.map((c) => [c.name || c.campaign_id,
+        `${pill(String(c.status || 'draft').toLowerCase(), { ACTIVE:'t-green', PAUSED:'t-amber', COMPLETED:'t-blue', ERROR:'t-red' }[c.status] || 't-grey')} ${pill(String(c.member_status || '').replace(/_/g,' ').toLowerCase(), 't-grey', true)}
+         <div class="sub">${c.emails_sent_count ? `${esc(c.emails_sent_count)} sent` : 'nothing sent yet'}${c.instantly_lead_status ? ` · ${esc(c.instantly_lead_status.toLowerCase())}` : ''}${c.interest_status ? ` · ${esc(c.interest_status.replace(/_/g,' ').toLowerCase())}` : ''}${c.last_event_type ? ` · last ${esc(c.last_event_type.replace(/_/g,' ').toLowerCase())} ${esc(when(c.last_event_at))}` : ''}</div>
+         <a class="linkout" href="/novus/campaigns.html#campaign?id=${encodeURIComponent(c.campaign_id)}&tab=audience" style="margin-top:6px;padding:4px 9px;font-size:11.5px">Open campaign &#8599;</a>`])))
+    : '';
+  const kinds = (HIST_FILTERS.find((f) => f[0] === HIST_FILTER) || HIST_FILTERS[0])[2];
+  const entries = (data.entries || []).filter((e) => !kinds || kinds.includes(e.kind));
+  const counts = data.counts || {};
+  const chips = `<div class="tabs" style="margin:0 0 12px">${HIST_FILTERS.map(([key, label, k]) => {
+    const n = k ? k.reduce((sum, kind) => sum + (counts[kind] || 0), 0) : (data.entries || []).length;
+    return `<button class="tab ${key === HIST_FILTER ? 'on' : ''}" data-histfilter="${key}" type="button">${esc(label)}<span class="tab-n">${n}</span></button>`;
+  }).join('')}</div>`;
+  body.innerHTML = camps + blk('Timeline', chips + timelineHtml(entries));
+}
 async function loadHistory(agencyId){
   const token = ++HIST_TOKEN;
   try{
-    const res = await fetch(`/api/novus/personalisation?novus_operation=lead-timeline&agency_id=${encodeURIComponent(agencyId)}`, { headers:{ Accept:'application/json' } });
-    const data = await res.json();
+    const data = await leadData(agencyId);
     if(token !== HIST_TOKEN || !$('hist-body')) return;
-    if(!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
-    const camps = (data.campaigns || []).length
-      ? blk('Campaigns', kv(data.campaigns.map((c) => [c.name || c.campaign_id,
-          `${pill(String(c.status || 'draft').toLowerCase(), { ACTIVE:'t-green', PAUSED:'t-amber', COMPLETED:'t-blue', ERROR:'t-red' }[c.status] || 't-grey')} ${pill(String(c.member_status || '').replace(/_/g,' ').toLowerCase(), 't-grey', true)}
-           <div class="sub">${c.emails_sent_count ? `${esc(c.emails_sent_count)} sent` : 'nothing sent yet'}${c.instantly_lead_status ? ` · ${esc(c.instantly_lead_status.toLowerCase())}` : ''}${c.interest_status ? ` · ${esc(c.interest_status.replace(/_/g,' ').toLowerCase())}` : ''}${c.last_event_type ? ` · last ${esc(c.last_event_type.replace(/_/g,' ').toLowerCase())} ${esc(when(c.last_event_at))}` : ''}</div>
-           <a class="linkout" href="/novus/campaigns.html#campaign?id=${encodeURIComponent(c.campaign_id)}&tab=audience" style="margin-top:6px;padding:4px 9px;font-size:11.5px">Open campaign &#8599;</a>`])))
-      : '';
-    const counts = data.counts || {};
-    const summary = Object.entries(counts).map(([k, n]) => `${n} ${k}`).join(' · ');
-    $('hist-body').innerHTML = camps + blk('Timeline', `<div class="note" style="margin:0 0 12px">${esc(summary || 'no events')}</div>` + timelineHtml(data.entries || []));
+    HIST_DATA = data;
+    paintHistory();
   }catch(err){
     if(token === HIST_TOKEN && $('hist-body')) $('hist-body').innerHTML = `<div class="banner err"><div>${esc(err.message || 'History could not load.')}</div></div>`;
   }
 }
 
+/* ═══ PROFILE — everything NOVUS holds for one agency ══════════════════
+   Facts only, from lib/lead-timeline.mjs buildLeadProfile(): a field with no
+   stored value is left out rather than shown as a guess. */
+const lowerWords = (v) => String(v || '').replace(/_/g, ' ').toLowerCase();
+function profileHtml(p){
+  if(!p) return '<div class="note">No agency record was found for this lead.</div>';
+  const id = p.identity || {};
+  const rows = (pairs) => kv(pairs.filter(([, v]) => v !== '' && v != null));
+  const link = (url, label) => url ? `<a class="src" href="${esc(/^https?:/i.test(url) ? url : 'https://' + url)}" target="_blank" rel="noopener">${esc(label || url)} ↗</a>` : '';
+  const parts = [];
+  parts.push(blk('Identity', rows([
+    ['Agency', esc(id.agency_name)], ['Agency ID', `<span class="mono">${esc(id.agency_id)}</span>`],
+    ['Location', esc(id.location || '')], ['Branches', esc(id.branch_count || '')],
+    ['Website', link(id.website || id.domain)], ['Rightmove branch', link(id.rightmove_sales_branch_url, 'listing page')],
+    ['Main phone', id.main_phone ? `<span class="mono">${esc(id.main_phone)}</span>` : ''], ['Other numbers', esc(id.known_phone_numbers || '')],
+    ['Owner / MD', esc(id.owner_md || '')], ['CRM', esc(id.crm_name || '')], ['Live listings', esc(id.live_listing_count || '')],
+    ['Source', esc(id.source || '')], ['Added', id.created_at ? esc(when(id.created_at)) : ''],
+    ['Pipeline status', esc(lowerWords(id.current_pipeline_status))],
+  ])));
+  const s = p.suppression || {};
+  const flags = [s.email_opted_out ? pill('email opted out', 't-red', true) : '', s.do_not_call ? pill('do not call', 't-red', true) : '', s.agency_suppression ? pill(lowerWords(s.agency_suppression), 't-amber', true) : ''].join(' ');
+  const contacts = (p.contacts || []).map((c) => [esc(c.contact_name || c.email || 'Unnamed'),
+    `${c.contact_role ? esc(c.contact_role) + ' · ' : ''}<span class="mono">${esc(c.email || '')}</span>${c.phone || c.mobile ? ` · <span class="mono">${esc(c.phone || c.mobile)}</span>` : ''}
+     <div class="sub">${[c.verification_status && `email ${lowerWords(c.verification_status)}`, c.contact_type && lowerWords(c.contact_type), c.phone_verification_status && `phone ${lowerWords(c.phone_verification_status)}`].filter(Boolean).map(esc).join(' · ')}</div>`]);
+  if(id.outreach_contact?.outreach_contact_email && !(p.contacts || []).some((c) => String(c.email||'').toLowerCase() === id.outreach_contact.outreach_contact_email.toLowerCase())){
+    contacts.push([esc(id.outreach_contact.outreach_contact_name || 'Outreach contact'), `<span class="mono">${esc(id.outreach_contact.outreach_contact_email)}</span><div class="sub">outreach contact on the agency record</div>`]);
+  }
+  parts.push(blk('Contacts', (flags.trim() ? `<div style="margin-bottom:8px">${flags}</div>` : '') + (contacts.length ? kv(contacts) : '<div class="note">No contacts recorded.</div>')));
+
+  const w = p.work || {};
+  const openRows = (w.open || []).map((a) => [esc(actionLabel(a.type)),
+    `${a.interested ? pill('interested', 't-green', true) + ' ' : ''}${a.priority ? pill(a.priority.toLowerCase(), PRIORITY_TONE[a.priority.toUpperCase()], true) + ' ' : ''}${a.overdue ? pill('overdue', 't-red', true) + ' ' : ''}${a.due_at ? esc(dueState(a.due_at).text) : 'no due date'} · owner ${esc(OWNER_LABEL[a.owner] || a.owner || '—')}
+     <div class="sub">${esc(humaniseReason(a.reason))}</div>`]);
+  parts.push(blk('Current work', (openRows.length ? kv(openRows) : '<div class="note">Nothing outstanding.</div>')
+    + `<div class="note" style="margin-top:8px">${w.completed_count || 0} completed${p.next_step ? ` · next: ${esc(p.next_step.what)} ${esc(dueState(p.next_step.at).text.toLowerCase())}` : ''}</div>`));
+
+  const e = p.email || {};
+  parts.push(blk('Email', rows([
+    ['Campaign emails sent', String(e.emails_sent || 0)], ['Replies received', String(e.replies_received || 0)], ['Replies sent from NOVUS', String(e.manual_replies_sent || 0)],
+    ['Latest reply', e.latest_reply ? `${esc(when(e.latest_reply.received_at))}${e.latest_reply.classification ? ' · ' + esc(humaniseReason(e.latest_reply.classification)) : ''}<div class="quote" style="margin-top:6px">${esc(e.latest_reply.cleaned_reply_text || '')}</div>` : ''],
+  ]) + '<div class="note">Campaign membership and every email are in History.</div>'));
+
+  const c = p.calls || {};
+  const callRows = (c.recent || []).map((x) => [esc(when(x.started_at)), `${x.inbound ? 'Inbound · ' : ''}${esc(lowerWords(x.outcome) || 'no outcome logged')}${x.owner_reached ? ' · owner reached' : x.gatekeeper_reached ? ' · gatekeeper' : ''}${x.script ? ` · <span class="muted">${esc(x.script)}</span>` : ''}${x.callback_at ? ` · callback ${esc(when(x.callback_at))}` : ''}${x.note ? `<div class="sub">${esc(x.note)}</div>` : ''}`]);
+  parts.push(blk('Phone', rows([
+    ['Attempts', String(c.attempts || 0)], ['Connected', String(c.connected || 0)], ['Gatekeeper conversations', String(c.gatekeeper_conversations || 0)], ['Owner conversations', String(c.owner_conversations || 0)],
+    ['Objections recorded', (c.objections || []).map(esc).join(', ')],
+  ]) + (callRows.length ? kv(callRows) : '')));
+
+  const probes = (p.probes || []).map((x) => {
+    const a = x.assessment || {};
+    return [esc(x.probe_timestamp ? when(x.probe_timestamp) : 'unsent'), `${esc(x.property_street || x.property_address || 'property not recorded')}${x.probe_reference ? ` · <span class="mono">${esc(x.probe_reference)}</span>` : ''} · ${esc(lowerWords(x.probe_status))}${String(x.compromised).toUpperCase() === 'TRUE' ? ' · ' + pill('compromised', 't-red', true) : ''}
+      <div class="sub">${[a.human_contact && `human contact: ${a.human_contact}`, a.response_hours && `first response ${a.response_hours}h`, a.channels_used && `channels: ${a.channels_used}`, a.seller_recognition && `seller signal: ${lowerWords(a.seller_recognition)}`, a.grade && `grade ${a.grade}`].filter(Boolean).map(esc).join(' · ')}</div>
+      ${x.enquiry_text ? `<details class="tech"><summary>Enquiry text</summary><div class="quote">${esc(x.enquiry_text)}</div></details>` : ''}`];
+  });
+  parts.push(blk('Rightmove probes', probes.length ? kv(probes) + '<div class="note">Probes cannot see phone qualification, so the seller-signal assessment covers written and recorded responses only.</div>' : '<div class="note">No probe on record.</div>'));
+
+  const meetings = (p.meetings || []).map((m) => [esc(m.meeting_at ? when(m.meeting_at) : 'unscheduled'),
+    `${esc(lowerWords(m.status))}${m.outcome ? ` · ${esc(lowerWords(m.outcome))}` : ''}${m.findings_agreed ? ` · ${m.findings_agreed} finding${m.findings_agreed === 1 ? '' : 's'} agreed` : ''}${m.agreed_scope ? ' · scope agreed' : ''}${m.follow_up_at ? ` · follow-up ${esc(when(m.follow_up_at))}` : ''}
+     ${m.outcome_notes ? `<div class="sub">${esc(m.outcome_notes)}</div>` : ''}
+     <a class="linkout" href="/novus/meetings.html#discovery?id=${encodeURIComponent(m.session_id)}" style="margin-top:6px;padding:4px 9px;font-size:11.5px">Open in Meetings &#8599;</a>`]);
+  parts.push(blk('Meetings & commercial', meetings.length ? kv(meetings) : '<div class="note">No meeting recorded.</div>'));
+  return parts.join('');
+}
+async function loadProfile(agencyId){
+  try{
+    const data = await leadData(agencyId);
+    if(OPEN_LEAD?.agency_id !== agencyId || DRAWER_PANE !== 'summary' || !$('profile-body')) return;
+    $('profile-body').innerHTML = profileHtml(data.profile);
+  }catch(err){
+    if($('profile-body')) $('profile-body').innerHTML = `<div class="banner err"><div>${esc(err.message || 'Profile could not load.')}</div></div>`;
+  }
+}
+
+/* Deep-link and cross-page names for drawer panes. */
+function drawerPane(name){ return ({ profile:'summary', timeline:'history', email:'conversation' })[name] || name; }
 function openDrawer(agencyId, pane){
   const lead = LEADS.find((l) => l.agency_id === agencyId);
   if(!lead) return;
   OPEN_LEAD = lead;
-  DRAWER_PANE = pane || (lead.needs_human && lead.outbound_id ? 'conversation' : 'summary');
+  DRAWER_PANE = pane || (lead.needs_human && (lead.outbound_id || lead.reply.received_at) ? 'conversation' : 'summary');
+  paintDrawerHead(lead);
+  renderDrawerPane();
+  $('drawer').classList.add('on');
+  $('drawer').setAttribute('aria-hidden','false');
+  $('scrim').classList.add('on');
+}
+function paintDrawerHead(lead){
   $('d-name').textContent = lead.agency_name || '(no agency name)';
   $('d-sub').textContent = [lead.contact.name, lead.contact.email].filter(Boolean).join(' · ') || 'No resolved contact';
   $('d-pills').innerHTML = stagePill(lead.current_stage)
     + (lead.action_queue ? pill(QUEUE_LABEL[lead.action_queue], QUEUE_TONE[lead.action_queue]) : '')
     + (lead.priority ? pill(lead.priority.toLowerCase(), PRIORITY_TONE[lead.priority], true) : '');
-  renderDrawerPane();
-  $('drawer').classList.add('on');
-  $('drawer').setAttribute('aria-hidden','false');
-  $('scrim').classList.add('on');
 }
 
 function closeDrawer(){
@@ -1594,7 +1787,7 @@ const REPLY_BLOCK_TEXT = {
 function replyComposerHtml(data, agencyName, notice){
   const candidate = data.manual_reply || {};
   const inbox = data.sender_inbox || {};
-  const outboundId = data.outbound_id || '';
+  const outboundId = data.journey_key || data.outbound_id || '';
   const draft = REPLY_DRAFTS.get(outboundId) || '';
   const ambiguousLocked = AMBIGUOUS_LOCKS.has(outboundId);
   const eligible = candidate.eligible === true && inbox.status === 'CONFIRMED' && !ambiguousLocked;
@@ -1642,13 +1835,13 @@ function conversationHtml(data, agencyName, notice){
   return parts.join('');
 }
 
-async function loadConversation(outboundId, agencyName, notice){
+async function loadConversation(query, agencyName, notice){
   const token = ++CONV_TOKEN;
   const body = $('conv-body');
   if(!body) return;
   body.innerHTML = '<div class="note"><span class="spin"></span>Loading the live conversation&hellip;</div>';
   try{
-    const res = await fetch(`${CONVERSATION_URL}&outbound_id=${encodeURIComponent(outboundId)}`, { headers:{ Accept:'application/json' } });
+    const res = await fetch(`${CONVERSATION_URL}&${query}`, { headers:{ Accept:'application/json' } });
     const data = await res.json();
     if(token !== CONV_TOKEN) return; /* the operator has opened another lead */
     if(!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
@@ -1670,7 +1863,7 @@ function syncReplyControls(){
   const textarea = $('reply-body');
   const button = $('send-reply');
   if(!textarea || !button || !CONV_DATA) return;
-  const outboundId = CONV_DATA.outbound_id;
+  const outboundId = CONV_DATA.journey_key || CONV_DATA.outbound_id;
   REPLY_DRAFTS.set(outboundId, textarea.value);
   const count = $('reply-count');
   if(count) count.textContent = `${textarea.value.length} / 5000`;
@@ -1699,8 +1892,9 @@ async function sendManualReply(){
   const replyText = textarea.value.trim();
   if(!replyText || !candidate.eligible || inbox.status !== 'CONFIRMED') return;
 
+  const journeyKey = data.journey_key || data.outbound_id;
   SEND_IN_FLIGHT = true;
-  SEND_OUTBOUND_ID = data.outbound_id;
+  SEND_OUTBOUND_ID = journeyKey;
   syncReplyControls();
   const confirmed = window.confirm(`You’re about to send this reply from ${inbox.eaccount} to ${data.lead_email}. Send it?`);
   if(!confirmed){
@@ -1721,7 +1915,7 @@ async function sendManualReply(){
     const result = await response.json();
 
     if(result.send_outcome === 'SENT' || result.sent === true){
-      REPLY_DRAFTS.delete(data.outbound_id);
+      REPLY_DRAFTS.delete(journeyKey);
       let notice = { type:'success', text:'Reply sent.' };
       if(result.persistence_error){
         notice = { type:'warning', text:`Reply sent, but local audit persistence failed: ${result.persistence_error}. Do not resend.` };
@@ -1732,17 +1926,18 @@ async function sendManualReply(){
       }
       SEND_IN_FLIGHT = false; SEND_OUTBOUND_ID = null;
       await load(true);
-      if(CONV_LEAD?.outbound_id === data.outbound_id) await loadConversation(data.outbound_id, CONV_LEAD.agency_name, notice);
+      LEAD_DATA.delete(data.agency_id);
+      if(CONV_LEAD?.key === journeyKey) await loadConversation(CONV_LEAD.query, CONV_LEAD.agency_name, notice);
       return;
     }
 
     if(result.send_outcome === 'AMBIGUOUS'){
-      AMBIGUOUS_LOCKS.add(data.outbound_id);
+      AMBIGUOUS_LOCKS.add(journeyKey);
       const auditWarning = result.persistence_error ? ` Local audit persistence also failed: ${result.persistence_error}.` : '';
       showReplyOutcome('warning', `This may have sent.${auditWarning} Do not resend yet. Refresh/check the conversation first.`);
     } else if(result.blocked_reason === 'STALE_REPLY_EVENT'){
       SEND_IN_FLIGHT = false; SEND_OUTBOUND_ID = null;
-      await loadConversation(data.outbound_id, CONV_LEAD?.agency_name || '',
+      if(CONV_LEAD) await loadConversation(CONV_LEAD.query, CONV_LEAD.agency_name || '',
         { type:'warning', text:'A newer reply has arrived. Refresh the conversation before replying.' });
       return;
     } else if(result.send_outcome === 'REJECTED'){
@@ -1756,7 +1951,7 @@ async function sendManualReply(){
   }catch(err){
     /* Failure before a classified response is not proof the send failed.
        Keep the draft, and make the operator verify the conversation. */
-    AMBIGUOUS_LOCKS.add(data.outbound_id);
+    AMBIGUOUS_LOCKS.add(journeyKey);
     showReplyOutcome('warning', 'The send result could not be confirmed. Do not resend yet. Refresh/check the conversation first.');
   }finally{
     SEND_IN_FLIGHT = false; SEND_OUTBOUND_ID = null; syncReplyControls();
@@ -1789,6 +1984,7 @@ function showWarnings(warnings){
 }
 
 async function load(force){
+  if(force) LEAD_DATA.clear();
   const btn = $('refresh');
   btn.disabled = true;
   $('stamp').innerHTML = '<span class="spin"></span>Loading';
@@ -1811,7 +2007,14 @@ async function load(force){
 
     showWarnings(data.warnings);
     renderAll();
-    if(PENDING_AGENCY){ const id = PENDING_AGENCY; PENDING_AGENCY = ''; if(LEADS.some((l) => l.agency_id === id)) openDrawer(id, 'history'); }
+    /* One record, one state: an open drawer is re-bound to the fresh lead so
+       it can never show what the list and ledger no longer say. The
+       conversation pane is left to its own send/refresh flow. */
+    if(OPEN_LEAD){
+      const fresh = LEADS.find((l) => l.agency_id === OPEN_LEAD.agency_id);
+      if(fresh){ OPEN_LEAD = fresh; paintDrawerHead(fresh); if(DRAWER_PANE !== 'conversation') renderDrawerPane(); }
+    }
+    if(PENDING_AGENCY){ const id = PENDING_AGENCY; PENDING_AGENCY = ''; if(LEADS.some((l) => l.agency_id === id)) openDrawer(id, drawerPane(PENDING_PANE || 'history')); }
 
     const age = data.cached ? ` · cached ${Math.round((data.cache_age_ms||0)/1000)}s` : '';
     $('stamp').innerHTML = `<span class="nav-dot${data.cached ? ' stale' : ''}"></span>${esc(when(data.generated_at))}${esc(age)}`;
@@ -1954,8 +2157,18 @@ async function createAction(lead){
 window.addEventListener('hashchange', () => {
   const id = pendingAgencyFromHash();
   showView(routeFromHash(), { push:false });
-  if(id && LOADED && LEADS.some((l) => l.agency_id === id)) openDrawer(id, 'history');
+  if(id && LOADED && LEADS.some((l) => l.agency_id === id)) openDrawer(id, drawerPane(PENDING_PANE || 'history'));
 });
+
+/* Global search from this page opens the same lead profile, in place. */
+function installSearchNavigate(){
+  if(!window.NovusSearch) return;
+  NovusSearch.navigate = (r) => {
+    if(LOADED && LEADS.some((l) => l.agency_id === r.agency_id)) { openDrawer(r.agency_id, 'summary'); return; }
+    location.hash = `#leads?agency=${encodeURIComponent(r.agency_id)}&pane=profile`;
+  };
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installSearchNavigate); else installSearchNavigate();
 
 document.addEventListener('click', (e) => {
   const nav = e.target.closest('.nav-item');
@@ -1963,6 +2176,9 @@ document.addEventListener('click', (e) => {
 
   const goto = e.target.closest('[data-goto]');
   if(goto){ showView(goto.dataset.goto); return; }
+
+  const emailTab = e.target.closest('[data-emailtab]');
+  if(emailTab){ EMAIL_TAB = emailTab.dataset.emailtab; renderEmailActions(); return; }
 
   const actionTab = e.target.closest('[data-actiontab]');
   if(actionTab){ ACTION_TAB = actionTab.dataset.actiontab; renderActions(); return; }
@@ -1979,8 +2195,8 @@ document.addEventListener('click', (e) => {
 
   if(e.target.id === 'conv-refresh'){
     if(CONV_LEAD){
-      AMBIGUOUS_LOCKS.delete(CONV_LEAD.outbound_id);
-      loadConversation(CONV_LEAD.outbound_id, CONV_LEAD.agency_name);
+      AMBIGUOUS_LOCKS.delete(CONV_LEAD.key);
+      loadConversation(CONV_LEAD.query, CONV_LEAD.agency_name);
     }
     return;
   }
@@ -2000,9 +2216,12 @@ document.addEventListener('click', (e) => {
 
   /* A row/task click opens the record. Anything that is itself a link or a
      button inside the row keeps its own behaviour. */
+  if(e.target.classList.contains('open-reply')){ openDrawer(e.target.dataset.agency, 'conversation'); return; }
+  const histFilter = e.target.closest('[data-histfilter]');
+  if(histFilter){ HIST_FILTER = histFilter.dataset.histfilter; paintHistory(); return; }
   if(e.target.closest('a,button')) return;
   const row = e.target.closest('[data-id]');
-  if(row && row.dataset.id) openDrawer(row.dataset.id);
+  if(row && row.dataset.id) openDrawer(row.dataset.id, row.dataset.openPane ? drawerPane(row.dataset.openPane) : undefined);
 });
 
 $('refresh').addEventListener('click', () => load(true));

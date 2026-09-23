@@ -80,6 +80,7 @@
     "novus:calling-setup": "node scripts/novus-calling-setup.mjs",
     "novus:lead-search-selftest": "node scripts/novus-lead-search-selftest.mjs",
     "novus:campaigns-selftest": "node scripts/novus-campaigns-selftest.mjs",
+    "novus:founding-pilot-selftest": "node scripts/novus-founding-pilot-selftest.mjs",
     "novus:instantly-link": "node scripts/novus-instantly-link.mjs",
     "novus:sidebar-parity-selftest": "node scripts/novus-sidebar-parity-selftest.mjs",
     "novus:discovery-selftest": "node scripts/novus-discovery-selftest.mjs",

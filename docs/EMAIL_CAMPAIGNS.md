@@ -197,6 +197,23 @@ campaign / negative reply / active conversation / active follow-up / meeting
 booked, requires probe) are stored per campaign. Eligibility is re-evaluated
 against the live workbook at push time.
 
+## Locked presets
+
+`lib/campaign-presets.mjs` registers the campaign types whose name, copy,
+delays and safety policy are fixed in code: `PROBE_FIVE_MINUTE_CALL`
+(`lib/probe-call-campaign.mjs`) and the founding-pilot A/B test,
+`FOUNDING_PILOT_OUTCOME` (no probe allowed) and `FOUNDING_PILOT_PROBE`
+(closed probe with a seller signal required), in `lib/founding-pilot-campaign.mjs`.
+Every locked preset gets the same treatment: an explicit agency cohort, the
+strict policy, a provider draft check before any lead is added, member-scoped
+reply matching, deterministic reply classification with CRITICAL call actions,
+the preset's call script in Calling Mode, and the per-campaign funnel on the
+detail page. The two founding types share a cohort, so `IN_OTHER_COHORT` stops an
+agency from joining both arms. While an agency's founding sequence is
+unfinished, `buildCallingWorkspace` keeps it out of the cold-call pool
+(`counts.in_email_test`). To change copy, add a new preset with a new name;
+never edit one that has sent. Test: `npm run novus:founding-pilot-selftest`.
+
 ## Safe testing without emailing anyone
 
 1. Set the env vars and deploy (`NOVUS_CAMPAIGN_POLLER_SECRET` if you want

@@ -354,4 +354,67 @@ console.log('\nF. HTTP and browser contracts');
   __setClaimStoreForTests(null);
 }
 
+console.log('\nG. campaign-layer journey (founding-pilot replies carry no OUTBOUND row)');
+{
+  const CAMPAIGN_REPLY = { ...REPLY, outreach_id: '' };
+  const withCampaign = (members) => {
+    const fixture = makeRepo({ replies: [CAMPAIGN_REPLY], outbound: [] });
+    fixture.repo.store.CAMPAIGNS = rows(['campaign_id', 'instantly_campaign_id', 'name', 'campaign_type'], [{ campaign_id: 'cmp_1', instantly_campaign_id: 'camp_1', name: 'NOVUS — Founding Pilot · A1 Outcome-led', campaign_type: 'FOUNDING_PILOT_OUTCOME' }]);
+    fixture.repo.store.CAMPAIGN_MEMBERS = rows(['member_id', 'campaign_id', 'agency_id', 'email', 'member_status'], members);
+    return fixture;
+  };
+  const member = { member_id: 'cmm_1', campaign_id: 'cmp_1', agency_id: 'ag_1', email: LEAD, member_status: 'PUSHED' };
+
+  const sent = await execute({ fixture: withCampaign([member]) });
+  assert.equal(sent.result.sent, true, JSON.stringify(sent.result.blocked_reasons));
+  const post = sent.transport.log.find((call) => call.method === 'POST').body;
+  assert.equal(post.reply_to_uuid, EMAIL_ID);
+  assert.equal(post.eaccount, EACCOUNT);
+  assert.equal(post.subject, 'Re: Enquiry');
+  const row = sent.fixture.salesObjects()[0];
+  assert.equal(row.outreach_id, 'cmm_1');
+  assert.equal(row.agency_id, 'ag_1');
+  assert.equal(row.reply_event_id, 'rpl_1');
+  assert.equal(row.send_outcome, 'SENT');
+  assert.equal(sent.fixture.replyObject().action_status, 'COMPLETED');
+  ok('a campaign reply sends in-thread from the resolved inbox, records its member journey and completes');
+
+  for (const [label, members, reason] of [
+    ['no member', [], 'OUTBOUND_MATCH_MISSING'],
+    ['two members, same address', [member, { ...member, member_id: 'cmm_2' }], 'OUTBOUND_MATCH_AMBIGUOUS'],
+    ['member of another agency', [{ ...member, agency_id: 'ag_other' }], 'AGENCY_ID_MISMATCH'],
+  ]) {
+    const run = await execute({ fixture: withCampaign(members) });
+    assert.equal(run.result.sent, false, label);
+    assert.ok(run.result.blocked_reasons.includes(reason), `${label}: ${run.result.blocked_reasons}`);
+    assert.equal(run.transport.log.filter((call) => call.method === 'POST').length, 0, label);
+  }
+  ok('no, ambiguous or cross-agency member resolution blocks before any send');
+
+  const optedOut = withCampaign([member]);
+  optedOut.repo.store.REPLY_EVENTS.push(REPLY_EVENTS_HEADER.map((c) => ({ ...CAMPAIGN_REPLY, reply_event_id: 'rpl_0', received_at: '2026-09-01T10:00:00.000Z', suppression_type: 'PERMANENT' })[c] ?? ''));
+  const blocked = await execute({ fixture: optedOut });
+  assert.ok(blocked.result.blocked_reasons.includes('PROSPECT_OPTED_OUT'));
+  ok('an opt-out anywhere in the agency history still blocks a campaign reply');
+
+  // The conversation endpoint serves the same journey by agency.
+  const fixture = withCampaign([member]);
+  const transport = makeFetch();
+  __setRepoForTests(fixture.repo);
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = transport.fetchImpl;
+  const res = { statusCode: 0, body: null, setHeader() {}, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; }, end() { return this; } };
+  await handler({ method: 'GET', query: { novus_operation: 'operator-conversation', agency_id: 'ag_1' }, headers: { authorization: `Basic ${Buffer.from('joe:secret').toString('base64')}` } }, res);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(res.body.journey_key, 'agency:ag_1');
+  assert.equal(res.body.lead_email, LEAD);
+  assert.equal(res.body.sender_inbox.eaccount, EACCOUNT);
+  assert.equal(res.body.manual_reply.eligible, true, JSON.stringify(res.body.manual_reply));
+  assert.equal(res.body.manual_reply.reply_event_id, 'rpl_1');
+  assert.equal(transport.log.filter((call) => call.method === 'POST').length, 0, 'reading a conversation never sends');
+  globalThis.fetch = realFetch;
+  __setRepoForTests(null);
+  ok('operator-conversation?agency_id= shows the thread and an eligible composer for a campaign reply');
+}
+
 console.log(`\nNOVUS manual-reply live self-test passed (${passed} focused groups).`);

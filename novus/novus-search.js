@@ -154,7 +154,7 @@
     if (state.mode === 'pick') { close(r); return; }
     close(null);
     if (typeof NovusSearch.navigate === 'function') { NovusSearch.navigate(r); return; }
-    window.location.href = '/novus/calling.html?lead=' + encodeURIComponent(r.agency_id);
+    window.location.href = '/novus/operator.html#leads?agency=' + encodeURIComponent(r.agency_id) + '&pane=profile';
   }
 
   function open(opts) {

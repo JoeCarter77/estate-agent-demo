@@ -378,6 +378,8 @@
         <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg><span>Campaigns</span></a>
       <a class="nav-item" href="/novus/campaigns.html#new">
         <svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span>New Campaign</span></a>
+      <a class="nav-item" href="/novus/operator.html#email-actions">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/><path d="M15 16l2 2 4-4"/></svg><span>Email Actions</span><span class="nav-badge zero" id="b-email-actions">0</span></a>
     </div>
 
     <div class="nav-group">
@@ -516,7 +518,7 @@ function showErr(msg){ $('load-err').innerHTML = `<div>${esc(msg)}</div>`; $('lo
 function hideErr(){ $('load-err').classList.add('hidden'); }
 function notice(html, kind){ const el = $('notice'); if(!html){ el.classList.add('hidden'); return; } el.className = `banner ${kind||'info'}`; el.innerHTML = `<div>${html}</div>`; el.classList.remove('hidden'); }
 function emptyState(t, s){ return `<div class="empty"><div class="empty-ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v15H4z"/><path d="M4 10h16"/></svg></div><div class="empty-t">${esc(t)}</div><div class="empty-s">${esc(s)}</div></div>`; }
-const agencyLink = (id) => `/novus/operator.html#leads?agency=${encodeURIComponent(id)}`;
+const agencyLink = (id) => `/novus/operator.html#leads?agency=${encodeURIComponent(id)}&pane=profile`;
 
 const SUIT_TONE = { POTENTIAL_FIT:'t-green', FURTHER_VALIDATION_REQUIRED:'t-amber', NOT_CURRENTLY_SUITABLE:'t-red' };
 const SUIT_LABEL = { POTENTIAL_FIT:'Potential fit', FURTHER_VALIDATION_REQUIRED:'Further validation required', NOT_CURRENTLY_SUITABLE:'Not currently suitable' };

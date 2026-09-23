@@ -60,12 +60,13 @@ import {
   fetchLeadConversation,
   resolveSenderInbox,
 } from '../../lib/instantly-conversation.mjs';
-import { readSalesMessagesForOutreach } from '../../lib/sales-messages.mjs';
+import { readSalesMessagesForOutreach, readSalesMessagesForAgency } from '../../lib/sales-messages.mjs';
 // The Phase 3A pure gate remains shared by dry-run and live manual replies.
 // Phase 3B execution is kept in a separate module below so policy, transport,
 // claim and persistence ordering stay hermetically testable.
 import {
   evaluateManualReplyGate,
+  resolveCampaignMemberForReply,
   MAX_MANUAL_REPLY_BODY_CHARS,
   manualReplyClaimKey,
 } from '../../lib/manual-reply.mjs';
@@ -1167,8 +1168,12 @@ async function handleOperatorConversation(req, res) {
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
   const outboundId = (req.query?.outbound_id || '').trim();
-  if (!outboundId) {
-    return res.status(400).json({ success: false, error: 'Missing outbound_id' });
+  // A campaign-layer lead (lib/campaign-*.mjs) has no OUTBOUND journey; its
+  // conversation is scoped by agency instead, and its reply journey resolves
+  // through its CAMPAIGN_MEMBERS row exactly as the live send does.
+  const agencyJourneyId = outboundId ? '' : (req.query?.agency_id || '').trim();
+  if (!outboundId && !agencyJourneyId) {
+    return res.status(400).json({ success: false, error: 'Missing outbound_id or agency_id' });
   }
 
   const warnings = [];
@@ -1178,25 +1183,32 @@ async function handleOperatorConversation(req, res) {
     const repo = getRepo();
 
     const outboundRecords = await repo.getRecords('OUTBOUND', 'outbound_id');
-    const outboundRecord = outboundRecords.find(
-      (record) => String(record.obj?.outbound_id ?? '').trim() === outboundId,
-    ) || null;
-    if (!outboundRecord) {
-      return res.status(404).json({ success: false, error: `No OUTBOUND row for outbound_id ${outboundId}` });
+    let outbound = null;
+    if (outboundId) {
+      const outboundRecord = outboundRecords.find(
+        (record) => String(record.obj?.outbound_id ?? '').trim() === outboundId,
+      ) || null;
+      if (!outboundRecord) {
+        return res.status(404).json({ success: false, error: `No OUTBOUND row for outbound_id ${outboundId}` });
+      }
+      outbound = outboundRecord.obj;
     }
-    const outbound = outboundRecord.obj;
 
-    // REPLY_EVENTS joins on outreach_id, which stores OUTBOUND.outbound_id.
-    // Read-only, and the tab's schema is not touched.
+    // REPLY_EVENTS joins on outreach_id, which stores OUTBOUND.outbound_id —
+    // or, for a campaign-layer lead, on agency_id. Read-only.
     const replyRecords = await repo.getRecords('REPLY_EVENTS', 'reply_event_id');
     const replyEvents = replyRecords
       .map((record) => record.obj)
-      .filter((obj) => String(obj.outreach_id ?? '').trim() === outboundId);
+      .filter((obj) => (outboundId
+        ? String(obj.outreach_id ?? '').trim() === outboundId
+        : String(obj.agency_id ?? '').trim() === agencyJourneyId));
 
     // SALES_MESSAGES does not exist yet. The reader treats that as "not
     // available" rather than an error, so this drawer works unchanged either
     // way (see lib/sales-messages.mjs).
-    const sales = await readSalesMessagesForOutreach(repo, outboundId);
+    const sales = outboundId
+      ? await readSalesMessagesForOutreach(repo, outboundId)
+      : await readSalesMessagesForAgency(repo, agencyJourneyId);
     if (!sales.available) {
       warn('sales_messages_unavailable', `SALES_MESSAGES not read (${sales.error}); NOVUS-sent messages come from Instantly only`);
     }
@@ -1205,7 +1217,7 @@ async function handleOperatorConversation(req, res) {
     // browser. OUTBOUND carries the address actually uploaded to Instantly and
     // is therefore the one this conversation is keyed on; a REPLY_EVENTS
     // lead_email is used only if OUTBOUND has none.
-    let leadEmail = String(outbound.outreach_contact_email ?? '').trim();
+    let leadEmail = String(outbound?.outreach_contact_email ?? '').trim();
     if (!leadEmail) {
       const fromReply = replyEvents.map((row) => String(row.lead_email ?? '').trim()).find(Boolean) || '';
       if (fromReply) {
@@ -1273,10 +1285,19 @@ async function handleOperatorConversation(req, res) {
     const liveParent = latestInstantlyEmailId
       ? instantlyMessages.find((message) => String(message.instantly_email_id ?? '').trim() === latestInstantlyEmailId) || null
       : null;
+    let campaignMember = null;
+    if (!outboundId && latestReply && !String(latestReply.outreach_id ?? '').trim()) {
+      const [campaignRecords, memberRecords] = await Promise.all([
+        repo.getRecords('CAMPAIGNS', 'campaign_id').catch(() => []),
+        repo.getRecords('CAMPAIGN_MEMBERS', 'member_id').catch(() => []),
+      ]);
+      campaignMember = resolveCampaignMemberForReply({ campaignRecords, memberRecords, replyEvent: latestReply });
+    }
     const manualGate = evaluateManualReplyGate({
       replyEvent: latestReply,
       outreachReplyEvents: replyEvents,
       outboundRecords,
+      campaignMember,
       liveParent,
       mailboxes: novusMailboxes(),
       body: 'composer eligibility probe',
@@ -1292,8 +1313,10 @@ async function handleOperatorConversation(req, res) {
     return res.status(200).json({
       success: true,
       outbound_id: outboundId,
-      agency_id: String(outbound.agency_id ?? '').trim(),
-      probe_id: String(outbound.probe_id ?? '').trim(),
+      // The key the page stores drafts/locks under: one per conversation.
+      journey_key: outboundId || `agency:${agencyJourneyId}`,
+      agency_id: String(outbound?.agency_id ?? agencyJourneyId).trim(),
+      probe_id: String(outbound?.probe_id ?? '').trim(),
       lead_email: leadEmail,
       sender_inbox: {
         status: sender.sender_status,

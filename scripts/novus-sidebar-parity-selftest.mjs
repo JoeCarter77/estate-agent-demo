@@ -42,6 +42,7 @@ const CANONICAL = [
   { group: null, key: 'analytics', label: 'Analytics', badge: null },
   { group: 'Email', key: 'campaigns', label: 'Campaigns', badge: null },
   { group: 'Email', key: 'new-campaign', label: 'New Campaign', badge: null },
+  { group: 'Email', key: 'email-actions', label: 'Email Actions', badge: 'b-email-actions' },
   { group: 'Calling', key: 'calling', label: 'Calling', badge: null },
   { group: 'Calling', key: 'call-actions', label: 'Call Actions', badge: null },
   { group: 'Calling', key: 'scripts', label: 'Scripts', badge: null },
@@ -53,7 +54,7 @@ const CANONICAL = [
 // Which items are this page's OWN tabs (data-view buttons) vs. links back to
 // the other workspace — the one legitimate structural difference between the
 // two pages.
-const OPERATOR_OWN = new Set(['overview', 'actions', 'future', 'pipeline', 'prober', 'leads', 'analytics', 'exceptions']);
+const OPERATOR_OWN = new Set(['overview', 'actions', 'email-actions', 'future', 'pipeline', 'prober', 'leads', 'analytics', 'exceptions']);
 const CALLING_OWN = new Set(['calling', 'call-actions', 'scripts', 'calling-analytics']);
 const CAMPAIGNS_OWN = new Set(['campaigns', 'new-campaign']);
 const MEETINGS_OWN = new Set(['meetings']);
