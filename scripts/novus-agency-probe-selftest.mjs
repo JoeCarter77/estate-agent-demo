@@ -16,7 +16,7 @@
 import assert from 'node:assert';
 import { createRepo, __setRepoForTests } from '../lib/sheets.mjs';
 import { extractListingAddress } from '../lib/rightmove-meta.mjs';
-import { isProbeQueueEligible } from '../lib/acquisition-stage.mjs';
+import { isProbeQueueEligible, resolveLifecycleStage } from '../lib/acquisition-stage.mjs';
 
 const AGENCIES_HEADER = [
   'agency_id','agency_name','website','domain','location','branch_count','main_phone',
@@ -70,6 +70,10 @@ function makeFakeSheet({ agenciesHeader = AGENCIES_HEADER } = {}) {
         const target = store[t][row - 1 + i] || (store[t][row - 1 + i] = []);
         r.forEach((v, j) => { target[col - 1 + j] = v; });
       });
+      return {};
+    },
+    async batchUpdate(data) {
+      for (const { range, values } of data) await this.update(range, values);
       return {};
     },
     async deleteRows(tab, rowNumbers) {
@@ -393,40 +397,174 @@ async function run() {
     __setRepoForTests(null);
   }
 
-  console.log('\nPart F — automatic selection and safe Skip Agency');
+  console.log('\nPart F — Skip keeps the record; Delete only for exact duplicates; brand/branch guard');
   {
+    const rm = (slug, id) => `https://www.rightmove.co.uk/estate-agents/agent/${slug}/Branch-${id}.html`;
+    // The four live rows from NOVUS_Data_V1_Master_v2, verbatim in the fields
+    // the matcher reads (rows 59, 169, 488, 721).
+    const POCOCK_NEWMARKET = { agency_id: 'ag_hist_pocock-shaw-m31t', agency_name: 'Pocock + Shaw', website: 'https://www.pocock.co.uk/', domain: 'pocock.co.uk',
+      probe_sent: 'YES', location: 'Newmarket', main_phone: '01638 668284', known_phone_numbers: '01638 668284',
+      rightmove_sales_branch_url: 'https://www.rightmove.co.uk/estate-agents/agent/Pocock-Shaw/Newmarket-13799.html',
+      outreach_contact_email: 'piers@pocock.co.uk', email_verification_status: 'VALID' };
+    const POCOCK_ELY = { agency_id: 'ag-pocock-shaw-703', agency_name: 'Pocock & Shaw', website: 'http://www.pocock.co.uk/', domain: 'pocock.co.uk',
+      location: 'Ely, Cambridgeshire, 26 High St, ELY CB7 4JU, UK', main_phone: '01353 668091', known_phone_numbers: '01353 668091',
+      rightmove_sales_branch_url: 'https://www.rightmove.co.uk/estate-agents/agent/Pocock-and-Shaw/Cottenham-217103.html',
+      outreach_contact_email: 'piers@pocock.co.uk', email_verification_status: 'VALID', updated_at: '2026-09-02T23:32:56.315Z' };
+    const SJW_ORIGINAL = { agency_id: 'ag-sj-warren-632', agency_name: 'SJ Warren Estate Agents Burnham-On-Crouch', website: 'http://sjwarren.co.uk/', domain: 'sjwarren.co.uk',
+      probe_sent: 'YES', location: 'Burnham-on-Crouch, 164 Station Rd, Burnham-on-Crouch CM0 8HJ, UK', main_phone: '01621 734300', known_phone_numbers: '01621 734300',
+      rightmove_sales_branch_url: 'https://www.rightmove.co.uk/estate-agents/agent/S-J-Warren/Burnham-On-Crouch-165632.html',
+      outreach_contact_email: 'simon@sjwarren.co.uk', email_verification_status: 'VALID' };
+    const SJW_DUPLICATE = { agency_id: 'ag-sj-warren-estate-agents-burnham-on-cro-5489', agency_name: 'SJ Warren Estate Agents Burnham-On-Crouch', website: 'http://sjwarren.co.uk/', domain: 'sjwarren.co.uk',
+      location: 'Burnham, Buckinghamshire, 164 Station Rd, Burnham-on-Crouch CM0 8HJ, UK', main_phone: '01621 734300', known_phone_numbers: '01621 734300',
+      rightmove_sales_branch_url: 'https://www.rightmove.co.uk/estate-agents/agent/S-J-Warren/Essex-165632.html',
+      outreach_contact_email: 'info@sjwarren.co.uk', email_verification_status: 'VALID', updated_at: '2026-09-02T23:47:51.251Z' };
+
     const { store, valuesApi } = makeFakeSheet();
-    store.AGENCIES.push(agencyRow({ agency_id: 'ag_probed', agency_name: 'Already Probed', probe_sent: 'YES' }));
-    store.AGENCIES.push(agencyRow({ agency_id: 'ag_delete', agency_name: 'Bad Upstream Lead', updated_at: '2026-09-03T10:00:00Z' }));
-    store.AGENCIES.push(agencyRow({ agency_id: 'ag_history', agency_name: 'Has History' }));
-    store.PROBES.push(PROBES_HEADER.map((key) => ({ probe_id: 'prb_existing', agency_id: 'ag_probed', probe_status: 'closed' }[key] ?? '')));
-    store.PROBES.push(PROBES_HEADER.map((key) => ({ probe_id: 'prb_history', agency_id: 'ag_history', probe_status: 'closed' }[key] ?? '')));
+    store.AGENCIES.push(agencyRow(POCOCK_NEWMARKET));
+    store.AGENCIES.push(agencyRow(SJW_ORIGINAL));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_plain', agency_name: 'Plain Unrelated', rightmove_sales_branch_url: rm('Plain', 101), outreach_contact_email: 'a@plain.test' }));
+    store.AGENCIES.push(agencyRow(POCOCK_ELY));
+    store.AGENCIES.push(agencyRow(SJW_DUPLICATE));
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_next', agency_name: 'Next Unrelated', rightmove_sales_branch_url: rm('Next', 102), outreach_contact_email: 'a@next.test' }));
+    // An exact duplicate that HAS its own history (a probe) must not be deletable.
+    store.AGENCIES.push(agencyRow({ agency_id: 'ag_dup_history', agency_name: 'SJ Warren', domain: 'sjwarren.co.uk',
+      location: '164 Station Rd, Burnham-on-Crouch CM0 8HJ', main_phone: '01621 734300',
+      rightmove_sales_branch_url: SJW_ORIGINAL.rightmove_sales_branch_url, outreach_contact_email: 'x@sjwarren.co.uk' }));
+    store.PROBES.push(PROBES_HEADER.map((key) => ({ probe_id: 'prb_pocock', probe_reference: 'RM-0029', agency_id: POCOCK_NEWMARKET.agency_id, probe_status: 'closed', probe_timestamp: '2026-08-17T22:33:14.677Z' }[key] ?? '')));
+    store.PROBES.push(PROBES_HEADER.map((key) => ({ probe_id: 'prb_sjw', probe_reference: 'RM-0169', agency_id: SJW_ORIGINAL.agency_id, probe_status: 'closed', probe_timestamp: '2026-08-31T23:03:57.722Z' }[key] ?? '')));
+    store.PROBES.push(PROBES_HEADER.map((key) => ({ probe_id: 'prb_dup_hist', agency_id: 'ag_dup_history', probe_status: 'draft' }[key] ?? '')));
+    const CONTACTS_HEADER = ['contact_id', 'agency_id', 'email', 'is_selected_for_outreach', 'notes', 'updated_at'];
+    store.CONTACTS = [CONTACTS_HEADER, ['cnt_sjw_dup', SJW_DUPLICATE.agency_id, 'info@sjwarren.co.uk', 'TRUE', '', '']];
+    const ACTIONS_COLS = ['action_id', 'agency_id', 'outreach_id', 'probe_id', 'reply_event_id', 'action_type', 'action_owner', 'action_status',
+      'due_at', 'reason', 'source_stage', 'dedupe_key', 'created_at', 'updated_at', 'completed_at', 'cancelled_at', 'completion_reason', 'error', 'metadata_json'];
+    store.ACTIONS = [ACTIONS_COLS, ACTIONS_COLS.map((k) => ({ action_id: 'act_sjw_dup', agency_id: SJW_DUPLICATE.agency_id, action_type: 'PROBE_AGENCY',
+      action_status: 'DUE', action_owner: 'JOE', dedupe_key: `${SJW_DUPLICATE.agency_id}:PROBE_AGENCY:${SJW_DUPLICATE.agency_id}` }[k] ?? ''))];
     __setRepoForTests(createRepo(valuesApi));
     const { default: handler } = await import('../api/novus/probe.js');
+    const call = async (req) => { const res = mockRes(); await handler(mockReq(req), res); return res; };
+    const agencyCells = (id) => {
+      const header = store.AGENCIES[0];
+      const row = store.AGENCIES.find((r) => r[0] === id);
+      return row ? Object.fromEntries(header.map((h, i) => [h, row[i] ?? ''])) : null;
+    };
 
-    const next = mockRes();
-    await handler(mockReq({ method: 'GET', query: { next: '1' } }), next);
-    assert.equal(next.statusCode, 200);
-    assert.equal(next.body.agency.agency_id, 'ag_delete');
-    ok('next=1 automatically skips agencies whose physical probe_sent is not blank');
+    // Pocock & Shaw: row 488 (Ely) is ANOTHER BRANCH of the probed row 59.
+    const ely = await call({ method: 'GET', query: { agency_id: POCOCK_ELY.agency_id } });
+    assert.equal(ely.statusCode, 200);
+    assert.equal(ely.body.relationship.status, 'OTHER_BRANCH');
+    assert.equal(ely.body.relationship.probe_decision, 'CONFIRM_RELATED_PROBED');
+    assert.equal(ely.body.relationship.related[0].agency_id, POCOCK_NEWMARKET.agency_id);
+    assert.deepEqual(ely.body.relationship.related[0].probe_references, ['RM-0029']);
+    assert.match(ely.body.relationship_summary, /Another branch of this company has already been probed: Pocock \+ Shaw \(Newmarket\)/);
+    assert.equal(ely.body.delete_check.permitted, false);
+    ok('Pocock & Shaw Ely (row 488) is shown as another branch of probed Pocock + Shaw Newmarket (row 59, RM-0029)');
 
-    const noConfirm = mockRes();
-    await handler(mockReq({ body: { action: 'skip-agency', agency_id: 'ag_delete' } }), noConfirm);
-    assert.equal(noConfirm.statusCode, 400);
-    ok('hard deletion requires the exact server confirmation token');
+    const elyUnconfirmed = await call({ body: { action: 'create', url: 'https://www.rightmove.co.uk/properties/1', agency_id: POCOCK_ELY.agency_id } });
+    assert.equal(elyUnconfirmed.statusCode, 409);
+    assert.equal(elyUnconfirmed.body.needs_confirmation, true);
+    assert.equal(store.PROBES.filter((r) => r[2] === POCOCK_ELY.agency_id).length, 0);
+    ok('an unconfirmed probe of another branch is refused and writes nothing');
 
-    const deleted = mockRes();
-    await handler(mockReq({ body: { action: 'skip-agency', agency_id: 'ag_delete', expected_updated_at: '2026-09-03T10:00:00Z', confirm: 'DELETE_UNWORKED_AGENCY' } }), deleted);
-    assert.equal(deleted.statusCode, 200);
-    assert.equal(store.AGENCIES.some((row) => row[0] === 'ag_delete'), false);
-    ok('confirmed upstream-only agency is physically deleted');
+    const elyConfirmed = await call({ body: { action: 'create', url: 'https://www.rightmove.co.uk/properties/1', agency_id: POCOCK_ELY.agency_id, confirm_related_probe: true } });
+    assert.equal(elyConfirmed.statusCode, 200, elyConfirmed.body?.error);
+    assert.equal(elyConfirmed.body.probe.probe_status, 'draft');
+    ok('a deliberate, confirmed branch-specific probe of Pocock & Shaw Ely is allowed');
+    // Tidy: this draft is not part of the remaining scenario.
+    store.PROBES = store.PROBES.filter((r) => r[2] !== POCOCK_ELY.agency_id);
 
-    const protectedHistory = mockRes();
-    await handler(mockReq({ body: { action: 'skip-agency', agency_id: 'ag_history', confirm: 'DELETE_UNWORKED_AGENCY' } }), protectedHistory);
-    assert.equal(protectedHistory.statusCode, 409);
-    assert.equal(store.AGENCIES.some((row) => row[0] === 'ag_history'), true);
-    assert.equal(protectedHistory.body.dependencies[0].tab, 'PROBES');
-    ok('downstream probe history blocks deletion and is retained');
+    // SJ Warren: row 721 is the SAME BRANCH as probed row 169.
+    const dup = await call({ method: 'GET', query: { agency_id: SJW_DUPLICATE.agency_id } });
+    assert.equal(dup.body.relationship.status, 'EXACT_DUPLICATE');
+    assert.equal(dup.body.relationship.canonical_agency_id, SJW_ORIGINAL.agency_id);
+    assert.equal(dup.body.relationship.probe_decision, 'BLOCKED_EXACT_BRANCH_PROBED');
+    assert.match(dup.body.relationship_summary, /This exact branch has already been probed .* RM-0169/);
+    assert.equal(dup.body.delete_check.permitted, true, dup.body.delete_check.reason);
+    ok('SJ Warren row 721 is an exact duplicate of probed row 169 (RM-0169); delete is permitted');
+
+    const dupCreate = await call({ body: { action: 'create', url: 'https://www.rightmove.co.uk/properties/2', agency_id: SJW_DUPLICATE.agency_id, confirm_related_probe: true } });
+    assert.equal(dupCreate.statusCode, 409);
+    assert.match(dupCreate.body.error, /This exact branch has already been probed/);
+    ok('an exact branch already probed cannot be probed again, even with confirmation');
+
+    const original = await call({ method: 'GET', query: { agency_id: SJW_ORIGINAL.agency_id } });
+    assert.equal(original.body.relationship.canonical_agency_id, '');
+    assert.equal(original.body.delete_check.permitted, false);
+    ok('the kept (probed) SJ Warren row 169 is never offered for deletion');
+
+    const histDup = await call({ method: 'GET', query: { agency_id: 'ag_dup_history' } });
+    assert.equal(histDup.body.relationship.status, 'EXACT_DUPLICATE');
+    assert.equal(histDup.body.delete_check.permitted, false);
+    assert.match(histDup.body.delete_check.reason, /Not deletable: this row has its own history \(1 PROBES\)/);
+    ok('an exact duplicate with its own history is not deletable, with an informative reason');
+
+    // SKIP — needs a real reason; keeps the row; records status, reason, time.
+    const noReason = await call({ body: { action: 'skip-agency', agency_id: 'ag_plain' } });
+    assert.equal(noReason.statusCode, 400);
+    assert.match(noReason.body.error, /Already probed another branch, Duplicate agency, Unsuitable agency, No suitable Rightmove listing, Other/);
+    ok('Skip requires one of the five skip reasons');
+
+    const probesBefore = store.PROBES.length;
+    const skipped = await call({ body: { action: 'skip-agency', agency_id: POCOCK_ELY.agency_id, reason: 'Already probed another branch', note: 'Newmarket probed as RM-0029' } });
+    assert.equal(skipped.statusCode, 200, skipped.body?.error);
+    const elyRow = agencyCells(POCOCK_ELY.agency_id);
+    assert.ok(elyRow, 'skipped agency row is kept');
+    assert.equal(elyRow.probe_skip_status, 'SKIPPED');
+    assert.equal(elyRow.probe_skip_reason, 'Already probed another branch — Newmarket probed as RM-0029');
+    assert.ok(Date.parse(elyRow.probe_skipped_at));
+    assert.equal(elyRow.probe_sent, '', 'a skip never marks the agency probed');
+    assert.equal(store.PROBES.length, probesBefore, 'a skip never creates a PROBES row');
+    assert.match(elyRow.notes, /prober skip: Already probed another branch/);
+    assert.equal(skipped.body.next_agency_id, SJW_DUPLICATE.agency_id);
+    ok('Skip keeps Pocock & Shaw Ely, records status/reason/time + audit note, creates no probe and advances');
+
+    const nextQ = await call({ method: 'GET', query: { next: '1' } });
+    assert.equal(nextQ.body.agency.agency_id, 'ag_plain');
+    const afterPlain = await call({ method: 'GET', query: { next_after: 'ag_plain' } });
+    assert.equal(afterPlain.body.agency.agency_id, SJW_DUPLICATE.agency_id, 'skipped Ely is passed over');
+    assert.equal(resolveLifecycleStage({ agency: elyRow }).stage, 'CLOSED');
+    ok('a skipped agency is excluded from the queue and raises no PROBE_AGENCY / SORT_LEAD task');
+
+    const skippedCreate = await call({ body: { action: 'create', url: 'https://www.rightmove.co.uk/properties/3', agency_id: POCOCK_ELY.agency_id, confirm_related_probe: true } });
+    assert.equal(skippedCreate.statusCode, 409);
+    assert.match(skippedCreate.body.error, /skipped .* Restore it/);
+    ok('a skipped agency cannot be probed until restored');
+
+    const restored = await call({ body: { action: 'restore-agency', agency_id: POCOCK_ELY.agency_id } });
+    assert.equal(restored.statusCode, 200, restored.body?.error);
+    assert.equal(agencyCells(POCOCK_ELY.agency_id).probe_skip_status, 'RESTORED');
+    assert.equal(agencyCells(POCOCK_ELY.agency_id).probe_skip_reason, 'Already probed another branch — Newmarket probed as RM-0029', 'the skip history is kept');
+    const afterRestore = await call({ method: 'GET', query: { next_after: 'ag_plain' } });
+    assert.equal(afterRestore.body.agency.agency_id, POCOCK_ELY.agency_id);
+    ok('a skipped agency can be restored to the queue, keeping its skip history');
+
+    // DELETE — separate action, exact duplicates only.
+    const notDup = await call({ body: { action: 'delete-agency', agency_id: POCOCK_ELY.agency_id, confirm: 'DELETE_EXACT_DUPLICATE' } });
+    assert.equal(notDup.statusCode, 409);
+    assert.match(notDup.body.error, /Only a confirmed exact duplicate .* Use Skip/);
+    assert.ok(agencyCells(POCOCK_ELY.agency_id));
+    ok('a different branch cannot be deleted — the refusal says to use Skip instead');
+
+    const keepOriginal = await call({ body: { action: 'delete-agency', agency_id: SJW_ORIGINAL.agency_id, confirm: 'DELETE_EXACT_DUPLICATE' } });
+    assert.equal(keepOriginal.statusCode, 409);
+    assert.ok(agencyCells(SJW_ORIGINAL.agency_id));
+    ok('the canonical probed row can never be deleted');
+
+    const noToken = await call({ body: { action: 'delete-agency', agency_id: SJW_DUPLICATE.agency_id } });
+    assert.equal(noToken.statusCode, 400);
+    ok('delete requires the exact server confirmation token');
+
+    const del = await call({ body: { action: 'delete-agency', agency_id: SJW_DUPLICATE.agency_id, confirm: 'DELETE_EXACT_DUPLICATE', expected_updated_at: SJW_DUPLICATE.updated_at } });
+    assert.equal(del.statusCode, 200, del.body?.error);
+    assert.equal(agencyCells(SJW_DUPLICATE.agency_id), null);
+    assert.ok(agencyCells(SJW_ORIGINAL.agency_id), 'canonical row kept');
+    assert.equal(store.PROBES.filter((r) => r[2] === SJW_ORIGINAL.agency_id).length, 1, 'canonical probe history kept');
+    assert.deepEqual(store.CONTACTS[1].slice(0, 4), ['cnt_sjw_dup', SJW_ORIGINAL.agency_id, 'info@sjwarren.co.uk', 'FALSE']);
+    const actRow = store.ACTIONS.find((r) => r[0] === 'act_sjw_dup');
+    assert.ok(actRow, 'the action row is cancelled, not deleted');
+    const act = Object.fromEntries(ACTIONS_COLS.map((k, i) => [k, actRow[i]]));
+    assert.equal(act.action_status, 'CANCELLED');
+    assert.match(act.completion_reason, /exact duplicate of ag-sj-warren-632/);
+    ok('SJ Warren row 721 deletes cleanly: contact re-linked to row 169, its system action cancelled, nothing historical removed');
     __setRepoForTests(null);
   }
 
@@ -510,12 +648,10 @@ async function run() {
     ok('auto-advance uses the same VALID-email rule');
 
     const skipped = mockRes();
-    await handler(mockReq({ body: { action: 'skip-agency', agency_id: 'ag_q_second',
-      expected_updated_at: '2026-09-03T10:00:00Z', reason: 'Lettings only', confirm: 'DELETE_UNWORKED_AGENCY' } }), skipped);
+    await handler(mockReq({ body: { action: 'skip-agency', agency_id: 'ag_q_second', reason: 'Unsuitable agency' } }), skipped);
     assert.equal(skipped.statusCode, 200, skipped.body?.error);
     assert.equal(skipped.body.next_agency_id, 'ag_q_third');
-    assert.equal(skipped.body.reason, 'Lettings only');
-    assert.equal(skipped.body.reason_persisted, false);
+    assert.equal(skipped.body.reason, 'Unsuitable agency');
     ok('Skip Agency advances by the same VALID-email rule');
 
     const { store: bare, valuesApi: bareApi } = makeFakeSheet({ agenciesHeader: AGENCIES_HEADER.filter((h) => h !== 'probe_sent') });

@@ -33,6 +33,10 @@ export const INTERVENTIONS = {
     title: 'Agency page would not load',
     action: 'Open the branch URL yourself. Fix it in AGENCIES, or skip the agency manually.',
   },
+  related_agency_probed: {
+    title: 'Company or branch already probed',
+    action: 'Open this agency in the Prober: probe it deliberately, skip it, or delete it if it is an exact duplicate. Nothing was submitted.',
+  },
   uncertain_suitability: {
     title: 'Property suitability unclear',
     action: 'Review the branch page and either pick a property manually or skip the agency.',

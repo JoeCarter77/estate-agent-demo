@@ -71,12 +71,15 @@
            operator touches on every single probe, in the order they touch
            them, all above the fold.
 
-           SKIPPING IS THE EXCEPTION AND SITS BELOW ALL OF IT. It is a
-           hard delete, so it must never occupy the prime part of the screen
-           and must never be the control nearest the operator's hand. Its
-           reason select, its note and its button are one block under a rule,
-           and its semantics — reason, confirmation, audit, hard delete,
-           optimistic-concurrency guard — are untouched.
+           BRAND / BRANCH CONTEXT sits between the agency and the URL: if
+           this company (or this exact branch) was already probed, the operator
+           sees it before touching Create probe. An exact branch already
+           probed disables Create; another branch needs a deliberate tick.
+
+           SKIP sits below the workflow. It records a reason on the KEPT row
+           and takes it out of the queue — nothing is deleted, nothing is
+           marked probed. DELETE appears only for a confirmed exact duplicate
+           with no history of its own, and says why when it is absent.
            ═══════════════════════════════════════════════════════════════════ -->
       <section id="view-new">
         <div class="page-head">
@@ -92,7 +95,7 @@
             <div class="probe-stat"><div class="n" id="p-today">&mdash;</div><div class="l">Probes sent today</div></div>
           </div>
           <p class="field-note">Queue rule — the first agency in sheet order whose
-            <span class="mono">probe_sent</span> is blank.</p>
+            <span class="mono">probe_sent</span> is blank and that has not been skipped.</p>
         </div>
 
         <div class="card">
@@ -111,6 +114,20 @@
                 both pages open automatically from one click.</div>
             </div>
 
+            <!-- BRAND / BRANCH CONTEXT — filled from the agency read. -->
+            <div id="rel-panel" class="hidden" style="margin-top:14px;" data-relationship="" data-probe-decision="">
+              <div id="rel-banner" class="banner warn"><span id="rel-summary"></span></div>
+              <dl class="kv" id="rel-list" style="margin-top:10px;"></dl>
+              <label id="rel-confirm-row" class="field-note hidden" style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;">
+                <input type="checkbox" id="rel-confirm" />
+                <span>I am deliberately probing <b>this branch</b> as well.</span>
+              </label>
+            </div>
+            <div id="skipped-panel" class="banner warn hidden" style="margin-top:14px;">
+              <span id="skipped-text"></span>
+              <button id="restore-btn" class="btn btn-secondary btn-sm" type="button" style="margin-left:auto;">Restore to queue</button>
+            </div>
+
             <!-- 3 · PROPERTY URL, 4 · CREATE -->
             <div class="field">
               <label class="field-l" for="url">Rightmove URL</label>
@@ -126,11 +143,11 @@
           </div>
         </div>
 
-        <!-- 5 · SKIP — below the whole workflow, on purpose. -->
-        <div class="dangerzone hidden" id="skip-field">
+        <!-- 5 · SKIP (and DELETE where permitted) — below the workflow. -->
+        <div class="section hidden" id="skip-field" style="margin-top:28px;">
           <div class="section-head">
             <div class="section-title">Skip agency</div>
-            <div class="section-note">Only when this agency should never be probed.</div>
+            <div class="section-note">Keeps the record and its history; takes it out of the probe queue. It can be restored later.</div>
           </div>
           <div class="card flat">
             <div class="card-body">
@@ -138,21 +155,26 @@
                 <label class="field-l" for="skip-reason">Skip reason</label>
                 <select class="input block" id="skip-reason">
                   <option value="">Choose a reason&hellip;</option>
-                  <option>Lettings only</option>
-                  <option>Bad Rightmove listing</option>
-                  <option>Unavailable / closed</option>
-                  <option>Duplicate</option>
-                  <option>Poor lead</option>
-                  <option>Wrong match</option>
+                  <option>Already probed another branch</option>
+                  <option>Duplicate agency</option>
+                  <option>Unsuitable agency</option>
+                  <option>No suitable Rightmove listing</option>
                   <option>Other</option>
                 </select>
-                <div class="field-note">Recorded in the server audit log only. Skipping
-                  <b>hard-deletes the AGENCIES row</b>, so there is no column left to store the reason in, and
-                  it only succeeds when no downstream history exists.</div>
               </div>
               <div class="field">
-                <button id="skip-btn" class="btn btn-danger block" type="button">Skip agency</button>
+                <input class="input block" id="skip-note" type="text" maxlength="200" placeholder="Note (optional)" />
               </div>
+              <div class="field">
+                <button id="skip-btn" class="btn btn-secondary block" type="button">Skip</button>
+              </div>
+              <div id="delete-box" class="hidden">
+                <div class="field-note" id="delete-note"></div>
+                <div class="field">
+                  <button id="delete-btn" class="btn btn-danger block" type="button">Delete duplicate</button>
+                </div>
+              </div>
+              <div class="field-note hidden" id="delete-why"></div>
             </div>
           </div>
         </div>
@@ -312,7 +334,10 @@
       const btn = $('create-btn');
       btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Creating…';
       try {
-        const data = await api('/api/novus/probe', { method: 'POST', body: JSON.stringify({ action: 'create', url, agency_id: launchAgencyId }) });
+        const data = await api('/api/novus/probe', { method: 'POST', body: JSON.stringify({
+          action: 'create', url, agency_id: launchAgencyId,
+          confirm_related_probe: Boolean($('rel-confirm') && $('rel-confirm').checked),
+        }) });
         render(data.probe);
         $('view-new').classList.add('hidden');
         $('view-ready').classList.remove('hidden');
@@ -352,28 +377,123 @@
       }
     });
 
+    function goNext(result) {
+      window.location.href = result.next_agency_id
+        ? '/novus/probe?agency_id=' + encodeURIComponent(result.next_agency_id)
+        : '/novus/probe?next=1';
+    }
+
+    // SKIP — a recorded decision on the kept row, then straight to the next
+    // eligible agency. No confirm(): nothing is destroyed and it is reversible.
     $('skip-btn').addEventListener('click', async () => {
       const agencyId = activeAgencyId();
       if (!agencyId) return;
-      const name = $('agency-name').value || agencyId;
-      if (!window.confirm(`Permanently delete ${name} from the acquisition pool? This only succeeds when no downstream history exists.`)) return;
-      const btn = $('skip-btn');
-      btn.disabled = true; btn.textContent = 'Checking history…';
       clearErr($('create-err'));
+      const reason = $('skip-reason').value;
+      if (!reason) { showErr($('create-err'), 'Choose a skip reason first.'); return; }
+      const btn = $('skip-btn');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Skipping…';
       try {
-        const result = await api('/api/novus/probe', { method: 'POST', body: JSON.stringify({
-          action: 'skip-agency', agency_id: agencyId, expected_updated_at: launchAgencyUpdatedAt,
-          reason: ($('skip-reason') && $('skip-reason').value) || '',
-          confirm: 'DELETE_UNWORKED_AGENCY',
-        }) });
-        window.location.href = result.next_agency_id
-          ? '/novus/probe?agency_id=' + encodeURIComponent(result.next_agency_id)
-          : '/novus/probe?next=1';
+        goNext(await api('/api/novus/probe', { method: 'POST', body: JSON.stringify({
+          action: 'skip-agency', agency_id: agencyId, reason, note: $('skip-note').value.trim(),
+        }) }));
       } catch (e) {
         showErr($('create-err'), e.message);
-        btn.disabled = false; btn.textContent = 'Skip agency';
+        btn.disabled = false; btn.textContent = 'Skip';
       }
     });
+
+    $('restore-btn').addEventListener('click', async () => {
+      const agencyId = activeAgencyId();
+      const btn = $('restore-btn');
+      btn.disabled = true;
+      clearErr($('create-err'));
+      try {
+        await api('/api/novus/probe', { method: 'POST', body: JSON.stringify({ action: 'restore-agency', agency_id: agencyId }) });
+        window.location.reload();
+      } catch (e) { showErr($('create-err'), e.message); btn.disabled = false; }
+    });
+
+    // DELETE — only rendered when the server confirmed an exact duplicate
+    // with no history of its own; the server re-checks on the call.
+    $('delete-btn').addEventListener('click', async () => {
+      const agencyId = activeAgencyId();
+      const name = $('agency-name').value || agencyId;
+      if (!window.confirm('Delete this duplicate row for ' + name + '?\n\n' + $('delete-note').textContent
+        + '\n\nThe kept row and all of its history are untouched; this row\'s contacts are re-linked to it.')) return;
+      const btn = $('delete-btn');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Deleting…';
+      clearErr($('create-err'));
+      try {
+        goNext(await api('/api/novus/probe', { method: 'POST', body: JSON.stringify({
+          action: 'delete-agency', agency_id: agencyId, expected_updated_at: launchAgencyUpdatedAt,
+          confirm: 'DELETE_EXACT_DUPLICATE',
+        }) }));
+      } catch (e) {
+        showErr($('create-err'), e.message);
+        btn.disabled = false; btn.textContent = 'Delete duplicate';
+      }
+    });
+
+    const REL_LABEL = { EXACT_BRANCH: 'Same branch', RIGHTMOVE_URL_CONFLICT: 'Same Rightmove page',
+      OTHER_BRANCH: 'Other branch', AMBIGUOUS: 'Possibly related' };
+
+    // What NOVUS knows about this company before the operator decides.
+    function paintRelationship(data) {
+      const rel = data.relationship;
+      const panel = $('rel-panel');
+      if (!rel || !rel.related.length) return;
+      panel.dataset.relationship = rel.status;
+      panel.dataset.probeDecision = rel.probe_decision;
+      const blocked = rel.probe_decision.indexOf('BLOCKED_') === 0;
+      const confirm = rel.probe_decision === 'CONFIRM_RELATED_PROBED';
+      $('rel-banner').className = 'banner ' + (blocked ? 'err' : confirm ? 'warn' : 'info');
+      $('rel-summary').textContent = data.relationship_summary
+        || ('Related records exist but none has been probed (' + rel.status.replace(/_/g, ' ').toLowerCase() + ').');
+      const list = $('rel-list');
+      list.innerHTML = '';
+      rel.related.slice(0, 6).forEach((r) => {
+        const dt = document.createElement('dt');
+        dt.textContent = REL_LABEL[r.relationship] || r.relationship;
+        const dd = document.createElement('dd');
+        const probe = r.probed ? 'probed' + (r.probe_references.length ? ' ' + r.probe_references.join(', ') : '')
+          + (r.last_probe_at ? ' on ' + fmt(r.last_probe_at) : '') : (r.draft_count ? 'draft probe only' : 'not probed');
+        dd.textContent = r.agency_name + ' — ' + (r.location || 'no location').split(',')[0]
+          + ' · row ' + r.sheet_row + ' · ' + probe;
+        dd.title = r.evidence.join('; ');
+        list.appendChild(dt); list.appendChild(dd);
+      });
+      panel.classList.remove('hidden');
+      if (blocked) {
+        $('create-btn').disabled = true;
+        $('url').disabled = true;
+      }
+      if (confirm) $('rel-confirm-row').classList.remove('hidden');
+      // Pre-select the matching skip reason; the operator still clicks Skip.
+      if (!$('skip-reason').value) {
+        if (rel.status === 'EXACT_DUPLICATE') $('skip-reason').value = 'Duplicate agency';
+        else if (confirm) $('skip-reason').value = 'Already probed another branch';
+      }
+    }
+
+    function paintDelete(check) {
+      if (check && check.permitted) {
+        $('delete-note').textContent = check.reason;
+        $('delete-box').classList.remove('hidden');
+      } else if (check && check.reason) {
+        $('delete-why').textContent = check.reason;
+        $('delete-why').classList.remove('hidden');
+      }
+    }
+
+    function paintSkipped(agency) {
+      if (String(agency.probe_skip_status || '').toUpperCase() !== 'SKIPPED') return;
+      $('skipped-text').textContent = 'Skipped ' + fmt(agency.probe_skipped_at) + ' — '
+        + (agency.probe_skip_reason || 'no reason recorded') + '. It is out of the probe queue.';
+      $('skipped-panel').classList.remove('hidden');
+      $('create-btn').disabled = true;
+      $('skip-btn').disabled = true;
+    }
 
     // The agency this probe belongs to — from the launch link, or from the
     // probe itself when the page was rehydrated via ?probe_id=.
@@ -462,13 +582,16 @@
         launchAgencyId = agencyId;
         updateAnotherBtn();
         $('agency-field').classList.remove('hidden');
-        // The skip block is only meaningful once there IS an agency in play.
+        // Skip / delete are only meaningful once there IS an agency in play.
         $('skip-field').classList.remove('hidden');
         $('agency-name').value = agencyId; // shown immediately; replaced by the real name below if found
         try {
           const data = await api('/api/novus/probe?agency_id=' + encodeURIComponent(agencyId), { method: 'GET' });
           $('agency-name').value = data.agency.agency_name || agencyId;
           launchAgencyUpdatedAt = String(data.agency.updated_at || '');
+          paintRelationship(data);
+          paintDelete(data.delete_check);
+          paintSkipped(data.agency);
 
           // ONE-CLICK LAUNCH — the agency's own Rightmove branch page, taken
           // from the existing AGENCIES.rightmove_sales_branch_url column

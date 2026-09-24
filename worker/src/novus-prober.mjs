@@ -15,7 +15,7 @@
 //   #sent-btn        Mark as sent
 //   #status-text     Draft | Observing
 //   #skip-reason     the existing skip reason select
-//   #skip-btn        Skip agency (hard delete, confirm() dialog)
+//   #skip-btn        Skip (records the reason on the kept row; no dialog)
 
 import { dismissCookieBanner } from './browser.mjs';
 
@@ -134,14 +134,13 @@ export class ProberPage {
     return { ok: false, error: error || 'Mark as sent did not reach Observing' };
   }
 
-  // STEP 3's skip path — the existing Skip agency workflow, reason select and
-  // confirm() dialog included. It hard-deletes an unworked AGENCIES row, so it
-  // is only ever called for a verified, unambiguous ineligibility.
+  // STEP 3's skip path — the Prober's Skip, reason select included. It keeps
+  // the AGENCIES row and records the reason, and is still only ever called for
+  // a verified, unambiguous ineligibility.
   async skipAgency(reason) {
     await this.page.locator('#skip-reason').selectOption({ label: reason }).catch(async () => {
       await this.page.locator('#skip-reason').selectOption(reason);
     });
-    this.page.once('dialog', (dialog) => dialog.accept().catch(() => {}));
     const before = this.page.url();
     await this.page.locator('#skip-btn').click();
     try {

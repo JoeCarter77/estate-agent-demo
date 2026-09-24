@@ -16,6 +16,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { relationshipsForAgency, relationshipSummary } from '../../../lib/agency-relationships.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -50,6 +51,7 @@ export function createMockWorld(fixture = {}) {
 
 function eligible(agency) {
   return !String(agency.probe_sent || '').trim()
+    && String(agency.probe_skip_status || '').toUpperCase() !== 'SKIPPED'
     && /^https?:\/\//i.test(String(agency.rightmove_sales_branch_url || ''))
     && String(agency.email_verification_status || '').toUpperCase() === 'VALID';
 }
@@ -81,7 +83,11 @@ function handleNovusApi(world, req, res, url, body) {
     }
     if (q.get('agency_id')) {
       const agency = world.agencies.find((a) => a.agency_id === q.get('agency_id'));
-      return agency ? send(200, { agency }) : send(404, { error: 'Agency not found' });
+      if (!agency) return send(404, { error: 'Agency not found' });
+      // The real shared matcher, over the mock world's rows.
+      const relationship = relationshipsForAgency(agency.agency_id,
+        world.agencies.map((obj, i) => ({ obj, rowNumber: i + 2 })), world.probes.map((obj) => ({ obj })));
+      return send(200, { agency, relationship, relationship_summary: relationshipSummary(relationship), delete_check: { permitted: false } });
     }
     if (q.get('probe_id')) {
       const probe = world.probes.find((p) => p.probe_id === q.get('probe_id'));
@@ -132,16 +138,15 @@ function handleNovusApi(world, req, res, url, body) {
   }
 
   if (body.action === 'skip-agency') {
-    if (body.confirm !== 'DELETE_UNWORKED_AGENCY') return send(400, { error: 'Missing confirm=DELETE_UNWORKED_AGENCY' });
+    if (!body.reason) return send(400, { error: 'Choose a skip reason' });
     const index = world.agencies.findIndex((a) => a.agency_id === body.agency_id);
     if (index === -1) return send(404, { error: 'Agency not found' });
-    if (world.probes.some((p) => p.agency_id === body.agency_id)) {
-      return send(409, { error: 'Agency cannot be hard-deleted because downstream history exists' });
-    }
-    const [removed] = world.agencies.splice(index, 1);
-    const next = world.agencies.slice(index).find(eligible);
-    world.log.push({ op: 'skip', agency_id: removed.agency_id, reason: body.reason });
-    return send(200, { deleted: true, agency_id: removed.agency_id, reason: body.reason, next_agency_id: next?.agency_id || '', queue: queueStats(world) });
+    // Kept, not deleted: the reason is recorded on the row itself.
+    const agency = world.agencies[index];
+    Object.assign(agency, { probe_skip_status: 'SKIPPED', probe_skip_reason: body.reason, probe_skipped_at: new Date().toISOString() });
+    const next = world.agencies.slice(index + 1).find(eligible) || world.agencies.find(eligible);
+    world.log.push({ op: 'skip', agency_id: agency.agency_id, reason: body.reason });
+    return send(200, { skipped: true, agency_id: agency.agency_id, reason: body.reason, next_agency_id: next?.agency_id || '', queue: queueStats(world) });
   }
 
   return send(400, { error: 'Missing or unknown action — expected "create" or "mark-sent"' });

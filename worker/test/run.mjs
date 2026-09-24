@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { buildHarness } from './harness.mjs';
-import { standardWorld, APPROVED_IDENTITY } from './mock/fixtures.mjs';
+import { standardWorld, APPROVED_IDENTITY, agency } from './mock/fixtures.mjs';
 import { classifyPropertyType, chooseListing } from '../src/suitability.mjs';
 import { recoveryPlan, OperatorState } from '../src/state.mjs';
 import { classifySubmissionPage } from '../src/rightmove.mjs';
@@ -175,9 +175,34 @@ await test('lettings-only agency is skipped through the existing Skip workflow',
     const skip = h.world.log.find((entry) => entry.op === 'skip');
     assert.ok(skip, 'the existing skip-agency endpoint was called');
     assert.equal(skip.agency_id, 'ag-lettings-2');
-    assert.equal(skip.reason, 'Lettings only');
+    assert.equal(skip.reason, 'Unsuitable agency');
+    const kept = h.world.agencies.find((a) => a.agency_id === 'ag-lettings-2');
+    assert.ok(kept, 'the skipped agency row is kept');
+    assert.equal(kept.probe_skip_status, 'SKIPPED');
+    assert.equal(kept.probe_sent, '', 'a skip never marks the agency probed');
     assert.equal(h.world.probes.filter((p) => p.agency_id === 'ag-lettings-2').length, 0,
       'no probe was created for the skipped agency');
+  } finally { await h.close(); }
+});
+
+await test('another branch of an already-probed company stops for a human before Rightmove', async () => {
+  const world = standardWorld();
+  // Same company (domain + mailbox) as the probed Echo Estates, different branch.
+  world.agencies = [
+    agency('ag-echo-branch', 'Echo Estates Northtown', 'Echo-Estates', '55556', { domain: 'echo.test', outreach_contact_email: 'md@echo.test' }),
+    ...world.agencies.map((a) => (a.agency_id === 'ag-done-5' ? { ...a, domain: 'echo.test', outreach_contact_email: 'md@echo.test' } : a)),
+  ];
+  const h = await buildHarness(world);
+  try {
+    const run = h.run({ batchSize: 1 });
+    await waitFor(() => h.state.data.current.needs_human, 25000);
+    assert.equal(h.state.data.current.needs_human.reason, 'related_agency_probed');
+    assert.match(h.state.data.current.needs_human.detail, /Another branch of this company has already been probed/);
+    assert.equal(h.state.data.current.submission.state, 'none', 'nothing was submitted');
+    assert.equal(h.world.probes.length, 0, 'no probe was created');
+    h.orchestrator.release({ outcome: 'abandon' });
+    await h.orchestrator.emergencyStop();
+    await run.catch(() => {});
   } finally { await h.close(); }
 });
 

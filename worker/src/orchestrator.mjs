@@ -29,13 +29,15 @@ class HumanNeeded extends Error {
   constructor(reason, detail) { super(`${reason}: ${detail}`); this.reason = reason; this.detail = detail; }
 }
 
-// A skip is a HARD DELETE of the AGENCIES row. It is only ever automatic for
-// the cases below, each of which is decided from an explicit, countable fact on
-// the page — never from a model's opinion and never from an absence of data.
+// A skip records a reason on the kept AGENCIES row and takes it out of the
+// queue (restorable). It is still only ever automatic for the cases below,
+// each decided from an explicit, countable fact on the page — never from a
+// model's opinion and never from an absence of data. Labels are the Prober's
+// own skip reasons.
 const AUTO_SKIP = {
-  lettings_only: 'Lettings only',
-  no_sales_listings: 'Lettings only',
-  bad_branch_page: 'Bad Rightmove listing',
+  lettings_only: 'Unsuitable agency',
+  no_sales_listings: 'No suitable Rightmove listing',
+  bad_branch_page: 'No suitable Rightmove listing',
 };
 
 export class Orchestrator {
@@ -356,7 +358,8 @@ export class Orchestrator {
     }
 
     this.lastAgencyId = loaded.agencyId;
-    const agency = await this.novus.agency(loaded.agencyId).then((d) => d.agency).catch(() => ({}));
+    const agencyRead = await this.novus.agency(loaded.agencyId).catch(() => ({}));
+    const agency = agencyRead.agency || {};
     this.state.beginAgency({
       agency_id: loaded.agencyId,
       agency_name: loaded.agencyName || agency.agency_name || '',
@@ -364,6 +367,15 @@ export class Orchestrator {
       branch_url: loaded.branchUrl || agency.rightmove_sales_branch_url || '',
     });
     this.log(`[operator] agency: ${this.state.data.current.agency_name} (${loaded.agencyId})`);
+
+    // BRAND / BRANCH GUARD — before any Rightmove tab is touched. If this
+    // branch, its Rightmove page or another branch of the company was already
+    // probed, probing again is a human decision (probe, skip or delete), and
+    // NOVUS would refuse the probe after the enquiry had already gone out.
+    const decision = agencyRead.relationship?.probe_decision || 'CLEAR';
+    if (decision !== 'CLEAR') {
+      throw new HumanNeeded('related_agency_probed', agencyRead.relationship_summary || decision);
+    }
     await this.pace();
 
     // STEP 2 — the agency's Rightmove branch page, in its own tab.
