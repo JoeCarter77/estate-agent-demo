@@ -19,6 +19,43 @@
   <!-- Same product, same stylesheet as the Command Centre and the Prober. -->
   <link rel="stylesheet" href="/novus/novus-ui.css" />
   <link rel="stylesheet" href="/novus/novus-shell.css" />
+  <!-- ROLE VIEW. A SETTER account (lib/novus-users.mjs) sees Calling Mode
+       only. This is presentation; the server refuses every admin operation
+       to a setter regardless (api/novus/personalisation.js, middleware.js). -->
+  <style>
+    .role-setter .nav a.nav-item, .role-setter .admin-only, .role-setter #setup-box,
+    .role-setter a[title*="profile" i], .role-setter #scr-new, .role-setter #obj-new,
+    .role-setter .obj-edit, .role-setter #v-scripts .btnrow { display:none !important; }
+    .role-setter #v-scripts input, .role-setter #v-scripts textarea, .role-setter #v-scripts select { pointer-events:none; opacity:.85; }
+    .who { font-size:12px; color:var(--muted, #8a8f98); margin-bottom:6px; }
+    .team-otp { font-family:ui-monospace,Menlo,monospace; font-size:15px; padding:8px 10px; border-radius:8px; background:rgba(127,127,127,.12); user-select:all; }
+    /* ── Calling session timer (lib/call-sessions.mjs). Fixed bottom-right,
+       above Calling Mode (z 60) and below toasts (z 80). ── */
+    .sess{position:fixed;right:16px;bottom:16px;z-index:75;display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:calc(100vw - 32px);
+      padding:9px 12px;border-radius:var(--r-lg);background:var(--bg-2);border:1px solid var(--hair-2);box-shadow:var(--shadow-md);font-size:12px;color:var(--ink-2);}
+    .sess .dot{width:8px;height:8px;border-radius:50%;background:var(--ink-4);flex:none;}
+    .sess.active .dot{background:var(--blue);box-shadow:0 0 10px var(--blue-glow);}
+    .sess.paused .dot{background:var(--amber);}
+    .sess .big{font-family:var(--mono);font-size:15px;color:var(--ink);font-weight:600;}
+    .sess .st{display:flex;flex-direction:column;line-height:1.2;}
+    .sess .st b{font-family:var(--mono);color:var(--ink);font-weight:600;font-size:12.5px;}
+    .sess .st span{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);}
+    .sess .btn{padding:5px 10px;}
+    .sess .warn{color:var(--amber);font-size:11.5px;}
+    .sess.min .st, .sess.min .warn{display:none;}
+    @media (max-width:720px){ .sess{left:calc(var(--nav-w, 60px) + 8px);right:8px;bottom:10px;gap:8px;} .sess .st:nth-of-type(n+4){display:none;} }
+    .ovl{position:fixed;inset:0;z-index:78;background:var(--scrim, rgba(0,0,0,.55));display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;}
+    .ovl .panel{width:100%;max-width:980px;background:var(--bg);border:1px solid var(--hair-2);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:22px 24px;}
+    .ovl h2{font-family:var(--serif);font-weight:400;font-size:24px;margin:0 0 4px;}
+    .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:14px 0;}
+    .m{border:1px solid var(--hair);border-radius:var(--r-md);padding:10px 12px;}
+    .m b{display:block;font-family:var(--mono);font-size:17px;color:var(--ink);font-weight:600;}
+    .m span{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);}
+    .m small{display:block;color:var(--ink-4);font-size:11px;margin-top:2px;}
+    .perf-user{margin-bottom:22px;}
+    .formrow{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;}
+    .formrow label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--ink-3);}
+  </style>
   <script src="/novus/novus-ui.js" defer></script>
   <!-- Twilio Voice JS SDK, vendored (novus/vendor). It only ever receives a
        short-lived access token minted server-side; no Twilio secret is here. -->
@@ -246,7 +283,47 @@
             <button class="btn btn-secondary btn-sm" id="an-apply" type="button">Apply</button>
           </span>
           <select class="input" id="an-script"><option value="">All scripts</option></select>
+          <select class="input admin-only hidden" id="an-user" title="Whose calls"><option value="">Everyone</option></select>
           <span class="an-range-note" id="an-note"></span>
+        </div>
+        <!-- TEAM & ACCESS — admin only (team-* operations). -->
+        <div class="section admin-only hidden" id="team-sec">
+          <div class="section-head"><div class="section-title">Team &amp; access</div>
+            <div class="section-note">Individual logins. Setters see Calling Mode only: the cold pool plus call actions from their own calls. Your own login is the environment credential and is not managed here.</div></div>
+          <div class="card"><div class="tablewrap"><table>
+            <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th class="num">Calls today</th><th class="num">Calls 7d</th>
+              <th class="num">Owner reached 7d</th><th class="num">Meetings 7d</th><th class="col-md">Last call</th><th></th></tr></thead>
+            <tbody id="team-rows"></tbody></table></div>
+            <div class="card-body">
+              <div id="team-otp-box" class="banner warn hidden"></div>
+              <div class="btnrow" style="gap:8px;align-items:center;flex-wrap:wrap">
+                <input class="input" id="team-name" placeholder="Display name, e.g. Louis" maxlength="60" />
+                <input class="input" id="team-username" placeholder="Username, e.g. louis" maxlength="32" autocomplete="off" />
+                <button class="btn btn-secondary btn-sm" id="team-create" type="button">Create setter account</button>
+                <span class="card-note">A one-time password is shown once; give it to them directly.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- SESSIONS & PERFORMANCE — admin: everyone; setter: himself only
+             (the server scopes call-performance to the caller). -->
+        <div class="section" id="perf-sec">
+          <div class="section-head"><div class="section-title" id="perf-title">Sessions &amp; performance</div>
+            <div class="section-note">Recorded session time is shown separately from approved time. Hover a figure for its definition.</div></div>
+          <div class="an-filters">
+            <div class="seg" id="perf-range">
+              <button type="button" data-prange="today">Today</button>
+              <button type="button" data-prange="this_week" class="on">This week</button>
+              <button type="button" data-prange="last_week">Last week</button>
+              <button type="button" data-prange="custom">Custom</button>
+            </div>
+            <span id="perf-custom" class="hidden" style="display:inline-flex;gap:6px;align-items:center;">
+              <input class="input" type="date" id="perf-from" /> <span class="muted">to</span> <input class="input" type="date" id="perf-to" />
+              <button class="btn btn-secondary btn-sm" id="perf-apply" type="button">Apply</button>
+            </span>
+            <span class="an-range-note" id="perf-note"></span>
+          </div>
+          <div id="perf-body"></div>
         </div>
         <div id="an-empty" class="hidden"></div>
         <div id="an-body">
@@ -348,6 +425,9 @@
 </div>
 <!-- Due call-action toasts: top-right, small, never a modal, above Calling Mode. -->
 <div class="toasts" id="toasts" aria-live="polite"></div>
+<!-- Calling session timer + session overlays (end summary, session review). -->
+<div class="sess hidden" id="sess" role="region" aria-label="Calling session"></div>
+<div class="ovl hidden" id="sess-ovl"><div class="panel" id="sess-panel"></div></div>
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
@@ -488,6 +568,309 @@ async function post(url, body){
 }
 function showErr(msg){ $('load-err').innerHTML = `<div>${esc(msg)}</div>`; $('load-err').classList.remove('hidden'); }
 
+/* ═══ WHO IS SIGNED IN (lib/novus-users.mjs) ════════════════════════════
+   ADMIN: everything, plus Team & access and a per-caller analytics filter.
+   SETTER: Calling Mode only — the rail's links to other workspaces, lead
+   profile links, script editing and setup/repair are hidden, and the server
+   scopes the queue and analytics to them and refuses everything else. */
+let ME = null;
+let TEAM = [];
+const IS_SETTER = () => ME?.role === 'SETTER';
+const teamName = (id) => (TEAM.find((u)=>u.user_id===id)||{}).display_name || '';
+async function loadMe(){
+  try{ const r = await fetch(OP('whoami'), { headers:{ Accept:'application/json' } }); const d = await r.json(); if(r.ok && d.user) ME = d.user; }catch{ ME = null; }
+  if(!ME) return;
+  document.body.classList.toggle('role-setter', IS_SETTER());
+  sessInit();
+  if(VIEW==='calling-analytics') loadPerf();
+  if(IS_SETTER()){
+    document.querySelectorAll('.nav .nav-group').forEach((g) => { if(!g.querySelector('.nav-item[data-view]')) g.style.display = 'none'; });
+    return;
+  }
+  document.querySelectorAll('.admin-only').forEach((el) => el.classList.remove('hidden'));
+  loadTeam();
+}
+async function loadTeam(){
+  try{
+    const r = await fetch(OP('team-users'), { headers:{ Accept:'application/json' } }); const d = await r.json();
+    if(!r.ok || d.success===false) throw new Error(d.error || `Request failed (${r.status})`);
+    TEAM = d.users || [];
+  }catch(err){ $('team-rows').innerHTML = `<tr><td colspan="10" class="muted">Team could not load. ${esc(err.message||'')}</td></tr>`; return; }
+  renderTeam();
+  if(LOADED) renderView();
+}
+function renderTeam(){
+  const sel = $('an-user'); const cur = AN_Q.user_id||'';
+  sel.innerHTML = `<option value="">Everyone</option>` + TEAM.map((u)=>`<option value="${esc(u.user_id)}"${u.user_id===cur?' selected':''}>${esc(u.display_name)}</option>`).join('');
+  $('team-rows').innerHTML = TEAM.map((u) => { const a = u.activity||{}; const setter = u.role==='SETTER';
+    return `<tr><td><b>${esc(u.display_name)}</b></td><td class="mono">${dash(u.username)}</td><td>${pill(u.role, setter?'t-blue':'t-grey', true)}</td>
+      <td>${pill(u.status, u.status==='ACTIVE'?'t-green':'t-red', true)}</td>
+      <td class="num">${a.calls_today||0}</td><td class="num">${a.calls_7d||0}</td><td class="num">${a.owner_reached_7d||0}</td><td class="num">${a.meetings_7d||0}</td>
+      <td class="col-md">${a.last_call_at?esc(ago(a.last_call_at)):'<span class="muted">&mdash;</span>'}</td>
+      <td class="nowrap"><button class="btn btn-quiet btn-sm" data-team-view="${esc(u.user_id)}" type="button">Calls</button>
+        ${setter?`<button class="btn btn-quiet btn-sm" data-team-status="${esc(u.user_id)}" data-to="${u.status==='ACTIVE'?'DISABLED':'ACTIVE'}" type="button">${u.status==='ACTIVE'?'Disable':'Enable'}</button>
+        <button class="btn btn-quiet btn-sm" data-team-reset="${esc(u.user_id)}" type="button">Reset password</button>`:''}</td></tr>`; }).join('');
+}
+function showOtp(user, password){
+  const box = $('team-otp-box');
+  box.innerHTML = `<div><strong>One-time password for ${esc(user.display_name)} (<span class="mono">${esc(user.username)}</span>)</strong> — copy it now and give it to them directly. It is not stored and will not be shown again.
+    <div class="btnrow" style="margin-top:8px;gap:8px;align-items:center"><span class="team-otp" id="team-otp">${esc(password)}</span>
+    <button class="btn btn-secondary btn-sm" id="team-otp-copy" type="button">Copy</button><button class="btn btn-quiet btn-sm" id="team-otp-hide" type="button">Done</button></div></div>`;
+  box.classList.remove('hidden');
+}
+document.addEventListener('click', async (e) => {
+  const t = e.target.closest('button'); if(!t || IS_SETTER()) return;
+  try{
+    if(t.id==='team-create'){
+      const display_name = $('team-name').value.trim(); const username = $('team-username').value.trim().toLowerCase();
+      if(!display_name || !username){ showErr('Enter a display name and a username.'); return; }
+      if(!confirm(`Create a SETTER login "${username}" for ${display_name}?`)) return;
+      t.disabled = true;
+      const out = await post(OP('team-user-create'), { confirm:'CREATE_USER', display_name, username, role:'SETTER' });
+      $('team-name').value = ''; $('team-username').value = '';
+      showOtp(out.user, out.one_time_password); await loadTeam();
+    } else if(t.dataset.teamStatus){
+      const u = TEAM.find((x)=>x.user_id===t.dataset.teamStatus); const to = t.dataset.to;
+      if(!confirm(`${to==='DISABLED'?'Disable':'Enable'} ${u?.display_name||'this account'}? ${to==='DISABLED'?'They lose access within about 30 seconds.':''}`)) return;
+      await post(OP('team-user-status'), { confirm:'SET_USER_STATUS', user_id: t.dataset.teamStatus, status: to }); await loadTeam();
+    } else if(t.dataset.teamReset){
+      const u = TEAM.find((x)=>x.user_id===t.dataset.teamReset);
+      if(!confirm(`Reset the password for ${u?.display_name||'this account'}? Their current password stops working.`)) return;
+      const out = await post(OP('team-user-reset'), { confirm:'RESET_USER_PASSWORD', user_id: t.dataset.teamReset }); showOtp(out.user, out.one_time_password);
+    } else if(t.dataset.teamView){
+      AN_Q.user_id = t.dataset.teamView==='' ? '' : t.dataset.teamView; $('an-user').value = AN_Q.user_id; loadAnalytics(false);
+    } else if(t.id==='team-otp-copy'){ await navigator.clipboard?.writeText($('team-otp').textContent); t.textContent = 'Copied';
+    } else if(t.id==='team-otp-hide'){ $('team-otp-box').innerHTML = ''; $('team-otp-box').classList.add('hidden'); }
+  }catch(err){ showErr(err.message||'Team action failed'); }
+  finally{ if(t.id==='team-create') t.disabled = false; }
+});
+
+/* ═══ CALLING SESSION TIMER (lib/call-session-handlers.mjs) ═════════════
+   The server owns the session: every time shown here is computed from the
+   server's timestamps (corrected for this device's clock offset), so a
+   refresh, a closed tab or another device shows the same session. The page
+   only asks to start / pause / resume / end, and sends a heartbeat every two
+   minutes saying whether the person actually used the page — the server
+   pauses a session automatically after 20 minutes without activity. */
+const SESS = { s:null, offset:0, tick:null, hb:null, hbMs:120000, interacted:false, busy:false, loaded:false };
+const sessNow = () => Date.now() + SESS.offset;
+function hms(sec){ sec = Math.max(0, Math.round(sec||0)); const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s2 = sec%60;
+  return h ? `${h}:${String(m).padStart(2,'0')}:${String(s2).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(s2).padStart(2,'0')}`; }
+function dur(sec){ if(sec==null) return '—'; sec = Math.round(sec); const h = Math.floor(sec/3600), m = Math.round((sec%3600)/60);
+  return h ? `${h}h ${String(m).padStart(2,'0')}m` : (sec < 60 ? `${sec}s` : `${Math.floor(sec/60)}m ${String(sec%60).padStart(2,'0')}s`); }
+function liveTimes(s){
+  if(!s) return null;
+  const start = Date.parse(s.started_at); const now = s.status==='ENDED' ? Date.parse(s.ended_at) : sessNow();
+  const pausedAt = Date.parse(s.paused_at);
+  const elapsed = Math.max(0, (now - start)/1000);
+  const paused = Math.min(elapsed, Number(s.paused_seconds_base ?? s.paused_seconds ?? 0) + (s.status==='PAUSED' && Number.isFinite(pausedAt) ? Math.max(0,(now-pausedAt)/1000) : 0));
+  return { elapsed, paused, active: Math.max(0, elapsed - paused) };
+}
+function sessAccept(data){
+  if(data?.server_now) SESS.offset = Date.parse(data.server_now) - Date.now();
+  const s = data?.session || null;
+  // paused_seconds from the server already includes the open pause up to
+  // server_now; keep only the completed part so the live tick adds the rest.
+  if(s && s.status==='PAUSED' && s.paused_at){ s.paused_seconds_base = Math.max(0, s.paused_seconds - Math.max(0,(Date.parse(data.server_now)-Date.parse(s.paused_at))/1000)); }
+  SESS.s = s && s.status!=='ENDED' ? s : null;
+  SESS.loaded = true;
+  if(data?.heartbeat_ms) SESS.hbMs = data.heartbeat_ms;
+  renderSess();
+}
+function renderSess(){
+  const el = $('sess'); if(!el || !SESS.loaded) return;
+  el.classList.remove('hidden');
+  const s = SESS.s;
+  el.classList.toggle('active', s?.status==='ACTIVE'); el.classList.toggle('paused', s?.status==='PAUSED');
+  if(!s){ el.innerHTML = `<span class="dot"></span><span>No calling session running</span><button class="btn btn-primary btn-sm" data-sess="start" type="button"${SESS.busy?' disabled':''}>Start session</button>`; return; }
+  const t = liveTimes(s); const x = s.totals || {};
+  const measuredNote = x.talk_unmeasured_connected ? `${x.talk_unmeasured_connected} connected call${x.talk_unmeasured_connected===1?'':'s'} without Twilio timing are not included` : 'Measured by Twilio from answer to hang-up; ringing excluded';
+  el.innerHTML = `<span class="dot"></span>
+    <div class="st" title="Time since the session started"><b id="sess-el">${hms(t.elapsed)}</b><span>Session</span></div>
+    <div class="st" title="Session time with the timer running (paused time excluded)"><b id="sess-ac">${hms(t.active)}</b><span>Active</span></div>
+    <div class="st" title="Outbound calls saved in this session"><b>${x.dials||0}</b><span>Dials</span></div>
+    <div class="st" title="${esc(measuredNote)}"><b>${dur(x.talk_seconds||0)}</b><span>Talk</span></div>
+    <div class="st" title="Owner reached and the pitch delivered"><b>${x.owner_conversations||0}</b><span>Owner convs</span></div>
+    <div class="st" title="Meetings booked in this session"><b>${x.meetings_booked||0}</b><span>Meetings</span></div>
+    ${s.status==='PAUSED' ? `<span class="warn">${s.auto_paused ? 'Paused automatically — no activity for 20 min' : 'Paused'}</span><button class="btn btn-primary btn-sm" data-sess="resume" type="button">Resume</button>`
+      : `<button class="btn btn-secondary btn-sm" data-sess="pause" type="button">Pause</button>`}
+    <button class="btn btn-quiet btn-sm" data-sess="end" type="button">End session</button>`;
+}
+function sessTick(){ const s = SESS.s; if(!s) return; const t = liveTimes(s); const a = $('sess-el'), b = $('sess-ac'); if(a) a.textContent = hms(t.elapsed); if(b) b.textContent = hms(t.active); }
+async function sessLoad(){
+  try{ const r = await fetch(OP('call-session-current'), { headers:{ Accept:'application/json' } }); const d = await r.json(); if(r.ok && d.success) sessAccept(d); }catch{ /* the bar simply stays as it was */ }
+}
+async function sessDo(action){
+  if(SESS.busy) return;
+  if(action==='end' && !confirm('End this calling session? You will see a summary of what you completed.')) return;
+  SESS.busy = true; renderSess();
+  try{
+    const out = action==='start' ? await post(OP('call-session-start'), { confirm:'START_SESSION' })
+      : await post(OP(`call-session-${action}`), { session_id: SESS.s?.session_id });
+    sessAccept(out);
+    if(action==='end') showSessionSummary(out.session);
+  }catch(err){
+    showErr(err.message || 'Session update failed');
+    if(err.status===409) await sessLoad();
+  }finally{ SESS.busy = false; renderSess(); }
+}
+async function sessHeartbeat(){
+  if(!SESS.s || document.hidden) return;
+  const interacted = SESS.interacted; SESS.interacted = false;
+  try{ sessAccept(await post(OP('call-session-heartbeat'), { session_id: SESS.s.session_id, interacted })); }
+  catch(err){ if(err.status===409) sessLoad(); }
+}
+function sessInit(){
+  ['keydown','pointerdown','touchstart','wheel'].forEach((ev) => document.addEventListener(ev, () => { SESS.interacted = true; }, { passive:true, capture:true }));
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) sessLoad(); });
+  SESS.tick = setInterval(sessTick, 1000);
+  SESS.hb = setInterval(sessHeartbeat, SESS.hbMs);
+  sessLoad();
+}
+function metricsGrid(x, defs){
+  const d = defs || {}; const t = (k) => esc(d[k]||'');
+  const pct = (v) => v==null ? '—' : `${Math.round(v*100)}%`;
+  const num = (v) => v==null ? '—' : v;
+  return `<div class="mgrid">
+    <div class="m" title="${t('sessions')}"><b>${x.sessions}</b><span>Sessions</span>${x.sessions_needing_review?`<small>${x.sessions_needing_review} need review</small>`:''}</div>
+    <div class="m" title="${t('active_time')}"><b>${dur(x.active_seconds)}</b><span>Active time</span></div>
+    <div class="m" title="${t('paused_time')}"><b>${dur(x.paused_seconds)}</b><span>Paused time</span></div>
+    <div class="m" title="${t('approved_time')}"><b>${x.sessions_approved?dur(x.approved_minutes*60):'—'}</b><span>Approved time</span><small>${x.sessions_approved} of ${x.sessions} sessions approved</small></div>
+    <div class="m" title="${t('dials')}"><b>${x.dials}</b><span>Dials</span><small>${x.dials_in_session} in sessions · ${x.dials_outside_session} outside</small></div>
+    <div class="m" title="${t('dials_per_active_hour')}"><b>${num(x.dials_per_active_hour)}</b><span>Dials / active hr</span></div>
+    <div class="m" title="${t('connected')}"><b>${x.connected}</b><span>Connected</span><small>${pct(x.connection_rate)} of dials</small></div>
+    <div class="m" title="${t('talk_time')}"><b>${dur(x.talk_seconds)}</b><span>Talk time (measured)</span><small>${x.talk_measured_calls} measured · ${x.talk_unmeasured_connected} connected not measurable</small></div>
+    <div class="m" title="${t('talk_per_active_hour')}"><b>${x.talk_seconds_per_active_hour==null?'—':dur(x.talk_seconds_per_active_hour)}</b><span>Talk / active hr</span></div>
+    <div class="m" title="${t('talk_time')}"><b>${x.average_connected_talk_seconds==null?'—':dur(x.average_connected_talk_seconds)}</b><span>Avg connected call</span></div>
+    <div class="m" title="${t('gatekeepers_reached')}"><b>${x.gatekeepers_reached}</b><span>Gatekeepers reached</span></div>
+    <div class="m" title="${t('owners_reached')}"><b>${x.owners_reached}</b><span>Owners reached</span></div>
+    <div class="m" title="${t('owner_conversations')}"><b>${x.owner_conversations}</b><span>Owner conversations</span></div>
+    <div class="m" title="${t('meetings_booked')}"><b>${x.meetings_booked}</b><span>Meetings booked</span></div>
+    <div class="m" title="${t('meetings_attended')}"><b>${x.meetings_attended}</b><span>Meetings attended</span></div>
+    <div class="m" title="${t('meetings_per_active_hour')}"><b>${num(x.meetings_per_active_hour)}</b><span>Meetings / active hr</span></div>
+    <div class="m" title="${t('meetings_per_owner_conversation')}"><b>${num(x.meetings_per_owner_conversation)}</b><span>Meetings / owner conv</span></div>
+    <div class="m" title="${t('callbacks_created')}"><b>${x.callbacks_created}</b><span>Callbacks created</span><small>${x.followups_created} other follow-ups</small></div>
+  </div>`;
+}
+function showSessionSummary(s){
+  const x = s?.totals || {};
+  $('sess-panel').innerHTML = `<h2>Session complete</h2>
+    <p class="muted">${esc(when(s.started_at))} – ${esc(when(s.ended_at))} · ${dur(s.active_seconds)} active, ${dur(s.paused_seconds)} paused</p>
+    ${metricsGrid({ ...x, sessions:1, active_seconds:s.active_seconds, paused_seconds:s.paused_seconds, sessions_approved:0 }, PERF?.definitions)}
+    <p class="card-note">Talk time counts only calls Twilio measured (answer to hang-up). Recorded time is not approved time — your manager reviews sessions separately.</p>
+    <div class="btnrow"><button class="btn btn-primary" data-sess-close type="button">Done</button></div>`;
+  $('sess-ovl').classList.remove('hidden');
+}
+
+/* ═══ SESSIONS & PERFORMANCE (call-performance / call-session-detail) ═══ */
+let PERF = null; const PERF_Q = { range:'this_week', from:'', to:'' };
+async function loadPerf(){
+  if(PERF_Q.range==='custom' && !(PERF_Q.from && PERF_Q.to)){ $('perf-note').textContent = 'Pick both dates, then Apply.'; return; }
+  $('perf-note').innerHTML = '<span class="spin"></span> Loading';
+  try{
+    const p = new URLSearchParams({ range: PERF_Q.range }); if(PERF_Q.range==='custom'){ p.set('from', PERF_Q.from); p.set('to', PERF_Q.to); }
+    const r = await fetch(`${OP('call-performance')}&${p}`, { headers:{ Accept:'application/json' } }); const d = await r.json();
+    if(!r.ok || d.success===false) throw new Error(d.error || `Request failed (${r.status})`);
+    PERF = d; renderPerf();
+  }catch(err){ $('perf-note').textContent = `Could not load: ${err.message||''}`; }
+}
+function renderPerf(){
+  if(!PERF) return;
+  const d = new Date(Date.parse(PERF.range.to) - 1);
+  $('perf-note').textContent = `${new Date(PERF.range.from).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})} – ${d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}`;
+  $('perf-title').textContent = IS_SETTER() ? 'My sessions & performance' : 'Team sessions & performance';
+  const users = IS_SETTER() ? PERF.users : PERF.users.filter((u) => u.user.role!=='ADMIN' || u.summary.sessions || u.summary.dials);
+  $('perf-body').innerHTML = users.length ? users.map((u) => `<div class="perf-user">
+    ${IS_SETTER() ? '' : `<div class="section-head"><div class="section-title">${esc(u.user.display_name)} ${pill(u.user.role, u.user.role==='SETTER'?'t-blue':'t-grey', true)}</div></div>`}
+    ${metricsGrid(u.summary, PERF.definitions)}
+    <div class="card"><div class="tablewrap"><table>
+      <thead><tr><th>Started</th><th>Ended</th><th class="num">Active</th><th class="num">Paused</th><th class="num">Dials</th><th class="num">Talk</th><th class="num">Owner convs</th><th class="num">Meetings</th><th>Status</th><th>Approval</th><th></th></tr></thead>
+      <tbody>${u.sessions.length ? u.sessions.map((s) => `<tr>
+        <td class="nowrap">${esc(when(s.started_at))}</td><td class="nowrap">${s.ended_at?esc(when(s.ended_at)):'<span class="muted">open</span>'}</td>
+        <td class="num">${dur(s.active_seconds)}</td><td class="num">${dur(s.paused_seconds)}</td>
+        <td class="num">${s.totals?.dials||0}</td><td class="num">${dur(s.totals?.talk_seconds||0)}</td><td class="num">${s.totals?.owner_conversations||0}</td><td class="num">${s.totals?.meetings_booked||0}</td>
+        <td>${pill(s.status, s.status==='ENDED'?'t-grey':s.status==='ACTIVE'?'t-green':'t-amber', true)}${s.needs_review?` ${pill('Needs review','t-red',true)}`:''}${s.end_reason&&s.end_reason!=='USER'?` <span class="t-sub">${esc(s.end_reason.replace(/_/g,' ').toLowerCase())}</span>`:''}</td>
+        <td>${s.approval.status==='APPROVED'?`${pill('Approved','t-green',true)} <span class="t-sub">${dur((s.approval.approved_minutes||0)*60)}</span>`:s.approval.status==='REJECTED'?pill('Rejected','t-red',true):'<span class="muted">Pending</span>'}</td>
+        <td><button class="btn btn-quiet btn-sm" data-sess-open="${esc(s.session_id)}" type="button">Review</button></td></tr>`).join('')
+        : `<tr><td colspan="11" class="muted">No sessions in this range.</td></tr>`}</tbody></table></div></div>
+  </div>`).join('') : emptyState('No activity in this range', 'Sessions and calls will appear here.');
+}
+async function openSession(id){
+  $('sess-panel').innerHTML = '<p><span class="spin"></span> Loading session</p>'; $('sess-ovl').classList.remove('hidden');
+  try{
+    const r = await fetch(`${OP('call-session-detail')}&session_id=${encodeURIComponent(id)}`, { headers:{ Accept:'application/json' } }); const d = await r.json();
+    if(!r.ok || d.success===false) throw new Error(d.error || `Request failed (${r.status})`);
+    renderSessionDetail(d);
+  }catch(err){ $('sess-panel').innerHTML = `<p>${esc(err.message||'Could not load')}</p><div class="btnrow"><button class="btn btn-secondary" data-sess-close type="button">Close</button></div>`; }
+}
+function renderSessionDetail(d){
+  const s = d.session; const x = s.totals || {}; const admin = !IS_SETTER();
+  const chips = (c) => [c.gatekeeper_reached?pill('Gatekeeper','t-grey',true):'', c.owner_reached?pill('Owner','t-blue',true):'', c.owner_conversation?pill('Pitched','t-green',true):''].join(' ');
+  const evLabel = { START:'Started', PAUSE:'Paused', RESUME:'Resumed', END:'Ended', AUTO_PAUSE_IDLE:'Paused automatically (no activity)', AUTO_RESUME_ON_CALL:'Resumed by a call', AUTO_END_ABANDONED:'Ended automatically (abandoned)', AUTO_END_DUPLICATE:'Ended automatically (duplicate)' };
+  const localIn = (iso) => iso ? toLocalInput(iso) : '';
+  $('sess-panel').innerHTML = `<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+      <div><h2>${esc(s.user_name||'Session')} — ${esc(when(s.started_at))}</h2>
+      <p class="muted">${esc(when(s.started_at))} – ${s.ended_at?esc(when(s.ended_at)):'still open'} · ${dur(s.elapsed_seconds)} elapsed · ${dur(s.active_seconds)} active · ${dur(s.paused_seconds)} paused · ${d.agencies_contacted} agencies contacted
+      ${s.needs_review?` · ${pill('Needs review','t-red',true)}`:''}</p></div>
+      <button class="btn btn-quiet btn-sm" data-sess-close type="button">Close</button></div>
+    ${metricsGrid({ ...x, sessions:1, active_seconds:s.active_seconds, paused_seconds:s.paused_seconds, approved_minutes:s.approval.approved_minutes||0, sessions_approved:s.approval.status==='APPROVED'?1:0 }, d.definitions)}
+    <div class="section-head"><div class="section-title">Call timeline</div><div class="section-note">Talk = Twilio answer → hang-up. "Not measured" means no reliable Twilio timing (e.g. a manual call) — never estimated.</div></div>
+    <div class="card"><div class="tablewrap"><table>
+      <thead><tr><th>Time</th><th>Agency</th><th>Outcome</th><th>Reached</th><th class="num">Talk</th><th class="num">Incl. ringing</th><th>Created</th><th></th></tr></thead>
+      <tbody>${d.calls.length ? d.calls.map((c) => `<tr>
+        <td class="nowrap">${esc(when(c.started_at))}${c.direction==='INBOUND'?' <span class="t-sub">inbound</span>':''}</td>
+        <td><div class="t-name">${esc(c.agency_name)}${admin?` <a class="muted" href="${profileLink(c.agency_id)}" target="_blank" rel="noopener" title="Full lead profile" style="font-size:11px">profile ↗</a>`:''}</div><div class="t-sub">${dash(c.contact_name)} · ${c.call_mode==='TWILIO'?'NOVUS dialler':'manual'}</div></td>
+        <td>${esc(outcomeLabel(c.outcome))}${c.note?`<div class="t-sub">${esc(c.note.slice(0,120))}</div>`:''}</td>
+        <td>${chips(c)}</td>
+        <td class="num">${c.talk_seconds==null?'<span class="muted" title="No reliable Twilio answer/hang-up timing for this call">not measured</span>':dur(c.talk_seconds)}</td>
+        <td class="num">${c.dial_seconds==null?'<span class="muted">—</span>':dur(c.dial_seconds)}</td>
+        <td>${c.meeting_booked?`Meeting ${esc(when(c.meeting_at))}${c.meeting_attended?' · attended':''}`:''}${c.callbacks_created?`${c.meeting_booked?'<br>':''}Callback${c.callback_at?` ${esc(when(c.callback_at))}`:''}`:''}${c.followups_created?`<br>${c.followups_created} follow-up${c.followups_created===1?'':'s'}`:''}</td>
+        <td>${c.recording?`<a href="${RECORDING_URL}&call_id=${encodeURIComponent(c.call_id)}" target="_blank" rel="noopener" style="color:var(--blue)">recording</a>`:''}</td></tr>`).join('')
+        : '<tr><td colspan="8" class="muted">No calls were linked to this session.</td></tr>'}</tbody></table></div></div>
+    <div class="section-head" style="margin-top:18px"><div class="section-title">Session events</div></div>
+    <ul class="cm-list">${(d.events||[]).map((e) => `<li><b>${esc(when(e.at))}</b><span>${esc(evLabel[e.type]||e.type)}${e.note?` — ${esc(e.note)}`:''}</span></li>`).join('')}</ul>
+    ${admin ? `<div class="section-head" style="margin-top:18px"><div class="section-title">Correct this session</div><div class="section-note">For an obviously wrong record (e.g. a forgotten End). Every change is kept in the audit trail with your reason.</div></div>
+      <div class="formrow">
+        <label>Start<input class="input" type="datetime-local" id="sc-start" value="${esc(localIn(s.started_at))}" /></label>
+        <label>End<input class="input" type="datetime-local" id="sc-end" value="${esc(localIn(s.ended_at))}" /></label>
+        <label>Paused minutes<input class="input" type="number" min="0" id="sc-paused" value="${Math.round(s.paused_seconds/60)}" style="width:110px" /></label>
+        <label style="flex:1;min-width:200px">Reason (required)<input class="input" id="sc-reason" placeholder="e.g. Forgot to end; last call was 16:42" /></label>
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="sc-reviewed" ${s.needs_review?'checked':''} /> Mark reviewed</label>
+        <button class="btn btn-secondary btn-sm" data-sess-correct="${esc(s.session_id)}" type="button">Save correction</button>
+      </div>
+      <div class="section-head" style="margin-top:18px"><div class="section-title">Timesheet approval</div><div class="section-note">Approved time is your decision and is stored separately from recorded time. NOVUS does not calculate or send pay.</div></div>
+      <div class="formrow">
+        <label>Decision<select class="input" id="sa-status"><option value="APPROVED"${s.approval.status==='APPROVED'?' selected':''}>Approve</option><option value="REJECTED"${s.approval.status==='REJECTED'?' selected':''}>Reject</option><option value="PENDING"${s.approval.status==='PENDING'?' selected':''}>Pending</option></select></label>
+        <label>Approved minutes<input class="input" type="number" min="0" id="sa-min" value="${s.approval.approved_minutes ?? Math.round(s.active_seconds/60)}" style="width:120px" /></label>
+        <label style="flex:1;min-width:200px">Note<input class="input" id="sa-note" value="${esc(s.approval.note||'')}" /></label>
+        <button class="btn btn-secondary btn-sm" data-sess-approve="${esc(s.session_id)}" type="button">Save decision</button>
+      </div>
+      ${(d.audit||[]).length?`<div class="section-head" style="margin-top:18px"><div class="section-title">Audit trail</div></div><ul class="cm-list">${d.audit.map((a) => `<li><b>${esc(when(a.at))}</b><span>${esc(a.by_name||a.by)} · ${esc(a.action)}${a.reason?` — ${esc(a.reason)}`:''}<br><span class="mono t-sub">${esc(Object.entries(a.changes||{}).map(([k,v])=>`${k}: ${v.from||'∅'} → ${v.to||'∅'}`).join(' · '))}</span></span></li>`).join('')}</ul>`:''}` : ''}`;
+}
+document.addEventListener('click', async (e) => {
+  const t = e.target.closest('button,[data-sess-close]'); if(!t) return;
+  if(t.dataset.sess){ sessDo(t.dataset.sess); return; }
+  if(t.hasAttribute('data-sess-close')){ $('sess-ovl').classList.add('hidden'); if(VIEW==='calling-analytics') loadPerf(); return; }
+  if(t.dataset.sessOpen){ openSession(t.dataset.sessOpen); return; }
+  if(t.dataset.prange){ PERF_Q.range = t.dataset.prange; document.querySelectorAll('#perf-range button').forEach((b)=>b.classList.toggle('on', b===t)); $('perf-custom').classList.toggle('hidden', PERF_Q.range!=='custom'); if(PERF_Q.range!=='custom') loadPerf(); return; }
+  if(t.id==='perf-apply'){ PERF_Q.from = $('perf-from').value; PERF_Q.to = $('perf-to').value; loadPerf(); return; }
+  try{
+    if(t.dataset.sessCorrect){
+      // Only fields the admin actually changed are sent: the inputs show
+      // minutes, so resubmitting an untouched field would round it.
+      const changed = (id) => $(id).value !== $(id).defaultValue;
+      const body = { confirm:'CORRECT_SESSION', session_id:t.dataset.sessCorrect, reason:$('sc-reason').value, mark_reviewed:$('sc-reviewed').checked };
+      if(changed('sc-paused')) body.paused_minutes = $('sc-paused').value;
+      if(changed('sc-start') && $('sc-start').value) body.started_at = fromLocalInput($('sc-start').value);
+      if(changed('sc-end') && $('sc-end').value) body.ended_at = fromLocalInput($('sc-end').value);
+      await post(OP('call-session-correct'), body); openSession(t.dataset.sessCorrect);
+    } else if(t.dataset.sessApprove){
+      await post(OP('call-session-approve'), { confirm:'APPROVE_SESSION', session_id:t.dataset.sessApprove, approval_status:$('sa-status').value, approved_minutes:$('sa-min').value, note:$('sa-note').value });
+      openSession(t.dataset.sessApprove);
+    }
+  }catch(err){ alert(err.message || 'Could not save'); }
+});
+
 /* ═══ ROUTING ═══════════════════════════════════════════════════════════ */
 const VIEWS = ['calling','call-actions','scripts','calling-analytics'];
 const VIEW_TITLE = { 'calling':'Calling', 'call-actions':'Call actions', 'scripts':'Scripts', 'calling-analytics':'Calling analytics' };
@@ -500,7 +883,7 @@ function showView(name, { push = true } = {}){
   if(push && routeFromHash()!==VIEW) location.hash = '#'+VIEW;
   renderView();
 }
-function renderView(){ if(VIEW==='calling-analytics'){ loadAnalytics(false); return; } if(!LOADED) return; if(VIEW==='calling') renderCalling(); if(VIEW==='call-actions') renderCallActions(); if(VIEW==='scripts') renderScripts(); }
+function renderView(){ if(VIEW==='calling-analytics'){ loadAnalytics(false); if(ME) loadPerf(); return; } if(!LOADED) return; if(VIEW==='calling') renderCalling(); if(VIEW==='call-actions') renderCallActions(); if(VIEW==='scripts') renderScripts(); }
 
 /* ═══ LOAD ══════════════════════════════════════════════════════════════ */
 let LOAD_PROMISE = null;
@@ -514,6 +897,7 @@ async function loadWorkspace(force){
     const data = await res.json();
     if(!res.ok || data.success===false) throw new Error(data.error || `Request failed (${res.status})`);
     WS = data; LOADED = true;
+    if(SESS.loaded) sessLoad();
     renderSetup(); renderResume(); renderView();
     notifyDue(data.call_actions);
     $('stamp').innerHTML = `<span class="nav-dot${data.cached?' stale':''}"></span>${esc(when(data.generated_at))}${data.cached?` · cached ${Math.round((data.cache_age_ms||0)/1000)}s`:''}`;
@@ -599,7 +983,7 @@ function callActionHtml(a){
         ${a.priority==='CRITICAL'?pill('CRITICAL','t-red',true):''}
         ${pill(a.kind==='EMAIL_REPLY'?'call requested':a.kind==='RETRY'?'retry':a.kind==='CALLBACK'?'callback':'call', a.kind==='EMAIL_REPLY'?'t-green':a.kind==='CALLBACK'?'t-amber':'t-blue', true)}
         ${a.suppressed?pill('suppressed','t-red',true):''}${a.no_phone?pill('no number','t-red',true):''}</div>
-      <div class="task-who"><b>${dash(a.agency_name)}</b> <a class="muted" href="${profileLink(a.agency_id)}" target="_blank" rel="noopener" title="Full lead profile" style="font-size:11px">profile ↗</a> &middot; ${dash(a.contact_name)}${a.contact_role?` <span class="muted">(${esc(a.contact_role)})</span>`:''} &middot; <span class="mono">${dash(a.phone)}</span></div>
+      <div class="task-who"><b>${dash(a.agency_name)}</b>${!IS_SETTER() && a.assigned_user_id && teamName(a.assigned_user_id) ? ` ${pill(teamName(a.assigned_user_id),'t-blue',true)}` : ''} <a class="muted" href="${profileLink(a.agency_id)}" target="_blank" rel="noopener" title="Full lead profile" style="font-size:11px">profile ↗</a> &middot; ${dash(a.contact_name)}${a.contact_role?` <span class="muted">(${esc(a.contact_role)})</span>`:''} &middot; <span class="mono">${dash(a.phone)}</span></div>
       <div class="task-why">${a.kind==='EMAIL_REPLY'?`${a.reply_received_at?`Replied ${esc(ago(a.reply_received_at))} &middot; `:''}${a.campaign_name?`Source: ${esc(a.campaign_name)} &middot; `:''}${a.property?`Property: ${esc(a.property)} &middot; `:''}${a.probe_reference?`Probe: ${esc(a.probe_reference)} &middot; `:''}${a.reply_text?`“${esc(a.reply_text)}”`:''}${a.timing?.language?` &middot; Timing: ${esc(a.timing.language)}`:''}${a.needs_review?` &middot; <b>Review number or timing</b>`:''}`:`${a.previous_outcome?`Last time: ${esc(outcomeLabel(a.previous_outcome))} &middot; `:''}${a.attempts||0} previous attempt${a.attempts===1?'':'s'}${a.note?` &middot; ${esc(a.note)}`:''}`}</div>
     </div>
     <div class="task-side"><div class="task-when ${over?'due':''}">${esc(a.group==='overdue'?when(a.due_at):time)}</div>
@@ -1460,6 +1844,7 @@ function analyticsQuery(){
   const p = new URLSearchParams({ range: AN_Q.range });
   if(AN_Q.range==='custom'){ p.set('from', AN_Q.from); p.set('to', AN_Q.to); }
   if(AN_Q.script_id) p.set('script_id', AN_Q.script_id);
+  if(AN_Q.user_id) p.set('user_id', AN_Q.user_id);
   return p.toString();
 }
 async function loadAnalytics(force){
@@ -1740,6 +2125,7 @@ document.addEventListener('change', (e) => {
   if(VIEW!=='calling-analytics') return;
   const id = e.target.id;
   if(id==='an-script'){ AN_Q.script_id = e.target.value; loadAnalytics(false); return; }
+  if(id==='an-user'){ AN_Q.user_id = e.target.value; loadAnalytics(false); return; }
   const map = { 'ex-outcome':'outcome', 'ex-objection':'objection', 'ex-script':'script', 'ex-gk':'gk', 'ex-owner':'owner', 'ex-meeting':'meeting', 'ex-pitched':'pitched' };
   if(map[id]){ exSet({ [map[id]]: e.target.value }); renderAnalytics(); }
 });
@@ -1969,6 +2355,7 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
   load(false).then(() => { if(LOADED && WS?.leads?.[leadId]) startSession('all', leadId); else showErr('That lead is not in the calling workspace.'); });
 })();
 
+loadMe();
 showView(routeFromHash(), { push:false });
 if(!LOAD_PROMISE) load(false);
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initDialer); else initDialer();

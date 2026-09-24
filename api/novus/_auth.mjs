@@ -16,6 +16,9 @@
 // (REPLY_EVENTS; the campaign sync poller). See their comments.
 
 import crypto from 'node:crypto';
+import { getRepo } from '../../lib/sheets.mjs';
+import { adminCaller, decodeBasic } from '../../lib/novus-users.mjs';
+import { resolveSessionCaller, sessionCookieOf, sessionSecret, verifySessionToken } from '../../lib/auth-session.mjs';
 
 function safeEqual(a, b) {
   const ab = Buffer.from(String(a));
@@ -24,9 +27,21 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(ab, bb);
 }
 
-// Returns true if the request is authorised. If not, writes a 401 (with the
-// WWW-Authenticate challenge) or 500 (if not configured) and returns false.
+// Returns true if the request is authorised AS THE ADMIN. If not, writes a
+// 401 or 500 (if not configured) and returns false.
+//
+// Two ways to be the admin: the env credential as HTTP Basic Auth (machine
+// clients: GitHub poller, Playwright worker), or an ADMIN login-page session
+// cookie. The cookie is checked here synchronously (signature + expiry);
+// its server-side record was already checked by middleware.js before this
+// function was invoked, and personalisation.js re-checks it in full.
+//
+// The WWW-Authenticate challenge is sent only to non-browser clients: a
+// browser (which always sends Sec-Fetch-Mode) must never get the native
+// password prompt — its pages send the user to /novus/login.html instead.
 export function requireAuth(req, res) {
+  const session = verifySessionToken(sessionCookieOf(req), sessionSecret());
+  if (session?.role === 'ADMIN') return true;
   const user = process.env.NOVUS_BASIC_AUTH_USER;
   const pass = process.env.NOVUS_BASIC_AUTH_PASS;
   if (!user || !pass) {
@@ -45,9 +60,47 @@ export function requireAuth(req, res) {
     const okPass = safeEqual(p, pass);
     if (okUser && okPass) return true;
   }
-  res.setHeader('WWW-Authenticate', 'Basic realm="NOVUS", charset="UTF-8"');
+  if (!req.headers?.['sec-fetch-mode']) res.setHeader('WWW-Authenticate', 'Basic realm="NOVUS", charset="UTF-8"');
   res.status(401).json({ error: 'Authentication required' });
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// INDIVIDUAL ACCOUNTS (lib/novus-users.mjs, lib/auth-session.mjs). This
+// resolves WHO is calling without deciding what they may do; the operation
+// allowlist is enforced by the caller (api/novus/personalisation.js).
+//   1. A login-page session cookie, fully validated: signature, expiry, the
+//      server-side record (logout/revocation), and for a setter the USERS row
+//      (ACTIVE, same role, password not reset since sign-in). It wins over
+//      Basic Auth, so a browser that still caches the old admin Basic
+//      credential never turns a setter's session into the admin.
+//   2. The admin env credential as HTTP Basic Auth (machine clients).
+// Setter accounts sign in ONLY through the login page; there is no setter
+// Basic Auth path. Returns the caller, or null.
+export function isAdminCredential(req) {
+  const user = process.env.NOVUS_BASIC_AUTH_USER;
+  const pass = process.env.NOVUS_BASIC_AUTH_PASS;
+  if (!user || !pass) return false;
+  const creds = decodeBasic(req.headers?.authorization);
+  if (!creds) return false;
+  const okUser = safeEqual(creds.username, user);
+  const okPass = safeEqual(creds.password, pass);
+  return okUser && okPass;
+}
+
+// The 401 for a request with no valid caller. Same challenge rule as above.
+export function sendUnauthorized(req, res) {
+  if (!req.headers?.['sec-fetch-mode']) res.setHeader('WWW-Authenticate', 'Basic realm="NOVUS", charset="UTF-8"');
+  return res.status(401).json({ success: false, error: 'Authentication required', login: '/novus/login.html' });
+}
+
+export async function resolveCaller(req, { repo = null } = {}) {
+  if (sessionCookieOf(req)) {
+    const viaSession = await resolveSessionCaller(req, { repo: repo || getRepo() }).catch(() => null);
+    if (viaSession) return viaSession;
+  }
+  if (isAdminCredential(req)) return { ...adminCaller(), via: 'basic' };
+  return null;
 }
 
 

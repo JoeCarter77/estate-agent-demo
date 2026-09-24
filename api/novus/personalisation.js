@@ -31,7 +31,14 @@
 import { getRepo } from '../../lib/sheets.mjs';
 import { NeverBounceError, verifyEmail } from '../../lib/neverbounce.mjs';
 import { resolveAgencyContact, listResolutionBacklog } from '../../lib/contact-resolution.mjs';
-import { requireAuth, requireReplyPollerSecret, requireCampaignPollerSecret } from './_auth.mjs';
+import { requireAuth as requireAdminAuth, resolveCaller, sendUnauthorized, requireReplyPollerSecret, requireCampaignPollerSecret } from './_auth.mjs';
+import { handleAuthLogin, handleAuthLogout, isSameOriginWrite } from '../../lib/auth-session.mjs';
+import { SETTER_OPERATIONS } from '../../lib/novus-users.mjs';
+import { handleWhoami, handleTeamUsers, handleTeamUserCreate, handleTeamUserStatus, handleTeamUserReset } from '../../lib/team-handlers.mjs';
+import {
+  handleCallSessionCurrent, handleCallSessionStart, handleCallSessionPause, handleCallSessionResume, handleCallSessionEnd,
+  handleCallSessionHeartbeat, handleCallPerformance, handleCallSessionDetail, handleCallSessionCorrect, handleCallSessionApprove,
+} from '../../lib/call-session-handlers.mjs';
 import { pollInstantlyReplies, recoverUnresolvedReplyEvents } from '../../lib/instantly-reply-poll.mjs';
 import {
   evaluateSendDemoDryRun,
@@ -1743,6 +1750,18 @@ const TWILIO_WEBHOOK_OPERATIONS = {
   'twilio-voice-inbound-action': handleVoiceInboundAction,
 };
 
+// Every human branch below calls requireAuth. handler() first resolves the
+// caller (lib/novus-users.mjs) onto req.novusUser and refuses a SETTER any
+// operation outside SETTER_OPERATIONS with a 403; this check repeats that
+// rule so no branch can be reached by a setter even if the gate moved.
+// Without a resolved caller it is exactly the original admin-only guard.
+function requireAuth(req, res) {
+  const caller = req.novusUser;
+  if (caller && (caller.role === 'ADMIN' || (caller.role === 'SETTER' && SETTER_OPERATIONS.has(req.query?.novus_operation)))) return true;
+  if (caller) { res.status(403).json({ success: false, error: 'Not available to your account' }); return false; }
+  return requireAdminAuth(req, res);
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (TWILIO_WEBHOOK_OPERATIONS[req.query?.novus_operation]) {
@@ -1752,6 +1771,55 @@ export default async function handler(req, res) {
     // /api/novus/webhooks/instantly — Instantly event delivery. Verified by
     // INSTANTLY_WEBHOOK_SECRET inside the handler, never by Basic Auth.
     return handleInstantlyWebhook(req, res);
+  }
+  // ── Sign in / sign out (the login page) ──────────────────────────────
+  // Reached through /api/novus/auth/login|logout, which middleware.js lets
+  // through unauthenticated. Both refuse cross-origin requests.
+  if (req.query?.novus_operation === 'auth-login') return handleAuthLogin(req, res, { repo: getRepo() });
+  if (req.query?.novus_operation === 'auth-logout') return handleAuthLogout(req, res);
+  // ── Who is calling ───────────────────────────────────────────────────
+  // A login-page session (validated against its server-side record and, for
+  // a setter, the USERS row) or the admin machine credential (Basic Auth).
+  // No caller → 401. A setter outside the allowlist → 403.
+  const caller = await resolveCaller(req);
+  if (!caller) return sendUnauthorized(req, res);
+  // CSRF: a write authenticated by the session cookie must come from a
+  // NOVUS page (same Origin). Basic-Auth machine clients send no Origin.
+  if (!isSameOriginWrite(req, { basic: caller.via === 'basic' })) {
+    return res.status(403).json({ success: false, error: 'Cross-origin request refused' });
+  }
+  if (caller.role === 'SETTER' && !SETTER_OPERATIONS.has(req.query?.novus_operation)) {
+    return res.status(403).json({ success: false, error: 'Not available to your account' });
+  }
+  req.novusUser = caller;
+  // ── Team / accounts ──────────────────────────────────────────────────
+  if (req.method === 'GET' && req.query?.novus_operation === 'whoami') return handleWhoami(req, res);
+  const TEAM_OPERATIONS = { 'team-user-create': handleTeamUserCreate, 'team-user-status': handleTeamUserStatus, 'team-user-reset': handleTeamUserReset };
+  if (req.method === 'GET' && req.query?.novus_operation === 'team-users') {
+    if (!requireAuth(req, res)) return;
+    return handleTeamUsers(req, res);
+  }
+  if (req.method === 'POST' && TEAM_OPERATIONS[req.query?.novus_operation]) {
+    // ADMIN ONLY: team-* is not in SETTER_OPERATIONS.
+    if (!requireAuth(req, res)) return;
+    return TEAM_OPERATIONS[req.query.novus_operation](req, res);
+  }
+  // ── Calling sessions & performance (lib/call-session-handlers.mjs) ───
+  // Setters reach the read/timer operations through SETTER_OPERATIONS and the
+  // handlers scope them to the caller; correct/approve are admin-only.
+  const SESSION_READ_OPERATIONS = { 'call-session-current': handleCallSessionCurrent, 'call-performance': handleCallPerformance, 'call-session-detail': handleCallSessionDetail };
+  const SESSION_WRITE_OPERATIONS = {
+    'call-session-start': handleCallSessionStart, 'call-session-pause': handleCallSessionPause, 'call-session-resume': handleCallSessionResume,
+    'call-session-end': handleCallSessionEnd, 'call-session-heartbeat': handleCallSessionHeartbeat,
+    'call-session-correct': handleCallSessionCorrect, 'call-session-approve': handleCallSessionApprove,
+  };
+  if (req.method === 'GET' && SESSION_READ_OPERATIONS[req.query?.novus_operation]) {
+    if (!requireAuth(req, res)) return;
+    return SESSION_READ_OPERATIONS[req.query.novus_operation](req, res);
+  }
+  if (req.method === 'POST' && SESSION_WRITE_OPERATIONS[req.query?.novus_operation]) {
+    if (!requireAuth(req, res)) return;
+    return SESSION_WRITE_OPERATIONS[req.query.novus_operation](req, res);
   }
   // ── Email / Campaigns ────────────────────────────────────────────────
   const CAMPAIGN_READ_OPERATIONS = {

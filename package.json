@@ -84,6 +84,8 @@
     "novus:instantly-link": "node scripts/novus-instantly-link.mjs",
     "novus:sidebar-parity-selftest": "node scripts/novus-sidebar-parity-selftest.mjs",
     "novus:discovery-selftest": "node scripts/novus-discovery-selftest.mjs",
+    "novus:team-access-selftest": "node scripts/novus-team-access-selftest.mjs",
+    "novus:call-sessions-selftest": "node scripts/novus-call-sessions-selftest.mjs",
     "novus:operator": "node worker/src/index.mjs",
     "novus:operator-selftest": "node worker/test/run.mjs"
   },

@@ -38,6 +38,17 @@ export class OperatorBrowser {
         : undefined,
       acceptDownloads: false,
     });
+    // NOVUS pages now send people to a login page instead of challenging for
+    // Basic Auth (middleware.js), so the worker presents its admin machine
+    // credential up front — ONLY on the NOVUS origin, never to agency sites —
+    // with the X-NOVUS-Client marker middleware requires on page requests.
+    if (this.config.basicAuthUser && this.config.novusBaseUrl) {
+      const origin = new URL(this.config.novusBaseUrl).origin;
+      const authorization = `Basic ${Buffer.from(`${this.config.basicAuthUser}:${this.config.basicAuthPass}`).toString('base64')}`;
+      await this.context.route((u) => u.origin === origin, (route) => route.continue({
+        headers: { ...route.request().headers(), authorization, 'x-novus-client': 'worker' },
+      }));
+    }
     this.context.setDefaultTimeout(this.config.timeouts.control);
     this.context.setDefaultNavigationTimeout(this.config.timeouts.nav);
     // Chrome can activate on its first launch. Return focus to the application

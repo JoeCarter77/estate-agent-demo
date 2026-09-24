@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NOVUS — Sign in</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/novus/assets/novus-mark-32.png" />
+  <link rel="apple-touch-icon" href="/novus/assets/novus-mark-128.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <meta name="theme-color" content="#0A0B0E" />
+  <meta name="color-scheme" content="dark" />
+  <script data-theme-boot>
+    (function(){var t='dark';try{var v=localStorage.getItem('novus.theme');if(v==='light'||v==='dark')t=v;}catch(e){}
+    document.documentElement.setAttribute('data-theme',t);})();
+  </script>
+  <link rel="stylesheet" href="/novus/novus-ui.css" />
+  <!-- The login page holds no NOVUS data and no secret. The password is sent
+       once, over HTTPS, to /api/novus/auth/login; the session lives in an
+       HttpOnly cookie the page's script can never read. Nothing is stored in
+       localStorage. -->
+  <style>
+    body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;
+      background:radial-gradient(1200px 600px at 20% -10%, rgba(var(--brand-rgb),.14), transparent 60%), var(--bg);}
+    .login{width:100%;max-width:380px;}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:28px;}
+    .brand img{width:40px;height:40px;}
+    .brand .n{font-size:15px;font-weight:700;letter-spacing:.18em;color:var(--ink);}
+    .brand .s{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-4);margin-top:3px;}
+    .card-login{background:linear-gradient(180deg,var(--surface-2,rgba(255,255,255,.03)),var(--surface,rgba(255,255,255,.02)));
+      border:1px solid var(--hair);border-radius:var(--r-lg);padding:28px 24px;box-shadow:var(--shadow-lg);}
+    h1{font-family:var(--serif);font-weight:400;font-size:28px;margin:0 0 6px;color:var(--ink);letter-spacing:-.01em;}
+    .sub{font-size:13px;color:var(--ink-3);margin:0 0 22px;line-height:1.5;}
+    .field{margin-bottom:14px;}
+    .btn-block{width:100%;justify-content:center;padding:12px 14px;font-size:14px;margin-top:6px;display:inline-flex;align-items:center;gap:8px;}
+    .btn-block[disabled]{opacity:.7;cursor:progress;}
+    .spin{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:sp .8s linear infinite;display:none;}
+    .busy .spin{display:inline-block;}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    #msg{margin-bottom:14px;}
+    .foot{margin-top:18px;font-size:11.5px;color:var(--ink-4);text-align:center;line-height:1.6;}
+    input.input{font-size:16px;} /* ≥16px: no iOS zoom on focus */
+  </style>
+</head>
+<body>
+  <main class="login">
+    <div class="brand">
+      <img src="/novus/assets/novus-mark-512.png" alt="" width="40" height="40" />
+      <div><div class="n">NOVUS</div><div class="s">Acquisition</div></div>
+    </div>
+    <div class="card-login">
+      <h1>Sign in</h1>
+      <p class="sub">Use the username and password you were given for NOVUS.</p>
+      <div id="msg" class="banner err hidden" role="alert" aria-live="assertive"></div>
+      <form id="f" novalidate>
+        <div class="field">
+          <label class="field-l" for="u">Username</label>
+          <input class="input block" id="u" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required />
+        </div>
+        <div class="field">
+          <label class="field-l" for="p">Password</label>
+          <input class="input block" id="p" name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button class="btn btn-primary btn-block" id="go" type="submit"><span class="spin" aria-hidden="true"></span><span id="go-t">Sign in</span></button>
+      </form>
+    </div>
+    <p class="foot" id="foot">Signed-in sessions last up to 12 hours and end after 2 hours without use.</p>
+  </main>
+<script>
+(function(){
+  var f = document.getElementById('f'), u = document.getElementById('u'), p = document.getElementById('p');
+  var go = document.getElementById('go'), goT = document.getElementById('go-t'), msg = document.getElementById('msg');
+  var params = new URLSearchParams(location.search);
+  var reason = params.get('reason');
+  function show(text, tone){ msg.textContent = text; msg.className = 'banner ' + (tone || 'err'); }
+  if (reason === 'signed-out') show('You have signed out.', 'info');
+  if (reason === 'expired') show('Your session ended. Sign in again to continue.', 'info');
+  u.focus();
+  f.addEventListener('submit', function(e){
+    e.preventDefault();
+    if (!u.value.trim() || !p.value) { show('Enter your username and password.'); (u.value.trim() ? p : u).focus(); return; }
+    go.disabled = true; go.classList.add('busy'); goT.textContent = 'Signing in…'; msg.className = 'banner err hidden';
+    fetch('/api/novus/auth/login', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ username: u.value.trim(), password: p.value, next: params.get('next') || '' })
+    }).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok: r.ok, status: r.status, d: d }; }); })
+      .then(function(x){
+        if (x.ok && x.d.success) { goT.textContent = 'Opening NOVUS…'; location.replace(x.d.redirect || '/novus/operator.html'); return; }
+        p.value = '';
+        show(x.d.error || (x.status === 429 ? 'Too many attempts. Try again later.' : 'Sign-in failed. Try again.'));
+        go.disabled = false; go.classList.remove('busy'); goT.textContent = 'Sign in'; p.focus();
+      })
+      .catch(function(){ show('NOVUS could not be reached. Check your connection and try again.'); go.disabled = false; go.classList.remove('busy'); goT.textContent = 'Sign in'; });
+  });
+})();
+</script>
+</body>
+</html>
