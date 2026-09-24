@@ -35,73 +35,48 @@
 <body>
 <div class="app">
 
-  <!-- ── SIDEBAR ──────────────────────────────────────────────────────── -->
+  <!-- ── SIDEBAR — ONE canonical rail, identical in operator.html, calling.html,
+       campaigns.html and meetings.html (calling.html adds the setter group).
+       Every item is a plain link keyed by data-nav; each page highlights the
+       destination its current view belongs to. Keep the four copies in
+       lockstep — scripts/novus-sidebar-parity-selftest.mjs asserts it. ── -->
   <nav class="nav">
     <div class="nav-brand">
       <img class="nav-mark" src="/novus/assets/novus-mark-512.png" width="34" height="34" alt="NOVUS" />
       <div><div class="nav-name">NOVUS</div><div class="nav-sub">Acquisition</div></div>
     </div>
-
+    <div class="nav-scroll">
     <div class="nav-group">
-      <button class="nav-item" data-view="overview" type="button">
-        <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Overview</span></button>
-      <button class="nav-item" data-view="actions" type="button">
-        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg>
-        <span>Actions</span><span class="nav-badge zero" id="b-actions">0</span></button>
-      <button class="nav-item" data-view="future" type="button">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/></svg>
-        <span>Future</span><span class="nav-badge zero" id="b-future">0</span></button>
-      <button class="nav-item" data-view="pipeline" type="button">
-        <svg viewBox="0 0 24 24"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg><span>Pipeline</span></button>
-      <button class="nav-item" data-view="prober" type="button">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-        <span>Prober</span><span class="nav-badge zero" id="b-prober">0</span></button>
-      <button class="nav-item" data-view="leads" type="button">
-        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg>
-        <span>Leads</span><span class="nav-badge zero" id="b-leads">0</span></button>
-      <button class="nav-item" data-view="analytics" type="button">
-        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Analytics</span></button>
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item" data-nav="dashboard" href="/novus/operator.html#dashboard">
+        <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Dashboard</span></a>
+      <a class="nav-item" data-nav="actions" href="/novus/operator.html#actions">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>Actions</span><span class="nav-badge zero" id="b-actions">0</span></a>
+      <a class="nav-item" data-nav="leads" href="/novus/operator.html#leads">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg><span>Leads</span></a>
     </div>
-
     <div class="nav-group">
-      <div class="nav-label">Email</div>
-      <a class="nav-item" href="/novus/campaigns.html#campaigns">
-        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg><span>Campaigns</span></a>
-      <a class="nav-item" href="/novus/campaigns.html#new">
-        <svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span>New Campaign</span></a>
-      <button class="nav-item" data-view="email-actions" type="button">
-        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/><path d="M15 16l2 2 4-4"/></svg><span>Email Actions</span><span class="nav-badge zero" id="b-email-actions">0</span></button>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">Calling</div>
-      <a class="nav-item" href="/novus/calling.html#calling">
-        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span></a>
-      <a class="nav-item" href="/novus/calling.html#call-actions">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/></svg><span>Call Actions</span></a>
-      <a class="nav-item" href="/novus/calling.html#scripts">
-        <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg><span>Scripts</span></a>
-      <a class="nav-item" href="/novus/calling.html#calling-analytics">
-        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Calling Analytics</span></a>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">Meetings</div>
-      <a class="nav-item" href="/novus/meetings.html#meetings">
+      <div class="nav-label">Acquisition</div>
+      <a class="nav-item" data-nav="email" href="/novus/operator.html#email">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg><span>Email</span><span class="nav-badge zero" id="b-email-actions">0</span></a>
+      <a class="nav-item" data-nav="calling" href="/novus/calling.html#calling">
+        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span><span class="nav-badge zero" id="b-calls">0</span></a>
+      <a class="nav-item" data-nav="prober" href="/novus/operator.html#prober">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Prober</span><span class="nav-badge zero" id="b-prober">0</span></a>
+      <a class="nav-item" data-nav="meetings" href="/novus/meetings.html#meetings">
         <svg viewBox="0 0 24 24"><path d="M4 5h16v15H4z"/><path d="M4 10h16"/><path d="M9 3v4M15 3v4"/></svg><span>Meetings</span></a>
     </div>
-
     <div class="nav-group">
-      <div class="nav-label">System</div>
-      <button class="nav-item" data-view="exceptions" type="button">
-        <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
-        <span>Exceptions</span><span class="nav-badge zero" id="b-exceptions">0</span></button>
-      <a class="nav-item" href="/novus/communications.html">
-        <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 4l8 8 8-8"/></svg>
-        <span>Communications</span></a>
+      <div class="nav-label">Management</div>
+      <a class="nav-item" data-nav="analytics" href="/novus/operator.html#analytics">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Analytics</span></a>
+      <a class="nav-item" data-nav="team" href="/novus/calling.html#team">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><path d="M16 4.6a3.5 3.5 0 010 6.8"/><path d="M18.5 14.2A6.5 6.5 0 0121.5 20"/></svg><span>Team</span></a>
     </div>
-
+    </div>
     <div class="nav-foot">
+      <a class="nav-item nav-admin" data-nav="settings" href="/novus/operator.html#settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span>Settings</span><span class="nav-badge zero" id="b-exceptions">0</span></a>
       <div class="nav-stamp" id="stamp"><span class="spin"></span>Loading</div>
     </div>
   </nav>
@@ -109,7 +84,7 @@
   <!-- ── MAIN ─────────────────────────────────────────────────────────── -->
   <main class="main">
     <div class="topbar">
-      <div class="crumb">NOVUS <span class="muted">/</span> <b id="crumb">Overview</b></div>
+      <div class="crumb">NOVUS <span class="muted">/</span> <b id="crumb">Dashboard</b></div>
       <div class="topbar-right">
         <button class="gsearch" type="button" data-global-search title="Search leads (⌘K / Ctrl+K)" aria-label="Search leads">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -130,31 +105,71 @@
       <div id="load-err" class="banner err hidden"></div>
       <div id="warn-box" class="banner warn hidden"></div>
 
-      <!-- ══ OVERVIEW ══════════════════════════════════════════════════ -->
+      <!-- ══ DASHBOARD (was Overview) ════════════════════════════════
+           What needs Joe now, what is moving commercially, and whether
+           anything is broken. Every figure is the dashboard feed this page
+           already loads; campaigns and team status are two small cached
+           reads made only while this view is open. Each item links to the
+           workspace where the work is actually done. ══════════════════ -->
       <section class="view" id="v-overview">
         <div class="page-head">
-          <h1 class="page-title">Acquisition</h1>
+          <h1 class="page-title">Dashboard</h1>
           <p class="page-sub" id="ov-sub">&nbsp;</p>
         </div>
 
-        <div class="kpis" id="ov-kpis"></div>
+        <div class="kpis" id="ov-attn"></div>
 
-        <div class="section">
+        <div class="section hidden" id="ov-exc-section" style="margin-top:0;margin-bottom:var(--s-6)">
           <div class="section-head">
-            <div class="section-title">Funnel</div>
-            <div class="section-note">Every agency, counted once at its furthest point reached.</div>
+            <div class="section-title">Needs fixing: system exceptions</div>
+            <div class="section-note">Things that are genuinely stuck.</div>
+            <a class="section-link" href="#settings">Open in Settings &rarr;</a>
           </div>
-          <div class="card"><div class="card-body"><div class="funnel" id="ov-funnel"></div></div></div>
+          <div class="card"><div id="ov-exc"></div></div>
+        </div>
+
+        <div class="dash-grid">
+          <div class="section">
+            <div class="section-head">
+              <div class="section-title">Needs you now</div>
+              <div class="section-note">Due and overdue manual sales work, most urgent first.</div>
+              <a class="section-link" href="#actions">All actions &rarr;</a>
+            </div>
+            <div class="card"><div class="tasks" id="ov-tasks"></div></div>
+          </div>
+          <div class="dash-side">
+            <div class="section">
+              <div class="section-head">
+                <div class="section-title">Meetings to prepare</div>
+                <a class="section-link" href="/novus/meetings.html#meetings">Meetings &rarr;</a>
+              </div>
+              <div class="card"><div class="dash-list" id="ov-meetings"></div></div>
+            </div>
+            <div class="section">
+              <div class="section-head">
+                <div class="section-title">Campaigns</div>
+                <a class="section-link" href="/novus/campaigns.html#campaigns">Email &rsaquo; Campaigns &rarr;</a>
+              </div>
+              <div class="card"><div class="dash-list" id="ov-campaigns"></div></div>
+            </div>
+            <div class="section">
+              <div class="section-head">
+                <div class="section-title">Team calling</div>
+                <a class="section-link" href="/novus/calling.html#team">Team &rarr;</a>
+              </div>
+              <div class="card"><div class="dash-list" id="ov-team"></div></div>
+            </div>
+          </div>
         </div>
 
         <div class="section">
           <div class="section-head">
-            <div class="section-title">Needs you now</div>
-            <div class="section-note">Due and overdue manual sales work only — scheduled work is in Future, probing is in the Prober.
-              Owner <b>Joe</b>, queue <b>Manual</b>, recommended by <b>NOVUS</b>.</div>
-            <button class="section-link" data-goto="actions" type="button">Open actions &rarr;</button>
+            <div class="section-title">Acquisition activity</div>
+            <div class="section-note">Every agency, counted once at its furthest point reached.</div>
+            <a class="section-link" href="#analytics">Analytics &rarr;</a>
           </div>
-          <div class="card"><div class="tasks" id="ov-tasks"></div></div>
+          <div class="kpis" id="ov-kpis"></div>
+          <div class="card"><div class="card-body"><div class="funnel" id="ov-funnel"></div></div></div>
         </div>
 
         <div class="section">
@@ -164,28 +179,17 @@
           </div>
           <div class="syslist" id="ov-system"></div>
         </div>
-
-        <div class="section hidden" id="ov-exc-section">
-          <div class="section-head">
-            <div class="section-title">Exceptions</div>
-            <div class="section-note">Things that are genuinely stuck.</div>
-            <button class="section-link" data-goto="exceptions" type="button">Open exceptions &rarr;</button>
-          </div>
-          <div class="card"><div id="ov-exc"></div></div>
-        </div>
       </section>
 
       <!-- ══ ACTIONS ═══════════════════════════════════════════════════ -->
       <section class="view" id="v-actions">
         <div class="page-head">
           <h1 class="page-title">Actions</h1>
-          <p class="page-sub">What needs you <b>now</b>. Due and overdue manual work only — anything scheduled for
-            later sits in <button class="section-link" data-goto="future" type="button"
-              style="margin:0;padding:0">Future&nbsp;&rarr;</button>. Probe queue work and NOVUS-owned
-            checkpoints are deliberately not here.</p>
-          <p class="page-sub">NOVUS recommends every action on this page; until an action type has a deliberately
-            enabled automated executor, <b>you</b> execute it. Owner <b>Joe</b> &middot; queue <b>Manual</b>
-            &middot; recommended by <b>NOVUS</b>.</p>
+          <p class="page-sub">Every piece of manual work in the shared action ledger — what needs doing and where it gets
+            done. Each row's main button takes you to that place: calls open <b>Calling</b>, email replies open the thread
+            in <b>Email</b>, meetings open <b>Meetings</b>. <b>Scheduled</b> holds work whose time has not come yet; it
+            moves into the other tabs by itself when due. Probe queue work and NOVUS-owned checkpoints are deliberately
+            not here.</p>
         </div>
         <div class="tabs" id="ac-tabs"></div>
         <div class="card"><div class="tasks" id="ac-list"></div></div>
@@ -193,38 +197,21 @@
 
       <!-- ══ EMAIL ACTIONS ═════════════════════════════════════════════ -->
       <section class="view" id="v-email-actions">
+        <nav class="wstabs" aria-label="Email"><a class="wstab on" href="#email">Inbox</a><a class="wstab" href="/novus/campaigns.html#campaigns">Campaigns</a></nav>
         <div class="page-head">
-          <h1 class="page-title">Email actions</h1>
+          <h1 class="page-title">Inbox</h1>
           <p class="page-sub">Every email conversation that needs you, interested prospects first. Open a row to read
-            the thread and reply in it without leaving this page. The same shared actions also appear in
-            <button class="section-link" data-goto="actions" type="button" style="margin:0;padding:0">Actions&nbsp;&rarr;</button>;
-            calls are in <a class="section-link" href="/novus/calling.html#call-actions" style="margin:0;padding:0">Call Actions&nbsp;&rarr;</a>.</p>
+            the thread and reply in it without leaving this page. Scheduled email follow-ups are under
+            <b>Scheduled</b>. The same shared actions also appear in <a class="section-link" href="#actions" style="margin:0;padding:0">Actions&nbsp;&rarr;</a>;
+            calls are in <a class="section-link" href="/novus/calling.html#call-actions" style="margin:0;padding:0">Calling &rsaquo; Call actions&nbsp;&rarr;</a>.</p>
         </div>
         <div class="tabs" id="ea-tabs"></div>
         <div class="card"><div class="tasks" id="ea-list"></div></div>
       </section>
 
-      <!-- ══ FUTURE ACTIONS ════════════════════════════════════════════ -->
-      <section class="view" id="v-future">
-        <div class="page-head">
-          <h1 class="page-title">Future actions</h1>
-          <p class="page-sub">Manual work with a real scheduled time still ahead of it. Nothing here is late and
-            nothing here needs you today — each row moves into
-            <button class="section-link" data-goto="actions" type="button" style="margin:0;padding:0">Actions&nbsp;&rarr;</button>
-            by itself once its stored <span class="mono">due_at</span> passes. Owner <b>Joe</b> &middot;
-            queue <b>Manual</b> &middot; recommended by <b>NOVUS</b>.</p>
-        </div>
-        <div class="section">
-          <div class="section-head">
-            <div class="section-title">Scheduled</div>
-            <div class="section-note" id="fu-note"></div>
-          </div>
-          <div class="card"><div class="tasks future" id="fu-list"></div></div>
-        </div>
-      </section>
-
       <!-- ══ PIPELINE ══════════════════════════════════════════════════ -->
       <section class="view" id="v-pipeline">
+        <nav class="wstabs" aria-label="Leads"><a class="wstab" href="#leads">All agencies</a><a class="wstab on" href="#pipeline">Pipeline</a></nav>
         <div class="page-head">
           <h1 class="page-title">Pipeline</h1>
           <p class="page-sub">Where every agency currently sits. Each agency appears in exactly one stage.
@@ -395,9 +382,11 @@
 
       <!-- ══ LEADS ═════════════════════════════════════════════════════ -->
       <section class="view" id="v-leads">
+        <nav class="wstabs" aria-label="Leads"><a class="wstab on" href="#leads">All agencies</a><a class="wstab" href="#pipeline">Pipeline</a></nav>
         <div class="page-head">
           <h1 class="page-title">Leads</h1>
-          <p class="page-sub">The master record. Search every agency, contact and probe, then open the full lead.</p>
+          <p class="page-sub">The master record. Search every agency, contact and probe, then open the full lead: profile,
+            conversation, history, probe, demo and actions in one place. <b>Pipeline</b> shows where every agency sits.</p>
         </div>
         <div class="filters">
           <div class="searchbox">
@@ -429,10 +418,14 @@
 
       <!-- ══ ANALYTICS ═════════════════════════════════════════════════ -->
       <section class="view" id="v-analytics">
+        <nav class="wstabs" aria-label="Analytics"><a class="wstab on" href="#analytics">Overview</a><a class="wstab" href="/novus/calling.html#calling-analytics">Calling</a></nav>
         <div class="page-head">
           <h1 class="page-title">Analytics</h1>
           <p class="page-sub">Current-state volume and conversion, computed from stored evidence and from Instantly's
-            own record of what was actually sent. There is no historical time series yet, so no trends are shown.</p>
+            own record of what was actually sent. There is no historical time series yet, so no trends are shown.
+            Per-campaign figures are in <a class="section-link" href="/novus/campaigns.html#campaigns" style="margin:0;padding:0">Email &rsaquo; Campaigns</a>;
+            meeting outcomes in <a class="section-link" href="/novus/meetings.html#meetings" style="margin:0;padding:0">Meetings</a>;
+            individual performance in <a class="section-link" href="/novus/calling.html#team" style="margin:0;padding:0">Team</a>.</p>
         </div>
         <div id="an-prov"></div>
         <div id="an-bottleneck"></div>
@@ -457,16 +450,34 @@
       <!-- ══ EXCEPTIONS ════════════════════════════════════════════════ -->
       <section class="view" id="v-exceptions">
         <div class="page-head">
-          <h1 class="page-title">Exceptions</h1>
-          <p class="page-sub">System health. Only genuinely broken or unaccounted-for states appear here —
-            normal pipeline waiting is not an exception.</p>
+          <h1 class="page-title">Settings</h1>
+          <p class="page-sub">System health and administration. Administrator only. No secret or API key is ever shown here.</p>
         </div>
+        <div class="section" style="margin-top:0">
+          <div class="section-head"><div class="section-title">Integrations</div>
+            <div class="section-note">What this page's own reads report. Nothing here is a new check.</div></div>
+          <div class="card"><div class="card-body" id="st-integrations"></div></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div class="section-title">Administration</div></div>
+          <div class="card"><div class="dash-list">
+            <a class="dash-row" href="/novus/calling.html#team"><span class="t">Team &amp; access</span><span class="s">Accounts, roles, password resets, sessions and timesheet approvals</span><span class="r">&rarr;</span></a>
+            <a class="dash-row" href="/novus/calling.html#scripts"><span class="t">Calling scripts</span><span class="s">Owner and gatekeeper scripts, versions and the objection library</span><span class="r">&rarr;</span></a>
+            <a class="dash-row" href="/novus/communications.html"><span class="t">Communication resolution</span><span class="s">Inbound calls and emails NOVUS could not safely attach to an agency</span><span class="r">&rarr;</span></a>
+            <a class="dash-row" href="/novus/calling.html#calling"><span class="t">Calling setup</span><span class="s">Twilio and ledger setup warnings appear at the top of Calling when something is missing</span><span class="r">&rarr;</span></a>
+          </div></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div class="section-title">System exceptions</div>
+            <div class="section-note">Only genuinely broken or unaccounted-for states appear here — normal pipeline waiting is not an exception.
+              Critical ones are also shown on the Dashboard.</div></div>
         <div class="filters">
           <button class="btn btn-secondary btn-sm" id="unrouted" type="button">
             <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg>Check unrouted replies</button>
           <span class="card-note">Reads Instantly once. Classifies nothing, writes nothing.</span>
         </div>
         <div class="card"><div id="ex-list"></div></div>
+        </div>
         <div class="section hidden" id="ex-unrouted-wrap" style="margin-top:32px;">
           <div class="section-head"><div class="section-title">Unrouted replies</div>
             <div class="section-note">Inbound replies the poller skipped because they matched no single outreach journey.</div></div>
@@ -551,6 +562,8 @@ let METRICS = {};
 let GLOBAL_EXCEPTIONS = [];
 let LOADED = false;
 let PROBE_QUEUE = null;
+/* Freshness of the last dashboard read, for Settings › Integrations. */
+let FEED = { generated_at:'', cached:false, cache_age_ms:0, warnings:0 };
 /* Provenance of the outreach-execution read, verbatim from the server. Used
    only to TELL THE TRUTH about the email figures on screen; no number is
    derived from it here. */
@@ -599,7 +612,17 @@ const ACTION_LABEL = {
    when NOVUS is the one that recommended it. See the execution authority
    registry in lib/acquisition-actions.mjs. */
 const QUEUE_LABEL = { JOE:'Manual', PROBER:'Prober', SYSTEM:'NOVUS', CALLING:'Calling', SORT:'Sort' };
-const OWNER_LABEL = { JOE:'Joe', NOVUS:'NOVUS', SYSTEM:'NOVUS' };
+/* ACTIONS.action_owner is a queue (JOE = "a human does this"), not a person,
+   so it is never shown as who an action belongs to. A person is shown only
+   where the ledger stores one (metadata assigned_user_id). */
+function actionAssignee(action){
+  if(action.assigned_user_id) return action.assigned_user_id;
+  try { return JSON.parse(action.metadata_json || '{}').assigned_user_id || ''; } catch { return ''; }
+}
+function assigneeName(userId){
+  const user = (DASH_EXTRAS.team?.users || []).find((u) => u.user_id === userId);
+  return user ? user.display_name : (userId === 'admin' ? 'Joe' : 'another team member');
+}
 const QUEUE_TONE  = { JOE:'t-amber', PROBER:'t-blue', SYSTEM:'t-grey', CALLING:'t-blue', SORT:'t-grey' };
 const PRIORITY_TONE = { CRITICAL:'t-red', HIGH:'t-amber', NORMAL:'t-blue', LOW:'t-grey' };
 const CONTACT_TONE  = { OWNER_DIRECT:'t-violet', NAMED_HUMAN:'t-blue', GENERIC:'t-grey', UNKNOWN:'t-grey' };
@@ -618,6 +641,9 @@ const ACTION_TABS = [
      its own tab count, deliberately excluded from every other tab (including
      All), from dueActions()/manualActions() and from the sidebar badge. */
   { key:'sortleads', label:'Sort leads', types:null, sortLeads:true },
+  /* Work whose stored due_at is still ahead (was the Future page). The same
+     rows move into the tabs above by themselves once due. */
+  { key:'scheduled', label:'Scheduled', types:null, scheduled:true },
 ];
 
 /* Pipeline bands. Mutually exclusive: a lead has exactly one canonical stage,
@@ -722,14 +748,35 @@ function demoState(lead){
    Hash routes over one document. Navigation only changes which view is
    rendered — it never posts, deletes, sends or mutates anything.          */
 
-const VIEWS = ['overview','actions','email-actions','future','pipeline','prober','leads','analytics','exceptions'];
-const VIEW_TITLE = { overview:'Overview', actions:'Actions', 'email-actions':'Email actions', future:'Future actions', pipeline:'Pipeline',
-  prober:'Prober', leads:'Leads', analytics:'Analytics', exceptions:'Exceptions' };
+const VIEWS = ['overview','actions','email-actions','pipeline','prober','leads','analytics','exceptions'];
+const VIEW_TITLE = { overview:'Dashboard', actions:'Actions', 'email-actions':'Email · Inbox', pipeline:'Leads · Pipeline',
+  prober:'Prober', leads:'Leads', analytics:'Analytics', exceptions:'Settings' };
+/* NAVIGATION CLEANUP (Sept 2026). The sidebar names destinations, not these
+   internal views. HASH_OF is each view's canonical URL; ROUTE_ALIAS keeps
+   every URL that existed before the cleanup working (bookmarks, links from
+   other pages, the timeline, search) — #overview, #future, #email-actions
+   and #exceptions all still open the right place. NAV_OF says which sidebar
+   destination a view belongs to. */
+const HASH_OF = { overview:'dashboard', 'email-actions':'email', exceptions:'settings' };
+const ROUTE_ALIAS = { dashboard:'overview', email:'email-actions', inbox:'email-actions', settings:'exceptions', future:'actions' };
+const NAV_OF = { overview:'dashboard', actions:'actions', 'email-actions':'email', pipeline:'leads', leads:'leads',
+  prober:'prober', analytics:'analytics', exceptions:'settings' };
 let VIEW = 'overview';
 
 function routeFromHash(){
   const raw = String(window.location.hash || '').replace(/^#\/?/, '').split('?')[0].trim().toLowerCase();
-  return VIEWS.includes(raw) ? raw : 'overview';
+  const name = ROUTE_ALIAS[raw] || raw;
+  return VIEWS.includes(name) ? name : 'overview';
+}
+/* #future is Actions › Scheduled now; #email?tab=interested and
+   #actions?tab=calls open a list tab directly (Dashboard links use these). */
+function applyTabFromHash(){
+  const raw = String(window.location.hash || '').replace(/^#\/?/, '');
+  const [path, query] = raw.split('?');
+  const tab = new URLSearchParams(query || '').get('tab') || (path.toLowerCase() === 'future' ? 'scheduled' : '');
+  if(!tab) return;
+  if(routeFromHash() === 'actions' && ACTION_TABS.some((t) => t.key === tab)) ACTION_TAB = tab;
+  if(routeFromHash() === 'email-actions' && EMAIL_TABS.some((t) => t.key === tab)) EMAIL_TAB = tab;
 }
 /* Deep link from the campaigns page / timeline: #leads?agency=<agency_id>
    opens that lead's drawer on the History pane once the feed has loaded.
@@ -740,7 +787,7 @@ function pendingAgencyFromHash(){
   const params = new URLSearchParams(q);
   const id = params.get('agency') || '';
   PENDING_PANE = params.get('pane') || '';
-  if(id) history.replaceState(null, '', `${location.pathname}#${routeFromHash()}`);
+  if(id) history.replaceState(null, '', `${location.pathname}#${HASH_OF[routeFromHash()] || routeFromHash()}`);
   return id;
 }
 let PENDING_AGENCY = pendingAgencyFromHash();
@@ -749,13 +796,13 @@ function showView(name, { push = true } = {}){
   VIEW = VIEWS.includes(name) ? name : 'overview';
   VIEWS.forEach((v) => $('v-' + v).classList.toggle('on', v === VIEW));
   document.querySelectorAll('.nav-item').forEach((el) => {
-    const on = el.dataset.view === VIEW;
+    const on = el.dataset.nav === NAV_OF[VIEW];
     el.classList.toggle('on', on);
     el.setAttribute('aria-current', on ? 'page' : 'false');
   });
   $('crumb').textContent = VIEW_TITLE[VIEW];
   document.title = `NOVUS — ${VIEW_TITLE[VIEW]}`;
-  if(push && routeFromHash() !== VIEW) window.location.hash = '#' + VIEW;
+  if(push && routeFromHash() !== VIEW) window.location.hash = '#' + (HASH_OF[VIEW] || VIEW);
   window.scrollTo({ top:0 });
   renderView();
   if(VIEW === 'prober') loadProbeQueue();
@@ -768,15 +815,14 @@ function renderAll(){ renderBadges(); renderView(); }
 function renderBadges(){
   const set = (id, n, hot) => {
     const el = $(id);
+    if(!el) return;
     el.textContent = String(n);
     el.classList.toggle('zero', !n);
     el.classList.toggle('hot', Boolean(hot) && n > 0);
   };
   set('b-actions', dueActions().length, true);
   set('b-email-actions', emailActions().filter(isDueNow).length, true);
-  set('b-future', futureActions().length, false);
   set('b-prober', COUNTS.probe_queue ?? COUNTS.ready_to_probe ?? 0, false);
-  set('b-leads', LEADS.length, false);
   set('b-exceptions', exceptionItems().length, true);
 }
 
@@ -784,7 +830,6 @@ function renderView(){
   if(VIEW === 'overview')   renderOverview();
   if(VIEW === 'actions')    renderActions();
   if(VIEW === 'email-actions') renderEmailActions();
-  if(VIEW === 'future')     renderFuture();
   if(VIEW === 'pipeline')   renderPipeline();
   if(VIEW === 'prober')     renderProber();
   if(VIEW === 'leads')      renderLeads();
@@ -851,7 +896,9 @@ function kpiCard(label, value, foot, tone, view){
 }
 
 function renderOverview(){
+  loadDashboardExtras();
   if(!LOADED){
+    $('ov-attn').innerHTML = Array.from({length:4},()=>'<div class="skel skel-kpi"></div>').join('');
     $('ov-kpis').innerHTML = Array.from({length:4},()=>'<div class="skel skel-kpi"></div>').join('');
     $('ov-tasks').innerHTML = skeletonRows(3);
     return;
@@ -879,9 +926,36 @@ function renderOverview(){
 
   $('ov-funnel').innerHTML = funnelHtml();
 
+  /* WHAT NEEDS ATTENTION. Each tile is a count of the same ledger rows the
+     linked workspace lists, so the number and the destination always agree. */
+  const interested = emailActions().filter((l) => isDueNow(l) && l.next_action.interested).length;
+  const callsDue = todo.filter((l) => CALL_ACTION_TYPES.has(l.next_action.type)).length;
+  const excCount = exceptionItems().length;
+  const tile = (label, n, foot, tone, href) => `<a class="kpi act ${n ? tone : ''}" href="${href}">
+    <div class="kpi-l">${esc(label)}</div><div class="kpi-n">${n}</div><div class="kpi-f">${foot}</div></a>`;
+  $('ov-attn').innerHTML = [
+    tile('Interested replies', interested, 'Email &rsaquo; Inbox', 'good', '#email?tab=interested'),
+    /* Your due call actions in this ledger (= Actions › Calls). Every
+       callback, including setters', is counted on the Calling badge from the
+       calling ledger, which this page deliberately does not load. */
+    tile('Your calls due', callsDue, 'Actions &rsaquo; Calls &middot; all callbacks are in Calling', 'alert', '#actions?tab=calls'),
+    tile('Overdue actions', overdue, `${todo.length} due now &middot; ${later.length} scheduled`, 'alert', '#actions'),
+    tile('System exceptions', excCount, excCount ? 'needs fixing &rsaquo; Settings' : 'nothing is broken', 'alert', '#settings'),
+  ].join('');
+
   $('ov-tasks').innerHTML = todo.length
     ? todo.slice(0, 5).map(taskHtml).join('')
     : emptyState('Your queue is clear', 'Every manual sales action is done. Probing has its own queue.');
+
+  /* Meetings booked and awaiting preparation: the PREPARE_MEETING /
+     MEETING_FOLLOW_UP actions already in this feed (due soonest first). */
+  const meetings = LEADS.filter((l) => MEETING_ACTION_TYPES.has(l.next_action?.type))
+    .sort((a, b) => (Date.parse(a.next_action.due_at) || Infinity) - (Date.parse(b.next_action.due_at) || Infinity));
+  $('ov-meetings').innerHTML = meetings.length
+    ? meetings.slice(0, 5).map((l) => `<a class="dash-row" href="/novus/meetings.html#meetings">
+        <span class="t">${esc(l.agency_name)}</span><span class="s">${esc(actionLabel(l.next_action.type))} &middot; ${esc(l.contact.name || l.contact.email || 'no named contact')}</span>
+        <span class="r">${esc(dueState(l.next_action.due_at).text)}</span></a>`).join('')
+    : '<div class="dash-empty">No meeting is waiting to be prepared.</div>';
 
   const byStage = COUNTS.by_stage || {};
   const sys = [
@@ -903,7 +977,47 @@ function renderOverview(){
 
   const exc = exceptionItems();
   $('ov-exc-section').classList.toggle('hidden', exc.length === 0);
-  if(exc.length) $('ov-exc').innerHTML = exc.slice(0, 4).map(exceptionHtml).join('');
+  /* System-wide failures first; at most two here, the rest in Settings. */
+  const ordered = [...exc.filter((x) => !x.agency), ...exc.filter((x) => x.agency)];
+  if(exc.length) $('ov-exc').innerHTML = ordered.slice(0, 2).map(exceptionHtml).join('')
+    + (exc.length > 2 ? `<a class="dash-row" href="#settings"><span class="t">${exc.length - 2} more ${exc.length - 2 === 1 ? 'exception' : 'exceptions'}</span><span class="s">Open Settings to see and fix every one</span><span class="r">&rarr;</span></a>` : '');
+}
+
+/* CAMPAIGNS + TEAM CARDS. Two small reads, made only while the Dashboard is
+   open and at most once per page load (Refresh re-reads): campaigns-list is
+   cached server-side, team-users reads USERS + CALLS. Neither is part of the
+   main feed, so the rest of the page never waits for them. Read-only. */
+const DASH_EXTRAS = { campaigns:null, team:null, loading:false };
+const CAMPAIGN_TONE = { ACTIVE:'t-green', PAUSED:'t-amber', DRAFT:'t-grey', COMPLETED:'t-blue' };
+async function loadDashboardExtras(force){
+  if(DASH_EXTRAS.loading || (!force && DASH_EXTRAS.campaigns && DASH_EXTRAS.team)) { paintDashboardExtras(); return; }
+  DASH_EXTRAS.loading = true;
+  paintDashboardExtras();
+  const get = (op) => fetch(`/api/novus/personalisation?novus_operation=${op}`, { headers:{ Accept:'application/json' } })
+    .then((r) => r.json().then((d) => (r.ok && d.success !== false ? d : { error: d.error || `HTTP ${r.status}` })))
+    .catch((e) => ({ error: e.message || 'unavailable' }));
+  const [campaigns, team] = await Promise.all([get('campaigns-list'), get('team-users')]);
+  Object.assign(DASH_EXTRAS, { campaigns, team, loading:false });
+  paintDashboardExtras();
+}
+function paintDashboardExtras(){
+  const c = DASH_EXTRAS.campaigns;
+  $('ov-campaigns').innerHTML = !c ? '<div class="dash-empty"><span class="spin"></span> Loading campaigns</div>'
+    : c.error ? `<div class="dash-empty">Campaigns unavailable: ${esc(c.error)}</div>`
+    : (c.campaigns || []).filter((x) => x.status !== 'COMPLETED').slice(0, 5).map((x) => `<a class="dash-row" href="/novus/campaigns.html#campaign?id=${encodeURIComponent(x.campaign_id)}">
+        <span class="t">${esc(x.name)}</span>
+        <span class="s">${Number(x.metrics?.emails_sent) || 0} sent &middot; ${Number(x.metrics?.replies) || 0} replies &middot; ${Number(x.metrics?.positive) || 0} positive &middot; ${Number(x.metrics?.meetings) || 0} meetings</span>
+        <span class="r">${pill(String(x.status || '').toLowerCase(), CAMPAIGN_TONE[x.status], true)}</span></a>`).join('')
+      || '<div class="dash-empty">No live or draft campaigns.</div>';
+  const t = DASH_EXTRAS.team;
+  const setters = (t?.users || []).filter((u) => u.role === 'SETTER');
+  $('ov-team').innerHTML = !t ? '<div class="dash-empty"><span class="spin"></span> Loading team</div>'
+    : t.error ? `<div class="dash-empty">Team unavailable: ${esc(t.error)}</div>`
+    : setters.map((u) => { const a = u.activity || {}; return `<a class="dash-row" href="/novus/calling.html#team">
+        <span class="t">${esc(u.display_name)}${u.status !== 'ACTIVE' ? ' <span class="muted">(disabled)</span>' : ''}</span>
+        <span class="s">${a.calls_today || 0} calls today &middot; ${a.owner_reached_7d || 0} owners reached 7d &middot; ${a.meetings_7d || 0} meetings 7d</span>
+        <span class="r">${a.last_call_at ? `last call ${esc(ago(a.last_call_at))}` : 'no calls yet'}</span></a>`; }).join('')
+      || '<div class="dash-empty">No setter accounts yet. Create one in Team.</div>';
 }
 
 function funnelHtml(){
@@ -939,10 +1053,25 @@ function funnelHtml(){
 
 let ACTION_TAB = 'all';
 
+/* WHERE THE WORK GETS DONE. Actions says what needs doing; this button goes
+   to the workspace that does it. Navigation only — nothing is written. */
+const CALL_ACTION_TYPES = new Set(['CALL_PROSPECT','RETRY_CALL','CALL']);
+const MEETING_ACTION_TYPES = new Set(['PREPARE_MEETING','MEETING_FOLLOW_UP']);
+function routeButtonHtml(lead){
+  const t = lead.next_action?.type;
+  if(CALL_ACTION_TYPES.has(t)) return `<a class="btn btn-primary btn-sm" href="/novus/calling.html?lead=${encodeURIComponent(lead.agency_id)}">Call</a>`;
+  if(EMAIL_ACTION_TYPES.has(t)) return `<button class="btn btn-primary btn-sm open-reply" data-agency="${esc(lead.agency_id)}" type="button">Open &amp; reply</button>`;
+  if(MEETING_ACTION_TYPES.has(t)) return `<a class="btn btn-primary btn-sm" href="/novus/meetings.html#meetings">Meetings</a>`;
+  return '';
+}
 function taskHtml(lead){
   const a = lead.next_action || {};
   const due = dueState(a.due_at);
   const contact = lead.contact.name || lead.contact.email || 'no named contact';
+  const route = routeButtonHtml(lead);
+  const controls = a.id ? `<button class="btn btn-secondary btn-sm action-complete" data-action="${esc(a.id)}" type="button">Complete</button>
+        <button class="btn btn-quiet btn-sm action-complete-next" data-action="${esc(a.id)}" type="button">Complete + next</button>
+        <button class="btn btn-quiet btn-sm action-snooze" data-action="${esc(a.id)}" type="button">Snooze</button>` : '';
   return `<div class="task" data-id="${esc(lead.agency_id)}">
     <div class="task-rail ${due.cls}"></div>
     <div class="task-main">
@@ -959,9 +1088,7 @@ function taskHtml(lead){
     <div class="task-side">
       <div class="task-when ${due.cls}">${esc(due.text)}</div>
       ${lead.reply.received_at ? `<div class="task-when" style="font-weight:500">Replied ${esc(ago(lead.reply.received_at))}</div>` : ''}
-      ${a.id ? `<div class="btnrow"><button class="btn btn-secondary btn-sm action-complete" data-action="${esc(a.id)}" type="button">Complete</button>
-        <button class="btn btn-quiet btn-sm action-complete-next" data-action="${esc(a.id)}" type="button">Complete + next</button>
-        <button class="btn btn-quiet btn-sm action-snooze" data-action="${esc(a.id)}" type="button">Snooze</button></div>` : ''}
+      ${route || controls ? `<div class="btnrow">${route}${controls}</div>` : ''}
     </div></div>`;
 }
 
@@ -971,21 +1098,30 @@ function renderActions(){
      work, and mixing the two is what stopped this page answering "what do I
      need to do now?". */
   const all = dueActions();
-  const later = futureActions().length;
+  const scheduled = futureActions();
+  const later = scheduled.length;
   const sortLeads = sortLeadActions();
   $('ac-tabs').innerHTML = ACTION_TABS.map((t) => {
-    const n = t.sortLeads ? sortLeads.length : t.interested ? all.filter((l) => l.next_action.interested).length : (t.types ? all.filter((l) => t.types.includes(l.next_action.type)).length : all.length);
+    const n = t.scheduled ? later : t.sortLeads ? sortLeads.length : t.interested ? all.filter((l) => l.next_action.interested).length : (t.types ? all.filter((l) => t.types.includes(l.next_action.type)).length : all.length);
     return `<button class="tab ${t.key === ACTION_TAB ? 'on' : ''}" data-actiontab="${t.key}" type="button">
       ${esc(t.label)}<span class="tab-n">${n}</span></button>`;
   }).join('');
   const tab = ACTION_TABS.find((t) => t.key === ACTION_TAB) || ACTION_TABS[0];
+  if(tab.scheduled){
+    $('ac-list').classList.add('future');
+    $('ac-list').innerHTML = scheduled.length ? scheduled.map(taskHtml).join('')
+      : emptyState('Nothing scheduled', 'Every manual action either needs you now or is already done.',
+          '<circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/>');
+    return;
+  }
+  $('ac-list').classList.remove('future');
   const rows = tab.sortLeads ? sortLeads : tab.interested ? all.filter((l) => l.next_action.interested) : (tab.types ? all.filter((l) => tab.types.includes(l.next_action.type)) : all);
   $('ac-list').innerHTML = rows.length
     ? rows.map(taskHtml).join('')
     : emptyState(tab.sortLeads ? 'Nothing to sort' : (all.length ? 'Nothing in this tab' : 'Nothing is due now'),
         tab.sortLeads ? 'No lead-pool agency currently needs a housekeeping decision.'
           : (all.length ? 'Other tabs still have work due.'
-              : (later ? `${later} ${later === 1 ? 'action is' : 'actions are'} scheduled for later — they are in Future actions. Ready-to-probe agencies are in the Prober.`
+              : (later ? `${later} ${later === 1 ? 'action is' : 'actions are'} scheduled for later — see the Scheduled tab. Ready-to-probe agencies are in the Prober.`
                        : 'Ready-to-probe agencies are in the Prober, not here.')));
 }
 
@@ -1047,23 +1183,6 @@ function renderEmailActions(){
   $('ea-list').innerHTML = rows.length ? rows.map(emailRowHtml).join('')
     : emptyState(tab.key === 'scheduled' ? 'Nothing scheduled' : 'No email conversations need you',
         tab.key === 'scheduled' ? 'No email follow-up is waiting on a future date.' : 'New replies appear here after each sync.');
-}
-
-/* ── FUTURE ACTIONS ──────────────────────────────────────────────────────
-   The same canonical rows, the same server verdict, the same renderer — only
-   the timestamp filter and the calmer treatment differ. Ordered soonest
-   first, so the top of this list is what enters Actions next. */
-function renderFuture(){
-  if(!LOADED){ $('fu-list').innerHTML = skeletonRows(3); return; }
-  const rows = futureActions();
-  const next = rows[0];
-  $('fu-note').innerHTML = rows.length
-    ? `${rows.length} scheduled &middot; next ${esc(dueState(next.next_action.due_at).text.toLowerCase())}`
-    : 'Nothing is scheduled ahead.';
-  $('fu-list').innerHTML = rows.length
-    ? rows.map(taskHtml).join('')
-    : emptyState('Nothing scheduled', 'Every manual action either needs you now or is already done.',
-        '<circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/>');
 }
 
 /* ── PIPELINE ───────────────────────────────────────────────────────── */
@@ -1327,6 +1446,18 @@ function exceptionHtml(item){
 }
 
 function renderExceptions(){
+  /* Integrations: only what this page's own reads already report — the
+     dashboard feed (Google Sheets) and Instantly's execution read. Twilio and
+     the Rightmove Operator report on their own pages. No secret is shown. */
+  const tone = (ok) => ok ? 't-green' : 't-amber';
+  $('st-integrations').innerHTML = LOADED ? kv([
+    ['Google Sheets feed', `${pill('reading', 't-green', true)} <span class="muted">last read ${esc(when(FEED.generated_at))}${FEED.cached ? ` · cached ${Math.round(FEED.cache_age_ms/1000)}s` : ''}${FEED.warnings ? ` · ${FEED.warnings} data note${FEED.warnings === 1 ? '' : 's'} (see the banner at the top)` : ''}</span>`],
+    ['Instantly', `${pill(EXECUTION.available ? 'reading' : 'unavailable', tone(EXECUTION.available), true)} <span class="muted">${EXECUTION.available
+      ? `sent-email figures from ${esc(String(EXECUTION.source || '').toLowerCase().replace(/_/g, ' '))}${EXECUTION.cached ? ` · cached ${Math.round((EXECUTION.cache_age_ms || 0)/1000)}s` : ''}${EXECUTION.truncated ? ' · truncated' : ''}`
+      : esc(EXECUTION.error || 'the execution read did not answer')}</span>`],
+    ['Twilio calling', '<span class="muted">Setup problems are reported at the top of</span> <a class="section-link" href="/novus/calling.html#calling" style="margin:0;padding:0">Calling</a>'],
+    ['Rightmove Operator', '<span class="muted">Local worker status and recovery are on</span> <a class="section-link" href="#prober" style="margin:0;padding:0">Prober</a>'],
+  ]) : skeletonRows(2);
   const items = exceptionItems();
   $('ex-list').innerHTML = items.length
     ? items.map(exceptionHtml).join('')
@@ -1356,7 +1487,7 @@ function nextActionBox(lead){
         <div style="margin-top:6px">${lead.action_queue ? pill(QUEUE_LABEL[lead.action_queue], QUEUE_TONE[lead.action_queue]) : '&mdash;'}</div></div>
     </div>
     <div class="nextbox-grid three">
-      <div class="nextbox-cell"><div class="nextbox-l">Owner</div><div class="nextbox-cv">${dash(OWNER_LABEL[a.owner] || a.owner)}</div></div>
+      <div class="nextbox-cell"><div class="nextbox-l">Status</div><div class="nextbox-cv">${dash(a.status ? String(a.status).toLowerCase().replace(/_/g, ' ') : '')}</div></div>
       <div class="nextbox-cell"><div class="nextbox-l">Recommended by</div><div class="nextbox-cv">${dash(a.recommended_by)}</div></div>
       <div class="nextbox-cell"><div class="nextbox-l">Due</div>
         <div class="nextbox-cv ${due.cls === 'over' ? 'over' : ''}">${esc(due.text || '—')}</div></div>
@@ -1497,7 +1628,7 @@ function paneActions(lead){
   const actionRows = (items, controls=false) => items.length ? kv(items.map((a) => [
     a.title || actionLabel(a.action_type),
     `${pill(status(a).toLowerCase(), tone[status(a)], true)}
-     <div class="sub">${esc(a.action_owner || '')}${a.due_at ? ` · due ${esc(when(a.due_at))}` : ''}</div>
+     <div class="sub">${[a.due_at ? `due ${esc(when(a.due_at))}` : '', actionAssignee(a) ? `assigned to ${esc(assigneeName(actionAssignee(a)))}` : ''].filter(Boolean).join(' · ')}</div>
      <div class="sub">${esc(a.note || humaniseReason(a.completion_reason || a.reason || ''))}</div>
      ${controls ? `<div class="btnrow"><button class="btn btn-secondary btn-sm action-complete" data-action="${esc(a.action_id)}" type="button">Complete</button><button class="btn btn-quiet btn-sm action-complete-next" data-action="${esc(a.action_id)}" type="button">Complete + next</button><button class="btn btn-quiet btn-sm action-snooze" data-action="${esc(a.action_id)}" type="button">Snooze</button></div>` : ''}`,
   ])) : '<div class="note">None.</div>';
@@ -1638,7 +1769,7 @@ function profileHtml(p){
 
   const w = p.work || {};
   const openRows = (w.open || []).map((a) => [esc(actionLabel(a.type)),
-    `${a.interested ? pill('interested', 't-green', true) + ' ' : ''}${a.priority ? pill(a.priority.toLowerCase(), PRIORITY_TONE[a.priority.toUpperCase()], true) + ' ' : ''}${a.overdue ? pill('overdue', 't-red', true) + ' ' : ''}${a.due_at ? esc(dueState(a.due_at).text) : 'no due date'} · owner ${esc(OWNER_LABEL[a.owner] || a.owner || '—')}
+    `${a.interested ? pill('interested', 't-green', true) + ' ' : ''}${a.priority ? pill(a.priority.toLowerCase(), PRIORITY_TONE[a.priority.toUpperCase()], true) + ' ' : ''}${a.overdue ? pill('overdue', 't-red', true) + ' ' : ''}${a.due_at ? esc(dueState(a.due_at).text) : 'no due date'}${a.assigned_user_id ? ` · assigned to ${esc(assigneeName(a.assigned_user_id))}` : ''}
      <div class="sub">${esc(humaniseReason(a.reason))}</div>`]);
   parts.push(blk('Current work', (openRows.length ? kv(openRows) : '<div class="note">Nothing outstanding.</div>')
     + `<div class="note" style="margin-top:8px">${w.completed_count || 0} completed${p.next_step ? ` · next: ${esc(p.next_step.what)} ${esc(dueState(p.next_step.at).text.toLowerCase())}` : ''}</div>`));
@@ -1999,6 +2130,7 @@ async function load(force){
     METRICS = data.metrics || {};
     GLOBAL_EXCEPTIONS = data.global_exceptions || [];
     EXECUTION = data.outreach_execution || { available:false, source:'UNAVAILABLE', error:'', cached:false, cache_age_ms:0, truncated:false };
+    FEED = { generated_at:data.generated_at || '', cached:Boolean(data.cached), cache_age_ms:data.cache_age_ms || 0, warnings:(data.warnings || []).length };
     LOADED = true;
 
     fillFilter($('f-stage'), [...new Set(LEADS.map((l) => l.current_stage))].sort((a,b) => stageLabel(a).localeCompare(stageLabel(b))));
@@ -2156,6 +2288,7 @@ async function createAction(lead){
 
 window.addEventListener('hashchange', () => {
   const id = pendingAgencyFromHash();
+  applyTabFromHash();
   showView(routeFromHash(), { push:false });
   if(id && LOADED && LEADS.some((l) => l.agency_id === id)) openDrawer(id, drawerPane(PENDING_PANE || 'history'));
 });
@@ -2224,7 +2357,7 @@ document.addEventListener('click', (e) => {
   if(row && row.dataset.id) openDrawer(row.dataset.id, row.dataset.openPane ? drawerPane(row.dataset.openPane) : undefined);
 });
 
-$('refresh').addEventListener('click', () => load(true));
+$('refresh').addEventListener('click', () => { load(true); if(VIEW === 'overview') loadDashboardExtras(true); });
 $('reconcile').addEventListener('click', reconcileActions);
 $('unrouted').addEventListener('click', loadUnrouted);
 $('d-close').addEventListener('click', closeDrawer);
@@ -2250,6 +2383,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+applyTabFromHash();
 showView(routeFromHash(), { push:false });
 load(false);
 </script>

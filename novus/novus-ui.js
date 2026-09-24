@@ -103,7 +103,10 @@
     function historyField(lead) {
       var agencyId = String(lead && lead.agency_id || '').trim();
       if (!agencyId) return '';
-      return '<a href="/novus/operator.html#leads?agency=' + encodeURIComponent(agencyId) + '" target="_blank" rel="noopener"'
+      // A setter's account reads the calling profile; the admin the Command Centre drawer.
+      var setter = window.NovusAuth && window.NovusAuth.me && window.NovusAuth.me.role === 'SETTER';
+      var href = setter ? '/novus/calling.html#lead?agency=' + encodeURIComponent(agencyId) : '/novus/operator.html#leads?agency=' + encodeURIComponent(agencyId);
+      return '<a href="' + href + '" target="_blank" rel="noopener"'
         + ' style="min-width:120px;flex:0 1 150px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);text-decoration:none;color:inherit;">'
         + '<div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px">History</div>'
         + '<div style="font-size:13px;font-weight:600;line-height:1.35;color:var(--blue)">Full timeline &#8599;</div>'
@@ -253,7 +256,9 @@
     out.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/></svg><span class="nav-stamp" style="font-size:12px;color:inherit">Sign out</span>';
     out.addEventListener('click', function () { out.disabled = true; out.title = 'Signing out…'; window.NovusAuth.signOut(); });
     box.appendChild(who); box.appendChild(out);
-    foot.insertBefore(box, foot.firstChild);
+    // Under Settings, above the freshness stamp: the account is always at the
+    // bottom of the rail, which never scrolls away (novus-ui.css .nav-scroll).
+    foot.insertBefore(box, foot.querySelector('.nav-stamp') || foot.firstChild);
   }
   function load() {
     realFetch('/api/novus/personalisation?novus_operation=whoami', { headers: { Accept: 'application/json' }, credentials: 'same-origin' })

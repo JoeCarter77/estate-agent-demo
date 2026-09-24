@@ -341,76 +341,50 @@
 <body>
 <div class="app">
 
-  <!-- ── SIDEBAR — the operator.html rail (source of truth: novus/operator.html).
-       This page's own tab is a button; everything else links back. Keep in
-       lockstep with operator.html's <nav> — scripts/novus-sidebar-parity-selftest.mjs
-       asserts all four pages match. ── -->
+  <!-- ── SIDEBAR — ONE canonical rail, identical in operator.html, calling.html,
+       campaigns.html and meetings.html (calling.html adds the setter group).
+       Every item is a plain link keyed by data-nav; each page highlights the
+       destination its current view belongs to. Keep the four copies in
+       lockstep — scripts/novus-sidebar-parity-selftest.mjs asserts it. ── -->
   <nav class="nav">
     <div class="nav-brand">
       <img class="nav-mark" src="/novus/assets/novus-mark-512.png" width="34" height="34" alt="NOVUS" />
       <div><div class="nav-name">NOVUS</div><div class="nav-sub">Acquisition</div></div>
     </div>
-
+    <div class="nav-scroll">
     <div class="nav-group">
-      <a class="nav-item" href="/novus/operator.html#overview">
-        <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Overview</span></a>
-      <a class="nav-item" href="/novus/operator.html#actions">
-        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg>
-        <span>Actions</span><span class="nav-badge zero" id="b-actions">0</span></a>
-      <a class="nav-item" href="/novus/operator.html#future">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/></svg>
-        <span>Future</span><span class="nav-badge zero" id="b-future">0</span></a>
-      <a class="nav-item" href="/novus/operator.html#pipeline">
-        <svg viewBox="0 0 24 24"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg><span>Pipeline</span></a>
-      <a class="nav-item" href="/novus/operator.html#prober">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-        <span>Prober</span><span class="nav-badge zero" id="b-prober">0</span></a>
-      <a class="nav-item" href="/novus/operator.html#leads">
-        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg>
-        <span>Leads</span><span class="nav-badge zero" id="b-leads">0</span></a>
-      <a class="nav-item" href="/novus/operator.html#analytics">
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item" data-nav="dashboard" href="/novus/operator.html#dashboard">
+        <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Dashboard</span></a>
+      <a class="nav-item" data-nav="actions" href="/novus/operator.html#actions">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>Actions</span><span class="nav-badge zero" id="b-actions">0</span></a>
+      <a class="nav-item" data-nav="leads" href="/novus/operator.html#leads">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg><span>Leads</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Acquisition</div>
+      <a class="nav-item" data-nav="email" href="/novus/operator.html#email">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg><span>Email</span><span class="nav-badge zero" id="b-email-actions">0</span></a>
+      <a class="nav-item" data-nav="calling" href="/novus/calling.html#calling">
+        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span><span class="nav-badge zero" id="b-calls">0</span></a>
+      <a class="nav-item" data-nav="prober" href="/novus/operator.html#prober">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Prober</span><span class="nav-badge zero" id="b-prober">0</span></a>
+      <a class="nav-item" data-nav="meetings" href="/novus/meetings.html#meetings">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v15H4z"/><path d="M4 10h16"/><path d="M9 3v4M15 3v4"/></svg><span>Meetings</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Management</div>
+      <a class="nav-item" data-nav="analytics" href="/novus/operator.html#analytics">
         <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Analytics</span></a>
+      <a class="nav-item" data-nav="team" href="/novus/calling.html#team">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><path d="M16 4.6a3.5 3.5 0 010 6.8"/><path d="M18.5 14.2A6.5 6.5 0 0121.5 20"/></svg><span>Team</span></a>
     </div>
-
-    <div class="nav-group">
-      <div class="nav-label">Email</div>
-      <a class="nav-item" href="/novus/campaigns.html#campaigns">
-        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg><span>Campaigns</span></a>
-      <a class="nav-item" href="/novus/campaigns.html#new">
-        <svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span>New Campaign</span></a>
-      <a class="nav-item" href="/novus/operator.html#email-actions">
-        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/><path d="M15 16l2 2 4-4"/></svg><span>Email Actions</span><span class="nav-badge zero" id="b-email-actions">0</span></a>
     </div>
-
-    <div class="nav-group">
-      <div class="nav-label">Calling</div>
-      <a class="nav-item" href="/novus/calling.html#calling">
-        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span></a>
-      <a class="nav-item" href="/novus/calling.html#call-actions">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/></svg><span>Call Actions</span></a>
-      <a class="nav-item" href="/novus/calling.html#scripts">
-        <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg><span>Scripts</span></a>
-      <a class="nav-item" href="/novus/calling.html#calling-analytics">
-        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Calling Analytics</span></a>
+    <div class="nav-foot">
+      <a class="nav-item nav-admin" data-nav="settings" href="/novus/operator.html#settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span>Settings</span><span class="nav-badge zero" id="b-exceptions">0</span></a>
+      <div class="nav-stamp" id="stamp"><span class="spin"></span>Loading</div>
     </div>
-
-    <div class="nav-group">
-      <div class="nav-label">Meetings</div>
-      <button class="nav-item" data-view="meetings" type="button">
-        <svg viewBox="0 0 24 24"><path d="M4 5h16v15H4z"/><path d="M4 10h16"/><path d="M9 3v4M15 3v4"/></svg><span>Meetings</span></button>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">System</div>
-      <a class="nav-item" href="/novus/operator.html#exceptions">
-        <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
-        <span>Exceptions</span><span class="nav-badge zero" id="b-exceptions">0</span></a>
-      <a class="nav-item" href="/novus/communications.html">
-        <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 4l8 8 8-8"/></svg>
-        <span>Communications</span></a>
-    </div>
-
-    <div class="nav-foot"><div class="nav-stamp" id="stamp"><span class="spin"></span>Loading</div></div>
   </nav>
 
   <main class="main">
@@ -573,7 +547,7 @@ function showView(name){
      re-follow it instead of advancing the question. */
   try{ document.activeElement?.blur?.(); }catch{}
   ['meetings','discovery'].forEach((v) => $('v-'+v).classList.toggle('on', v === VIEW));
-  document.querySelectorAll('.nav-item[data-view]').forEach((el) => el.classList.toggle('on', true));
+  document.querySelectorAll('.nav-item[data-nav]').forEach((el) => { const on = el.dataset.nav === 'meetings'; el.classList.toggle('on', on); el.setAttribute('aria-current', on ? 'page' : 'false'); });
   $('crumb').textContent = VIEW === 'discovery' ? 'Discovery' : 'Meetings'; document.title = `NOVUS — ${VIEW === 'discovery' ? 'Discovery' : 'Meetings'}`;
   notice('');
 }
@@ -1768,7 +1742,6 @@ document.addEventListener('click', async (e) => {
     if(t.closest('[data-pres-exit]')){ closePresentation(); return; }
     return;
   }
-  const nav = t.closest('.nav-item[data-view]'); if(nav){ setHash('#meetings'); route(); return; }
   if(t.id === 'side-toggle'){ SIDE_HIDDEN = !SIDE_HIDDEN; applySideVisibility(); return; }
   if(t.id === 'setup-btn'){ t.disabled = true; try{ await post(OP('discovery-setup'), { confirm:'SETUP_DISCOVERY' }); await loadList(); }catch(err){ showErr(err.message); } return; }
   const st = t.closest('[data-start]'); if(st){ $('a-results').classList.add('hidden'); $('a-search').value = ''; setHash(`#start?agency=${encodeURIComponent(st.dataset.start)}`); route(); return; }

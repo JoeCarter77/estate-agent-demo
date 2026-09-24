@@ -96,8 +96,8 @@ function makeDom(){
     addEventListener(type, fn){ listeners.document[type] = fn; },
     title: '',
   };
-  const NAV_ITEMS = ['overview','actions','pipeline','prober','leads','analytics','exceptions'].map((v) => {
-    const el = new El('button'); el.dataset.view = v; return el;
+  const NAV_ITEMS = ['dashboard','actions','leads','email','calling','prober','meetings','analytics','team','settings'].map((v) => {
+    const el = new El('a'); el.dataset.nav = v; return el;
   });
   const DR_TABS = ['summary','conversation','probe','demo','actions'].map((p) => {
     const el = new El('button'); el.dataset.pane = p; return el;
@@ -162,7 +162,10 @@ function fixture(){
 // pass a () => payload getter and mutate what it returns between calls.
 function bootPage(payloadOrGetter, { onPost } = {}){
   const dom = makeDom();
-  const script = HTML.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/)[1];
+  // The page's main script, found by its header comment. A second,
+  // self-contained <script> (the autonomous-probing control client) follows
+  // it; the old "last script before </body>" pattern swallowed both.
+  const script = HTML.match(/<script>(\s*\/\* ═+\s*NOVUS Command Centre[\s\S]*?)<\/script>/)[1];
   const fetchCalls = [];
   const mutations = [];
   const currentPayload = () => typeof payloadOrGetter === 'function' ? payloadOrGetter() : payloadOrGetter;
@@ -183,7 +186,7 @@ function bootPage(payloadOrGetter, { onPost } = {}){
     return { ok:true, status:200, json: async () => ({ success:true }) };
   };
   const api = new Function('document','window','fetch','Date','console','encodeURIComponent','exportBridge',
-    script + '\n;exportBridge({ showView:()=>VIEW, go:showView, load, renderAll, manualActions, exceptionItems, openDrawer, closeDrawer, renderDrawerPane, setPane:(p)=>{DRAWER_PANE=p;}, setStage:(s)=>{PIPELINE_STAGE=s;}, setActionTab:(t)=>{ACTION_TAB=t;}, dueActions, futureActions, renderFuture, renderPipeline, renderActions, renderProber, renderLeads, renderAnalytics, renderExceptions, renderOverview, stageLabel, actionLabel, getLeads:()=>LEADS, completeAction, snoozeAction });');
+    script + '\n;exportBridge({ showView:()=>VIEW, go:showView, load, renderAll, manualActions, exceptionItems, openDrawer, closeDrawer, renderDrawerPane, setPane:(p)=>{DRAWER_PANE=p;}, setStage:(s)=>{PIPELINE_STAGE=s;}, setActionTab:(t)=>{ACTION_TAB=t;}, dueActions, futureActions, renderPipeline, renderActions, renderProber, renderLeads, renderAnalytics, renderExceptions, renderOverview, stageLabel, actionLabel, getLeads:()=>LEADS, completeAction, snoozeAction });');
   let bridge = null;
   api(dom.document, dom.window, fakeFetch, Date, { error(){}, warn(){}, log(){} }, encodeURIComponent, (b) => { bridge = b; });
   return { dom, bridge, fetchCalls, mutations, text: (id) => dom.stripTags(dom.document.getElementById(id).innerHTML || dom.document.getElementById(id).textContent) };
@@ -212,11 +215,13 @@ for(const view of ['overview','actions','pipeline','prober','leads','analytics',
     assert.equal(app.dom.document.getElementById('v-' + view).classList.contains('on'), true);
   });
 }
-check('the active sidebar item follows the view', () => {
-  app.bridge.go('pipeline');
-  const on = app.dom.NAV_ITEMS.filter((el) => el.classList.contains('on'));
-  assert.equal(on.length, 1);
-  assert.equal(on[0].dataset.view, 'pipeline');
+check('the active sidebar item is the destination the view belongs to', () => {
+  for(const [view, nav] of [['pipeline','leads'],['leads','leads'],['overview','dashboard'],['email-actions','email'],['exceptions','settings'],['actions','actions']]){
+    app.bridge.go(view);
+    const on = app.dom.NAV_ITEMS.filter((el) => el.classList.contains('on'));
+    assert.equal(on.length, 1, view);
+    assert.equal(on[0].dataset.nav, nav, view);
+  }
 });
 check('a direct hash opens that view on boot', () => {
   const direct = bootPage(payload);
@@ -227,7 +232,13 @@ check('a direct hash opens that view on boot', () => {
 check('navigating every view issues no write of any kind', () => {
   assert.deepEqual(app.mutations, []);
   const gets = app.fetchCalls.filter((c) => c.method === 'GET').map((c) => c.url);
-  assert.ok(gets.every((u) => u.includes('operator-dashboard') || u.includes('probe?queue=1')), gets.join('\n'));
+  // The Dashboard's campaigns and team cards are two read-only GETs.
+  assert.ok(gets.every((u) => u.includes('operator-dashboard') || u.includes('probe?queue=1')
+    || u.endsWith('novus_operation=campaigns-list') || u.endsWith('novus_operation=team-users')), gets.join('\n'));
+});
+check('the Dashboard reads campaigns and team at most once, not on every render', () => {
+  const extra = app.fetchCalls.filter((c) => /campaigns-list|team-users/.test(c.url));
+  assert.ok(extra.length <= 2, extra.map((c) => c.url).join('\n'));
 });
 
 console.log('\nActions — the manual queue only');
@@ -333,9 +344,9 @@ await (async () => {
     assert.ok(!html.includes('Henton Kirkman Residential'), 'a not-yet-due follow-up must not appear as work due today');
     assert.ok(!oooApp.bridge.dueActions().some((l) => l.agency_id === 'ag_reply'));
   });
-  check('it is visible in Upcoming instead', () => {
-    oooApp.bridge.go('future');
-    const html = oooApp.dom.document.getElementById('fu-list').innerHTML;
+  check('it is visible in Actions › Scheduled instead', () => {
+    oooApp.bridge.setActionTab('scheduled'); oooApp.bridge.go('actions');
+    const html = oooApp.dom.document.getElementById('ac-list').innerHTML;
     assert.ok(html.includes('Henton Kirkman Residential'), 'the follow-up must not be lost — it belongs in Upcoming');
     assert.ok(oooApp.bridge.futureActions().some((l) => l.agency_id === 'ag_reply'));
   });
@@ -363,11 +374,12 @@ check('a future-dated action is absent from the current Actions queue', () => {
   assert.ok(html.includes('Henton Kirkman Residential'), 'the due reply is still here');
   assert.ok(!html.includes('Period Homes Essex'), 'the future-dated call must not appear in Actions');
 });
-check('the same action appears in Future actions', () => {
-  split.bridge.go('future');
-  const html = split.dom.document.getElementById('fu-list').innerHTML;
+check('the same action appears in Actions › Scheduled', () => {
+  split.bridge.setActionTab('scheduled'); split.bridge.go('actions');
+  const html = split.dom.document.getElementById('ac-list').innerHTML;
   assert.ok(html.includes('Period Homes Essex'));
-  assert.ok(!html.includes('Henton Kirkman Residential'), 'due work must not be duplicated into Future');
+  assert.ok(!html.includes('Henton Kirkman Residential'), 'due work must not be duplicated into Scheduled');
+  split.bridge.setActionTab('all');
 });
 check('no manual action is lost or double counted across the two queues', () => {
   const all = split.bridge.manualActions().map((l) => l.agency_id).sort();
@@ -386,13 +398,17 @@ await check('an action with no schedule at all is treated as actionable now', ()
     assert.ok(!page.bridge.futureActions().some((l) => l.agency_id === 'ag_call'));
   });
 });
-check('the sidebar counts due work and scheduled work separately', () => {
+check('due work and scheduled work are counted separately', () => {
+  split.bridge.go('actions');
   assert.equal(split.dom.document.getElementById('b-actions').textContent, '1');
-  assert.equal(split.dom.document.getElementById('b-future').textContent, '1');
+  assert.match(split.dom.document.getElementById('ac-tabs').innerHTML, /Scheduled<span class="tab-n">1<\/span>/);
 });
-check('Future actions is visually calmer than the live queue', () => {
-  // The container carries the modifier the stylesheet quietens.
-  assert.ok(HTML.includes('class="tasks future" id="fu-list"'));
+check('Scheduled is visually calmer than the live queue', () => {
+  // The list carries the modifier the stylesheet quietens, only on that tab.
+  split.bridge.setActionTab('scheduled'); split.bridge.go('actions');
+  assert.ok(split.dom.document.getElementById('ac-list').classList.contains('future'));
+  split.bridge.setActionTab('all'); split.bridge.go('actions');
+  assert.ok(!split.dom.document.getElementById('ac-list').classList.contains('future'));
   assert.ok(CSS.includes('.tasks.future .task{opacity'));
 });
 

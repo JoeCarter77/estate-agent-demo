@@ -111,7 +111,7 @@ import {
 // external ~10-15 minute scheduler, not Vercel Cron (Hobby is daily-only) —
 // and carries its own second secret exactly like instantly-reply-poll below.
 import {
-  handleCampaignsList, handleCampaignDetail, handleCampaignAccounts, handleLeadTimeline,
+  handleCampaignsList, handleCampaignDetail, handleCampaignAccounts, handleLeadTimeline, handleCallingLeadProfile,
   handleCampaignSetup, handleCampaignAudience, handleCampaignCreate, handleCampaignDelete, handleCampaignUpdate, handleCampaignPush,
   handleCampaignLaunch, handleCampaignPause, handleCampaignResume, handleCampaignSync, handleCampaignSyncPoll, handleInstantlyWebhook,
   handleCampaignDiscover, handleCampaignLink, handleCampaignImportActivity, handleCampaignReconciliation,
@@ -2028,6 +2028,13 @@ export default async function handler(req, res) {
     // READ-ONLY: the ⌘K palette. Sheets reads only, cached index, no writer.
     if (!requireAuth(req, res)) return;
     return handleLeadSearch(req, res);
+  }
+  if (req.method === 'GET' && req.query?.novus_operation === 'calling-lead-profile') {
+    // READ-ONLY: the lead profile a setter may open from Leads / ⌘K — any
+    // agency, queue membership not required, commercial detail narrowed
+    // (lib/lead-timeline.mjs buildCallingProfile). Sheets reads only.
+    if (!requireAuth(req, res)) return;
+    return handleCallingLeadProfile(req, res);
   }
   if (req.method === 'GET' && req.query?.novus_operation === 'calling-inbound') {
     // READ-ONLY: the incoming-call overlay's view of one ringing/answered call.

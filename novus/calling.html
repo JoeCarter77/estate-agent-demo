@@ -19,12 +19,16 @@
   <!-- Same product, same stylesheet as the Command Centre and the Prober. -->
   <link rel="stylesheet" href="/novus/novus-ui.css" />
   <link rel="stylesheet" href="/novus/novus-shell.css" />
-  <!-- ROLE VIEW. A SETTER account (lib/novus-users.mjs) sees Calling Mode
-       only. This is presentation; the server refuses every admin operation
-       to a setter regardless (api/novus/personalisation.js, middleware.js). -->
+  <!-- ROLE VIEW. A SETTER account (lib/novus-users.mjs) gets the setter rail
+       (Calling, My Actions, Leads, Meetings, My Performance) and never the
+       admin one. This is presentation; the server refuses every admin
+       operation to a setter regardless (api/novus/personalisation.js,
+       middleware.js). -->
   <style>
-    .role-setter .nav a.nav-item, .role-setter .admin-only, .role-setter #setup-box,
-    .role-setter a[title*="profile" i], .role-setter #scr-new, .role-setter #obj-new,
+    .setter-nav { display:none; }
+    .role-setter .setter-nav { display:block; }
+    .role-setter .admin-nav, .role-setter .nav-admin, .role-setter .admin-only, .role-setter #setup-box,
+    .role-setter #scr-new, .role-setter #obj-new,
     .role-setter .obj-edit, .role-setter #v-scripts .btnrow { display:none !important; }
     .role-setter #v-scripts input, .role-setter #v-scripts textarea, .role-setter #v-scripts select { pointer-events:none; opacity:.85; }
     .who { font-size:12px; color:var(--muted, #8a8f98); margin-bottom:6px; }
@@ -70,77 +74,65 @@
 <body>
 <div class="app">
 
-  <!-- ── SIDEBAR — the same operator.html rail (source of truth: novus/operator.html),
-       with this workspace's own three tabs live as buttons and everything else a
-       link back to /novus/operator.html. Keep this block's items, order, groups,
-       labels and badge ids in lockstep with operator.html's <nav> — the parity
-       self-test in scripts/novus-calling-selftest.mjs asserts they match. ── -->
+  <!-- ── SIDEBAR — ONE canonical rail, identical in operator.html, calling.html,
+       campaigns.html and meetings.html (calling.html adds the setter group).
+       Every item is a plain link keyed by data-nav; each page highlights the
+       destination its current view belongs to. Keep the four copies in
+       lockstep — scripts/novus-sidebar-parity-selftest.mjs asserts it. ── -->
   <nav class="nav">
     <div class="nav-brand">
       <img class="nav-mark" src="/novus/assets/novus-mark-512.png" width="34" height="34" alt="NOVUS" />
       <div><div class="nav-name">NOVUS</div><div class="nav-sub">Acquisition</div></div>
     </div>
-
+    <div class="nav-scroll">
+    <div class="admin-nav">
     <div class="nav-group">
-      <a class="nav-item" href="/novus/operator.html#overview">
-        <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Overview</span></a>
-      <a class="nav-item" href="/novus/operator.html#actions">
-        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg>
-        <span>Actions</span><span class="nav-badge zero" id="b-actions">0</span></a>
-      <a class="nav-item" href="/novus/operator.html#future">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/></svg>
-        <span>Future</span><span class="nav-badge zero" id="b-future">0</span></a>
-      <a class="nav-item" href="/novus/operator.html#pipeline">
-        <svg viewBox="0 0 24 24"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg><span>Pipeline</span></a>
-      <a class="nav-item" href="/novus/operator.html#prober">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-        <span>Prober</span><span class="nav-badge zero" id="b-prober">0</span></a>
-      <a class="nav-item" href="/novus/operator.html#leads">
-        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg>
-        <span>Leads</span><span class="nav-badge zero" id="b-leads">0</span></a>
-      <a class="nav-item" href="/novus/operator.html#analytics">
-        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Analytics</span></a>
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item" data-nav="dashboard" href="/novus/operator.html#dashboard">
+        <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Dashboard</span></a>
+      <a class="nav-item" data-nav="actions" href="/novus/operator.html#actions">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>Actions</span><span class="nav-badge zero" id="b-actions">0</span></a>
+      <a class="nav-item" data-nav="leads" href="/novus/operator.html#leads">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg><span>Leads</span></a>
     </div>
-
     <div class="nav-group">
-      <div class="nav-label">Email</div>
-      <a class="nav-item" href="/novus/campaigns.html#campaigns">
-        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg><span>Campaigns</span></a>
-      <a class="nav-item" href="/novus/campaigns.html#new">
-        <svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span>New Campaign</span></a>
-      <a class="nav-item" href="/novus/operator.html#email-actions">
-        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/><path d="M15 16l2 2 4-4"/></svg><span>Email Actions</span><span class="nav-badge zero" id="b-email-actions">0</span></a>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">Calling</div>
-      <button class="nav-item" data-view="calling" type="button">
-        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span></button>
-      <button class="nav-item" data-view="call-actions" type="button">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.5"/><path d="M9 2h6"/></svg><span>Call Actions</span></button>
-      <button class="nav-item" data-view="scripts" type="button">
-        <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg><span>Scripts</span></button>
-      <button class="nav-item" data-view="calling-analytics" type="button">
-        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Calling Analytics</span></button>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-label">Meetings</div>
-      <a class="nav-item" href="/novus/meetings.html#meetings">
+      <div class="nav-label">Acquisition</div>
+      <a class="nav-item" data-nav="email" href="/novus/operator.html#email">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg><span>Email</span><span class="nav-badge zero" id="b-email-actions">0</span></a>
+      <a class="nav-item" data-nav="calling" href="/novus/calling.html#calling">
+        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span><span class="nav-badge zero" id="b-calls">0</span></a>
+      <a class="nav-item" data-nav="prober" href="/novus/operator.html#prober">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Prober</span><span class="nav-badge zero" id="b-prober">0</span></a>
+      <a class="nav-item" data-nav="meetings" href="/novus/meetings.html#meetings">
         <svg viewBox="0 0 24 24"><path d="M4 5h16v15H4z"/><path d="M4 10h16"/><path d="M9 3v4M15 3v4"/></svg><span>Meetings</span></a>
     </div>
-
     <div class="nav-group">
-      <div class="nav-label">System</div>
-      <a class="nav-item" href="/novus/operator.html#exceptions">
-        <svg viewBox="0 0 24 24"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
-        <span>Exceptions</span><span class="nav-badge zero" id="b-exceptions">0</span></a>
-      <a class="nav-item" href="/novus/communications.html">
-        <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 4l8 8 8-8"/></svg>
-        <span>Communications</span></a>
+      <div class="nav-label">Management</div>
+      <a class="nav-item" data-nav="analytics" href="/novus/operator.html#analytics">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Analytics</span></a>
+      <a class="nav-item" data-nav="team" href="/novus/calling.html#team">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><path d="M16 4.6a3.5 3.5 0 010 6.8"/><path d="M18.5 14.2A6.5 6.5 0 0121.5 20"/></svg><span>Team</span></a>
     </div>
-
-    <div class="nav-foot"><div class="nav-stamp" id="stamp"><span class="spin"></span>Loading</div></div>
+    </div>
+    <div class="nav-group setter-nav">
+      <div class="nav-label">Setter</div>
+      <a class="nav-item" data-nav="calling" href="/novus/calling.html#calling">
+        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span></a>
+      <a class="nav-item" data-nav="my-actions" href="/novus/calling.html#call-actions">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>My Actions</span><span class="nav-badge zero" id="b-calls-setter">0</span></a>
+      <a class="nav-item" data-nav="leads" href="/novus/calling.html#leads">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg><span>Leads</span></a>
+      <a class="nav-item" data-nav="meetings" href="/novus/calling.html#meetings">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v15H4z"/><path d="M4 10h16"/><path d="M9 3v4M15 3v4"/></svg><span>Meetings</span></a>
+      <a class="nav-item" data-nav="my-performance" href="/novus/calling.html#sessions">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>My Performance</span></a>
+    </div>
+    </div>
+    <div class="nav-foot">
+      <a class="nav-item nav-admin" data-nav="settings" href="/novus/operator.html#settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span>Settings</span><span class="nav-badge zero" id="b-exceptions">0</span></a>
+      <div class="nav-stamp" id="stamp"><span class="spin"></span>Loading</div>
+    </div>
   </nav>
 
   <main class="main">
@@ -163,6 +155,7 @@
       <div id="load-err" class="banner err hidden"></div>
       <div id="setup-box" class="banner warn hidden"></div>
       <div id="resume-box" class="resume-box hidden"></div>
+      <nav class="wstabs" id="ws-tabs" aria-label="Workspace"></nav>
 
       <!-- ══ CALLING ═══════════════════════════════════════════════════ -->
       <section class="view" id="v-calling">
@@ -221,9 +214,9 @@
       <section class="view" id="v-call-actions">
         <div class="page-head">
           <h1 class="page-title">Call actions</h1>
-          <p class="page-sub">Phone work only — callbacks you promised, no-answer retries and gatekept retries. The generic
-            <a href="/novus/operator.html#actions" style="color:var(--blue)">Actions</a> list is deliberately not this: information to
-            send and meetings to prepare live there.</p>
+          <p class="page-sub">Phone work only — callbacks you promised, requested calls, no-answer retries and gatekept retries,
+            from the shared action ledger. Information to send and meetings to prepare are not here<span class="admin-only hidden">: they are in
+            <a href="/novus/operator.html#actions" style="color:var(--blue)">Actions</a></span>.</p>
         </div>
         <div class="filters">
           <button class="btn btn-primary btn-sm" id="start-actions" type="button">
@@ -260,52 +253,20 @@
         </div>
       </section>
 
-      <!-- ══ CALLING ANALYTICS ═════════════════════════════════════════
-           Read model: ?novus_operation=calling-analytics (lib/calling-analytics.mjs).
-           Summary first, detail on click; the call explorer at the bottom is
-           where every drill-down lands. ══════════════════════════════════ -->
-      <section class="view" id="v-calling-analytics">
+      <!-- ══ SESSIONS ══════════════════════════════════════════════════
+           Your own calling sessions (the timer bar bottom-right runs them).
+           The perf-sec block below is shared with Team: showView() moves it
+           into whichever of the two views is open, so there is one renderer
+           and one set of ids. Setter: their own only (server-scoped). ══════ -->
+      <section class="view" id="v-sessions">
         <div class="page-head">
-          <h1 class="page-title">Calling analytics</h1>
-          <p class="page-sub">Where calls are lost, which objections come up, which scripts convert and when calling works —
-            counted from immutable call records. Rates are blank when there is nothing to divide by.</p>
+          <h1 class="page-title" id="sess-title">Sessions</h1>
+          <p class="page-sub">Start, pause, resume and end a session from the timer at the bottom-right of every Calling
+            screen; it survives a page refresh. Below: recorded time, dials, talk time, owner conversations and meetings
+            for each session.</p>
         </div>
-        <div class="an-filters" id="an-filters">
-          <div class="seg" id="an-range">
-            <button type="button" data-range="today">Today</button>
-            <button type="button" data-range="7d">7 days</button>
-            <button type="button" data-range="30d">30 days</button>
-            <button type="button" data-range="all" class="on">All time</button>
-            <button type="button" data-range="custom">Custom</button>
-          </div>
-          <span id="an-custom" class="hidden" style="display:inline-flex;gap:6px;align-items:center;">
-            <input class="input" type="date" id="an-from" /> <span class="muted">to</span> <input class="input" type="date" id="an-to" />
-            <button class="btn btn-secondary btn-sm" id="an-apply" type="button">Apply</button>
-          </span>
-          <select class="input" id="an-script"><option value="">All scripts</option></select>
-          <select class="input admin-only hidden" id="an-user" title="Whose calls"><option value="">Everyone</option></select>
-          <span class="an-range-note" id="an-note"></span>
-        </div>
-        <!-- TEAM & ACCESS — admin only (team-* operations). -->
-        <div class="section admin-only hidden" id="team-sec">
-          <div class="section-head"><div class="section-title">Team &amp; access</div>
-            <div class="section-note">Individual logins. Setters see Calling Mode only: the cold pool plus call actions from their own calls. Your own login is the environment credential and is not managed here.</div></div>
-          <div class="card"><div class="tablewrap"><table>
-            <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th class="num">Calls today</th><th class="num">Calls 7d</th>
-              <th class="num">Owner reached 7d</th><th class="num">Meetings 7d</th><th class="col-md">Last call</th><th></th></tr></thead>
-            <tbody id="team-rows"></tbody></table></div>
-            <div class="card-body">
-              <div id="team-otp-box" class="banner warn hidden"></div>
-              <div class="btnrow" style="gap:8px;align-items:center;flex-wrap:wrap">
-                <input class="input" id="team-name" placeholder="Display name, e.g. Louis" maxlength="60" />
-                <input class="input" id="team-username" placeholder="Username, e.g. louis" maxlength="32" autocomplete="off" />
-                <button class="btn btn-secondary btn-sm" id="team-create" type="button">Create setter account</button>
-                <span class="card-note">A one-time password is shown once; give it to them directly.</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <!-- SESSIONS & PERFORMANCE — admin: everyone; setter: himself only
+        <div id="perf-slot-sessions">
+        <!-- SESSIONS & PERFORMANCE — admin: everyone; setter: their own only
              (the server scopes call-performance to the caller). -->
         <div class="section" id="perf-sec">
           <div class="section-head"><div class="section-title" id="perf-title">Sessions &amp; performance</div>
@@ -324,6 +285,118 @@
             <span class="an-range-note" id="perf-note"></span>
           </div>
           <div id="perf-body"></div>
+        </div>
+        </div>
+      </section>
+
+      <!-- ══ TEAM (admin only) ═════════════════════════════════════════
+           Moved here from Calling analytics: accounts, roles, password
+           resets, and everyone's sessions with review, corrections and
+           timesheet approval. Same team-* and call-session-* operations. ══ -->
+      <section class="view" id="v-team">
+        <div class="page-head">
+          <h1 class="page-title">Team</h1>
+          <p class="page-sub">Individual logins and each person's calling performance. Recorded session time is shown
+            separately from approved time; corrections and approvals are audited.</p>
+        </div>
+        <!-- TEAM & ACCESS — admin only (team-* operations). -->
+        <div class="section admin-only hidden" id="team-sec" style="margin-top:0">
+          <div class="section-head"><div class="section-title">Members &amp; access</div>
+            <div class="section-note">Individual logins. Setters get Calling (the cold pool plus call actions from their own calls), lead search, the meetings they booked and their own performance — nothing administrative. Your own login is the environment credential and is not managed here.</div></div>
+          <div class="card"><div class="tablewrap"><table>
+            <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th class="num">Calls today</th><th class="num">Calls 7d</th>
+              <th class="num">Owner reached 7d</th><th class="num">Meetings 7d</th><th class="col-md">Last call</th><th></th></tr></thead>
+            <tbody id="team-rows"></tbody></table></div>
+            <div class="card-body">
+              <div id="team-otp-box" class="banner warn hidden"></div>
+              <div class="btnrow" style="gap:8px;align-items:center;flex-wrap:wrap">
+                <input class="input" id="team-name" placeholder="Display name, e.g. Louis" maxlength="60" />
+                <input class="input" id="team-username" placeholder="Username, e.g. louis" maxlength="32" autocomplete="off" />
+                <button class="btn btn-secondary btn-sm" id="team-create" type="button">Create setter account</button>
+                <span class="card-note">A one-time password is shown once; give it to them directly.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="perf-slot-team"></div>
+      </section>
+
+      <!-- ══ LEADS (setter) ═════════════════════════════════════════════
+           Search the whole agency database through the existing ⌘K lead
+           index (lead-search, already on the setter allowlist). A lead in
+           your calling scope opens in Calling Mode; any other lead shows its
+           summary read-only. No new permission, no new read. ══════════════ -->
+      <section class="view" id="v-leads">
+        <div class="page-head">
+          <h1 class="page-title">Leads</h1>
+          <p class="page-sub">Search every agency, contact, phone number or property — including agencies outside your
+            calling queue. Leads in your queue or call actions open in Calling Mode.</p>
+        </div>
+        <div class="filters">
+          <div class="searchbox" style="flex:1;max-width:560px">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+            <input class="input" id="sl-q" type="search" placeholder="Agency, contact, phone, email or property" autocomplete="off" spellcheck="false" />
+          </div>
+          <span class="card-note" id="sl-note"></span>
+        </div>
+        <div class="card"><div class="dash-list" id="sl-rows"><div class="dash-empty">Type at least two characters to search.</div></div></div>
+      </section>
+
+      <!-- ══ LEAD PROFILE (setter) ══════════════════════════════════════
+           Any agency, whether or not it is in this setter's queue:
+           calling-lead-profile (read-only, commercial detail narrowed) plus
+           the read-only email thread (operator-conversation). Nothing here
+           can send, edit or assign. ═══════════════════════════════════════ -->
+      <section class="view" id="v-lead">
+        <div class="mini" style="margin-bottom:10px"><a href="#leads" style="color:var(--ink-4)">&larr; Leads</a></div>
+        <div id="lp-body"></div>
+      </section>
+
+      <!-- ══ MEETINGS (setter) ══════════════════════════════════════════
+           Meetings you booked, from your own call records (calling-analytics,
+           already scoped to you). Discovery, diagnosis and proposals stay in
+           the admin Meetings workspace. ══════════════════════════════════ -->
+      <section class="view" id="v-meetings">
+        <div class="page-head">
+          <h1 class="page-title">Meetings</h1>
+          <p class="page-sub">Meetings you booked on a call. Book a meeting in Calling Mode with the <b>Booked meeting</b>
+            outcome; Joe runs the meeting itself.</p>
+        </div>
+        <div class="section" style="margin-top:0">
+          <div class="section-head"><div class="section-title">Upcoming</div><div class="section-note" id="sm-note"></div></div>
+          <div class="card"><div class="dash-list" id="sm-upcoming"></div></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div class="section-title">Past</div></div>
+          <div class="card"><div class="dash-list" id="sm-past"></div></div>
+        </div>
+      </section>
+
+      <!-- ══ CALLING ANALYTICS ═════════════════════════════════════════
+           Read model: ?novus_operation=calling-analytics (lib/calling-analytics.mjs).
+           Summary first, detail on click; the call explorer at the bottom is
+           where every drill-down lands. ══════════════════════════════════ -->
+      <section class="view" id="v-calling-analytics">
+        <div class="page-head">
+          <h1 class="page-title" id="an-title">Calling analytics</h1>
+          <p class="page-sub">Where calls are lost, which objections come up, which scripts convert and when calling works —
+            counted from immutable call records. Rates are blank when there is nothing to divide by.</p>
+        </div>
+        <div class="an-filters" id="an-filters">
+          <div class="seg" id="an-range">
+            <button type="button" data-range="today">Today</button>
+            <button type="button" data-range="7d">7 days</button>
+            <button type="button" data-range="30d">30 days</button>
+            <button type="button" data-range="all" class="on">All time</button>
+            <button type="button" data-range="custom">Custom</button>
+          </div>
+          <span id="an-custom" class="hidden" style="display:inline-flex;gap:6px;align-items:center;">
+            <input class="input" type="date" id="an-from" /> <span class="muted">to</span> <input class="input" type="date" id="an-to" />
+            <button class="btn btn-secondary btn-sm" id="an-apply" type="button">Apply</button>
+          </span>
+          <select class="input" id="an-script"><option value="">All scripts</option></select>
+          <select class="input admin-only hidden" id="an-user" title="Whose calls"><option value="">Everyone</option></select>
+          <span class="an-range-note" id="an-note"></span>
         </div>
         <div id="an-empty" class="hidden"></div>
         <div id="an-body">
@@ -526,7 +599,9 @@ No worries. When's usually the best time to catch them?`;
 
 /* ── helpers ────────────────────────────────────────────────────────── */
 /* The one lead profile (Command Centre drawer). New tab from Calling Mode so a live call is never interrupted. */
-const profileLink = (id) => `/novus/operator.html#leads?agency=${encodeURIComponent(id)}&pane=profile`;
+/* The admin opens the Command Centre drawer; a setter opens their calling
+   profile (calling-lead-profile) — the only profile their account may read. */
+const profileLink = (id) => IS_SETTER() ? `/novus/calling.html#lead?agency=${encodeURIComponent(id)}` : `/novus/operator.html#leads?agency=${encodeURIComponent(id)}&pane=profile`;
 function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function dash(v){ return (v==null||v==='')?'&mdash;':esc(v); }
 function pill(text, tone, bare){ return `<span class="pill ${tone||'t-grey'}${bare?' bare':''}">${esc(text)}</span>`; }
@@ -582,12 +657,12 @@ async function loadMe(){
   if(!ME) return;
   document.body.classList.toggle('role-setter', IS_SETTER());
   sessInit();
-  if(VIEW==='calling-analytics') loadPerf();
-  if(IS_SETTER()){
-    document.querySelectorAll('.nav .nav-group').forEach((g) => { if(!g.querySelector('.nav-item[data-view]')) g.style.display = 'none'; });
-    return;
-  }
-  document.querySelectorAll('.admin-only').forEach((el) => el.classList.remove('hidden'));
+  /* The rail, the workspace tabs and some views differ by role: re-route now
+     that the role is known. Admin opening a setter-only URL goes to the admin
+     equivalent; a setter opening #team gets their own sessions. */
+  if(!IS_SETTER()) document.querySelectorAll('.admin-only').forEach((el) => el.classList.remove('hidden'));
+  showView(VIEW, { push:false });
+  if(IS_SETTER()) return;
   loadTeam();
 }
 async function loadTeam(){
@@ -762,6 +837,140 @@ function showSessionSummary(s){
   $('sess-ovl').classList.remove('hidden');
 }
 
+/* ═══ SETTER · LEADS (lead-search) ══════════════════════════════════════
+   The same whole-database index as ⌘K. Opening a lead needs it to be in
+   this user's calling scope (the server scopes the workspace); anything else
+   is shown read-only, exactly as the search index returns it. */
+let SL_SEQ = 0, SL_TIMER = null;
+function searchSetterLeads(){
+  clearTimeout(SL_TIMER);
+  SL_TIMER = setTimeout(async () => {
+    const q = $('sl-q').value.trim(); const seq = ++SL_SEQ;
+    if(q.length < 2){ $('sl-note').textContent = ''; $('sl-rows').innerHTML = '<div class="dash-empty">Type at least two characters to search.</div>'; return; }
+    $('sl-note').innerHTML = '<span class="spin"></span> Searching';
+    try{
+      const r = await fetch(`${OP('lead-search')}&q=${encodeURIComponent(q)}&limit=25`, { headers:{ Accept:'application/json' } }); const d = await r.json();
+      if(seq!==SL_SEQ) return;
+      if(!r.ok || d.success===false) throw new Error(d.error || `Request failed (${r.status})`);
+      const rows = d.results || [];
+      $('sl-note').textContent = `${rows.length} result${rows.length===1?'':'s'}`;
+      $('sl-rows').innerHTML = rows.length ? rows.map((x) => { const inScope = Boolean(WS?.leads?.[x.agency_id]);
+        return `<div class="dash-row">
+          <span class="t">${esc(x.agency_name)}${x.location ? ` <span class="muted" style="font-weight:400">· ${esc(x.location)}</span>` : ''}</span>
+          <span class="s">${esc(x.contact_name || 'No named contact')}${x.contact_role ? ` (${esc(x.contact_role)})` : ''}${x.phone ? ` · <span class="mono">${esc(x.phone)}</span>` : ''}${x.pipeline_status ? ` · ${esc(String(x.pipeline_status).toLowerCase().replace(/_/g,' '))}` : ''}${x.attempts ? ` · ${x.attempts} call${x.attempts===1?'':'s'}` : ''}${x.last_call?.at ? ` · last call ${esc(ago(x.last_call.at))}${x.last_call.label ? ` (${esc(x.last_call.label)})` : ''}` : ''}</span>
+          <span class="r"><a class="btn btn-secondary btn-sm" href="#lead?agency=${encodeURIComponent(x.agency_id)}">Profile</a>${inScope ? ` <button class="btn btn-primary btn-sm" data-sl-open="${esc(x.agency_id)}" type="button">Open in Calling</button>` : ' <span class="muted">Not in your queue</span>'}</span></div>`; }).join('')
+        : '<div class="dash-empty">No agency, contact or property matches that.</div>';
+    }catch(err){ if(seq===SL_SEQ){ $('sl-note').textContent = ''; $('sl-rows').innerHTML = `<div class="dash-empty">Search unavailable: ${esc(err.message||'')}</div>`; } }
+  }, 220);
+}
+
+/* ═══ SETTER · LEAD PROFILE (calling-lead-profile) ═════════════════════════
+   Everything a caller needs about any agency. Protections first: opt-out,
+   do-not-call, agency suppression, live campaigns and other people's open
+   work are shown at the top — the server still enforces every one of them
+   when a call is started or saved. */
+let LP = { id:'', data:null, seq:0 };
+const OUTCOME_WORD = { NO_ANSWER:'No answer', GATEKEPT:'Gatekept', OWNER_UNAVAILABLE:'Owner unavailable', CALLBACK_REQUESTED:'Callback requested',
+  MORE_INFO_REQUESTED:'More info requested', NOT_INTERESTED:'Not interested', BOOKED_MEETING:'Booked meeting', WRONG_NUMBER:'Wrong number',
+  NOT_THE_DECISION_MAKER:'Not the decision-maker', DO_NOT_CALL:'Do not call', REFERRED_TO_EMAIL:'Referred to email' };
+const words = (v) => String(v||'').replace(/_/g,' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+async function loadLeadProfile(id){
+  const seq = ++LP.seq;
+  if(!id){ $('lp-body').innerHTML = '<div class="dash-empty">No agency selected.</div>'; return; }
+  if(LP.id!==id || !LP.data) $('lp-body').innerHTML = '<div class="dash-empty"><span class="spin"></span> Loading the lead profile</div>';
+  try{
+    const r = await fetch(`${OP('calling-lead-profile')}&agency_id=${encodeURIComponent(id)}`, { headers:{ Accept:'application/json' } }); const d = await r.json();
+    if(seq!==LP.seq) return;
+    if(!r.ok || d.success===false) throw new Error(d.error || `Request failed (${r.status})`);
+    LP = { id, data:d.lead, seq };
+    renderLeadProfile();
+  }catch(err){ if(seq===LP.seq) $('lp-body').innerHTML = `<div class="banner err">The lead profile could not load. ${esc(err.message||'')}</div>`; }
+}
+function renderLeadProfile(){
+  const L = LP.data; if(!L) return;
+  const I = L.identity || {}; const P = L.protections || {};
+  const inScope = Boolean(WS?.leads?.[L.agency_id]);
+  const card = (title, body, note='') => `<div class="section"><div class="section-head"><div class="section-title">${esc(title)}</div>${note?`<div class="section-note">${note}</div>`:''}</div><div class="card"><div class="card-body">${body}</div></div></div>`;
+  const kvs = (pairs) => `<dl class="kv">${pairs.filter(([, v]) => v).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>`;
+  const none = (t) => `<div class="muted" style="font-size:12.5px">${esc(t)}</div>`;
+  const warns = [];
+  if(P.do_not_call) warns.push('<b>Do not call.</b> A previous call recorded a do-not-call request.');
+  if(P.email_opted_out) warns.push('<b>Opted out of email.</b> Do not promise to email them.');
+  if(P.agency_suppression) warns.push(`<b>Agency suppressed:</b> ${esc(words(P.agency_suppression))}.`);
+  if((P.live_campaigns||[]).length) warns.push(`<b>In a live email campaign:</b> ${P.live_campaigns.map((c) => esc(c.name)).join(', ')}. Mention it rather than starting a separate pitch.`);
+  const others = (L.work?.open||[]).filter((a) => a.assigned_user_id && a.assigned_user_id!==ME?.user_id);
+  if(others.length) warns.push(`<b>${others.length} open ${others.length===1?'action is':'actions are'} assigned to someone else.</b> Check before calling.`);
+  const contacts = (L.contacts||[]).length ? (L.contacts||[]).map((c) => `<div style="margin-bottom:6px"><b>${esc(c.contact_name||'Unnamed contact')}</b>${c.contact_role?` <span class="muted">(${esc(c.contact_role)})</span>`:''}<div class="muted" style="font-size:12px">${[c.phone||c.mobile?`<span class="mono">${esc(c.phone||c.mobile)}</span>`:'', c.email?`<span class="mono">${esc(c.email)}</span>`:'', c.verification_status?esc(words(c.verification_status)):''].filter(Boolean).join(' · ')}</div></div>`).join('') : none('No separate contact records.');
+  const calls = L.calls || {};
+  const callRows = (calls.recent||[]).length ? `<div class="dash-list">${calls.recent.map((c) => `<div class="dash-row" style="padding:8px 0"><span class="t">${esc(OUTCOME_WORD[c.outcome] || words(c.outcome) || 'Not logged')}${c.inbound?' <span class="muted">(called back)</span>':''}</span><span class="s">${[esc(c.contact_name||''), c.owner_reached?'owner reached':c.gatekeeper_reached?'gatekeeper':'', c.script?esc(c.script):'', c.note?esc(c.note):''].filter(Boolean).join(' · ')}</span><span class="r">${esc(when(c.started_at))}</span></div>`).join('')}</div>` : none('Never called.');
+  const probe = (L.probes||[])[0];
+  const probeBody = probe ? kvs([['Property', esc(probe.property_street||probe.property_address||'')], ['Enquiry sent', esc(when(probe.probe_timestamp))], ['Status', esc(words(probe.probe_status))],
+      ['Human contact', esc(probe.assessment?.human_contact||'')], ['First response', probe.assessment?.response_hours?`${esc(probe.assessment.response_hours)}h`:''], ['Follow-ups', esc(probe.assessment?.follow_ups||'')],
+      ['Seller signal', esc(words(probe.assessment?.seller_recognition||''))], ['Grade', esc(probe.assessment?.grade||'')]])
+    + ((L.probes||[]).length>1 ? `<div class="muted" style="font-size:12px;margin-top:6px">${L.probes.length} probes on file; the latest is shown.</div>` : '') : none('No probe on file.');
+  const E = L.email || {};
+  const emailBody = kvs([['Campaign emails sent', String(E.emails_sent ?? 0)], ['Replies received', String(E.replies_received ?? 0)], ['Manual replies sent', String(E.manual_replies_sent ?? 0)],
+      ['Latest reply', E.latest_reply ? `${esc(when(E.latest_reply.received_at))}${E.latest_reply.classification?` · ${esc(words(E.latest_reply.classification))}`:''}` : '']])
+    + (E.latest_reply?.cleaned_reply_text ? `<div class="quote" style="margin-top:8px">${esc(E.latest_reply.cleaned_reply_text)}</div>` : '')
+    + ((L.campaigns||[]).length ? `<div style="margin-top:10px;font-size:12.5px">${L.campaigns.map((c) => `${esc(c.name)} <span class="muted">· ${esc(words(c.status))} · ${c.emails_sent_count} sent${c.interest_status?` · ${esc(words(c.interest_status))}`:''}</span>`).join('<br>')}</div>` : '')
+    + `<div class="btnrow" style="margin-top:10px"><button class="btn btn-quiet btn-sm" id="lp-conv" type="button">Show the email conversation</button></div><div id="lp-conv-body"></div>`;
+  const open = L.work?.open || [];
+  const workBody = open.length ? `<div class="dash-list">${open.map((a) => `<div class="dash-row" style="padding:8px 0"><span class="t">${esc(words(a.type))}${a.overdue?' <span style="color:var(--red)">overdue</span>':''}</span><span class="s">${esc(a.reason||'')}${a.assigned_user_id ? (a.assigned_user_id===ME?.user_id ? ' · assigned to you' : ' · assigned to someone else') : ''}</span><span class="r">${esc(when(a.due_at))}</span></div>`).join('')}</div>` : none('No outstanding actions.');
+  const meetings = (L.meetings||[]).length ? `<div class="dash-list">${L.meetings.map((m) => `<div class="dash-row" style="padding:8px 0"><span class="t">${m.meeting_at?esc(when(m.meeting_at)):'Not dated'}</span><span class="s">${[esc(m.contact_name||''), esc(words(m.status)), m.outcome?`outcome: ${esc(words(m.outcome))}`:''].filter(Boolean).join(' · ')}</span><span class="r">${m.follow_up_at?`follow-up ${esc(when(m.follow_up_at))}`:''}</span></div>`).join('')}</div>` : none('No meetings yet.');
+  const hist = (L.timeline||[]).slice().reverse().slice(0, 40);
+  const history = hist.length ? `<div class="dash-list">${hist.map((e) => `<div class="dash-row" style="padding:7px 0"><span class="t" style="font-weight:500">${esc(e.title)}</span><span class="s">${esc(e.detail||'')}</span><span class="r">${e.at?esc(when(e.at)):''}</span></div>`).join('')}</div>` : none('Nothing recorded yet.');
+  $('lp-body').innerHTML = `<div class="page-head" style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap">
+      <div><h1 class="page-title">${esc(L.agency_name)}</h1><p class="page-sub">${[esc(I.location||''), I.current_pipeline_status?esc(words(I.current_pipeline_status)):'', I.crm_name?`CRM: ${esc(I.crm_name)}`:'', I.live_listing_count?`${esc(I.live_listing_count)} live listings`:''].filter(Boolean).join(' · ')}</p>
+        ${L.next_step ? `<p class="page-sub">Next step: <b>${esc(L.next_step.what)}</b> ${esc(when(L.next_step.at))}</p>` : ''}</div>
+      <div class="btnrow">${inScope ? `<button class="btn btn-primary" data-sl-open="${esc(L.agency_id)}" type="button">Open in Calling</button>` : '<span class="muted" style="font-size:12.5px;max-width:260px">Not in your calling queue — read only.</span>'}</div></div>
+    ${warns.length ? `<div class="banner warn" style="margin-bottom:var(--s-5)"><div>${warns.join('<br>')}</div></div>` : ''}
+    <div class="an-grid">
+      <div>${card('Agency & contacts', kvs([['Main phone', I.main_phone?`<span class="mono">${esc(I.main_phone)}</span>`:''], ['Owner / MD', esc(I.owner_md||'')], ['Outreach contact', esc([I.outreach_contact?.outreach_contact_name, I.outreach_contact?.outreach_contact_email].filter(Boolean).join(' · '))],
+          ['Website', esc(I.website||I.domain||'')], ['Branches', esc(I.branch_count||'')]]) + contacts)}
+        ${card('Probe', probeBody)}
+        ${card('Meetings', meetings, 'Discovery notes and proposals stay with Joe.')}</div>
+      <div>${card('Calls', callRows, `${calls.attempts||0} attempt${calls.attempts===1?'':'s'} · ${calls.owner_conversations||0} owner conversation${calls.owner_conversations===1?'':'s'}${(calls.objections||[]).length?` · objections: ${calls.objections.map(esc).join(', ')}`:''}`)}
+        ${card('Outstanding actions', workBody)}
+        ${card('Email', emailBody)}</div>
+    </div>
+    ${card('History', history, 'Most recent first')}`;
+}
+async function loadLeadConversation(){
+  const L = LP.data; if(!L) return;
+  const box = $('lp-conv-body'); box.innerHTML = '<div class="note"><span class="spin"></span> Loading the conversation</div>';
+  const outbound = (L.timeline||[]).find((e) => e.outbound_id)?.outbound_id || '';
+  try{
+    const r = await fetch(`${CONVERSATION_URL}&${outbound ? `outbound_id=${encodeURIComponent(outbound)}` : `agency_id=${encodeURIComponent(L.agency_id)}`}`, { headers:{ Accept:'application/json' } }); const d = await r.json();
+    if(!r.ok || d.success===false) throw new Error(d.error || `Request failed (${r.status})`);
+    const msgs = d.conversation?.messages || [];
+    box.innerHTML = (d.instantly?.available===false ? '<div class="note">Live Instantly thread unavailable — stored messages only.</div>' : '')
+      + (msgs.length ? msgs.map((m) => `<div class="msg ${m.direction==='OUTBOUND'?'outbound':m.direction==='INBOUND'?'inbound':'unknown'}"><div class="msg-head"><span class="msg-who">${m.direction==='OUTBOUND'?'NOVUS':m.direction==='INBOUND'?esc(L.agency_name):'Unattributed'}</span><span class="msg-when">${esc(when(m.at))}</span></div>${m.subject?`<div class="msg-subject">${esc(m.subject)}</div>`:''}${m.body_text?`<div class="msg-body">${esc(m.body_text)}</div>`:''}</div>`).join('') : '<div class="note">No email messages on file.</div>')
+      + '<div class="note">Read only. Replies are sent by Joe from Email.</div>';
+  }catch(err){ box.innerHTML = `<div class="note">The conversation could not load: ${esc(err.message||'')}</div>`; }
+}
+
+/* ═══ SETTER · MEETINGS (own calling-analytics explorer) ═════════════════
+   BOOKED_MEETING outcomes from this user's own calls — the server scopes
+   calling-analytics to the caller, so this only ever lists their own. */
+let SM = null;
+async function loadSetterMeetings(){
+  if(!SM) $('sm-upcoming').innerHTML = '<div class="dash-empty"><span class="spin"></span> Loading</div>';
+  try{
+    const r = await fetch(`${ANALYTICS_URL}&range=all`, { headers:{ Accept:'application/json' } }); const d = await r.json();
+    if(!r.ok || d.success===false) throw new Error(d.error || `Request failed (${r.status})`);
+    SM = (d.explorer?.rows || []).filter((c) => c.outcome==='BOOKED_MEETING');
+  }catch(err){ $('sm-upcoming').innerHTML = `<div class="dash-empty">Meetings could not load: ${esc(err.message||'')}</div>`; $('sm-past').innerHTML = ''; return; }
+  const now = Date.now(); const at = (c) => Date.parse(c.meeting_at || '');
+  const upcoming = SM.filter((c) => at(c) >= now).sort((a, b) => at(a) - at(b));
+  const past = SM.filter((c) => !(at(c) >= now)).sort((a, b) => (at(b) || 0) - (at(a) || 0));
+  const row = (c) => `<div class="dash-row"><span class="t">${esc(c.agency_name || c.agency_id)}</span>
+    <span class="s">${esc(c.contact_name || 'No named contact')}${c.contact_role ? ` (${esc(c.contact_role)})` : ''} · booked ${esc(when(c.started_at))}${c.note ? ` · ${esc(c.note)}` : ''}</span>
+    <span class="r">${c.meeting_at ? esc(when(c.meeting_at)) : '<span class="muted">time not recorded</span>'}</span></div>`;
+  $('sm-note').textContent = `${SM.length} booked in total`;
+  $('sm-upcoming').innerHTML = upcoming.length ? upcoming.map(row).join('') : '<div class="dash-empty">No upcoming meetings booked yet.</div>';
+  $('sm-past').innerHTML = past.length ? past.map(row).join('') : '<div class="dash-empty">None yet.</div>';
+}
+
 /* ═══ SESSIONS & PERFORMANCE (call-performance / call-session-detail) ═══ */
 let PERF = null; const PERF_Q = { range:'this_week', from:'', to:'' };
 async function loadPerf(){
@@ -778,8 +987,12 @@ function renderPerf(){
   if(!PERF) return;
   const d = new Date(Date.parse(PERF.range.to) - 1);
   $('perf-note').textContent = `${new Date(PERF.range.from).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})} – ${d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}`;
-  $('perf-title').textContent = IS_SETTER() ? 'My sessions & performance' : 'Team sessions & performance';
-  const users = IS_SETTER() ? PERF.users : PERF.users.filter((u) => u.user.role!=='ADMIN' || u.summary.sessions || u.summary.dials);
+  /* Calling › Sessions is always your own; Team is everyone (admin only). */
+  const own = IS_SETTER() || VIEW!=='team';
+  $('perf-title').textContent = own ? 'My sessions & performance' : 'Team sessions & performance';
+  const users = IS_SETTER() ? PERF.users
+    : own ? PERF.users.filter((u) => u.user.user_id===ME?.user_id)
+    : PERF.users.filter((u) => u.user.role!=='ADMIN' || u.summary.sessions || u.summary.dials);
   $('perf-body').innerHTML = users.length ? users.map((u) => `<div class="perf-user">
     ${IS_SETTER() ? '' : `<div class="section-head"><div class="section-title">${esc(u.user.display_name)} ${pill(u.user.role, u.user.role==='SETTER'?'t-blue':'t-grey', true)}</div></div>`}
     ${metricsGrid(u.summary, PERF.definitions)}
@@ -872,18 +1085,64 @@ document.addEventListener('click', async (e) => {
 });
 
 /* ═══ ROUTING ═══════════════════════════════════════════════════════════ */
-const VIEWS = ['calling','call-actions','scripts','calling-analytics'];
-const VIEW_TITLE = { 'calling':'Calling', 'call-actions':'Call actions', 'scripts':'Scripts', 'calling-analytics':'Calling analytics' };
+/* NAVIGATION CLEANUP (Sept 2026). This page hosts four sidebar destinations:
+   Calling (queue, call actions, scripts, sessions), Analytics › Calling, Team
+   (admin) and — for a setter — My Actions, Leads, Meetings and My
+   Performance. Every hash that existed before still routes here unchanged
+   (#calling, #call-actions, #scripts, #calling-analytics). */
+const VIEWS = ['calling','call-actions','scripts','sessions','calling-analytics','team','leads','lead','meetings'];
+const VIEW_TITLE = { 'calling':'Calling', 'call-actions':'Call actions', 'scripts':'Scripts', 'sessions':'Sessions', 'calling-analytics':'Analytics · Calling',
+  'team':'Team', 'leads':'Leads', 'lead':'Lead profile', 'meetings':'Meetings' };
+const SETTER_TITLE = { 'calling':'Calling', 'call-actions':'My actions', 'scripts':'Scripts', 'sessions':'My performance', 'calling-analytics':'My call analytics',
+  'leads':'Leads', 'lead':'Lead profile', 'meetings':'Meetings' };
+const NAV_OF_ADMIN = { 'calling':'calling', 'call-actions':'calling', 'scripts':'calling', 'sessions':'calling', 'calling-analytics':'analytics', 'team':'team' };
+const NAV_OF_SETTER = { 'calling':'calling', 'scripts':'calling', 'call-actions':'my-actions', 'sessions':'my-performance', 'calling-analytics':'my-performance',
+  'leads':'leads', 'lead':'leads', 'meetings':'meetings' };
+/* Setter-only views; the admin has the full workspace for each. */
+const hashParam = (k) => new URLSearchParams(String(location.hash||'').split('?')[1]||'').get(k) || '';
+const ADMIN_EQUIVALENT = { 'leads':() => '/novus/operator.html#leads', 'meetings':() => '/novus/meetings.html#meetings',
+  'lead':() => `/novus/operator.html#leads?agency=${encodeURIComponent(hashParam('agency'))}&pane=profile` };
+function wsTabs(){
+  const tab = (href, label, on) => `<a class="wstab${on ? ' on' : ''}" href="${href}">${esc(label)}</a>`;
+  const CALLING = [['calling','Queue'],['call-actions','Call actions'],['scripts','Scripts'],['sessions','Sessions']];
+  if(IS_SETTER()){
+    if(['calling','scripts'].includes(VIEW)) return tab('#calling','Queue',VIEW==='calling') + tab('#scripts','Scripts',VIEW==='scripts');
+    if(['sessions','calling-analytics'].includes(VIEW)) return tab('#sessions','Sessions',VIEW==='sessions') + tab('#calling-analytics','Call analytics',VIEW==='calling-analytics');
+    return '';
+  }
+  if(CALLING.some(([v]) => v===VIEW)) return CALLING.map(([v, l]) => tab('#'+v, l, v===VIEW)).join('');
+  if(VIEW==='calling-analytics') return tab('/novus/operator.html#analytics','Overview',false) + tab('#calling-analytics','Calling',true);
+  return '';
+}
 function routeFromHash(){ const raw=String(location.hash||'').replace(/^#\/?/,'').split('?')[0].trim().toLowerCase(); return VIEWS.includes(raw)?raw:'calling'; }
 function showView(name, { push = true } = {}){
   VIEW = VIEWS.includes(name) ? name : 'calling';
+  /* Once the role is known: a setter never gets Team (their own sessions
+     instead); the admin opening a setter-only URL goes to the full workspace. */
+  if(IS_SETTER() && VIEW==='team'){ VIEW = 'sessions'; history.replaceState(null, '', '#sessions'); }
+  if(ME && !IS_SETTER() && ADMIN_EQUIVALENT[VIEW]){ location.replace(ADMIN_EQUIVALENT[VIEW]()); return; }
   VIEWS.forEach((v) => $('v-'+v).classList.toggle('on', v===VIEW));
-  document.querySelectorAll('.nav-item[data-view]').forEach((el) => el.classList.toggle('on', el.dataset.view===VIEW));
-  $('crumb').textContent = VIEW_TITLE[VIEW]; document.title = `NOVUS — ${VIEW_TITLE[VIEW]}`;
+  const navKey = (IS_SETTER() ? NAV_OF_SETTER : NAV_OF_ADMIN)[VIEW];
+  document.querySelectorAll('.nav-item[data-nav]').forEach((el) => { const on = el.dataset.nav===navKey; el.classList.toggle('on', on); el.setAttribute('aria-current', on ? 'page' : 'false'); });
+  /* One Sessions & performance block, shown in whichever view needs it. */
+  const slot = $(VIEW==='team' ? 'perf-slot-team' : 'perf-slot-sessions');
+  if($('perf-sec').parentNode!==slot) slot.appendChild($('perf-sec'));
+  $('ws-tabs').innerHTML = wsTabs();
+  const title = (IS_SETTER() ? SETTER_TITLE : VIEW_TITLE)[VIEW] || VIEW_TITLE[VIEW];
+  $('crumb').textContent = title; document.title = `NOVUS — ${title}`;
+  $('sess-title').textContent = IS_SETTER() ? 'My performance' : 'Sessions';
+  $('an-title').textContent = IS_SETTER() ? 'My call analytics' : 'Calling analytics';
   if(push && routeFromHash()!==VIEW) location.hash = '#'+VIEW;
   renderView();
 }
-function renderView(){ if(VIEW==='calling-analytics'){ loadAnalytics(false); if(ME) loadPerf(); return; } if(!LOADED) return; if(VIEW==='calling') renderCalling(); if(VIEW==='call-actions') renderCallActions(); if(VIEW==='scripts') renderScripts(); }
+function renderView(){
+  if(VIEW==='calling-analytics'){ loadAnalytics(false); return; }
+  if(VIEW==='sessions' || VIEW==='team'){ if(ME){ if(PERF) renderPerf(); loadPerf(); } return; }
+  if(VIEW==='leads'){ setTimeout(() => $('sl-q').focus(), 0); return; }
+  if(VIEW==='meetings'){ if(ME) loadSetterMeetings(); return; }
+  if(VIEW==='lead'){ if(ME) loadLeadProfile(hashParam('agency')); return; }
+  if(!LOADED) return; if(VIEW==='calling') renderCalling(); if(VIEW==='call-actions') renderCallActions(); if(VIEW==='scripts') renderScripts();
+}
 
 /* ═══ LOAD ══════════════════════════════════════════════════════════════ */
 let LOAD_PROMISE = null;
@@ -897,6 +1156,7 @@ async function loadWorkspace(force){
     const data = await res.json();
     if(!res.ok || data.success===false) throw new Error(data.error || `Request failed (${res.status})`);
     WS = data; LOADED = true;
+    ['b-calls','b-calls-setter'].forEach((id) => { const el = $(id), n = Number(data.counts?.call_actions_due) || 0; if(el){ el.textContent = String(n); el.classList.toggle('zero', !n); el.classList.toggle('hot', n > 0); } });
     if(SESS.loaded) sessLoad();
     renderSetup(); renderResume(); renderView();
     notifyDue(data.call_actions);
@@ -2133,6 +2393,14 @@ document.addEventListener('input', (e) => { if(VIEW==='calling-analytics' && e.t
 
 /* ═══ WIRING ════════════════════════════════════════════════════════════ */
 window.addEventListener('hashchange', () => showView(routeFromHash(), { push:false }));
+$('sl-q').addEventListener('input', searchSetterLeads);
+document.addEventListener('click', (e) => { if(e.target.id==='lp-conv') loadLeadConversation(); });
+document.addEventListener('click', (e) => {
+  const open = e.target.closest('[data-sl-open]'); if(!open) return;
+  if(busyForInbound()){ window.NovusVoice?.toast?.('On a call', 'That lead will open when this call is finished.'); return; }
+  if(CALL){ CALL=null; saveDraft(); }
+  startSession('all', open.dataset.slOpen);
+});
 $('refresh').addEventListener('click', () => { if(VIEW==='calling-analytics') loadAnalytics(true); else load(true); });
 $('start-all').addEventListener('click', () => startSession('all'));
 $('start-actions').addEventListener('click', () => startSession('actions'));
@@ -2145,7 +2413,6 @@ $('obj-new').addEventListener('click', () => { OBJ_NEW = true; OBJ_SEL = null; r
 
 document.addEventListener('click', async (e) => {
   const t = e.target;
-  const nav = t.closest('.nav-item[data-view]'); if(nav){ showView(nav.dataset.view); return; }
   if(t.id==='setup-btn'){ t.disabled = true; try{ await post(SETUP_URL, { confirm:'SETUP_CALLING_TABS' }); await load(true); }catch(err){ showErr(`Setup failed: ${err.message}`); t.disabled=false; } return; }
   if(t.id==='repair-btn'){ t.disabled = true; try{ const out = await post(REPAIR_URL, { confirm:'REPAIR_CALL_FOLLOWUPS' }); if(out.still_pending) showErr(`${out.still_pending} call(s) could still not be repaired — check the ACTIONS tab header.`); await load(true); }catch(err){ showErr(`Repair failed: ${err.message}`); t.disabled=false; } return; }
   if(t.id==='resume-btn'){ resumeDraft(); return; }
@@ -2331,6 +2598,7 @@ if(window.NovusVoice){
 if(window.NovusSearch){
   /* A search result opens the lead here, in Calling Mode, without a reload. */
   NovusSearch.navigate = (r) => {
+    if(IS_SETTER() && LOADED && !WS?.leads?.[r.agency_id]){ location.hash = `#lead?agency=${encodeURIComponent(r.agency_id)}`; return; }
     if(!LOADED || !WS?.leads?.[r.agency_id]){ location.href = `/novus/calling.html?lead=${encodeURIComponent(r.agency_id)}`; return; }
     if(busyForInbound()){ window.NovusVoice?.toast?.('On a call', `${r.agency_name} will not open until this call is finished.`); return; }
     if(CALL) { CALL=null; saveDraft(); }
@@ -2352,7 +2620,9 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
     INBOUND.timer = setTimeout(() => { if(INBOUND.pending && INBOUND.pending.call_id===inboundId){ INBOUND.pending=null; window.NovusVoice?.toast?.('Callback not connected', 'The caller was not re-connected in time and will have been offered voicemail.'); } }, 60000);
     return;
   }
-  load(false).then(() => { if(LOADED && WS?.leads?.[leadId]) startSession('all', leadId); else showErr('That lead is not in the calling workspace.'); });
+  // Outside the calling workspace: open the lead's profile instead (a setter's
+  // calling profile; the admin is sent on to the Command Centre drawer).
+  load(false).then(() => { if(LOADED && WS?.leads?.[leadId]) startSession('all', leadId); else location.hash = `#lead?agency=${encodeURIComponent(leadId)}`; });
 })();
 
 loadMe();

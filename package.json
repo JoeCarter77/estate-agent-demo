@@ -83,6 +83,7 @@
     "novus:founding-pilot-selftest": "node scripts/novus-founding-pilot-selftest.mjs",
     "novus:instantly-link": "node scripts/novus-instantly-link.mjs",
     "novus:sidebar-parity-selftest": "node scripts/novus-sidebar-parity-selftest.mjs",
+    "novus:setter-lead-profile-selftest": "node scripts/novus-setter-lead-profile-selftest.mjs",
     "novus:discovery-selftest": "node scripts/novus-discovery-selftest.mjs",
     "novus:team-access-selftest": "node scripts/novus-team-access-selftest.mjs",
     "novus:call-sessions-selftest": "node scripts/novus-call-sessions-selftest.mjs",
