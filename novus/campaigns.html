@@ -19,6 +19,10 @@
   <!-- Same product, same stylesheet as the Command Centre, the Prober and Calling. -->
   <link rel="stylesheet" href="/novus/novus-ui.css" />
   <link rel="stylesheet" href="/novus/novus-shell.css" />
+  <style>
+    #delete-draft-dialog{max-width:520px;width:calc(100% - 32px);padding:24px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink)}
+    #delete-draft-dialog::backdrop{background:rgba(0,0,0,.7)}
+  </style>
   <script src="/novus/novus-ui.js" defer></script>
   <script src="/novus/vendor/twilio-voice-sdk-2.18.5.min.js" defer></script>
   <script src="/novus/novus-search.js" defer></script>
@@ -322,6 +326,13 @@
       <section class="view" id="v-campaign">
         <div id="d-root"></div>
       </section>
+      <dialog id="delete-draft-dialog" aria-labelledby="delete-draft-title">
+        <h2 id="delete-draft-title">Delete draft campaign?</h2>
+        <p id="delete-draft-explanation"></p>
+        <p>Agencies, contacts, probes, suppression records and historical activity will remain. This cannot be undone.</p>
+        <div class="btnrow"><button class="btn btn-secondary" id="delete-draft-confirm" type="button">Delete Draft</button><button class="btn btn-quiet" id="delete-draft-cancel" type="button">Cancel</button></div>
+        <p id="delete-draft-error" role="alert" style="color:var(--red)"></p>
+      </dialog>
     </div>
   </main>
 </div>
@@ -639,6 +650,7 @@ function actionButtons(c){
   if(c.status === 'ACTIVE') b.push(`<button class="btn btn-secondary" data-gate="pause" type="button" ${canWrite ? '' : 'disabled'}>Pause</button>`);
   if(c.status === 'PAUSED') b.push(`<button class="btn btn-primary" data-gate="resume" type="button" ${canWrite ? '' : 'disabled'}>Resume…</button>`);
   if(c.instantly_campaign_id) b.push(`<button class="btn btn-quiet" id="d-sync" type="button" title="Reconcile this campaign with Instantly right now">Sync Now</button><button class="btn btn-quiet" id="d-live" type="button">Live status</button>`);
+  if(c.can_delete_draft) b.push('<button class="btn btn-quiet" id="d-delete" type="button">Delete Draft</button>');
   return b.join('');
 }
 function gateHtml(c){
@@ -949,6 +961,23 @@ async function syncCampaign(id){
     await loadList(true); if(VIEW === 'campaign' && DETAIL_ID) await loadDetail(DETAIL_ID, false);
   }catch(e){ notice(`<b>Sync failed.</b> ${esc(e.message)}`, 'err'); }
 }
+function confirmDeleteDraft(){
+  const c = DETAIL.campaign;
+  $('delete-draft-explanation').textContent = `Delete “${c.name}” from NOVUS, including its saved sequence, settings and ${DETAIL.members.length} draft audience member${DETAIL.members.length === 1 ? '' : 's'}? ${c.instantly_campaign_id ? `Linked Instantly campaign ${c.instantly_campaign_id} will not be deleted. If it still exists, NOVUS will refuse this action until you remove it in Instantly.` : 'There is no linked Instantly campaign.'}`;
+  $('delete-draft-error').textContent = '';
+  $('delete-draft-confirm').disabled = false;
+  $('delete-draft-dialog').showModal();
+}
+async function deleteDraft(){
+  const btn = $('delete-draft-confirm'); btn.disabled = true;
+  const id = DETAIL.campaign.campaign_id;
+  try{
+    await post(OP('campaign-delete'), { campaign_id:id, confirm:'DELETE_DRAFT_CAMPAIGN' });
+    $('delete-draft-dialog').close(); DETAIL = null; GATE = null; DETAIL_ID = ''; DETAIL_TAB = 'overview';
+    await loadList(true); showView('campaigns');
+    notice('<b>Draft deleted from NOVUS.</b> Campaign activity and prospect history were preserved. You can create a new campaign now.', 'info');
+  }catch(err){ $('delete-draft-error').textContent = err.message; btn.disabled = false; }
+}
 
 /* ═══ WIRING ════════════════════════════════════════════════════════════ */
 window.addEventListener('popstate', () => { const r = routeFromHash(); showView(r.view, { push:false, id:r.id, tab:r.tab }); });
@@ -966,6 +995,9 @@ document.addEventListener('click', async (e) => {
   if(e.target.id === 'imp-go'){ importCsv(false); return; }
   if(e.target.id === 'd-sync'){ syncCampaign(DETAIL.campaign.campaign_id); return; }
   if(e.target.id === 'd-live'){ loadDetail(DETAIL.campaign.campaign_id, true); return; }
+  if(e.target.id === 'd-delete'){ confirmDeleteDraft(); return; }
+  if(e.target.id === 'delete-draft-cancel'){ $('delete-draft-dialog').close(); return; }
+  if(e.target.id === 'delete-draft-confirm'){ deleteDraft(); return; }
   const act = e.target.closest('button.act'); if(act){ e.stopPropagation(); DETAIL_TAB = 'overview'; GATE = act.dataset.act; showView('campaign', { id: act.dataset.id }); return; }
   const gate = e.target.closest('[data-gate]'); if(gate){ GATE = gate.dataset.gate || null; renderDetail(); return; }
   if(e.target.id === 'g-go'){ runGate(e.target.dataset.go); return; }

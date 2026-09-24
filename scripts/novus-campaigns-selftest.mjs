@@ -41,6 +41,7 @@ function makeStore(initial) {
     async batchUpdate(data) { for (const { range, values } of data) await api.update(range, values); },
     async listTabs() { return Object.keys(store); },
     async addTab(tab) { store[tab] = []; },
+    async deleteRows(tab, rowNumbers) { for (const row of [...new Set(rowNumbers)].sort((a, b) => b - a)) store[tab].splice(row - 1, 1); },
   };
   return { store, repo: createRepo(api) };
 }
@@ -914,6 +915,92 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
 
   globalThis.fetch = realFetch;
   __setRepoForTests(null);
+}
+
+// ── draft deletion and recreation (no production campaign is touched) ─────
+{
+  const { store, repo } = makeStore(workbook());
+  __setRepoForTests(repo);
+  process.env.NOVUS_BASIC_AUTH_USER = 'novus'; process.env.NOVUS_BASIC_AUTH_PASS = 'testpass';
+  process.env.INSTANTLY_API_KEY = 'sk_test'; process.env.INSTANTLY_REPLY_API_KEY = 'sk_test';
+  const { default: handler } = await import('../api/novus/personalisation.js');
+  const basic = 'Basic ' + Buffer.from('novus:testpass').toString('base64');
+  const call = async (method, operation, body = {}, query = {}) => {
+    const res = { statusCode: 200, body: null, status(n) { this.statusCode = n; return this; }, json(v) { this.body = v; return this; }, setHeader() {}, end() { return this; } };
+    await handler({ method, query: { novus_operation: operation, ...query }, headers: { authorization: basic }, body }, res);
+    return res;
+  };
+  const create = () => call('POST', 'campaign-create', {
+    confirm: 'CREATE_CAMPAIGN', confirm_recipient_count: 1, name: 'Delete workflow', campaign_type: 'ENQUIRY_FOLLOWUP',
+    sequence: { steps: [{ subject: 'Hello', body: 'Approved body' }] }, sending: { email_list: ['sender@example.test'] }, filters: { agency_ids: ['ag_1'] },
+  });
+  const setCell = (tab, row, field, value) => { store[tab][row][store[tab][0].indexOf(field)] = value; };
+  let result = await create(); assert.equal(result.statusCode, 200, JSON.stringify(result.body));
+  const firstId = result.body.campaign_id;
+  result = await call('POST', 'campaign-delete', { campaign_id: firstId });
+  assert.equal(result.statusCode, 400, 'deletion requires its own confirmation token');
+  setCell('CAMPAIGNS', 2, 'instantly_campaign_id', 'ic_draft');
+  const realFetch = globalThis.fetch;
+  let providerExists = true;
+  let providerHasEmail = false;
+  let historyUnavailable = false;
+  globalThis.fetch = async (url, init) => {
+    assert.equal(init.method, 'GET', 'draft deletion only reads Instantly');
+    if (String(url).includes('/campaigns/ic_draft')) return new Response(providerExists ? JSON.stringify({ id: 'ic_draft', status: 0 }) : JSON.stringify({ message: 'not found' }), { status: providerExists ? 200 : 404 });
+    assert.match(String(url), /\/emails\?/);
+    assert.match(String(url), /campaign_id=ic_draft/);
+    if (historyUnavailable) return new Response(JSON.stringify({ message: 'history unavailable' }), { status: 403 });
+    return new Response(JSON.stringify({ items: providerHasEmail ? [{ id: 'em_1', ue_type: 1 }] : [], next_starting_after: null }), { status: 200 });
+  };
+  try {
+    result = await call('POST', 'campaign-delete', { campaign_id: firstId, confirm: 'DELETE_DRAFT_CAMPAIGN' });
+    assert.equal(result.statusCode, 409); assert.match(result.body.error, /still exists/);
+    assert.equal(store.CAMPAIGNS.length, 3); assert.equal(store.CAMPAIGN_MEMBERS.length, 3);
+    ok('a linked Instantly draft that still exists blocks NOVUS deletion without touching provider or workbook');
+
+    providerExists = false;
+    providerHasEmail = true;
+    result = await call('POST', 'campaign-delete', { campaign_id: firstId, confirm: 'DELETE_DRAFT_CAMPAIGN' });
+    assert.equal(result.statusCode, 409); assert.match(result.body.error, /email history/);
+    assert.equal(store.CAMPAIGNS.length, 3);
+    providerHasEmail = false;
+    historyUnavailable = true;
+    result = await call('POST', 'campaign-delete', { campaign_id: firstId, confirm: 'DELETE_DRAFT_CAMPAIGN' });
+    assert.equal(result.statusCode, 502); assert.equal(store.CAMPAIGNS.length, 3);
+    historyUnavailable = false;
+    const otherTablesBefore = Object.fromEntries(['AGENCIES', 'CONTACTS', 'PROBES', 'REPLY_EVENTS', 'OUTBOUND'].map((tab) => [tab, structuredClone(store[tab])]));
+    const eventsBefore = structuredClone(store.CAMPAIGN_EVENTS);
+    result = await call('POST', 'campaign-delete', { campaign_id: firstId, confirm: 'DELETE_DRAFT_CAMPAIGN' });
+    assert.equal(result.statusCode, 200, JSON.stringify(result.body)); assert.equal(result.body.members_deleted, 1);
+    assert.equal(store.CAMPAIGNS.length, 2); assert.equal(store.CAMPAIGN_MEMBERS.length, 2);
+    assert.deepEqual(store.CAMPAIGN_EVENTS, eventsBefore, 'campaign event history remains');
+    for (const [tab, before] of Object.entries(otherTablesBefore)) assert.deepEqual(store[tab], before, `${tab} remains untouched`);
+    ok('externally deleted Instantly draft allows NOVUS deletion; prospect, suppression and event history remain');
+
+    result = await create(); assert.equal(result.statusCode, 200, JSON.stringify(result.body));
+    const secondId = result.body.campaign_id; assert.notEqual(secondId, firstId);
+    assert.equal(result.body.summary.READY, 1, 'retained draft activity does not disqualify the same lead');
+    ok('the same campaign can be recreated with a fresh ID and the same eligible audience');
+
+    setCell('CAMPAIGN_MEMBERS', 2, 'emails_sent_count', '1');
+    let detail = await call('GET', 'campaign-detail', {}, { campaign_id: secondId });
+    assert.equal(detail.body.campaign.can_delete_draft, false, 'the UI hides Delete Draft when send history is present');
+    result = await call('POST', 'campaign-delete', { campaign_id: secondId, confirm: 'DELETE_DRAFT_CAMPAIGN' });
+    assert.equal(result.statusCode, 409); assert.equal(store.CAMPAIGNS.length, 3);
+    setCell('CAMPAIGN_MEMBERS', 2, 'emails_sent_count', '0');
+    setCell('CAMPAIGN_MEMBERS', 2, 'unsubscribed_at', iso(T0));
+    result = await call('POST', 'campaign-delete', { campaign_id: secondId, confirm: 'DELETE_DRAFT_CAMPAIGN' });
+    assert.equal(result.statusCode, 409, 'suppression data in a member snapshot must not be deleted');
+    setCell('CAMPAIGN_MEMBERS', 2, 'unsubscribed_at', '');
+    setCell('CAMPAIGNS', 2, 'analytics_json', JSON.stringify({ emails_sent_count: 1 }));
+    result = await call('POST', 'campaign-delete', { campaign_id: secondId, confirm: 'DELETE_DRAFT_CAMPAIGN' });
+    assert.equal(result.statusCode, 409);
+    setCell('CAMPAIGNS', 2, 'analytics_json', '');
+    store.CAMPAIGN_EVENTS.push(CAMPAIGN_EVENTS_HEADER.map((field) => field === 'event_id' ? 'cev_sent' : field === 'campaign_id' ? secondId : field === 'event_type' ? 'EMAIL_SENT' : ''));
+    result = await call('POST', 'campaign-delete', { campaign_id: secondId, confirm: 'DELETE_DRAFT_CAMPAIGN' });
+    assert.equal(result.statusCode, 409);
+    ok('member, analytics and ledger send evidence, plus suppression history, block deletion even when the label still says Draft');
+  } finally { globalThis.fetch = realFetch; __setRepoForTests(null); }
 }
 
 console.log(`\n✅ novus-campaigns-selftest: ${passed} checks passed`);

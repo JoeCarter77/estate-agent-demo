@@ -105,7 +105,7 @@ import {
 // and carries its own second secret exactly like instantly-reply-poll below.
 import {
   handleCampaignsList, handleCampaignDetail, handleCampaignAccounts, handleLeadTimeline,
-  handleCampaignSetup, handleCampaignAudience, handleCampaignCreate, handleCampaignUpdate, handleCampaignPush,
+  handleCampaignSetup, handleCampaignAudience, handleCampaignCreate, handleCampaignDelete, handleCampaignUpdate, handleCampaignPush,
   handleCampaignLaunch, handleCampaignPause, handleCampaignResume, handleCampaignSync, handleCampaignSyncPoll, handleInstantlyWebhook,
   handleCampaignDiscover, handleCampaignLink, handleCampaignImportActivity, handleCampaignReconciliation,
 } from '../../lib/campaign-handlers.mjs';
@@ -1772,6 +1772,7 @@ export default async function handler(req, res) {
     'campaign-audience': handleCampaignAudience, // POST because filters are structured; writes nothing
     'campaign-setup': handleCampaignSetup,
     'campaign-create': handleCampaignCreate,
+    'campaign-delete': handleCampaignDelete,
     'campaign-update': handleCampaignUpdate,
     'campaign-push': handleCampaignPush,
     'campaign-launch': handleCampaignLaunch,
