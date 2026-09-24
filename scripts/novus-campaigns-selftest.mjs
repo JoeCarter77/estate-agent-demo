@@ -241,11 +241,11 @@ const tablesOf = (store) => Object.fromEntries(Object.entries(store).map(([tab, 
   assert.equal(seq.errors.length, 0);
   const payload = buildInstantlyCampaignPayload({ name: 'Test', sequence: seq.sequence, schedule: { name: 'S', from: '09:00', to: '17:00', timezone: 'Europe/Isle_of_Man', days: { 0: false, 1: true, 2: true, 3: true, 4: true, 5: true, 6: false } }, sending: { email_list: ['joe@novushq.co.uk'], daily_limit: 40, stop_on_reply: true, stop_on_auto_reply: false, open_tracking: true, link_tracking: false, text_only: false, daily_max_leads: 0 } });
   assert.deepEqual(payload.sequences[0].steps.map((s) => s.delay), [3, 4, 0], 'NOVUS "wait before this step" becomes Instantly "wait before next step"');
-  assert.equal(payload.sequences[0].steps[0].variants[0].body, 'Line 1<br/>Line 2');
+  assert.equal(payload.sequences[0].steps[0].variants[0].body, '<div>Line 1</div><div>Line 2</div>');
   assert.equal(payload.campaign_schedule.schedules[0].days['1'], true);
   assert.equal(payload.email_list[0], 'joe@novushq.co.uk'); assert.equal(payload.daily_limit, 40); assert.equal(payload.daily_max_leads, undefined);
   assert.ok(normaliseSequence({ steps: [{ subject: 'x', body: '' }] }).errors.length);
-  ok('Instantly campaign payload: delays shift by one, newlines become <br/>, schedule/sending map to the documented fields');
+  ok('Instantly campaign payload: delays shift by one, bodies use HTML blocks, schedule/sending map to the documented fields');
 }
 
 // ── 4. handlers end to end ─────────────────────────────────────────────────

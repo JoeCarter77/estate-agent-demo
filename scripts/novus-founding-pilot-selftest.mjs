@@ -131,8 +131,16 @@ check('Instantly payload round-trips and the draft check rejects drift', () => {
   const payloadA = buildInstantlyCampaignPayload({ name: FOUNDING_OUTCOME_NAME, sequence: FOUNDING_OUTCOME_SEQUENCE, schedule: DEFAULT_SCHEDULE, sending: DEFAULT_SENDING });
   // Instantly re-wrapping the same words in its own HTML is still the approved copy…
   const rewrap = (p, fn) => ({ ...p, status: 0, sequences: [{ steps: p.sequences[0].steps.map((s) => ({ ...s, variants: s.variants.map((v) => ({ ...v, body: fn(v.body) })) })) }] });
-  const html = (b) => b.split('<br/>').map((line) => `<div>${line.replace(/£/g, '&pound;').replace(/'/g, '&#39;') || '<br>'}</div>`).join('');
+  const html = (b) => b.replace(/£/g, '&pound;').replace(/'/g, '&#39;').replace(/<br>/g, '<br/>');
   assert.equal(isMatchingInstantlyPresetCampaign(CAMPAIGN_PRESETS[FOUNDING_OUTCOME_TYPE], rewrap(payloadA, html)), true, 'Instantly markup');
+  assert.deepEqual(instantlyConfigurationDifferences(payloadA, rewrap(payloadA, html)), [], 'entity and line-break representation');
+  assert.deepEqual(instantlyConfigurationDifferences(payloadA, rewrap(payloadA, (b) => `${html(b)}<div><br></div><div><br></div>`)), [], 'trailing empty blocks on the repaired A1 draft');
+  const erased = rewrap(payloadA, () => '<div><br></div>'.repeat(10));
+  assert.deepEqual(instantlyConfigurationDifferences(payloadA, erased), ['step 1 body 1', 'step 2 body 1', 'step 3 body 1'], 'live A1 empty-body regression');
+  const changed = (step, body) => rewrap(payloadA, (value) => value === payloadA.sequences[0].steps[step].variants[0].body ? body : value);
+  assert.ok(instantlyConfigurationDifferences(payloadA, changed(2, payloadA.sequences[0].steps[2].variants[0].body.replace('£250', '£500'))).includes('step 3 body 1'));
+  assert.ok(instantlyConfigurationDifferences(payloadA, changed(0, payloadA.sequences[0].steps[0].variants[0].body.replace('{{agency}}', '{{company}}'))).includes('step 1 body 1'));
+  assert.ok(instantlyConfigurationDifferences(payloadA, changed(1, payloadA.sequences[0].steps[1].variants[0].body.replace(/<div>More valuations.*?<\/div>/, ''))).includes('step 2 body 1'));
   // …but a changed word is not.
   assert.equal(isMatchingInstantlyPresetCampaign(CAMPAIGN_PRESETS[FOUNDING_OUTCOME_TYPE], rewrap(payloadA, (b) => b.replace('£250', '£500'))), false, 'edited copy');
   assert.equal(isMatchingInstantlyPresetCampaign(CAMPAIGN_PRESETS[FOUNDING_PROBE_TYPE], { ...payloadA, status: 0 }), false, 'A1 copy under the B check');
