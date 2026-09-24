@@ -39,7 +39,7 @@
 
 import { getRepo } from '../lib/sheets.mjs';
 import { loadDemoFacts } from '../lib/demo-facts.mjs';
-import { requireAuth } from './novus/_auth.mjs';
+import { resolveCaller, sendUnauthorized } from './novus/_auth.mjs';
 import { compileDemoForProbe, compileDemos, isPersonalised } from '../lib/demo-compile.mjs';
 import {
   DEMOS_TAB, DEMOS_HEADER,
@@ -347,7 +347,11 @@ export default async function handler(req, res) {
 
       // Everything past this line writes demo CONTENT, so it needs the same
       // credential as the rest of NOVUS.
-      if (!requireAuth(req, res)) return undefined;
+      // Outside middleware.js's matcher: resolve the caller in full (session
+      // record checked, not just its signature). Admin only.
+      const caller = await resolveCaller(req);
+      if (!caller) return sendUnauthorized(req, res);
+      if (caller.role !== 'ADMIN') return res.status(403).json({ error: 'Not available to your account' });
       if (action === 'build') return await handleBuild(body, res);
       if (action === 'audit') return await handleAudit(body, res);
       if (action === 'archive') return await handleArchive(body, res, true);

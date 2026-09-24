@@ -12,7 +12,7 @@ import { getProbeData } from '../lib/probes.mjs';
 import { buildProbeLine } from '../lib/probeCopy.mjs';
 import { getRepo } from '../lib/sheets.mjs';
 import { resolvePropertyStreet } from '../lib/property-reference.mjs';
-import { requireAuth } from './novus/_auth.mjs';
+import { resolveCaller, sendUnauthorized } from './novus/_auth.mjs';
 
 const text = (value) => String(value ?? '').trim();
 const upper = (value) => text(value).toUpperCase();
@@ -76,7 +76,11 @@ export default async function handler(req, res) {
   const agencyId = text(req.query.agency_id);
   if (callContext || agencyId) {
     if (!callContext || !agencyId) return res.status(400).json({ error: 'call_context=1 requires agency_id' });
-    if (!requireAuth(req, res)) return;
+    // Outside middleware.js's matcher, so the caller is resolved in full
+    // here: a login session (server-side record + USERS row) or the admin
+    // machine credential. Read-only calling data for the lead being called,
+    // so a SETTER may read it too (Calling Mode's context panel).
+    if (!(await resolveCaller(req))) return sendUnauthorized(req, res);
     try {
       return res.status(200).json({ call_context: await getCallingContext(agencyId) });
     } catch (err) {

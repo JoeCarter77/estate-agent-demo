@@ -203,6 +203,22 @@ assert.deepEqual(store.CALLS.find((row) => row[0] === 'cal_legacy'), legacyCall)
 assert.deepEqual(store.ACTIONS.slice(2, 4), legacyActions);
 ok(`Louis is refused ${FORBIDDEN.length} admin operations and the other NOVUS functions server-side, writes nothing, and cannot touch Joe's history`);
 
+// ── 5b. endpoints outside middleware.js (/api/lead, /api/demo) ─────────────
+{
+  const { default: leadHandler } = await import('../api/lead.js');
+  const { default: demoHandler } = await import('../api/demo.js');
+  const hit = async (h, method, query, cookie, extra = {}) => { const rr = response(); await h({ method, query, headers: { host: HOST, 'sec-fetch-mode': 'cors', ...(cookie ? { cookie } : {}), ...extra }, body: method === 'POST' ? { action: 'build' } : undefined }, rr); return rr; };
+  let rr = await hit(leadHandler, 'GET', { call_context: '1', agency_id: 'ag_cold' }, LOUIS);
+  assert.notEqual(rr.statusCode, 401, 'Calling Mode\'s context panel works for Louis');
+  rr = await hit(leadHandler, 'GET', { call_context: '1', agency_id: 'ag_cold' }, '');
+  assert.equal(rr.statusCode, 401);
+  rr = await hit(demoHandler, 'POST', {}, LOUIS, { origin: `https://${HOST}` });
+  assert.equal(rr.statusCode, 403, 'demo build is admin-only');
+  rr = await hit(demoHandler, 'POST', {}, '', { authorization: ADMIN_BASIC });
+  assert.notEqual(rr.statusCode, 401, 'demo build scripts keep the admin machine credential');
+  ok('/api/lead call context (admin + setter) and /api/demo build (admin) resolve the caller in full');
+}
+
 // ── 6. logout ──────────────────────────────────────────────────────────────
 r = await login('louis', louisPass);
 const SECOND = r.cookie;
@@ -212,6 +228,11 @@ res = await request('GET', 'whoami', { cookie: SECOND });
 assert.equal(res.statusCode, 401, 'the old cookie value cannot be replayed after sign-out');
 res = await request('GET', 'whoami', { cookie: LOUIS });
 assert.equal(res.statusCode, 200, 'signing out one device leaves the other signed in');
+{
+  const { default: leadHandler } = await import('../api/lead.js');
+  const rr = response(); await leadHandler({ method: 'GET', query: { call_context: '1', agency_id: 'ag_cold' }, headers: { host: HOST, 'sec-fetch-mode': 'cors', cookie: SECOND } }, rr);
+  assert.equal(rr.statusCode, 401, 'a signed-out cookie is refused outside middleware too');
+}
 ok('sign-out deletes the server-side session: replaying the cookie fails');
 
 // ── 7. expiry ──────────────────────────────────────────────────────────────
