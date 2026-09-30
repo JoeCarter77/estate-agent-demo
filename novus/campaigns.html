@@ -970,7 +970,7 @@ function renderAddLeads(){
   $('al-list').innerHTML = AL.rows.length ? `<table><thead><tr><th></th><th>Agency</th><th>Contact</th><th>Email</th><th>Eligibility</th></tr></thead><tbody>${rows.map((r) => `<tr>
     <td><input type="checkbox" data-al="${esc(r.agency_id)}" ${AL.picked.has(r.agency_id) ? 'checked' : ''} ${r.eligibility_status === 'BLOCKED' ? 'disabled' : ''} /></td>
     <td>${esc(r.agency_name)}<div class="t-sub">${esc(r.location)}</div></td><td>${dash(r.contact_name)}</td><td><span class="mono">${esc(r.email)}</span></td>
-    <td>${pill(r.eligibility_status.toLowerCase(), ELIG_CLASS[r.eligibility_status])}${r.eligibility_status !== 'READY' ? `<div class="reasons">${esc(r.reasons.filter((x) => AL.labels[x]).map((x) => AL.labels[x]).join(' · '))}</div>` : ''}</td></tr>`).join('')}</tbody></table>` : emptyState('No eligible leads', 'Every eligible NOVUS lead is already in this campaign or blocked.');
+    <td>${pill(r.eligibility_status.toLowerCase(), ELIG_CLASS[r.eligibility_status])}<div class="reasons">${esc(r.reason_text || '')}</div>${r.info_text ? `<div class="t-sub">${esc(r.info_text)}</div>` : ''}</td></tr>`).join('')}</tbody></table>` : emptyState('No eligible leads', 'Every eligible NOVUS lead is already in this campaign or blocked.');
   renderAlCount();
 }
 function renderAlCount(){ $('al-count').textContent = `${AL.picked.size} selected · ${AL.rows.filter((r) => r.eligibility_status === 'READY').length} ready · ${AL.rows.filter((r) => r.eligibility_status === 'WARNING').length} warning`; $('al-go').disabled = !AL.picked.size; }
