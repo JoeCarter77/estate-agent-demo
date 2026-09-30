@@ -22,6 +22,10 @@
   <style>
     #delete-draft-dialog{max-width:520px;width:calc(100% - 32px);padding:24px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink)}
     #delete-draft-dialog::backdrop{background:rgba(0,0,0,.7)}
+    #add-leads-dialog{max-width:860px;width:calc(100% - 32px);max-height:calc(100vh - 64px);padding:20px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink)}
+    #add-leads-dialog::backdrop{background:rgba(0,0,0,.7)}
+    #al-list{max-height:52vh;overflow:auto;margin:12px 0}
+    #al-list td,#al-list th{padding:6px 8px}
   </style>
   <script src="/novus/novus-ui.js" defer></script>
   <script src="/novus/vendor/twilio-voice-sdk-2.18.5.min.js" defer></script>
@@ -309,6 +313,14 @@
         <p>Agencies, contacts, probes, suppression records and historical activity will remain. This cannot be undone.</p>
         <div class="btnrow"><button class="btn btn-secondary" id="delete-draft-confirm" type="button">Delete Draft</button><button class="btn btn-quiet" id="delete-draft-cancel" type="button">Cancel</button></div>
         <p id="delete-draft-error" role="alert" style="color:var(--red)"></p>
+      </dialog>
+      <dialog id="add-leads-dialog" aria-labelledby="add-leads-title">
+        <h2 id="add-leads-title">Add leads to campaign</h2>
+        <p class="small-note" id="al-sub"></p>
+        <div class="btnrow"><input class="input" id="al-search" type="search" placeholder="Filter by agency, contact or email" style="flex:1;min-width:180px" /><button class="btn btn-quiet btn-sm" id="al-all" type="button">Select all eligible</button><button class="btn btn-quiet btn-sm" id="al-none" type="button">Clear</button></div>
+        <div id="al-list"><div class="note">Loading eligible leads…</div></div>
+        <div class="btnrow"><button class="btn btn-primary" id="al-go" type="button" disabled>Add selected to campaign</button><button class="btn btn-quiet" id="al-cancel" type="button">Close</button><span class="hint" id="al-count"></span></div>
+        <p id="al-result" role="status"></p>
       </dialog>
     </div>
   </main>
@@ -717,7 +729,8 @@ function paneHtml(c){
     const members = DETAIL.members.filter((x) => !MEMBER_FILTER || x.eligibility_status === MEMBER_FILTER || x.member_status === MEMBER_FILTER);
     const chips = [['', 'All', DETAIL.members.length], ['READY','Ready',m.ready], ['WARNING','Warning',m.warning], ['BLOCKED','Blocked',m.blocked], ['PUSHED','In Instantly',m.pushed], ['PUSH_FAILED','Failed',m.push_failed]];
     return `<div class="filters">${chips.map(([k, l, n]) => `<button class="btn btn-sm ${MEMBER_FILTER === k ? 'btn-secondary' : 'btn-quiet'}" data-mfilter="${k}" type="button">${esc(l)} <span class="tab-n">${esc(n)}</span></button>`).join('')}
-      ${m.warning_unacknowledged && c.status !== 'COMPLETED' ? `<button class="btn btn-secondary btn-sm" id="ack-all" type="button" style="margin-left:auto">Acknowledge ${esc(m.warning_unacknowledged)} warning${m.warning_unacknowledged===1?'':'s'}</button>` : ''}</div>
+      ${c.instantly_campaign_id && c.status !== 'COMPLETED' ? `<button class="btn btn-primary btn-sm" id="al-open" type="button" style="margin-left:auto" ${DETAIL.config?.instantly_write_configured ? '' : 'disabled title="INSTANTLY_API_KEY not set"'}>Add leads</button>` : ''}
+      ${m.warning_unacknowledged && c.status !== 'COMPLETED' ? `<button class="btn btn-secondary btn-sm" id="ack-all" type="button">Acknowledge ${esc(m.warning_unacknowledged)} warning${m.warning_unacknowledged===1?'':'s'}</button>` : ''}</div>
       <div class="card"><div class="tablewrap"><table>
         <thead><tr><th>Agency</th><th>Contact</th><th>Email</th><th class="col-md">Probe</th><th>Eligibility</th><th>Handoff</th><th class="col-md">Instantly</th><th class="col-lg">Last event</th><th></th></tr></thead>
         <tbody>${members.map((x) => `<tr>
@@ -938,6 +951,41 @@ async function syncCampaign(id){
     await loadList(true); if(VIEW === 'campaign' && DETAIL_ID) await loadDetail(DETAIL_ID, false);
   }catch(e){ notice(`<b>Sync failed.</b> ${esc(e.message)}`, 'err'); }
 }
+/* Add leads to an existing linked Instantly campaign (campaign-add-leads). */
+const AL = { rows:[], picked:new Set(), q:'', labels:{} };
+async function openAddLeads(){
+  const c = DETAIL.campaign;
+  AL.rows = []; AL.picked = new Set(); AL.q = ''; $('al-search').value = ''; $('al-result').textContent = '';
+  $('al-sub').innerHTML = `Adds leads to the existing Instantly campaign <span class="mono">${esc(c.instantly_campaign_id)}</span>. The campaign's accounts, sequence, schedule and status are not changed.${c.status === 'ACTIVE' ? ' <b style="color:var(--amber)">This campaign is active — Instantly will start sequencing added leads on its normal schedule.</b>' : ''} Blocked, opted-out, invalid and existing members are not listed.`;
+  $('al-list').innerHTML = '<div class="note">Loading eligible leads…</div>'; renderAlCount();
+  $('add-leads-dialog').showModal();
+  try{
+    const data = await post(OP('campaign-add-leads'), { campaign_id: c.campaign_id, dry_run: true });
+    AL.rows = data.rows || []; AL.labels = data.reason_labels || {}; renderAddLeads();
+  }catch(err){ $('al-list').innerHTML = `<div class="banner err"><div>${esc(err.message)}</div></div>`; }
+}
+function alVisible(){ const q = AL.q.toLowerCase(); return AL.rows.filter((r) => !q || `${r.agency_name} ${r.contact_name} ${r.email}`.toLowerCase().includes(q)); }
+function renderAddLeads(){
+  const rows = alVisible();
+  $('al-list').innerHTML = AL.rows.length ? `<table><thead><tr><th></th><th>Agency</th><th>Contact</th><th>Email</th><th>Eligibility</th></tr></thead><tbody>${rows.map((r) => `<tr>
+    <td><input type="checkbox" data-al="${esc(r.agency_id)}" ${AL.picked.has(r.agency_id) ? 'checked' : ''} ${r.eligibility_status === 'BLOCKED' ? 'disabled' : ''} /></td>
+    <td>${esc(r.agency_name)}<div class="t-sub">${esc(r.location)}</div></td><td>${dash(r.contact_name)}</td><td><span class="mono">${esc(r.email)}</span></td>
+    <td>${pill(r.eligibility_status.toLowerCase(), ELIG_CLASS[r.eligibility_status])}${r.eligibility_status !== 'READY' ? `<div class="reasons">${esc(r.reasons.filter((x) => AL.labels[x]).map((x) => AL.labels[x]).join(' · '))}</div>` : ''}</td></tr>`).join('')}</tbody></table>` : emptyState('No eligible leads', 'Every eligible NOVUS lead is already in this campaign or blocked.');
+  renderAlCount();
+}
+function renderAlCount(){ $('al-count').textContent = `${AL.picked.size} selected · ${AL.rows.filter((r) => r.eligibility_status === 'READY').length} ready · ${AL.rows.filter((r) => r.eligibility_status === 'WARNING').length} warning`; $('al-go').disabled = !AL.picked.size; }
+async function submitAddLeads(){
+  const c = DETAIL.campaign; const btn = $('al-go'); btn.disabled = true;
+  $('al-result').textContent = `Adding ${AL.picked.size} lead${AL.picked.size === 1 ? '' : 's'}…`;
+  try{
+    const r = await post(OP('campaign-add-leads'), { campaign_id: c.campaign_id, confirm:'ADD_LEADS_TO_CAMPAIGN', agency_ids:[...AL.picked] });
+    const why = (r.skipped_reasons || []).slice(0, 5).map((x) => `${x.agency_name || x.agency_id}: ${x.reason}`).join('; ');
+    $('al-result').innerHTML = `<b>${esc(r.added)} added, ${esc(r.skipped)} skipped, ${esc(r.failed)} failed.</b>${why ? `<div class="small-note">${esc(why)}</div>` : ''}${(r.errors||[]).length ? `<div style="color:var(--red)">${esc(r.errors.map((e) => e.detail || e.message).join('; '))}</div>` : ''}`;
+    MEMBER_FILTER = ''; await loadDetail(c.campaign_id, false);
+    const data = await post(OP('campaign-add-leads'), { campaign_id: c.campaign_id, dry_run: true });
+    AL.rows = data.rows || []; AL.picked = new Set(); renderAddLeads();
+  }catch(err){ $('al-result').innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`; renderAlCount(); }
+}
 function confirmDeleteDraft(){
   const c = DETAIL.campaign;
   $('delete-draft-explanation').textContent = `Delete “${c.name}” from NOVUS, including its saved sequence, settings and ${DETAIL.members.length} draft audience member${DETAIL.members.length === 1 ? '' : 's'}? ${c.instantly_campaign_id ? `Linked Instantly campaign ${c.instantly_campaign_id} will not be deleted. If it still exists, NOVUS will refuse this action until you remove it in Instantly.` : 'There is no linked Instantly campaign.'}`;
@@ -972,6 +1020,12 @@ document.addEventListener('click', async (e) => {
   if(e.target.id === 'd-sync'){ syncCampaign(DETAIL.campaign.campaign_id); return; }
   if(e.target.id === 'd-live'){ loadDetail(DETAIL.campaign.campaign_id, true); return; }
   if(e.target.id === 'd-delete'){ confirmDeleteDraft(); return; }
+  if(e.target.id === 'al-open'){ openAddLeads(); return; }
+  if(e.target.id === 'al-cancel'){ $('add-leads-dialog').close(); return; }
+  if(e.target.id === 'al-all'){ alVisible().filter((r) => r.eligibility_status === 'READY').forEach((r) => AL.picked.add(r.agency_id)); renderAddLeads(); return; }
+  if(e.target.id === 'al-none'){ AL.picked = new Set(); renderAddLeads(); return; }
+  if(e.target.id === 'al-go'){ submitAddLeads(); return; }
+  if(e.target.dataset?.al !== undefined){ if(e.target.checked) AL.picked.add(e.target.dataset.al); else AL.picked.delete(e.target.dataset.al); renderAlCount(); return; }
   if(e.target.id === 'delete-draft-cancel'){ $('delete-draft-dialog').close(); return; }
   if(e.target.id === 'delete-draft-confirm'){ deleteDraft(); return; }
   const act = e.target.closest('button.act'); if(act){ e.stopPropagation(); DETAIL_TAB = 'overview'; GATE = act.dataset.act; showView('campaign', { id: act.dataset.id }); return; }
@@ -994,6 +1048,7 @@ document.addEventListener('click', async (e) => {
 });
 document.addEventListener('input', (e) => {
   const t = e.target;
+  if(t.id === 'al-search'){ AL.q = t.value; renderAddLeads(); return; }
   if((t.closest('#aud-filters') || t.closest('#custom-audience-mode')) && t.id !== 'f-name'){ scheduleAudience(); return; }
   if(t.dataset.subject !== undefined){ WIZ.steps[Number(t.dataset.subject)].subject = t.value; return; }
   if(t.dataset.body !== undefined){ WIZ.steps[Number(t.dataset.body)].body = t.value; return; }
