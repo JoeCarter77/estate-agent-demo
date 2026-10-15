@@ -86,6 +86,7 @@
     "novus:setter-lead-profile-selftest": "node scripts/novus-setter-lead-profile-selftest.mjs",
     "novus:discovery-selftest": "node scripts/novus-discovery-selftest.mjs",
     "novus:team-access-selftest": "node scripts/novus-team-access-selftest.mjs",
+    "novus:role-change-selftest": "node scripts/novus-role-change-selftest.mjs",
     "novus:call-sessions-selftest": "node scripts/novus-call-sessions-selftest.mjs",
     "novus:operator": "node worker/src/index.mjs",
     "novus:operator-selftest": "node worker/test/run.mjs"

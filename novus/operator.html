@@ -1010,11 +1010,11 @@ function paintDashboardExtras(){
         <span class="r">${pill(String(x.status || '').toLowerCase(), CAMPAIGN_TONE[x.status], true)}</span></a>`).join('')
       || '<div class="dash-empty">No live or draft campaigns.</div>';
   const t = DASH_EXTRAS.team;
-  const setters = (t?.users || []).filter((u) => u.role === 'SETTER');
+  const setters = (t?.users || []).filter((u) => u.managed_by !== 'env');
   $('ov-team').innerHTML = !t ? '<div class="dash-empty"><span class="spin"></span> Loading team</div>'
     : t.error ? `<div class="dash-empty">Team unavailable: ${esc(t.error)}</div>`
     : setters.map((u) => { const a = u.activity || {}; return `<a class="dash-row" href="/novus/calling.html#team">
-        <span class="t">${esc(u.display_name)}${u.status !== 'ACTIVE' ? ' <span class="muted">(disabled)</span>' : ''}</span>
+        <span class="t">${esc(u.display_name)}${u.role === 'ADMIN' ? ' <span class="muted">(admin)</span>' : ''}${u.status !== 'ACTIVE' ? ' <span class="muted">(disabled)</span>' : ''}</span>
         <span class="s">${a.calls_today || 0} calls today &middot; ${a.owner_reached_7d || 0} owners reached 7d &middot; ${a.meetings_7d || 0} meetings 7d</span>
         <span class="r">${a.last_call_at ? `last call ${esc(ago(a.last_call_at))}` : 'no calls yet'}</span></a>`; }).join('')
       || '<div class="dash-empty">No setter accounts yet. Create one in Team.</div>';

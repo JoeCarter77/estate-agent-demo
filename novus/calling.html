@@ -302,7 +302,7 @@
         <!-- TEAM & ACCESS — admin only (team-* operations). -->
         <div class="section admin-only hidden" id="team-sec" style="margin-top:0">
           <div class="section-head"><div class="section-title">Members &amp; access</div>
-            <div class="section-note">Individual logins. Setters get Calling (the cold pool plus call actions from their own calls), lead search, the meetings they booked and their own performance — nothing administrative. Your own login is the environment credential and is not managed here.</div></div>
+            <div class="section-note">Individual logins. Setters get Calling (the cold pool plus call actions from their own calls), lead search, the meetings they booked and their own performance — nothing administrative. Admins get everything you have. Change role promotes or demotes an account (audited; they sign in again). Your own login is the environment credential and is not managed here.</div></div>
           <div class="card"><div class="tablewrap"><table>
             <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th class="num">Calls today</th><th class="num">Calls 7d</th>
               <th class="num">Owner reached 7d</th><th class="num">Meetings 7d</th><th class="col-md">Last call</th><th></th></tr></thead>
@@ -683,7 +683,8 @@ function renderTeam(){
       <td class="num">${a.calls_today||0}</td><td class="num">${a.calls_7d||0}</td><td class="num">${a.owner_reached_7d||0}</td><td class="num">${a.meetings_7d||0}</td>
       <td class="col-md">${a.last_call_at?esc(ago(a.last_call_at)):'<span class="muted">&mdash;</span>'}</td>
       <td class="nowrap"><button class="btn btn-quiet btn-sm" data-team-view="${esc(u.user_id)}" type="button">Calls</button>
-        ${setter?`<button class="btn btn-quiet btn-sm" data-team-status="${esc(u.user_id)}" data-to="${u.status==='ACTIVE'?'DISABLED':'ACTIVE'}" type="button">${u.status==='ACTIVE'?'Disable':'Enable'}</button>
+        ${u.managed_by==='team'?`<button class="btn btn-quiet btn-sm" data-team-role="${esc(u.user_id)}" data-to="${setter?'ADMIN':'SETTER'}" type="button">Change role</button>
+        <button class="btn btn-quiet btn-sm" data-team-status="${esc(u.user_id)}" data-to="${u.status==='ACTIVE'?'DISABLED':'ACTIVE'}" type="button">${u.status==='ACTIVE'?'Disable':'Enable'}</button>
         <button class="btn btn-quiet btn-sm" data-team-reset="${esc(u.user_id)}" type="button">Reset password</button>`:''}</td></tr>`; }).join('');
 }
 function showOtp(user, password){
@@ -708,6 +709,11 @@ document.addEventListener('click', async (e) => {
       const u = TEAM.find((x)=>x.user_id===t.dataset.teamStatus); const to = t.dataset.to;
       if(!confirm(`${to==='DISABLED'?'Disable':'Enable'} ${u?.display_name||'this account'}? ${to==='DISABLED'?'They lose access within about 30 seconds.':''}`)) return;
       await post(OP('team-user-status'), { confirm:'SET_USER_STATUS', user_id: t.dataset.teamStatus, status: to }); await loadTeam();
+    } else if(t.dataset.teamRole){
+      const u = TEAM.find((x)=>x.user_id===t.dataset.teamRole); const to = t.dataset.to;
+      const what = to==='ADMIN' ? 'They get full administrator access to everything in NOVUS, exactly as you have.' : 'They lose all administrator access and are confined to Calling.';
+      if(!confirm(`Change ${u?.display_name||'this account'} (${u?.username||''}) from ${u?.role} to ${to}?\n\n${what} They are signed out everywhere and sign in again to pick up the new role. Their calls, sessions and history are kept.`)) return;
+      await post(OP('team-user-role'), { confirm:'CHANGE_USER_ROLE', user_id: t.dataset.teamRole, role: to }); await loadTeam();
     } else if(t.dataset.teamReset){
       const u = TEAM.find((x)=>x.user_id===t.dataset.teamReset);
       if(!confirm(`Reset the password for ${u?.display_name||'this account'}? Their current password stops working.`)) return;

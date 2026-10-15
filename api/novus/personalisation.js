@@ -34,7 +34,7 @@ import { resolveAgencyContact, listResolutionBacklog } from '../../lib/contact-r
 import { requireAuth as requireAdminAuth, resolveCaller, sendUnauthorized, requireReplyPollerSecret, requireCampaignPollerSecret } from './_auth.mjs';
 import { handleAuthLogin, handleAuthLogout, isSameOriginWrite } from '../../lib/auth-session.mjs';
 import { SETTER_OPERATIONS } from '../../lib/novus-users.mjs';
-import { handleWhoami, handleTeamUsers, handleTeamUserCreate, handleTeamUserStatus, handleTeamUserReset } from '../../lib/team-handlers.mjs';
+import { handleWhoami, handleTeamUsers, handleTeamUserCreate, handleTeamUserStatus, handleTeamUserReset, handleTeamUserRole } from '../../lib/team-handlers.mjs';
 import {
   handleCallSessionCurrent, handleCallSessionStart, handleCallSessionPause, handleCallSessionResume, handleCallSessionEnd,
   handleCallSessionHeartbeat, handleCallPerformance, handleCallSessionDetail, handleCallSessionCorrect, handleCallSessionApprove,
@@ -1794,7 +1794,7 @@ export default async function handler(req, res) {
   req.novusUser = caller;
   // ── Team / accounts ──────────────────────────────────────────────────
   if (req.method === 'GET' && req.query?.novus_operation === 'whoami') return handleWhoami(req, res);
-  const TEAM_OPERATIONS = { 'team-user-create': handleTeamUserCreate, 'team-user-status': handleTeamUserStatus, 'team-user-reset': handleTeamUserReset };
+  const TEAM_OPERATIONS = { 'team-user-create': handleTeamUserCreate, 'team-user-status': handleTeamUserStatus, 'team-user-reset': handleTeamUserReset, 'team-user-role': handleTeamUserRole };
   if (req.method === 'GET' && req.query?.novus_operation === 'team-users') {
     if (!requireAuth(req, res)) return;
     return handleTeamUsers(req, res);
