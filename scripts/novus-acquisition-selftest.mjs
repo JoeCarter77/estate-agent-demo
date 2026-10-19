@@ -392,7 +392,7 @@ console.log('\nManual action queue semantics (Needs your attention)');
       outreach_contact_name: 'Jane Doe', outreach_contact_email: 'jane@named-agency.test', email_verification_status: 'VALID',
     } })), 'READY_TO_PROBE');
   });
-  check('a lead with no usable outreach email at all derives SORT_LEAD, not RESOLVE_EXCEPTION', () => {
+  check('a lead with no usable outreach email sits in LEAD_POOL and derives NO action (no Sort-lead task, no RESOLVE_EXCEPTION)', () => {
     const blockedEvidence = base({ agency: {
       agency_id: 'ag_blocked', agency_name: 'No Email Agency', rightmove_sales_branch_url: 'https://rightmove.test/blocked',
       outreach_contact_name: '', outreach_contact_email: '', email_verification_status: '',
@@ -402,20 +402,21 @@ console.log('\nManual action queue semantics (Needs your attention)');
     blockedEvidence.stageReason = resolved.reason;
     assert.equal(blockedEvidence.stage, 'LEAD_POOL');
     assert.match(blockedEvidence.stageReason, /no outreach email/);
-    const [action] = deriveExpectedActions(blockedEvidence, NOW);
-    assert.equal(action.action_type, 'SORT_LEAD');
-    assert.equal(actionQueue(action), 'SORT');
-    assert.equal(isManualSalesAction(action), false);
+    assert.deepEqual(deriveExpectedActions(blockedEvidence, NOW), []);
+    assert.equal(enforceNextActionInvariant('LEAD_POOL', null), 'LEAD_POOL', 'a resting stage, not NO_NEXT_ACTION');
   });
   {
     const sortHeader = ['agency_id', 'agency_name', 'rightmove_sales_branch_url', 'probe_sent', 'outreach_contact_name', 'outreach_contact_email', 'email_verification_status'];
+    // A SORT_LEAD row raised before this change, still active in the ledger.
+    const legacySort = { ...Object.fromEntries(ACTIONS_HEADER.map((k) => [k, ''])), action_id: 'act_legacy_sort', agency_id: 'ag_sort_risky',
+      action_type: 'SORT_LEAD', action_owner: 'JOE', action_status: 'DUE', due_at: hoursAgo(48), reason: 'Agency is not currently eligible to progress',
+      source_stage: 'LEAD_POOL', dedupe_key: 'ag_sort_risky:SORT_LEAD:legacy', created_at: hoursAgo(48), updated_at: hoursAgo(48), metadata_json: JSON.stringify({ assigned_user_id: 'admin' }) };
     const sortTables = {
       AGENCIES: { header: sortHeader, rows: [
         // No email resolved yet at all — the largest real-world bucket.
         ['ag_sort_noemail', 'No Email Agency', 'https://rightmove.test/sort1', '', '', '', ''],
-        // A resolved GENERIC email that only verified RISKY — still genuinely
-        // blocked under the existing VALID-only deliverability gate, and still
-        // must never be presented as a name problem.
+        // A resolved GENERIC email that only verified RISKY — still blocked
+        // under the VALID-only gate, and carries a legacy SORT_LEAD row.
         ['ag_sort_risky', 'Risky Generic Agency', 'https://rightmove.test/sort2', '', '', 'sales@sort2.test', 'RISKY'],
         // A genuine live-conversation exception, untouched by this change.
         ['ag_reply_sort', 'Genuine Reply Agency', 'https://rightmove.test/sort3', 'YES', '', 'reply2@example.test', 'VALID'],
@@ -429,35 +430,36 @@ console.log('\nManual action queue semantics (Needs your attention)');
         ['r_sort', 'ag_reply_sort', 'QUESTION', hoursAgo(1)],
       ] },
       SALES_MESSAGES: { header: [], rows: [] },
-      ACTIONS: { header: [], rows: [] },
+      ACTIONS: { header: [...ACTIONS_HEADER], rows: [ACTIONS_HEADER.map((k) => legacySort[k])] },
     };
-    const board = buildAcquisitionDashboard(sortTables, { now: NOW, actionsAvailable: false });
-    const sortLead = (id) => board.leads.find((row) => row.agency_id === id);
-    check('Sort leads carry SORT_LEAD/needs_sort and are excluded from needs_human', () => {
+    const board = buildAcquisitionDashboard(sortTables, { now: NOW, actionsAvailable: true });
+    const lead = (id) => board.leads.find((row) => row.agency_id === id);
+    check('lead-pool agencies stay in Leads with no action, no exception and no Sort-leads flag or count', () => {
       for (const id of ['ag_sort_noemail', 'ag_sort_risky']) {
-        assert.equal(sortLead(id).current_stage, 'LEAD_POOL');
-        assert.equal(sortLead(id).next_action.type, 'SORT_LEAD');
-        assert.equal(sortLead(id).action_queue, 'SORT');
-        assert.equal(sortLead(id).needs_human, false);
-        assert.equal(sortLead(id).needs_sort, true);
+        assert.ok(lead(id), `${id} is still a lead`);
+        assert.equal(lead(id).current_stage, 'LEAD_POOL');
+        assert.equal(lead(id).next_action.type, null, 'a legacy SORT_LEAD row is never the next action');
+        assert.equal(lead(id).action_queue, null);
+        assert.equal(lead(id).needs_human, false);
+        assert.deepEqual(lead(id).exceptions, []);
+        assert.equal('needs_sort' in lead(id), false);
       }
-    });
-    check('Sort leads never invent a fallback/default contact name', () => {
-      assert.equal(sortLead('ag_sort_noemail').contact.name, '');
-      assert.equal(sortLead('ag_sort_risky').contact.name, '');
-    });
-    check('Sort leads are excluded from needs_attention (the sidebar Actions badge/All source) and get their own count', () => {
+      assert.equal('sort_leads' in board.counts, false);
       assert.equal(board.counts.needs_attention, 1);
-      assert.equal(board.counts.sort_leads, 2);
-      // The exact predicate the operator UI's dueActions()/manualActions() and
-      // sidebar badge use — proving Sort leads cannot leak into either.
       assert.equal(board.leads.filter((l) => l.needs_human).length, 1);
-      assert.equal(board.leads.filter((l) => l.needs_sort).length, 2);
+    });
+    check('lead-pool agencies never invent a fallback/default contact name', () => {
+      assert.equal(lead('ag_sort_noemail').contact.name, '');
+      assert.equal(lead('ag_sort_risky').contact.name, '');
+    });
+    check('reconciliation cancels (never deletes) a legacy SORT_LEAD row and raises no new one', () => {
+      const plan = reconcileActions([legacySort], [], NOW);
+      assert.deepEqual(plan.create, []);
+      assert.deepEqual(plan.cancel.map((c) => [c.action_id, c.patch.action_status]), [['act_legacy_sort', 'CANCELLED']]);
     });
     check('a genuine reply exception is untouched: still needs_human, still HUMAN_REPLY', () => {
-      assert.equal(sortLead('ag_reply_sort').needs_human, true);
-      assert.equal(sortLead('ag_reply_sort').needs_sort, false);
-      assert.equal(sortLead('ag_reply_sort').next_action.type, 'HUMAN_REPLY');
+      assert.equal(lead('ag_reply_sort').needs_human, true);
+      assert.equal(lead('ag_reply_sort').next_action.type, 'HUMAN_REPLY');
     });
   }
 }

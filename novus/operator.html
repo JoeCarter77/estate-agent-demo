@@ -699,11 +699,10 @@ const ACTION_TABS = [
   { key:'calls',     label:'Calls',      types:['CALL_PROSPECT','RETRY_CALL','CALL'] },
   { key:'reviews',   label:'Reviews',    types:['MANUAL_REVIEW','RESOLVE_EXCEPTION','REVIEW'] },
   { key:'followups', label:'Follow-ups', types:['FOLLOW_UP_CONVERSATION','SET_NEXT_STEP','DEMO_UNOPENED_FOLLOWUP','DEMO_OPENED_FOLLOWUP','FOLLOW_UP','SEND_INFORMATION','PREPARE_MEETING','MEETING_FOLLOW_UP'] },
-  /* Lead-pool housekeeping, not commercial acquisition work: its own queue
-     (server-side SORT_LEAD/isSortLeadAction in lib/acquisition-actions.mjs),
-     its own tab count, deliberately excluded from every other tab (including
-     All), from dueActions()/manualActions() and from the sidebar badge. */
-  { key:'sortleads', label:'Sort leads', types:null, sortLeads:true },
+  /* No "Sort leads" tab: lead-pool housekeeping is not a task. The server
+     no longer derives SORT_LEAD (lib/acquisition-actions.mjs, LEAD_POOL) and
+     never makes a legacy one a lead's next action. Lead-pool agencies live in
+     Leads and Pipeline. */
   /* Work whose stored due_at is still ahead (was the Future page). The same
      rows move into the tabs above by themselves once due. */
   { key:'scheduled', label:'Scheduled', types:null, scheduled:true },
@@ -935,13 +934,6 @@ function isDueNow(lead){
 }
 function dueActions(){ return manualActions().filter(isDueNow); }
 function futureActions(){ return manualActions().filter((l) => !isDueNow(l)); }
-/* needs_sort is the SERVER's Sort-leads verdict (isSortLeadAction), the same
-   pattern as manualActions()/needs_human above — never recomputed here. Not
-   split into due/future: lead-pool housekeeping has no commercial urgency
-   clock, so every open Sort-leads item just shows. */
-function sortLeadActions(){
-  return LEADS.filter((l) => l.needs_sort).sort((a, b) => a.agency_name.localeCompare(b.agency_name));
-}
 function overdueActions(){
   return dueActions().filter((l) => {
     const at = Date.parse(l.next_action.due_at || '');
@@ -1163,13 +1155,12 @@ function renderActions(){
      need to do now?". */
   const assigneeOf = (l) => l.next_action.assigned_user_id || '';
   const mine = (l) => teamMatch(assigneeOf(l), ACTION_TEAM);
-  $('ac-team').innerHTML = teamFilterHtml(ACTION_TEAM, 'data-actteam', 'All team', 'My actions', [...manualActions(), ...sortLeadActions()], assigneeOf);
+  $('ac-team').innerHTML = teamFilterHtml(ACTION_TEAM, 'data-actteam', 'All team', 'My actions', manualActions(), assigneeOf);
   const all = dueActions().filter(mine);
   const scheduled = futureActions().filter(mine);
   const later = scheduled.length;
-  const sortLeads = sortLeadActions().filter(mine);
   $('ac-tabs').innerHTML = ACTION_TABS.map((t) => {
-    const n = t.scheduled ? later : t.sortLeads ? sortLeads.length : t.interested ? all.filter((l) => l.next_action.interested).length : (t.types ? all.filter((l) => t.types.includes(l.next_action.type)).length : all.length);
+    const n = t.scheduled ? later : t.interested ? all.filter((l) => l.next_action.interested).length : (t.types ? all.filter((l) => t.types.includes(l.next_action.type)).length : all.length);
     return `<button class="tab ${t.key === ACTION_TAB ? 'on' : ''}" data-actiontab="${t.key}" type="button">
       ${esc(t.label)}<span class="tab-n">${n}</span></button>`;
   }).join('');
@@ -1182,14 +1173,13 @@ function renderActions(){
     return;
   }
   $('ac-list').classList.remove('future');
-  const rows = tab.sortLeads ? sortLeads : tab.interested ? all.filter((l) => l.next_action.interested) : (tab.types ? all.filter((l) => tab.types.includes(l.next_action.type)) : all);
+  const rows = tab.interested ? all.filter((l) => l.next_action.interested) : (tab.types ? all.filter((l) => tab.types.includes(l.next_action.type)) : all);
   $('ac-list').innerHTML = rows.length
     ? rows.map(taskHtml).join('')
-    : emptyState(tab.sortLeads ? 'Nothing to sort' : (all.length ? 'Nothing in this tab' : 'Nothing is due now'),
-        tab.sortLeads ? 'No lead-pool agency currently needs a housekeeping decision.'
-          : (all.length ? 'Other tabs still have work due.'
-              : (later ? `${later} ${later === 1 ? 'action is' : 'actions are'} scheduled for later — see the Scheduled tab. Ready-to-probe agencies are in the Prober.`
-                       : 'Ready-to-probe agencies are in the Prober, not here.')));
+    : emptyState(all.length ? 'Nothing in this tab' : 'Nothing is due now',
+        all.length ? 'Other tabs still have work due.'
+          : (later ? `${later} ${later === 1 ? 'action is' : 'actions are'} scheduled for later — see the Scheduled tab. Ready-to-probe agencies are in the Prober.`
+                   : 'Ready-to-probe agencies are in the Prober, not here.'));
 }
 
 /* ── EMAIL ACTIONS ──────────────────────────────────────────────────────
