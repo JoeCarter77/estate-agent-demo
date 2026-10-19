@@ -457,6 +457,16 @@ console.log('\nManual action queue semantics (Needs your attention)');
       assert.deepEqual(plan.create, []);
       assert.deepEqual(plan.cancel.map((c) => [c.action_id, c.patch.action_status]), [['act_legacy_sort', 'CANCELLED']]);
     });
+    check('reconciliation never wipes an action\'s assignee: refreshes keep it, and an assignee alone causes no rewrite', () => {
+      const stored = { ...legacySort, action_id: 'act_sys', action_type: 'PROBE_AGENCY', dedupe_key: 'k:sys', due_at: hoursAgo(5), action_status: 'DUE',
+        metadata_json: JSON.stringify({ basis: 'old', assigned_user_id: 'admin', assignment_history: [{ to: 'admin' }] }) };
+      const derived = { ...stored, metadata_json: JSON.stringify({ basis: 'new' }) };
+      const plan = reconcileActions([stored], [derived], NOW);
+      assert.equal(plan.update.length, 1);
+      assert.deepEqual(JSON.parse(plan.update[0].patch.metadata_json), { basis: 'new', assigned_user_id: 'admin', assignment_history: [{ to: 'admin' }] });
+      const same = { ...stored, metadata_json: JSON.stringify({ basis: 'old' }) };
+      assert.deepEqual(reconcileActions([stored], [same], NOW).update, [], 'only the assignee differs: nothing to write');
+    });
     check('a genuine reply exception is untouched: still needs_human, still HUMAN_REPLY', () => {
       assert.equal(lead('ag_reply_sort').needs_human, true);
       assert.equal(lead('ag_reply_sort').next_action.type, 'HUMAN_REPLY');
