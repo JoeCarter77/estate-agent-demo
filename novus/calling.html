@@ -307,6 +307,7 @@
             <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th class="num">Calls today</th><th class="num">Calls 7d</th>
               <th class="num">Owner reached 7d</th><th class="num">Meetings 7d</th><th class="col-md">Last call</th><th></th></tr></thead>
             <tbody id="team-rows"></tbody></table></div>
+            <div class="card-note" id="team-archived" style="padding:0 var(--s-4)"></div>
             <div class="card-body">
               <div id="team-otp-box" class="banner warn hidden"></div>
               <div class="btnrow" style="gap:8px;align-items:center;flex-wrap:wrap">
@@ -651,10 +652,19 @@ function showErr(msg){ $('load-err').innerHTML = `<div>${esc(msg)}</div>`; $('lo
 let ME = null;
 let TEAM = [];
 const IS_SETTER = () => ME?.role === 'SETTER';
-const teamName = (id) => (TEAM.find((u)=>u.user_id===id)||{}).display_name || '';
+/* Every member's name (archived included) for owner labels — team-roster is
+   readable by setters too; TEAM (team-users) is the admin-only table. */
+let ROSTER = [];
+const teamName = (id) => (TEAM.find((u)=>u.user_id===id)||ROSTER.find((u)=>u.user_id===id)||{}).display_name || (id==='admin'?'Joe':'');
+const ownerLabel = (id) => !id ? 'Unassigned' : id===ME?.user_id ? `${teamName(id)||'You'} (you)` : (teamName(id)||'Former team member');
+const leadOwnerId = (agencyId) => WS?.leads?.[agencyId]?.owner_user_id || '';
+async function loadRoster(){
+  try{ const r = await fetch(OP('team-roster'), { headers:{ Accept:'application/json' } }); const d = await r.json(); if(r.ok && d.success!==false) ROSTER = [...(d.members||[]), ...(d.archived||[])]; }catch{ ROSTER = []; }
+}
 async function loadMe(){
   try{ const r = await fetch(OP('whoami'), { headers:{ Accept:'application/json' } }); const d = await r.json(); if(r.ok && d.user) ME = d.user; }catch{ ME = null; }
   if(!ME) return;
+  loadRoster();
   document.body.classList.toggle('role-setter', IS_SETTER());
   sessInit();
   /* The rail, the workspace tabs and some views differ by role: re-route now
@@ -677,7 +687,9 @@ async function loadTeam(){
 function renderTeam(){
   const sel = $('an-user'); const cur = AN_Q.user_id||'';
   sel.innerHTML = `<option value="">Everyone</option>` + TEAM.map((u)=>`<option value="${esc(u.user_id)}"${u.user_id===cur?' selected':''}>${esc(u.display_name)}</option>`).join('');
-  $('team-rows').innerHTML = TEAM.map((u) => { const a = u.activity||{}; const setter = u.role==='SETTER';
+  const archived = TEAM.filter((u)=>u.status==='DELETED');
+  $('team-archived').innerHTML = archived.length ? `Archived (kept on their history): ${archived.map((u)=>esc(u.display_name)).join(', ')}` : '';
+  $('team-rows').innerHTML = TEAM.filter((u)=>u.status!=='DELETED').map((u) => { const a = u.activity||{}; const setter = u.role==='SETTER';
     return `<tr><td><b>${esc(u.display_name)}</b></td><td class="mono">${dash(u.username)}</td><td>${pill(u.role, setter?'t-blue':'t-grey', true)}</td>
       <td>${pill(u.status, u.status==='ACTIVE'?'t-green':'t-red', true)}</td>
       <td class="num">${a.calls_today||0}</td><td class="num">${a.calls_7d||0}</td><td class="num">${a.owner_reached_7d||0}</td><td class="num">${a.meetings_7d||0}</td>
@@ -685,7 +697,8 @@ function renderTeam(){
       <td class="nowrap"><button class="btn btn-quiet btn-sm" data-team-view="${esc(u.user_id)}" type="button">Calls</button>
         ${u.managed_by==='team'?`<button class="btn btn-quiet btn-sm" data-team-role="${esc(u.user_id)}" data-to="${setter?'ADMIN':'SETTER'}" type="button">Change role</button>
         <button class="btn btn-quiet btn-sm" data-team-status="${esc(u.user_id)}" data-to="${u.status==='ACTIVE'?'DISABLED':'ACTIVE'}" type="button">${u.status==='ACTIVE'?'Disable':'Enable'}</button>
-        <button class="btn btn-quiet btn-sm" data-team-reset="${esc(u.user_id)}" type="button">Reset password</button>`:''}</td></tr>`; }).join('');
+        <button class="btn btn-quiet btn-sm" data-team-reset="${esc(u.user_id)}" type="button">Reset password</button>
+        <button class="btn btn-quiet btn-sm" data-team-delete="${esc(u.user_id)}" type="button" style="color:var(--red)">Delete</button>`:''}</td></tr>`; }).join('');
 }
 function showOtp(user, password){
   const box = $('team-otp-box');
@@ -718,6 +731,25 @@ document.addEventListener('click', async (e) => {
       const u = TEAM.find((x)=>x.user_id===t.dataset.teamReset);
       if(!confirm(`Reset the password for ${u?.display_name||'this account'}? Their current password stops working.`)) return;
       const out = await post(OP('team-user-reset'), { confirm:'RESET_USER_PASSWORD', user_id: t.dataset.teamReset }); showOtp(out.user, out.one_time_password);
+    } else if(t.dataset.teamDelete){
+      const r = await fetch(`${OP('team-user-delete-preview')}&user_id=${encodeURIComponent(t.dataset.teamDelete)}`, { headers:{ Accept:'application/json' } }); const p = await r.json();
+      if(!r.ok || p.success===false) throw new Error(p.error || `Request failed (${r.status})`);
+      const box = $('team-otp-box');
+      box.innerHTML = `<div><strong>Delete ${esc(p.user.display_name)}?</strong>
+        <div style="margin-top:6px">Owns <b>${p.owned_leads}</b> ${p.owned_leads===1?'lead':'leads'} and has <b>${p.open_actions}</b> outstanding assigned ${p.open_actions===1?'action':'actions'}.</div>
+        <div class="muted" style="margin-top:4px">${esc(p.effect)}</div>
+        ${p.blocked ? `<div style="margin-top:6px;color:var(--red)">${esc(p.blocked)}</div>` : `<div class="btnrow" style="margin-top:8px;gap:8px;align-items:center">Transfer everything to
+          <select class="input" id="team-del-to" style="width:auto">${p.transfer_targets.map((u)=>`<option value="${esc(u.user_id)}"${u.user_id==='admin'?' selected':''}>${esc(u.display_name)}</option>`).join('')}</select>
+          <button class="btn btn-secondary btn-sm" data-team-delete-go="${esc(p.user.user_id)}" type="button" style="color:var(--red)">Delete and transfer</button>
+          <button class="btn btn-quiet btn-sm" id="team-otp-hide" type="button">Cancel</button></div>`}</div>`;
+      box.classList.remove('hidden');
+    } else if(t.dataset.teamDeleteGo){
+      const to = $('team-del-to').value; const u = TEAM.find((x)=>x.user_id===t.dataset.teamDeleteGo);
+      if(!confirm(`Delete ${u?.display_name||'this member'} and transfer their leads and outstanding actions to ${teamName(to)||to}? They can no longer sign in. Nothing they did is deleted.`)) return;
+      t.disabled = true;
+      const out = await post(OP('team-user-delete'), { confirm:'DELETE_USER', user_id: t.dataset.teamDeleteGo, transfer_to: to });
+      $('team-otp-box').innerHTML = `<div>Deleted. ${out.leads_transferred} ${out.leads_transferred===1?'lead':'leads'} and ${out.actions_transferred} outstanding ${out.actions_transferred===1?'action':'actions'} moved to ${esc(teamName(to)||to)}.</div>`;
+      await loadTeam(); loadRoster();
     } else if(t.dataset.teamView){
       AN_Q.user_id = t.dataset.teamView==='' ? '' : t.dataset.teamView; $('an-user').value = AN_Q.user_id; loadAnalytics(false);
     } else if(t.id==='team-otp-copy'){ await navigator.clipboard?.writeText($('team-otp').textContent); t.textContent = 'Copied';
@@ -921,12 +953,12 @@ function renderLeadProfile(){
     + ((L.campaigns||[]).length ? `<div style="margin-top:10px;font-size:12.5px">${L.campaigns.map((c) => `${esc(c.name)} <span class="muted">· ${esc(words(c.status))} · ${c.emails_sent_count} sent${c.interest_status?` · ${esc(words(c.interest_status))}`:''}</span>`).join('<br>')}</div>` : '')
     + `<div class="btnrow" style="margin-top:10px"><button class="btn btn-quiet btn-sm" id="lp-conv" type="button">Show the email conversation</button></div><div id="lp-conv-body"></div>`;
   const open = L.work?.open || [];
-  const workBody = open.length ? `<div class="dash-list">${open.map((a) => `<div class="dash-row" style="padding:8px 0"><span class="t">${esc(words(a.type))}${a.overdue?' <span style="color:var(--red)">overdue</span>':''}</span><span class="s">${esc(a.reason||'')}${a.assigned_user_id ? (a.assigned_user_id===ME?.user_id ? ' · assigned to you' : ' · assigned to someone else') : ''}</span><span class="r">${esc(when(a.due_at))}</span></div>`).join('')}</div>` : none('No outstanding actions.');
+  const workBody = open.length ? `<div class="dash-list">${open.map((a) => `<div class="dash-row" style="padding:8px 0"><span class="t">${esc(words(a.type))}${a.overdue?' <span style="color:var(--red)">overdue</span>':''}</span><span class="s">${esc(a.reason||'')}${a.assigned_user_id ? (a.assigned_user_id===ME?.user_id ? ' · assigned to you' : ` · assigned to ${esc(teamName(a.assigned_user_id)||'someone else')}`) : ''}</span><span class="r">${esc(when(a.due_at))}</span></div>`).join('')}</div>` : none('No outstanding actions.');
   const meetings = (L.meetings||[]).length ? `<div class="dash-list">${L.meetings.map((m) => `<div class="dash-row" style="padding:8px 0"><span class="t">${m.meeting_at?esc(when(m.meeting_at)):'Not dated'}</span><span class="s">${[esc(m.contact_name||''), esc(words(m.status)), m.outcome?`outcome: ${esc(words(m.outcome))}`:''].filter(Boolean).join(' · ')}</span><span class="r">${m.follow_up_at?`follow-up ${esc(when(m.follow_up_at))}`:''}</span></div>`).join('')}</div>` : none('No meetings yet.');
   const hist = (L.timeline||[]).slice().reverse().slice(0, 40);
   const history = hist.length ? `<div class="dash-list">${hist.map((e) => `<div class="dash-row" style="padding:7px 0"><span class="t" style="font-weight:500">${esc(e.title)}</span><span class="s">${esc(e.detail||'')}</span><span class="r">${e.at?esc(when(e.at)):''}</span></div>`).join('')}</div>` : none('Nothing recorded yet.');
   $('lp-body').innerHTML = `<div class="page-head" style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap">
-      <div><h1 class="page-title">${esc(L.agency_name)}</h1><p class="page-sub">${[esc(I.location||''), I.current_pipeline_status?esc(words(I.current_pipeline_status)):'', I.crm_name?`CRM: ${esc(I.crm_name)}`:'', I.live_listing_count?`${esc(I.live_listing_count)} live listings`:''].filter(Boolean).join(' · ')}</p>
+      <div><h1 class="page-title">${esc(L.agency_name)}</h1><p class="page-sub">${[`Owner: <b>${esc(ownerLabel(L.owner_user_id))}</b>`, esc(I.location||''), I.current_pipeline_status?esc(words(I.current_pipeline_status)):'', I.crm_name?`CRM: ${esc(I.crm_name)}`:'', I.live_listing_count?`${esc(I.live_listing_count)} live listings`:''].filter(Boolean).join(' · ')}</p>
         ${L.next_step ? `<p class="page-sub">Next step: <b>${esc(L.next_step.what)}</b> ${esc(when(L.next_step.at))}</p>` : ''}</div>
       <div class="btnrow">${inScope ? `<button class="btn btn-primary" data-sl-open="${esc(L.agency_id)}" type="button">Open in Calling</button>` : '<span class="muted" style="font-size:12.5px;max-width:260px">Not in your calling queue — read only.</span>'}</div></div>
     ${warns.length ? `<div class="banner warn" style="margin-bottom:var(--s-5)"><div>${warns.join('<br>')}</div></div>` : ''}
@@ -1457,7 +1489,7 @@ function tick(){ const el=$('cm-timer'); if(!el||!CALL) return; const from=Date.
 
 function renderModeHead(){
   const l = CALL.lead; const s = currentScript();
-  $('cm-name').innerHTML = `${esc(l.contact_name||(l.unidentified?'Unknown caller':'Unknown contact'))}${l.contact_role?`<small>${esc(l.contact_role)}</small>`:''}<small>${esc(l.agency_name)}${l.agency_id?` <a href="${profileLink(l.agency_id)}" target="_blank" rel="noopener" title="Open the full lead profile in a new tab">Profile ↗</a>`:''}</small>`
+  $('cm-name').innerHTML = `${esc(l.contact_name||(l.unidentified?'Unknown caller':'Unknown contact'))}${l.contact_role?`<small>${esc(l.contact_role)}</small>`:''}<small>${esc(l.agency_name)}${l.agency_id?` · Owner: ${esc(ownerLabel(l.owner_user_id||leadOwnerId(l.agency_id)))} <a href="${profileLink(l.agency_id)}" target="_blank" rel="noopener" title="Open the full lead profile in a new tab">Profile ↗</a>`:''}</small>`
     + (CALL.inbound ? ` <span class="pill t-blue bare" style="vertical-align:middle;margin-left:8px">callback</span>` : '')
     + (CALL.inbound && (l.unidentified || CALL.stage!=='done') ? ` <button class="btn btn-quiet btn-sm" id="cm-link" type="button" style="vertical-align:middle;margin-left:6px" title="Associate this call and number with a lead">${l.unidentified?'Link to lead':'Change lead'}</button>` : '');
   const ctx = l.context||{};

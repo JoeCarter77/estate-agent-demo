@@ -232,9 +232,11 @@ check('a direct hash opens that view on boot', () => {
 check('navigating every view issues no write of any kind', () => {
   assert.deepEqual(app.mutations, []);
   const gets = app.fetchCalls.filter((c) => c.method === 'GET').map((c) => c.url);
-  // The Dashboard's campaigns and team cards are two read-only GETs.
+  // The Dashboard's campaigns and team cards are two read-only GETs; the
+  // team roster (owner names + filters) is one more, once per page load.
   assert.ok(gets.every((u) => u.includes('operator-dashboard') || u.includes('probe?queue=1')
-    || u.endsWith('novus_operation=campaigns-list') || u.endsWith('novus_operation=team-users')), gets.join('\n'));
+    || u.endsWith('novus_operation=campaigns-list') || u.endsWith('novus_operation=team-users') || u.endsWith('novus_operation=team-roster')), gets.join('\n'));
+  assert.ok(gets.filter((u) => u.endsWith('team-roster')).length <= 1, 'roster read once');
 });
 check('the Dashboard reads campaigns and team at most once, not on every render', () => {
   const extra = app.fetchCalls.filter((c) => /campaigns-list|team-users/.test(c.url));

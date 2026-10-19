@@ -191,6 +191,7 @@
             moves into the other tabs by itself when due. Probe queue work and NOVUS-owned checkpoints are deliberately
             not here.</p>
         </div>
+        <div class="an-filters" id="ac-team" aria-label="Team member"></div>
         <div class="tabs" id="ac-tabs"></div>
         <div class="card"><div class="tasks" id="ac-list"></div></div>
       </section>
@@ -388,6 +389,7 @@
           <p class="page-sub">The master record. Search every agency, contact and probe, then open the full lead: profile,
             conversation, history, probe, demo and actions in one place. <b>Pipeline</b> shows where every agency sits.</p>
         </div>
+        <div class="an-filters" id="ld-team" aria-label="Lead owner"></div>
         <div class="filters">
           <div class="searchbox">
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -410,7 +412,7 @@
             <div class="card-note">Click any row for the full record.</div></div>
           <div class="tablewrap"><table>
             <thead><tr><th>Agency</th><th>Contact</th><th>Stage</th><th class="col-lg">Next action</th>
-              <th class="col-md">Queue</th><th class="col-lg">Last activity</th><th class="col-md">Priority</th></tr></thead>
+              <th class="col-md">Queue</th><th class="col-md">Assigned to</th><th class="col-lg">Last activity</th><th class="col-md">Priority</th></tr></thead>
             <tbody id="ld-rows"></tbody></table></div>
           <div id="ld-empty"></div>
         </div>
@@ -620,8 +622,69 @@ function actionAssignee(action){
   try { return JSON.parse(action.metadata_json || '{}').assigned_user_id || ''; } catch { return ''; }
 }
 function assigneeName(userId){
-  const user = (DASH_EXTRAS.team?.users || []).find((u) => u.user_id === userId);
+  if(!userId) return 'Unassigned';
+  const user = [...ROSTER.members, ...ROSTER.archived, ...(DASH_EXTRAS.team?.users || [])].find((u) => u.user_id === userId);
   return user ? user.display_name : (userId === 'admin' ? 'Joe' : 'another team member');
+}
+
+/* ── TEAM OWNERSHIP ─────────────────────────────────────────────────────
+   Leads have one owner (server: LEAD_OWNERSHIP ledger); an action's
+   assignee is its own explicit assignee, else the lead owner. These filters
+   only narrow what the server already decided; nothing is stored here. */
+let ROSTER = { me:'', members:[], archived:[] };
+let ACTION_TEAM = 'all';
+let LEAD_TEAM = 'all';
+async function loadRoster(){
+  try{
+    const r = await fetch('/api/novus/personalisation?novus_operation=team-roster', { headers:{ Accept:'application/json' } });
+    const d = await r.json();
+    if(r.ok && d.success !== false) ROSTER = { me:d.me || '', members:d.members || [], archived:d.archived || [] };
+  }catch{ /* names fall back; filters show All/Mine/Unassigned */ }
+  if(LOADED) renderAll();
+}
+function teamMatch(userId, key){
+  if(key === 'all') return true;
+  if(key === 'me') return Boolean(ROSTER.me) && userId === ROSTER.me;
+  if(key === 'none') return !userId;
+  return userId === key;
+}
+function teamFilterHtml(current, attr, allLabel, mineLabel, rows, idOf){
+  const n = (key) => rows.filter((r) => teamMatch(idOf(r), key)).length;
+  const opts = [['all', allLabel], ['me', mineLabel], ...ROSTER.members.map((u) => [u.user_id, u.display_name]), ['none', 'Unassigned']];
+  return `<div class="seg" style="flex-wrap:wrap">${opts.map(([key, label]) =>
+    `<button type="button" class="${key === current ? 'on' : ''}" ${attr}="${esc(key)}">${esc(label)} <span class="tab-n">${n(key)}</span></button>`).join('')}</div>`;
+}
+/* Reassign control for one action; '' = follow the lead owner. */
+function assignSelectHtml(action){
+  if(!action.id && !action.action_id) return '';
+  const id = action.id || action.action_id;
+  const explicit = action.assigned_explicit ? action.assigned_user_id : '';
+  const ownerLabel = action.assigned_explicit ? 'Lead owner' : `Lead owner · ${assigneeName(action.assigned_user_id)}`;
+  return `<select class="input assign-action" data-action="${esc(id)}" aria-label="Assigned to" style="height:28px;font-size:12px;padding:0 6px;width:auto">
+    <option value=""${explicit ? '' : ' selected'}>${esc(ownerLabel)}</option>
+    ${ROSTER.members.map((u) => `<option value="${esc(u.user_id)}"${u.user_id === explicit ? ' selected' : ''}>${esc(u.display_name)}</option>`).join('')}</select>`;
+}
+function ownerSelectHtml(lead){
+  const cur = lead.owner_user_id || '';
+  const known = ROSTER.members.some((u) => u.user_id === cur);
+  return `<label class="sub" style="display:inline-flex;gap:6px;align-items:center;margin-left:6px">Owner
+    <select class="input" id="d-owner" data-agency="${esc(lead.agency_id)}" style="height:26px;font-size:12px;padding:0 6px;width:auto">
+      <option value=""${cur ? '' : ' selected'}>Unassigned</option>
+      ${!known && cur ? `<option value="${esc(cur)}" selected>${esc(assigneeName(cur))}</option>` : ''}
+      ${ROSTER.members.map((u) => `<option value="${esc(u.user_id)}"${u.user_id === cur ? ' selected' : ''}>${esc(u.display_name)}</option>`).join('')}
+    </select></label>`;
+}
+async function setLeadOwner(agencyId, userId, select){
+  const lead = LEADS.find((l) => l.agency_id === agencyId);
+  if(!window.confirm(`Change the owner of ${lead?.agency_name || 'this lead'} from ${assigneeName(lead?.owner_user_id)} to ${assigneeName(userId)}?\n\nIndividually assigned actions keep their assignee.`)){
+    if(select) select.value = lead?.owner_user_id || ''; return;
+  }
+  await postWorkflow('/api/novus/personalisation?novus_operation=lead-owner-set', { agency_id:agencyId, user_id:userId, reason:'Changed from the lead profile', confirm:'SET_LEAD_OWNER' });
+  await load(true);
+}
+async function assignAction(actionId, userId){
+  await postWorkflow('/api/novus/personalisation?novus_operation=action-assign', { action_id:actionId, user_id:userId, confirm:'ASSIGN_ACTION' });
+  await load(true);
 }
 const QUEUE_TONE  = { JOE:'t-amber', PROBER:'t-blue', SYSTEM:'t-grey', CALLING:'t-blue', SORT:'t-grey' };
 const PRIORITY_TONE = { CRITICAL:'t-red', HIGH:'t-amber', NORMAL:'t-blue', LOW:'t-grey' };
@@ -1083,6 +1146,7 @@ function taskHtml(lead){
       </div>
       <div class="task-who"><b>${dash(lead.agency_name)}</b> &middot; ${esc(contact)}</div>
       <div class="task-why">${dash(humaniseReason(a.reason || lead.current_stage_reason))}</div>
+      <div class="task-why" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">Assigned to <b>${esc(assigneeName(a.assigned_user_id))}</b>${a.id ? assignSelectHtml(a) : ''}</div>
       ${a.interested && lead.reply.text ? `<div class="quote" style="margin-top:6px;max-height:4.9em;overflow:hidden">${esc(lead.reply.text)}</div>` : ''}
     </div>
     <div class="task-side">
@@ -1097,10 +1161,13 @@ function renderActions(){
   /* DUE NOW ONLY. A scheduled follow-up is real work, but it is not today's
      work, and mixing the two is what stopped this page answering "what do I
      need to do now?". */
-  const all = dueActions();
-  const scheduled = futureActions();
+  const assigneeOf = (l) => l.next_action.assigned_user_id || '';
+  const mine = (l) => teamMatch(assigneeOf(l), ACTION_TEAM);
+  $('ac-team').innerHTML = teamFilterHtml(ACTION_TEAM, 'data-actteam', 'All team', 'My actions', [...manualActions(), ...sortLeadActions()], assigneeOf);
+  const all = dueActions().filter(mine);
+  const scheduled = futureActions().filter(mine);
   const later = scheduled.length;
-  const sortLeads = sortLeadActions();
+  const sortLeads = sortLeadActions().filter(mine);
   $('ac-tabs').innerHTML = ACTION_TABS.map((t) => {
     const n = t.scheduled ? later : t.sortLeads ? sortLeads.length : t.interested ? all.filter((l) => l.next_action.interested).length : (t.types ? all.filter((l) => t.types.includes(l.next_action.type)).length : all.length);
     return `<button class="tab ${t.key === ACTION_TAB ? 'on' : ''}" data-actiontab="${t.key}" type="button">
@@ -1275,6 +1342,7 @@ async function loadProbeQueue(){
 /* ── LEADS ──────────────────────────────────────────────────────────── */
 
 function leadMatches(lead){
+  if(!teamMatch(lead.owner_user_id || '', LEAD_TEAM)) return false;
   const q = $('q').value.trim().toLowerCase();
   if(q){
     const hay = [lead.agency_name, lead.contact.name, lead.contact.email, lead.contact.phone,
@@ -1294,6 +1362,7 @@ function leadMatches(lead){
 
 function renderLeads(){
   if(!LOADED){ $('ld-rows').innerHTML = ''; $('ld-empty').innerHTML = skeletonRows(6); return; }
+  $('ld-team').innerHTML = teamFilterHtml(LEAD_TEAM, 'data-leadteam', 'All leads', 'My leads', LEADS, (l) => l.owner_user_id || '');
   const rows = LEADS.filter(leadMatches);
   $('ld-count').textContent = rows.length === LEADS.length
     ? `${LEADS.length} ${LEADS.length === 1 ? 'agency' : 'agencies'}`
@@ -1308,6 +1377,7 @@ function renderLeads(){
         ? `${esc(actionLabel(l.next_action.type))}<div class="t-sub ${due.cls === 'over' ? 'muted' : ''}">${esc(due.text)}</div>`
         : '<span class="muted">&mdash;</span>'}</td>
       <td class="col-md">${l.action_queue ? pill(QUEUE_LABEL[l.action_queue], QUEUE_TONE[l.action_queue], true) : '<span class="muted">&mdash;</span>'}</td>
+      <td class="col-md">${l.owner_user_id ? esc(assigneeName(l.owner_user_id)) : '<span class="muted">Unassigned</span>'}</td>
       <td class="col-lg nowrap">${l.latest_event.at ? esc(ago(l.latest_event.at)) : '<span class="muted">&mdash;</span>'}</td>
       <td class="col-md">${l.priority ? pill(l.priority.toLowerCase(), PRIORITY_TONE[l.priority], true) : '<span class="muted">&mdash;</span>'}</td>
     </tr>`;
@@ -1630,7 +1700,7 @@ function paneActions(lead){
     `${pill(status(a).toLowerCase(), tone[status(a)], true)}
      <div class="sub">${[a.due_at ? `due ${esc(when(a.due_at))}` : '', actionAssignee(a) ? `assigned to ${esc(assigneeName(actionAssignee(a)))}` : ''].filter(Boolean).join(' · ')}</div>
      <div class="sub">${esc(a.note || humaniseReason(a.completion_reason || a.reason || ''))}</div>
-     ${controls ? `<div class="btnrow"><button class="btn btn-secondary btn-sm action-complete" data-action="${esc(a.action_id)}" type="button">Complete</button><button class="btn btn-quiet btn-sm action-complete-next" data-action="${esc(a.action_id)}" type="button">Complete + next</button><button class="btn btn-quiet btn-sm action-snooze" data-action="${esc(a.action_id)}" type="button">Snooze</button></div>` : ''}`,
+     ${controls ? `<div class="btnrow">${assignSelectHtml(a)}<button class="btn btn-secondary btn-sm action-complete" data-action="${esc(a.action_id)}" type="button">Complete</button><button class="btn btn-quiet btn-sm action-complete-next" data-action="${esc(a.action_id)}" type="button">Complete + next</button><button class="btn btn-quiet btn-sm action-snooze" data-action="${esc(a.action_id)}" type="button">Snooze</button></div>` : ''}`,
   ])) : '<div class="note">None.</div>';
   return blk('Actions', `<div class="btnrow"><button class="btn btn-secondary btn-sm create-action" data-agency="${esc(lead.agency_id)}" type="button">+ Action</button></div>
     <h4>Active action</h4>${actionRows(active, true)}
@@ -1830,7 +1900,8 @@ function paintDrawerHead(lead){
   $('d-sub').textContent = [lead.contact.name, lead.contact.email].filter(Boolean).join(' · ') || 'No resolved contact';
   $('d-pills').innerHTML = stagePill(lead.current_stage)
     + (lead.action_queue ? pill(QUEUE_LABEL[lead.action_queue], QUEUE_TONE[lead.action_queue]) : '')
-    + (lead.priority ? pill(lead.priority.toLowerCase(), PRIORITY_TONE[lead.priority], true) : '');
+    + (lead.priority ? pill(lead.priority.toLowerCase(), PRIORITY_TONE[lead.priority], true) : '')
+    + ownerSelectHtml(lead);
 }
 
 function closeDrawer(){
@@ -2346,13 +2417,17 @@ document.addEventListener('click', (e) => {
   if(e.target.classList.contains('action-complete-next')){ completeAction(e.target.dataset.action, true).catch((err) => window.alert(err.message)); return; }
   if(e.target.classList.contains('action-snooze')){ snoozeAction(e.target.dataset.action).catch((err) => window.alert(err.message)); return; }
   if(e.target.classList.contains('create-action')){ if(OPEN_LEAD) createAction(OPEN_LEAD).catch((err) => window.alert(err.message)); return; }
+  const actTeam = e.target.closest('[data-actteam]');
+  if(actTeam){ ACTION_TEAM = actTeam.dataset.actteam; renderActions(); return; }
+  const leadTeam = e.target.closest('[data-leadteam]');
+  if(leadTeam){ LEAD_TEAM = leadTeam.dataset.leadteam; renderLeads(); return; }
 
   /* A row/task click opens the record. Anything that is itself a link or a
      button inside the row keeps its own behaviour. */
   if(e.target.classList.contains('open-reply')){ openDrawer(e.target.dataset.agency, 'conversation'); return; }
   const histFilter = e.target.closest('[data-histfilter]');
   if(histFilter){ HIST_FILTER = histFilter.dataset.histfilter; paintHistory(); return; }
-  if(e.target.closest('a,button')) return;
+  if(e.target.closest('a,button,select,label')) return;
   const row = e.target.closest('[data-id]');
   if(row && row.dataset.id) openDrawer(row.dataset.id, row.dataset.openPane ? drawerPane(row.dataset.openPane) : undefined);
 });
@@ -2373,6 +2448,10 @@ $('f-clear').addEventListener('click', () => {
   $(id).addEventListener('change', renderLeads);
 });
 document.addEventListener('input', (e) => { if(e.target.id === 'reply-body') syncReplyControls(); });
+document.addEventListener('change', (e) => {
+  if(e.target.id === 'd-owner') setLeadOwner(e.target.dataset.agency, e.target.value, e.target).catch((err) => window.alert(err.message));
+  else if(e.target.classList.contains('assign-action')) assignAction(e.target.dataset.action, e.target.value).catch((err) => window.alert(err.message));
+});
 document.addEventListener('keydown', (e) => {
   if(e.key === 'Escape'){ closeDrawer(); return; }
   /* "/" focuses search from anywhere except a field. */
@@ -2386,6 +2465,7 @@ document.addEventListener('keydown', (e) => {
 applyTabFromHash();
 showView(routeFromHash(), { push:false });
 load(false);
+loadRoster();
 </script>
 
 <!-- ══ AUTONOMOUS PROBING — CONTROL CLIENT ══════════════════════════════════

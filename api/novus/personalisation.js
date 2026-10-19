@@ -35,6 +35,8 @@ import { requireAuth as requireAdminAuth, resolveCaller, sendUnauthorized, requi
 import { handleAuthLogin, handleAuthLogout, isSameOriginWrite } from '../../lib/auth-session.mjs';
 import { SETTER_OPERATIONS } from '../../lib/novus-users.mjs';
 import { handleWhoami, handleTeamUsers, handleTeamUserCreate, handleTeamUserStatus, handleTeamUserReset, handleTeamUserRole } from '../../lib/team-handlers.mjs';
+import { handleTeamRoster, handleLeadOwnerSet, handleActionAssign, handleTeamUserDeletePreview, handleTeamUserDelete, handleOwnershipMigrate, readRoster } from '../../lib/ownership-handlers.mjs';
+import { claimLeadIfUnassigned, claimingUser, leadOwnerOf, readOwnershipTable } from '../../lib/lead-ownership.mjs';
 import {
   handleCallSessionCurrent, handleCallSessionStart, handleCallSessionPause, handleCallSessionResume, handleCallSessionEnd,
   handleCallSessionHeartbeat, handleCallPerformance, handleCallSessionDetail, handleCallSessionCorrect, handleCallSessionApprove,
@@ -878,7 +880,7 @@ async function handleOperatorDashboard(req, res) {
     const repo = getRepo();
     const entries = await Promise.all(ACQUISITION_REQUIRED_TABS.map(async (tab) => [tab, await repo.getTable(tab)]));
     let actionsAvailable = false;
-    for (const tab of ['SALES_MESSAGES', 'ACTIONS']) {
+    for (const tab of ['SALES_MESSAGES', 'ACTIONS', 'LEAD_OWNERSHIP']) {
       try {
         const table = await repo.getTable(tab);
         entries.push([tab, table]);
@@ -989,6 +991,15 @@ async function handleOperatorActionCreate(req, res) {
       probe_id: String(req.body?.probe_id || '').trim(),
       reply_event_id: String(req.body?.reply_event_id || '').trim(),
     }, now);
+    // Assignee: the one supplied, else the lead's owner at creation (blank
+    // for an unassigned lead — it then follows whoever claims the lead).
+    const requested = String(req.body?.assigned_user_id || '').trim();
+    if (requested && !(await readRoster(repo)).some((u) => u.user_id === requested && u.status === 'ACTIVE')) {
+      return res.status(400).json({ success: false, error: 'Choose an active team member' });
+    }
+    // Soft: an unreadable ownership ledger never blocks creating the action.
+    const assignee = requested || await readOwnershipTable(repo).then((t) => leadOwnerOf(t, agencyId)).catch(() => '');
+    if (assignee) row.metadata_json = JSON.stringify({ ...JSON.parse(row.metadata_json), assigned_user_id: assignee });
     const created = await appendAction(repo, row, now);
     invalidateOperatorCaches();
     return res.status(201).json({ success: true, action: created.row });
@@ -1027,8 +1038,10 @@ async function handleOperatorActionComplete(req, res) {
       if (future?.action_id) await patchAction(repo, future.action_id, { action_status: 'CANCELLED', cancelled_at: now, updated_at: now, completion_reason: 'Rolled back after parent completion failed' }).catch(() => null);
       throw err;
     }
+    // Completing an outreach action is a meaningful interaction.
+    const ownership = await claimLeadIfUnassigned(repo, { agencyId: action.agency_id, user: claimingUser(req), source: 'action-complete', refId: actionId });
     invalidateOperatorCaches();
-    return res.status(200).json({ success: true, action_id: actionId, completed_at: now, next_action: future });
+    return res.status(200).json({ success: true, action_id: actionId, completed_at: now, next_action: future, ownership });
   } catch (err) {
     return res.status(500).json({ success: false, error: err?.message || 'Could not complete action' });
   }
@@ -1088,6 +1101,7 @@ async function handleOperatorMarkMeetingBooked(req, res) {
   }
 }
 
+const actionMeta = (row) => { try { return JSON.parse(String(row?.metadata_json || '').trim() || '{}') || {}; } catch { return {}; } };
 const CALL_OUTCOMES = new Set(['NO_ANSWER', 'SPOKE_CONTINUE', 'MEETING_BOOKED', 'NOT_INTERESTED', 'CALL_LATER']);
 async function handleOperatorCallOutcome(req, res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -1119,7 +1133,7 @@ async function handleOperatorCallOutcome(req, res) {
     }
     if (!['PENDING', 'DUE', 'IN_PROGRESS'].includes(String(action.action_status).toUpperCase())) return res.status(409).json({ success: false, error: 'Action is no longer active' });
     const now = new Date().toISOString();
-    await patchAction(repo, actionId, { action_status: 'COMPLETED', completed_at: now, updated_at: now, completion_reason: `CALL_OUTCOME:${outcome}`, metadata_json: JSON.stringify({ outcome, note: String(req.body?.note || '').trim(), due_at: futureAt }) });
+    await patchAction(repo, actionId, { action_status: 'COMPLETED', completed_at: now, updated_at: now, completion_reason: `CALL_OUTCOME:${outcome}`, metadata_json: JSON.stringify({ ...actionMeta(action), outcome, note: String(req.body?.note || '').trim(), due_at: futureAt }) });
     if (outcome === 'MEETING_BOOKED' || outcome === 'NOT_INTERESTED') {
       const marked = await markAgencyTerminal(repo, action.agency_id, outcome, now);
       if (!marked.ok) return res.status(marked.status).json({ success: false, error: marked.error });
@@ -1135,6 +1149,7 @@ async function handleOperatorCallOutcome(req, res) {
         source_stage: 'CALL_DUE', dedupe_key: `${action.agency_id}:${type}:${actionId}:${dueAt}`, metadata_json: JSON.stringify({ parent_action_id: actionId, outcome }),
       }, now);
     }
+    await claimLeadIfUnassigned(repo, { agencyId: action.agency_id, user: claimingUser(req), source: 'call', refId: actionId });
     invalidateOperatorCaches();
     return res.status(200).json({ success: true, action_id: actionId, outcome });
   } catch (err) {
@@ -1698,6 +1713,7 @@ async function handleOperatorManualReplyLive(req, res) {
       expectedReceivedAt,
       apiKey,
       mailboxes: novusMailboxes(),
+      sentBy: req.novusUser?.user_id || 'joe',
     });
 
     // A send may be irreversible even if a later local write failed. `sent`
@@ -1705,6 +1721,8 @@ async function handleOperatorManualReplyLive(req, res) {
     // warning the operator must act on.
     if (result.sent) {
       invalidateOperatorCaches();
+      // An individual email is a meaningful interaction.
+      result.ownership = await claimLeadIfUnassigned(repo, { agencyId: result.target?.agency_id, user: claimingUser(req), source: 'email', refId: replyEventId });
       try { result.action_reconciliation = await reconcileActionEngine(repo, { agencyId: result.target?.agency_id }); }
       catch (err) {
         console.error('manual-reply action reconciliation failed:', err?.message || err);
@@ -1795,6 +1813,27 @@ export default async function handler(req, res) {
   // ── Team / accounts ──────────────────────────────────────────────────
   if (req.method === 'GET' && req.query?.novus_operation === 'whoami') return handleWhoami(req, res);
   const TEAM_OPERATIONS = { 'team-user-create': handleTeamUserCreate, 'team-user-status': handleTeamUserStatus, 'team-user-reset': handleTeamUserReset, 'team-user-role': handleTeamUserRole };
+  // ── Ownership (lib/ownership-handlers.mjs) ───────────────────────────
+  // team-roster is on SETTER_OPERATIONS (names only); the rest are ADMIN.
+  if (req.method === 'GET' && req.query?.novus_operation === 'team-roster') {
+    if (!requireAuth(req, res)) return;
+    return handleTeamRoster(req, res);
+  }
+  if (req.method === 'GET' && req.query?.novus_operation === 'team-user-delete-preview') {
+    if (!requireAuth(req, res)) return;
+    return handleTeamUserDeletePreview(req, res);
+  }
+  const OWNERSHIP_WRITE_OPERATIONS = {
+    'lead-owner-set': handleLeadOwnerSet, 'action-assign': handleActionAssign,
+    'team-user-delete': handleTeamUserDelete, 'team-ownership-migrate': handleOwnershipMigrate,
+  };
+  if (req.method === 'POST' && OWNERSHIP_WRITE_OPERATIONS[req.query?.novus_operation]) {
+    if (!requireAuth(req, res)) return;
+    const out = await OWNERSHIP_WRITE_OPERATIONS[req.query.novus_operation](req, res);
+    invalidateOperatorCaches();
+    invalidateLeadIndex();
+    return out;
+  }
   if (req.method === 'GET' && req.query?.novus_operation === 'team-users') {
     if (!requireAuth(req, res)) return;
     return handleTeamUsers(req, res);
