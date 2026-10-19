@@ -53,6 +53,7 @@ import { anthropicApiKeyVariable, hasAnthropicApiKey } from '../../lib/anthropic
 import { normalizeInstantlyEmail } from '../../lib/reply-router.mjs';
 import { PHRASES, DETERMINISTIC_PHRASES, CONTEXTUAL_PHRASES } from '../../lib/reply-classification-fixtures.mjs';
 import { buildOperatorLeads, OPERATOR_TABS } from '../../lib/operator-leads.mjs';
+import { handlePriorities, invalidatePrioritiesCache } from '../../lib/priorities-handler.mjs';
 import {
   ACQUISITION_REQUIRED_TABS,
   buildAcquisitionDashboard,
@@ -85,7 +86,7 @@ import { buildInstantlyReplyPayload } from '../../lib/instantly-reply-send.mjs';
 // calling workspace is a set of operations here, implemented in lib/.
 import {
   handleCallingWorkspace, handleCallingAnalytics, handleCallingSetup, handleCallingStart, handleCallingSave, handleCallingDiscard, handleCallingRepair, handleCallingActionReview,
-  handleScriptSave, handleScriptDuplicate, handleScriptStatus, handleObjectionSave,
+  handleScriptSave, handleScriptDuplicate, handleScriptStatus, handleObjectionSave, invalidateCallingCache,
 } from '../../lib/calling-handlers.mjs';
 import {
   handleTwilioToken, handleVoiceOutbound, handleVoiceStatus, handleVoiceRecording, handleCallingRecording,
@@ -825,6 +826,10 @@ let operatorDashboardCache = null;
 function invalidateOperatorCaches() {
   operatorLeadsCache = null;
   operatorDashboardCache = null;
+  invalidatePrioritiesCache();
+  // An action picked up / rescheduled from Your Priorities must show in Calling
+  // Mode straight away (its workspace is cached for 30s).
+  invalidateCallingCache();
 }
 
 async function loadOperatorTables(repo) {
@@ -971,6 +976,8 @@ function manualActionRow(input, context, now, parentActionId = '') {
       note: String(input?.note || '').trim(),
       priority,
       ...(parentActionId ? { parent_action_id: parentActionId } : {}),
+      // A missed meeting (Your Priorities → No-show): ties the rebook to the meeting it replaces.
+      ...(input?.no_show === true ? { no_show: true, meeting_at: String(input?.meeting_at || '').trim() } : {}),
     }),
   };
 }
@@ -1059,9 +1066,13 @@ async function handleOperatorActionSnooze(req, res) {
     const action = read.rows.find((row) => String(row.action_id).trim() === actionId);
     if (!action || !activeActionStatus(action.action_status)) return res.status(409).json({ success: false, error: 'Action is not active' });
     const now = new Date().toISOString();
-    await patchAction(repo, actionId, { action_status: 'SNOOZED', due_at: dueAt, updated_at: now });
+    const dueIso = new Date(Date.parse(dueAt)).toISOString();
+    // Recorded on the row so the reconciler keeps the new date (see
+    // reconcileActions) and the change is attributable.
+    const metadata = { ...actionMeta(action), rescheduled: { due_at: dueIso, at: now, by: req.novusUser?.user_id || 'admin', from: String(action.due_at || ''), note: String(req.body?.note || '').trim().slice(0, 300) } };
+    await patchAction(repo, actionId, { action_status: 'SNOOZED', due_at: dueIso, updated_at: now, metadata_json: JSON.stringify(metadata) });
     invalidateOperatorCaches();
-    return res.status(200).json({ success: true, action_id: actionId, due_at: dueAt });
+    return res.status(200).json({ success: true, action_id: actionId, due_at: dueIso });
   } catch (err) {
     return res.status(500).json({ success: false, error: err?.message || 'Could not snooze action' });
   }
@@ -1133,21 +1144,32 @@ async function handleOperatorCallOutcome(req, res) {
     }
     if (!['PENDING', 'DUE', 'IN_PROGRESS'].includes(String(action.action_status).toUpperCase())) return res.status(409).json({ success: false, error: 'Action is no longer active' });
     const now = new Date().toISOString();
-    await patchAction(repo, actionId, { action_status: 'COMPLETED', completed_at: now, updated_at: now, completion_reason: `CALL_OUTCOME:${outcome}`, metadata_json: JSON.stringify({ ...actionMeta(action), outcome, note: String(req.body?.note || '').trim(), due_at: futureAt }) });
+    const completion = { action_status: 'COMPLETED', completed_at: now, updated_at: now, completion_reason: `CALL_OUTCOME:${outcome}`, metadata_json: JSON.stringify({ ...actionMeta(action), outcome, note: String(req.body?.note || '').trim(), due_at: futureAt }) };
     if (outcome === 'MEETING_BOOKED' || outcome === 'NOT_INTERESTED') {
+      // The agency status is the operation; the action is only completed once it has landed.
       const marked = await markAgencyTerminal(repo, action.agency_id, outcome, now);
       if (!marked.ok) return res.status(marked.status).json({ success: false, error: marked.error });
+      await patchAction(repo, actionId, completion);
       try { await reconcileActionEngine(repo, { agencyId: action.agency_id, now }); }
       catch (err) { console.error('terminal call-outcome action cancellation failed:', err?.message || err); }
     } else {
+      // NEXT STEP FIRST. Completing before the follow-up existed could leave a
+      // completed call with no next action if the append failed. Now the
+      // follow-up is written, then the call is completed, and a failed
+      // completion rolls the follow-up back (same pattern as action-complete).
       const type = outcome === 'NO_ANSWER' ? 'RETRY_CALL' : outcome === 'CALL_LATER' ? 'CALL_PROSPECT' : requestedNextType;
       const dueAt = outcome === 'NO_ANSWER' ? addMs(now, ACQUISITION_POLICY.callNoAnswerRetryMs) : futureAt;
-      await appendAction(repo, {
+      const created = await appendAction(repo, {
         agency_id: action.agency_id, outreach_id: action.outreach_id, probe_id: action.probe_id,
         action_type: type, action_owner: 'JOE', action_status: 'PENDING', due_at: dueAt,
         reason: outcome === 'NO_ANSWER' ? 'Call was not answered; retry after central 48-hour policy' : `Call outcome ${outcome} requires a future checkpoint`,
         source_stage: 'CALL_DUE', dedupe_key: `${action.agency_id}:${type}:${actionId}:${dueAt}`, metadata_json: JSON.stringify({ parent_action_id: actionId, outcome }),
       }, now);
+      try { await patchAction(repo, actionId, completion); }
+      catch (err) {
+        if (created?.row?.action_id && !created.reused) await patchAction(repo, created.row.action_id, { action_status: 'CANCELLED', cancelled_at: now, updated_at: now, completion_reason: 'Rolled back after parent completion failed' }).catch(() => null);
+        throw err;
+      }
     }
     await claimLeadIfUnassigned(repo, { agencyId: action.agency_id, user: claimingUser(req), source: 'call', refId: actionId });
     invalidateOperatorCaches();
@@ -1963,6 +1985,11 @@ export default async function handler(req, res) {
     // method, and the operation performs Sheets READS only.
     if (!requireAuth(req, res)) return;
     return handleOperatorLeads(req, res);
+  }
+  if (req.method === 'GET' && req.query?.novus_operation === 'priorities') {
+    // YOUR PRIORITIES (lib/priorities.mjs). READ-ONLY; shared by admin and setter.
+    if (!requireAuth(req, res)) return;
+    return handlePriorities(req, res);
   }
   if (req.method === 'GET' && req.query?.novus_operation === 'operator-dashboard') {
     if (!requireAuth(req, res)) return;

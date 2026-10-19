@@ -218,7 +218,9 @@ const ADMIN_ONLY = [
   ['GET', 'discovery-meetings'], ['GET', 'discovery-session', { session_id: 'ds_1' }],
   ['GET', 'campaigns-list'], ['GET', 'campaign-detail', { campaign_id: 'cmp_a1' }],
   ['POST', 'campaign-create'], ['POST', 'campaign-push'], ['POST', 'campaign-launch'], ['POST', 'campaign-pause'], ['POST', 'campaign-delete'],
-  ['POST', 'operator-manual-reply'], ['POST', 'send-demo'], ['POST', 'operator-action-complete'], ['POST', 'operator-action-create'],
+  ['POST', 'operator-manual-reply'], ['POST', 'send-demo'],
+  // operator-action-complete / -create / -snooze and action-assign are shared
+  // workspace operations since Your Priorities (Oct 2026) — see novus-priorities-selftest.
   ['POST', 'team-user-create'], ['POST', 'team-user-status'], ['POST', 'team-user-reset'],
   ['POST', 'call-session-approve'], ['POST', 'call-session-correct'],
   ['POST', 'script-save'], ['POST', 'objection-save'], ['POST', 'calling-setup'], ['POST', 'calling-repair'],

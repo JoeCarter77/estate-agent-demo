@@ -42,7 +42,7 @@ const SESSION_COOKIE = 'novus_session';
 const LOGIN_PAGE = '/novus/login.html';
 const PUBLIC_PAGES = new Set(['/novus/login', '/novus/login.html']);
 const PUBLIC_API = new Set(['/api/novus/auth/login', '/api/novus/auth/logout']);
-const SETTER_PAGES = new Set(['/novus/calling', '/novus/calling.html']);
+const SETTER_PAGES = new Set(['/novus/calling', '/novus/calling.html', '/novus/priorities', '/novus/priorities.html']);
 // Stylesheets, scripts, images and fonts hold no NOVUS data (the repository is
 // public); the login page needs them before anyone is signed in.
 const STATIC_ASSET = /\.(css|js|png|svg|ico|woff2?)$/i;
@@ -136,7 +136,7 @@ export default async function middleware(req) {
       if (session.role === 'SETTER') {
         if (fullCheckDownstream || SETTER_PAGES.has(pathname)) return;
         if (isApi) return json(403, { success: false, error: 'Not available to your account' });
-        return Response.redirect(new URL('/novus/calling.html', req.url), 302);
+        return Response.redirect(new URL('/novus/priorities.html', req.url), 302);
       }
     }
   }

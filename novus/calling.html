@@ -90,8 +90,8 @@
       <div class="nav-label">Workspace</div>
       <a class="nav-item" data-nav="dashboard" href="/novus/operator.html#dashboard">
         <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Dashboard</span></a>
-      <a class="nav-item" data-nav="actions" href="/novus/operator.html#actions">
-        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>Actions</span><span class="nav-badge zero" id="b-actions">0</span></a>
+      <a class="nav-item" data-nav="actions" href="/novus/priorities.html">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>Your Priorities</span><span class="nav-badge zero" id="b-actions">0</span></a>
       <a class="nav-item" data-nav="leads" href="/novus/operator.html#leads">
         <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg><span>Leads</span></a>
     </div>
@@ -116,6 +116,8 @@
     </div>
     <div class="nav-group setter-nav">
       <div class="nav-label">Setter</div>
+      <a class="nav-item" data-nav="priorities" href="/novus/priorities.html">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>Your Priorities</span></a>
       <a class="nav-item" data-nav="calling" href="/novus/calling.html#calling">
         <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span></a>
       <a class="nav-item" data-nav="my-actions" href="/novus/calling.html#call-actions">
@@ -658,7 +660,9 @@ let ROSTER = [];
 const teamName = (id) => (TEAM.find((u)=>u.user_id===id)||ROSTER.find((u)=>u.user_id===id)||{}).display_name || (id==='admin'?'Joe':'');
 const ownerLabel = (id) => !id ? 'Unassigned' : id===ME?.user_id ? `${teamName(id)||'You'} (you)` : (teamName(id)||'Former team member');
 const leadOwnerId = (agencyId) => WS?.leads?.[agencyId]?.owner_user_id || '';
-async function loadRoster(){
+let ROSTER_PROMISE = null;
+function loadRoster(){ ROSTER_PROMISE = loadRosterNow(); return ROSTER_PROMISE; }
+async function loadRosterNow(){
   try{ const r = await fetch(OP('team-roster'), { headers:{ Accept:'application/json' } }); const d = await r.json(); if(r.ok && d.success!==false) ROSTER = [...(d.members||[]), ...(d.archived||[])]; }catch{ ROSTER = []; }
 }
 async function loadMe(){
@@ -1429,7 +1433,9 @@ function startSession(mode, agencyId, actionId=''){
   openMode(); beginCall(lead);
 }
 function openMode(){ window.scrollTo(0,0); $('cm').classList.add('on'); $('cm').setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; }
-function closeMode(){ $('cm').classList.remove('on'); $('cm').setAttribute('aria-hidden','true'); document.body.style.overflow=''; stopTimer(); KEYPAD=false; SESSION=null; CALL=null; saveDraft(); renderResume(); load(true); openDeferredToast(); }
+/* Opened from Your Priorities (?from=priorities): closing Calling Mode goes back there. */
+let RETURN_TO = '';
+function closeMode(){ $('cm').classList.remove('on'); $('cm').setAttribute('aria-hidden','true'); document.body.style.overflow=''; stopTimer(); KEYPAD=false; SESSION=null; CALL=null; saveDraft(); if(RETURN_TO){ location.href = RETURN_TO; return; } renderResume(); load(true); openDeferredToast(); }
 function beginCall(lead){
   /* The server already decided this: a lead with a previous call stays on
      that exact version even if it is now archived (cohort integrity), and
@@ -2651,6 +2657,8 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
   const params = new URLSearchParams(location.search);
   const inboundId = params.get('inbound') || '';
   const leadId = params.get('lead') || '';
+  const actionId = params.get('action') || '';
+  if(params.get('from')==='priorities') RETURN_TO = '/novus/priorities.html';
   if(!inboundId && !leadId) return;
   history.replaceState(null, '', location.pathname + location.hash);
   if(inboundId){
@@ -2660,7 +2668,16 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
   }
   // Outside the calling workspace: open the lead's profile instead (a setter's
   // calling profile; the admin is sent on to the Command Centre drawer).
-  load(false).then(() => { if(LOADED && WS?.leads?.[leadId]) startSession('all', leadId); else location.hash = `#lead?agency=${encodeURIComponent(leadId)}`; });
+  /* Owner names come from the roster: wait for it (briefly) so the opened
+     lead never shows its owner as "former team member". */
+  const rosterReady = () => new Promise((resolve) => { const t0 = Date.now(); (function wait(){ if(ROSTER_PROMISE) ROSTER_PROMISE.then(resolve, resolve); else if(Date.now() - t0 > 3000) resolve(); else setTimeout(wait, 50); })(); });
+  Promise.all([load(false), rosterReady()]).then(() => {
+    if(!(LOADED && WS?.leads?.[leadId])){ location.hash = `#lead?agency=${encodeURIComponent(leadId)}`; return; }
+    /* Tie the call to the priority it came from when Calling Mode knows it;
+       otherwise the save still completes every open call action for the agency. */
+    const known = actionId && (WS.call_actions||[]).some((a)=>a.action_id===actionId && a.agency_id===leadId);
+    startSession('all', leadId, known ? actionId : '');
+  });
 })();
 
 loadMe();

@@ -154,7 +154,7 @@ assert.equal((await request('GET', 'whoami', { cookie: LOUIS })).statusCode, 401
 assert.equal((await request('GET', 'whoami', { cookie: LOUIS_PHONE })).statusCode, 401, 'on every device');
 let r = await login('louis.g', louisPass);
 assert.equal(r.res.statusCode, 200, JSON.stringify(r.res.body));
-assert.equal(r.res.body.user.role, 'ADMIN'); assert.equal(r.res.body.redirect, '/novus/operator.html', 'lands where Joe lands');
+assert.equal(r.res.body.user.role, 'ADMIN'); assert.equal(r.res.body.redirect, '/novus/priorities.html', 'lands where Joe lands');
 LOUIS = r.cookie;
 res = await request('GET', 'whoami', { cookie: LOUIS });
 assert.equal(res.body.user.role, 'ADMIN'); assert.equal(res.body.user.user_id, louisId, 'he acts as himself, not as Joe');
@@ -284,7 +284,7 @@ for (const c of [LOUIS, LOUIS_ADMIN_2]) {
 }
 // Backstop: even if his ADMIN session record survived, the USERS re-check refuses it.
 r = await login('louis.g', louisPass);
-assert.equal(r.res.body.user.role, 'SETTER'); assert.equal(r.res.body.redirect, '/novus/calling.html');
+assert.equal(r.res.body.user.role, 'SETTER'); assert.equal(r.res.body.redirect, '/novus/priorities.html');
 LOUIS = r.cookie;
 assert.equal((await request('GET', 'team-users', { cookie: LOUIS })).statusCode, 403, 'setter restrictions back in force');
 assert.equal((await mw('/novus/operator.html', LOUIS)).status, 302);

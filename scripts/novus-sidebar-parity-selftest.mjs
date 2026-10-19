@@ -33,6 +33,8 @@ const HTML = {
   'calling.html': read('calling.html'),
   'campaigns.html': read('campaigns.html'),
   'meetings.html': read('meetings.html'),
+  // Your Priorities (Oct 2026): the shared landing page, carries both rails.
+  'priorities.html': read('priorities.html'),
 };
 
 let passed = 0;
@@ -41,7 +43,7 @@ const ok = (msg) => { passed += 1; console.log(`  ✓ ${msg}`); };
 // The canonical admin rail. Order matters.
 const CANONICAL = [
   { group: 'Workspace', key: 'dashboard', label: 'Dashboard', href: '/novus/operator.html#dashboard', badge: null },
-  { group: 'Workspace', key: 'actions', label: 'Actions', href: '/novus/operator.html#actions', badge: 'b-actions' },
+  { group: 'Workspace', key: 'actions', label: 'Your Priorities', href: '/novus/priorities.html', badge: 'b-actions' },
   { group: 'Workspace', key: 'leads', label: 'Leads', href: '/novus/operator.html#leads', badge: null },
   { group: 'Acquisition', key: 'email', label: 'Email', href: '/novus/operator.html#email', badge: 'b-email-actions' },
   { group: 'Acquisition', key: 'calling', label: 'Calling', href: '/novus/calling.html#calling', badge: 'b-calls' },
@@ -52,6 +54,7 @@ const CANONICAL = [
   { group: 'foot', key: 'settings', label: 'Settings', href: '/novus/operator.html#settings', badge: 'b-exceptions' },
 ];
 const SETTER = [
+  { key: 'priorities', label: 'Your Priorities', href: '/novus/priorities.html' },
   { key: 'calling', label: 'Calling', href: '/novus/calling.html#calling' },
   { key: 'my-actions', label: 'My Actions', href: '/novus/calling.html#call-actions' },
   { key: 'leads', label: 'Leads', href: '/novus/calling.html#leads' },
@@ -95,7 +98,7 @@ const NAVS = Object.fromEntries(Object.entries(HTML).map(([f, h]) => [f, parseNa
 
 console.log('\nBranding');
 for (const [file, nav] of Object.entries(NAVS)) assert.equal(nav.navSub, 'Acquisition', `${file}: NOVUS / Acquisition branding`);
-ok('all four pages carry the same NOVUS / Acquisition sidebar branding');
+ok('all five pages carry the same NOVUS / Acquisition sidebar branding');
 
 console.log('\nThe canonical admin rail');
 for (const [file, nav] of Object.entries(NAVS)) {
@@ -121,7 +124,7 @@ assert.ok(/class="nav-scroll"/.test(NAVS['operator.html'].raw), 'rail has its ow
 ok('the rail middle scrolls independently; the foot (Settings, account, sign out) stays pinned');
 
 console.log('\nThe setter rail (calling.html only)');
-assert.deepEqual(NAVS['calling.html'].setter.map(({ key, label, href }) => ({ key, label, href })), SETTER);
+for (const f of ['calling.html', 'priorities.html']) assert.deepEqual(NAVS[f].setter.map(({ key, label, href }) => ({ key, label, href })), SETTER, `${f}: setter rail`);
 for (const f of ['operator.html', 'campaigns.html', 'meetings.html']) assert.equal(NAVS[f].setter.length, 0, `${f}: no setter rail`);
 const css = HTML['calling.html'];
 assert.ok(/\.setter-nav \{ display:none; \}/.test(css) && /\.role-setter \.setter-nav \{ display:block; \}/.test(css), 'setter rail hidden unless role-setter');
@@ -143,6 +146,7 @@ function resolves(href) {
   if (file === '/novus/campaigns.html') return CAMPAIGN_ROUTES.has(route);
   if (file === '/novus/meetings.html') return MEETING_ROUTES.has(route);
   if (file === '/novus/communications.html') return true;
+  if (file === '/novus/priorities.html') return hash === '';
   return false;
 }
 for (const [file, nav] of Object.entries(NAVS)) {
@@ -156,7 +160,7 @@ for (const [file, html] of Object.entries(HTML)) {
   }
 }
 for (const [file, html] of Object.entries(HTML)) {
-  for (const bare of ['operator', 'calling', 'campaigns', 'meetings']) {
+  for (const bare of ['operator', 'calling', 'campaigns', 'meetings', 'priorities']) {
     assert.ok(!new RegExp(`/novus/${bare}#`).test(html), `${file}: bare /novus/${bare}# link — Vercel serves ${bare}.html, so this 404s`);
   }
 }

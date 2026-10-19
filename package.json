@@ -8,6 +8,7 @@
     "bench:zones": "node scraper-bench.mjs --zones",
     "test": "node parser-test.mjs",
     "novus:selftest": "node scripts/novus-selftest.mjs",
+    "novus:priorities-selftest": "node scripts/novus-priorities-selftest.mjs",
     "novus:agency-probe-selftest": "node scripts/novus-agency-probe-selftest.mjs",
     "novus:comms-selftest": "node scripts/novus-comms-selftest.mjs",
     "novus:comms-delete-selftest": "node scripts/novus-comms-delete-selftest.mjs",

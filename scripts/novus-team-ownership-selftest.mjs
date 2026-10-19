@@ -236,7 +236,8 @@ res = await request('POST', 'operator-action-create', { cookie: JOE, body: { con
 assert.equal(metaOf(actionRow(res.body.action.action_id)).assigned_user_id, 'admin');
 assert.equal(await ownerOf('ag_n4'), '', 'creating an action does not claim');
 ok('5. an action created for Louis\'s lead defaults to Louis; an unassigned lead can still have an explicitly assigned action');
-assert.equal((await request('POST', 'action-assign', { cookie: LOUIS, body: { confirm: 'ASSIGN_ACTION', action_id: newActionId, user_id: louisId } })).statusCode, 403);
+// Shared workspace (Oct 2026): either person may pick up an action.
+assert.equal((await request('POST', 'action-assign', { cookie: LOUIS, body: { confirm: 'ASSIGN_ACTION', action_id: newActionId, user_id: louisId } })).statusCode, 200);
 const statusBefore = actionRow(newActionId).action_status; const dueBefore = actionRow(newActionId).due_at;
 res = await request('POST', 'action-assign', { cookie: JOE, body: { confirm: 'ASSIGN_ACTION', action_id: newActionId, user_id: 'admin' } });
 assert.equal(res.statusCode, 200, JSON.stringify(res.body));

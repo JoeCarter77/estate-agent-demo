@@ -134,7 +134,7 @@ assert.equal(r.res.body.user.role, 'ADMIN'); assert.equal(r.res.body.redirect, '
 const setCookie = String(r.res.headers['Set-Cookie']);
 for (const attr of ['HttpOnly', 'Secure', 'SameSite=Lax', 'Path=/', 'Max-Age=43200']) assert.ok(setCookie.includes(attr), attr);
 assert.ok(!setCookie.includes('admin-env-pass'));
-assert.equal((await login('joe', 'admin-env-pass', '//evil.example/x')).res.body.redirect, '/novus/operator.html', 'no open redirect');
+assert.equal((await login('joe', 'admin-env-pass', '//evil.example/x')).res.body.redirect, '/novus/priorities.html', 'no open redirect');
 res = await request('POST', 'auth-login', { body: { username: 'joe', password: 'admin-env-pass' }, origin: 'https://evil.example' });
 assert.equal(res.statusCode, 403, 'cross-origin sign-in refused');
 const ADMIN = (await login('joe', 'admin-env-pass')).cookie;
@@ -156,7 +156,7 @@ ok('the admin creates Louis from a signed-in session; a cross-origin forged requ
 NOW += 400; // still the same wall-clock second as the account's creation
 r = await login('louis', louisPass, '/novus/operator.html');
 assert.equal(r.res.statusCode, 200);
-assert.equal(r.res.body.redirect, '/novus/calling.html', 'a setter always lands in Calling Mode');
+assert.equal(r.res.body.redirect, '/novus/priorities.html', 'a setter lands on Your Priorities');
 let LOUIS = r.cookie;
 res = await request('GET', 'whoami', { cookie: LOUIS });
 assert.equal(res.statusCode, 200, 'a sign-in in the same second as account creation is valid'); assert.equal(res.body.user.role, 'SETTER'); assert.equal(res.body.user.user_id, louisId);
@@ -182,7 +182,7 @@ const FORBIDDEN = [
   ['POST', 'campaign-create'], ['POST', 'campaign-update'], ['POST', 'campaign-push'], ['POST', 'campaign-launch'], ['POST', 'campaign-delete'],
   ['GET', 'campaigns-list'], ['POST', 'script-save'], ['POST', 'script-status'], ['POST', 'objection-save'], ['POST', 'calling-setup'],
   ['POST', 'calling-repair'], ['GET', 'team-users'], ['POST', 'team-user-create'], ['POST', 'team-user-status'], ['POST', 'team-user-reset'],
-  ['GET', 'operator-leads'], ['GET', 'operator-dashboard'], ['POST', 'operator-action-complete'], ['POST', 'operator-manual-reply'],
+  ['GET', 'operator-leads'], ['GET', 'operator-dashboard'], ['POST', 'operator-manual-reply'],
   ['GET', 'discovery-meetings'], ['POST', 'discovery-outcome'], ['POST', 'send-demo'], ['POST', 'verify-contact'],
   ['GET', 'instantly-replies-test'], ['GET', 'lead-timeline'], ['POST', 'call-session-correct'], ['POST', 'call-session-approve'], ['GET', ''],
 ];
@@ -313,7 +313,7 @@ ok('5 failed sign-ins lock the username for 15 minutes; a missing secret or sess
     assert.equal(await mw('/novus/calling.html', { cookie: LOUIS }), undefined);
     for (const page of ['/novus/operator.html', '/novus/campaigns.html', '/novus/meetings.html', '/novus/probe.html', '/novus']) {
       out = await mw(page, { cookie: LOUIS });
-      assert.equal(out.status, 302, page); assert.equal(loc(out), `https://${HOST}/novus/calling.html`);
+      assert.equal(out.status, 302, page); assert.equal(loc(out), `https://${HOST}/novus/priorities.html`);
     }
     assert.equal((await mw('/api/novus/probe', { cookie: LOUIS })).status, 403);
     assert.equal(await mw('/api/novus/personalisation', { cookie: LOUIS }), undefined, 'the function enforces the allowlist');

@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NOVUS — Your Priorities</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/novus/assets/novus-mark-32.png" />
+  <link rel="apple-touch-icon" href="/novus/assets/novus-mark-128.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <meta name="theme-color" content="#0A0B0E" />
+  <meta name="color-scheme" content="dark" />
+  <!-- THEME, BEFORE FIRST PAINT — see the same snippet in operator.html. -->
+  <script data-theme-boot>
+    (function(){var t='dark';try{var v=localStorage.getItem('novus.theme');if(v==='light'||v==='dark')t=v;}catch(e){}
+    document.documentElement.setAttribute('data-theme',t);})();
+  </script>
+  <link rel="stylesheet" href="/novus/novus-ui.css" />
+  <link rel="stylesheet" href="/novus/novus-shell.css" />
+  <script src="/novus/novus-ui.js" defer></script>
+  <script src="/novus/vendor/twilio-voice-sdk-2.18.5.min.js" defer></script>
+  <script src="/novus/novus-search.js" defer></script>
+  <script src="/novus/novus-inbound.js" defer></script>
+  <!-- YOUR PRIORITIES — the shared daily workspace for Joe and Louis.
+       Data: GET ?novus_operation=priorities (lib/priorities.mjs). Simple
+       summary first → context on click → technical detail only on request. -->
+  <style>
+    .setter-nav { display:none; }
+    .role-setter .setter-nav { display:block; }
+    .role-setter .admin-nav, .role-setter .nav-admin, .role-setter .admin-only { display:none !important; }
+    .pr-page{max-width:980px;}
+    .pr-filters{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 var(--s-5);}
+    .pr-filters button{font:inherit;font-size:12.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--hair-2);background:transparent;color:var(--ink-3);cursor:pointer;}
+    .pr-filters button.on{background:var(--blue-tint);color:var(--ink);border-color:rgba(var(--brand-rgb),.35);}
+    .pr-filters button .n{margin-left:6px;color:var(--ink-4);font-variant-numeric:tabular-nums;}
+    .pr-list{display:flex;flex-direction:column;gap:10px;}
+    .pr-card{border:1px solid var(--hair-2);border-radius:var(--r-lg);background:var(--bg-2);overflow:hidden;}
+    .pr-card.first{border-color:rgba(var(--amber-rgb),.45);}
+    .pr-card.test{opacity:.6;}
+    .pr-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 16px;cursor:pointer;width:100%;text-align:left;background:none;border:0;color:inherit;font:inherit;}
+    .pr-row:hover{background:rgba(var(--ink-rgb),.025);}
+    .pr-agency{font-size:12px;color:var(--ink-3);font-weight:600;letter-spacing:.01em;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    .pr-head{font-size:15.5px;font-weight:700;letter-spacing:.02em;color:var(--ink);margin-top:3px;line-height:1.3;}
+    .pr-card.first .pr-head{color:var(--amber);}
+    .pr-sum{font-size:13px;color:var(--ink-2);margin-top:4px;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+    .pr-when{text-align:right;font-size:12px;color:var(--ink-3);white-space:nowrap;}
+    .pr-when b{display:block;font-size:13px;color:var(--ink);font-weight:600;}
+    .pr-when.over b{color:var(--red);}
+    .pr-who{font-size:11px;color:var(--ink-4);margin-top:3px;}
+    .pr-detail{border-top:1px solid var(--hair);padding:16px;display:none;}
+    .pr-card.open .pr-detail{display:block;}
+    .pr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 22px;}
+    @media (max-width:720px){.pr-grid{grid-template-columns:1fr;} .pr-row{grid-template-columns:1fr;} .pr-when{text-align:left;}}
+    .pr-k{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4);margin-bottom:5px;}
+    .pr-v{font-size:13px;color:var(--ink-2);line-height:1.55;}
+    .pr-v.unk{color:var(--ink-5, var(--ink-4));font-style:italic;}
+    .pr-facts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+    .pr-facts li{font-size:13px;color:var(--ink-2);line-height:1.5;}
+    .pr-facts .when{color:var(--ink-4);font-size:11.5px;}
+    .pr-next{margin-top:14px;padding:12px 14px;border-radius:var(--r-md);background:var(--blue-tint);border:1px solid rgba(var(--brand-rgb),.2);}
+    .pr-next .pr-k{color:var(--blue);}
+    .pr-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center;}
+    .pr-actions .btn-primary{font-size:13px;padding:8px 16px;}
+    .pr-actions select{font:inherit;font-size:12px;background:var(--bg);color:var(--ink-2);border:1px solid var(--hair-2);border-radius:var(--r-sm);padding:5px 8px;}
+    .pr-busy{color:var(--amber);font-weight:600;}
+    .pr-also{margin-top:12px;font-size:12.5px;color:var(--ink-3);}
+    .pr-also li{margin:3px 0;}
+    .pr-why{margin-top:12px;font-size:12px;color:var(--ink-4);}
+    .pr-why summary{cursor:pointer;}
+    .pr-debug{display:none;margin-top:10px;font-family:var(--mono);font-size:11px;white-space:pre-wrap;word-break:break-word;color:var(--ink-4);background:rgba(var(--ink-rgb),.03);border-radius:var(--r-sm);padding:10px;max-height:260px;overflow:auto;}
+    .show-debug .pr-debug{display:block;}
+    .pr-empty{padding:18px;border:1px dashed var(--hair-2);border-radius:var(--r-lg);color:var(--ink-4);font-size:13px;}
+    .pr-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:var(--s-5);font-size:12px;color:var(--ink-4);}
+    .pr-foot a{color:var(--ink-3);}
+    .pr-score{margin-top:var(--s-6);}
+    .pr-score summary{cursor:pointer;list-style:none;}
+    .pr-nums{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:16px;}
+    .pr-num{border:1px solid var(--hair);border-radius:var(--r-md);padding:10px 12px;}
+    .pr-num b{display:block;font-family:var(--mono);font-size:18px;color:var(--ink);}
+    .pr-num span{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);}
+    .pr-num small{display:block;font-size:11px;color:var(--ink-4);margin-top:2px;}
+    .pr-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:16px;}
+    .pr-table th,.pr-table td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--hair);}
+    .pr-table th{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);font-weight:700;}
+    .pr-table td.n{font-family:var(--mono);text-align:right;} .pr-table th.n{text-align:right;}
+    .pr-dlg{position:fixed;inset:0;z-index:90;background:var(--scrim, rgba(0,0,0,.55));display:flex;align-items:flex-start;justify-content:center;padding:80px 16px;}
+    .pr-dlg.hidden{display:none;}
+    .pr-dlg-panel{width:100%;max-width:440px;background:var(--bg);border:1px solid var(--hair-2);border-radius:var(--r-xl);padding:20px 22px;box-shadow:var(--shadow-lg);}
+    .pr-dlg-title{font-weight:700;font-size:15px;margin-bottom:12px;}
+    .pr-dlg-panel label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--ink-3);margin-bottom:10px;}
+    .pr-dlg-panel input,.pr-dlg-panel textarea,.pr-dlg-panel select{font:inherit;font-size:13px;background:var(--bg-2);color:var(--ink);border:1px solid var(--hair-2);border-radius:var(--r-sm);padding:7px 9px;}
+    .pr-quick{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+    .pr-dlg-err{color:var(--red);font-size:12.5px;margin:6px 0;}
+    .pr-dlg-err.hidden{display:none;}
+  </style>
+</head>
+<body>
+<div class="app">
+
+
+  <!-- ── SIDEBAR — ONE canonical rail, identical in operator.html, calling.html, priorities.html,
+       campaigns.html and meetings.html (calling.html adds the setter group).
+       Every item is a plain link keyed by data-nav; each page highlights the
+       destination its current view belongs to. Keep the four copies in
+       lockstep — scripts/novus-sidebar-parity-selftest.mjs asserts it. ── -->
+  <nav class="nav">
+    <div class="nav-brand">
+      <img class="nav-mark" src="/novus/assets/novus-mark-512.png" width="34" height="34" alt="NOVUS" />
+      <div><div class="nav-name">NOVUS</div><div class="nav-sub">Acquisition</div></div>
+    </div>
+    <div class="nav-scroll">
+    <div class="admin-nav">
+    <div class="nav-group">
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item" data-nav="dashboard" href="/novus/operator.html#dashboard">
+        <svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Dashboard</span></a>
+      <a class="nav-item" data-nav="actions" href="/novus/priorities.html">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>Your Priorities</span><span class="nav-badge zero" id="b-actions">0</span></a>
+      <a class="nav-item" data-nav="leads" href="/novus/operator.html#leads">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg><span>Leads</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Acquisition</div>
+      <a class="nav-item" data-nav="email" href="/novus/operator.html#email">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 7l8 6 8-6"/></svg><span>Email</span><span class="nav-badge zero" id="b-email-actions">0</span></a>
+      <a class="nav-item" data-nav="calling" href="/novus/calling.html#calling">
+        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span><span class="nav-badge zero" id="b-calls">0</span></a>
+      <a class="nav-item" data-nav="prober" href="/novus/operator.html#prober">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Prober</span><span class="nav-badge zero" id="b-prober">0</span></a>
+      <a class="nav-item" data-nav="meetings" href="/novus/meetings.html#meetings">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v15H4z"/><path d="M4 10h16"/><path d="M9 3v4M15 3v4"/></svg><span>Meetings</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Management</div>
+      <a class="nav-item" data-nav="analytics" href="/novus/operator.html#analytics">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Analytics</span></a>
+      <a class="nav-item" data-nav="team" href="/novus/calling.html#team">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><path d="M16 4.6a3.5 3.5 0 010 6.8"/><path d="M18.5 14.2A6.5 6.5 0 0121.5 20"/></svg><span>Team</span></a>
+    </div>
+    </div>
+    <div class="nav-group setter-nav">
+      <div class="nav-label">Setter</div>
+      <a class="nav-item" data-nav="priorities" href="/novus/priorities.html">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>Your Priorities</span></a>
+      <a class="nav-item" data-nav="calling" href="/novus/calling.html#calling">
+        <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg><span>Calling</span></a>
+      <a class="nav-item" data-nav="my-actions" href="/novus/calling.html#call-actions">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg><span>My Actions</span><span class="nav-badge zero" id="b-calls-setter">0</span></a>
+      <a class="nav-item" data-nav="leads" href="/novus/calling.html#leads">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg><span>Leads</span></a>
+      <a class="nav-item" data-nav="meetings" href="/novus/calling.html#meetings">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v15H4z"/><path d="M4 10h16"/><path d="M9 3v4M15 3v4"/></svg><span>Meetings</span></a>
+      <a class="nav-item" data-nav="my-performance" href="/novus/calling.html#sessions">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>My Performance</span></a>
+    </div>
+    </div>
+    <div class="nav-foot">
+      <a class="nav-item nav-admin" data-nav="settings" href="/novus/operator.html#settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span>Settings</span><span class="nav-badge zero" id="b-exceptions">0</span></a>
+      <div class="nav-stamp" id="stamp"><span class="spin"></span>Loading</div>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="crumb">NOVUS <span class="muted">/</span> <b id="crumb">Your Priorities</b></div>
+      <div class="topbar-right">
+        <button class="gsearch" type="button" data-global-search title="Search leads (⌘K / Ctrl+K)" aria-label="Search leads">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <span>Search leads, agencies, numbers, properties…</span><kbd>⌘K</kbd></button>
+        <button class="btn btn-secondary btn-sm" id="refresh" type="button">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 019-9 9 9 0 016.7 3M21 12a9 9 0 01-9 9 9 9 0 01-6.7-3"/><path d="M21 3v6h-6M3 21v-6h6"/></svg>Refresh</button>
+        <button class="btn btn-quiet btn-sm themebtn" data-theme-toggle type="button" title="Switch to light theme" aria-label="Switch to light theme" aria-pressed="false">
+          <svg class="ic-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+          <svg class="ic-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1111.2 3a6.6 6.6 0 009.8 9.8z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="page pr-page">
+      <div id="load-err" class="banner err hidden"></div>
+      <div id="warn-box" class="banner warn hidden"></div>
+      <div class="page-head">
+        <div class="page-title" id="hello">Your priorities</div>
+        <div class="page-sub" id="overview">Loading what needs doing…</div>
+      </div>
+      <div class="pr-filters" id="filters" role="tablist" aria-label="Whose priorities"></div>
+
+      <section class="section" id="sec-first">
+        <div class="section-head"><div class="section-title">Do this first</div><div class="section-note" id="n-first"></div></div>
+        <div class="pr-list" id="l-first"></div>
+      </section>
+      <section class="section" id="sec-today">
+        <div class="section-head"><div class="section-title">Today</div><div class="section-note" id="n-today"></div></div>
+        <div class="pr-list" id="l-today"></div>
+      </section>
+      <section class="section" id="sec-coming">
+        <div class="section-head"><div class="section-title">Coming up</div><div class="section-note" id="n-coming"></div>
+          <button class="section-link" id="more-coming" type="button" hidden></button></div>
+        <div class="pr-list" id="l-coming"></div>
+      </section>
+
+      <details class="card pr-score" id="scoreboard">
+        <summary class="card-head"><span class="card-title">This week — results, then activity</span><span class="card-note" id="score-note"></span></summary>
+        <div class="card-body" id="score-body"></div>
+      </details>
+      <div class="pr-foot">
+        <a class="admin-only hidden" href="/novus/operator.html#actions">All actions (advanced list)</a>
+        <label class="pr-debug-toggle"><input type="checkbox" id="debug-toggle" /> Show technical details</label>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- One small dialog, reused for reschedule / complete / no-show. -->
+<div class="pr-dlg hidden" id="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+  <div class="pr-dlg-panel">
+    <div class="pr-dlg-title" id="dlg-title"></div>
+    <div id="dlg-body"></div>
+    <div class="pr-dlg-err hidden" id="dlg-err"></div>
+    <div class="btnrow"><button class="btn btn-primary" id="dlg-ok" type="button">Save</button><button class="btn btn-quiet" id="dlg-cancel" type="button">Cancel</button></div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const OP = (name) => `/api/novus/personalisation?novus_operation=${name}`;
+function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const LONDON = 'Europe/London';
+const fmt = (iso, opts) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('en-GB', { timeZone: LONDON, ...opts }); };
+
+let DATA = null; let ME = null; let FILTER = 'all'; const OPEN = new Set(); let SHOW_ALL_COMING = false;
+
+/* ── small pure decisions (kept free of DOM so they can be tested) ───── */
+function personName(id, roster){
+  if(!id) return 'Unassigned';
+  const u = (roster||[]).find((r) => r.user_id === id);
+  return u ? (u.display_name || id) : id;
+}
+function filterItems(items, filter, viewerId){
+  if(filter === 'all') return items;
+  if(filter === 'mine') return items.filter((c) => c.assignee_id === viewerId);
+  if(filter === 'unassigned') return items.filter((c) => !c.assignee_id);
+  return items.filter((c) => c.assignee_id === filter);
+}
+function primaryHref(card, isSetter){
+  const a = encodeURIComponent(card.agency_id || '');
+  const p = card.primary || {};
+  if(p.kind === 'call') return `/novus/calling.html?lead=${a}${card.action_id ? `&action=${encodeURIComponent(card.action_id)}` : ''}&from=priorities`;
+  if(p.kind === 'settings') return '/novus/operator.html#settings';
+  if(isSetter){
+    if(p.kind === 'meeting') return '/novus/calling.html#meetings';
+    return `/novus/calling.html#lead?agency=${a}`;
+  }
+  if(p.kind === 'reply') return `/novus/operator.html#leads?agency=${a}&pane=conversation`;
+  if(p.kind === 'meeting') return card.meeting && card.meeting.session_id ? `/novus/meetings.html#discovery?id=${encodeURIComponent(card.meeting.session_id)}` : `/novus/meetings.html#start?agency=${a}`;
+  return `/novus/operator.html#leads?agency=${a}&pane=profile`;
+}
+function historyHref(card, isSetter){
+  const a = encodeURIComponent(card.agency_id || '');
+  return isSetter ? `/novus/calling.html#lead?agency=${a}` : `/novus/operator.html#leads?agency=${a}&pane=timeline`;
+}
+function dueText(card, nowMs){
+  const meetingAt = card.meeting && Date.parse(card.meeting.at);
+  if(/^MEETING_(TODAY|TOMORROW|UPCOMING)$/.test(card.situation) && Number.isFinite(meetingAt)){
+    const day = card.situation === 'MEETING_TODAY' ? 'today' : card.situation === 'MEETING_TOMORROW' ? 'tomorrow' : fmt(card.meeting.at, { weekday:'short', day:'numeric', month:'short' });
+    return { big: `Meeting ${day} ${fmt(card.meeting.at, { hour:'2-digit', minute:'2-digit' })}`, small: card.overdue || Date.parse(card.due_at) <= nowMs ? 'prep due now' : '', over:false };
+  }
+  if(card.kind === 'exception') return { big:'No next step', small: card.due_at ? `since ${fmt(card.due_at, { weekday:'short', day:'numeric', month:'short' })}` : '', over: card.overdue };
+  if(!card.due_at) return card.kind === 'exception' ? { big:'Needs a decision', small:'' , over:false } : { big:'No deadline set', small:'', over:false };
+  const t = Date.parse(card.due_at);
+  const time = fmt(card.due_at, { hour:'2-digit', minute:'2-digit' });
+  if(card.overdue){ const d = card.overdue_days; return { big: `Overdue ${d} day${d===1?'':'s'}`, small: `was due ${fmt(card.due_at, { weekday:'short', day:'numeric', month:'short' })}`, over:true }; }
+  if(card.due_day === 'today') return { big: t <= nowMs ? 'Due now' : `Today ${time}`, small: t <= nowMs ? `since ${time}` : '', over:false };
+  if(card.due_day === 'tomorrow') return { big: `Tomorrow ${time}`, small:'', over:false };
+  return { big: fmt(card.due_at, { weekday:'short', day:'numeric', month:'short' }), small: time, over:false };
+}
+/* What one person can do with a card. Completing / rescheduling needs a
+   ledger action; a derived exception is resolved by doing its primary step. */
+function cardControls(card){
+  const m = card.meeting || {};
+  const meetingPassed = m.at && !m.outcome && Date.parse(m.at) < Date.now();
+  return {
+    reschedule: Boolean(card.action_id), complete: Boolean(card.action_id), assign: Boolean(card.action_id),
+    noShow: ['MEETING_OUTCOME_MISSING'].includes(card.situation) && Boolean(meetingPassed || card.kind === 'exception'),
+  };
+}
+
+/* ── data ──────────────────────────────────────────────────────────── */
+async function post(op, body){
+  const res = await fetch(OP(op), { method:'POST', headers:{ Accept:'application/json', 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if(!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+async function loadMe(){
+  try{ const r = await fetch(OP('whoami'), { headers:{ Accept:'application/json' } }); const d = await r.json(); if(r.ok && d.user) ME = d.user; }catch{ ME = null; }
+  document.body.classList.toggle('role-setter', ME?.role === 'SETTER');
+  if(ME && ME.role !== 'SETTER') document.querySelectorAll('.admin-only').forEach((el) => el.classList.remove('hidden'));
+}
+async function load(refresh){
+  $('stamp').innerHTML = '<span class="spin"></span>Loading';
+  try{
+    const r = await fetch(OP('priorities') + (refresh ? '&refresh=1' : ''), { headers:{ Accept:'application/json' } });
+    const d = await r.json();
+    if(!r.ok || !d.success) throw new Error(d.error || `Could not load (${r.status})`);
+    DATA = d; $('load-err').classList.add('hidden');
+    $('warn-box').classList.toggle('hidden', !(d.warnings||[]).length);
+    $('warn-box').innerHTML = (d.warnings||[]).map((w) => `<div>${esc(w)}</div>`).join('');
+    render();
+    $('stamp').textContent = `Updated ${fmt(d.generated_at, { hour:'2-digit', minute:'2-digit' })}`;
+  }catch(e){
+    $('load-err').innerHTML = `<div>Your priorities could not be loaded: ${esc(e.message)}. Nothing has been lost — try Refresh.</div>`;
+    $('load-err').classList.remove('hidden'); $('stamp').textContent = 'Not loaded';
+  }
+}
+
+/* ── render ────────────────────────────────────────────────────────── */
+function render(){
+  if(!DATA) return;
+  const roster = DATA.roster || [];
+  const viewer = DATA.viewer || ME || {};
+  const items = filterItems(DATA.items || [], FILTER, viewer.user_id);
+  const first = items.filter((c) => c.tier === 'FIRST'), today = items.filter((c) => c.tier === 'TODAY'), coming = items.filter((c) => c.tier === 'COMING_UP');
+  const hour = Number(fmt(new Date().toISOString(), { hour:'2-digit', hour12:false }));
+  const name = (viewer.display_name || personName(viewer.user_id, roster) || '').split(/\s+/)[0];
+  $('hello').textContent = `${hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'}${name ? `, ${name}` : ''}`;
+  const overdue = items.filter((c) => c.overdue).length, issues = items.filter((c) => c.kind === 'exception').length;
+  const parts = [`<b>${first.length}</b> to do first`, `<b>${today.length}</b> more today`];
+  if(overdue) parts.push(`<b>${overdue}</b> overdue`);
+  if(issues) parts.push(`<b>${issues}</b> stranded ${issues === 1 ? 'opportunity' : 'opportunities'}`);
+  parts.push(`${coming.length} coming up`);
+  $('overview').innerHTML = parts.join(' · ');
+  const all = DATA.items || [];
+  const due = (list) => list.filter((c) => c.tier !== 'COMING_UP').length;
+  const chips = [['all', 'All priorities', due(all)], ['mine', 'Mine', due(filterItems(all, 'mine', viewer.user_id))]]
+    .concat(roster.filter((u) => u.user_id !== viewer.user_id).map((u) => [u.user_id, `${(u.display_name||u.user_id).split(/\s+/)[0]}'s`, due(filterItems(all, u.user_id))]))
+    .concat([['unassigned', 'Unassigned', due(filterItems(all, 'unassigned'))]]);
+  $('filters').innerHTML = chips.map(([k, l, n]) => `<button type="button" role="tab" aria-selected="${k===FILTER}" class="${k===FILTER?'on':''}" data-filter="${esc(k)}">${esc(l)}<span class="n">${n}</span></button>`).join('');
+  const list = (el, rows, empty) => { $(el).innerHTML = rows.length ? rows.map(cardHtml).join('') : `<div class="pr-empty">${esc(empty)}</div>`; };
+  list('l-first', first, 'Nothing urgent. Start with Today.');
+  list('l-today', today, first.length ? 'Nothing else due today.' : 'Nothing due today — use the time for new calls in Calling.');
+  const shown = SHOW_ALL_COMING ? coming : coming.slice(0, 8);
+  list('l-coming', shown, 'Nothing scheduled yet.');
+  $('more-coming').hidden = coming.length <= 8;
+  $('more-coming').textContent = SHOW_ALL_COMING ? 'Show fewer' : `Show all ${coming.length}`;
+  $('n-first').textContent = first.length ? `${first.length}` : ''; $('n-today').textContent = today.length ? `${today.length}` : ''; $('n-coming').textContent = coming.length ? `${coming.length}` : '';
+  const badge = $('b-actions'); if(badge){ const n = first.length + today.length; badge.textContent = n; badge.classList.toggle('zero', !n); }
+  renderScoreboard();
+}
+
+function cardHtml(card){
+  const roster = DATA.roster || [];
+  const isSetter = ME?.role === 'SETTER';
+  const due = dueText(card, Date.now());
+  const open = OPEN.has(card.id);
+  const busy = card.in_progress ? `<span class="pr-busy">${esc(personName(card.in_progress.user_id, roster))} is on a call with them now</span>` : '';
+  return `<article class="pr-card${card.tier==='FIRST'?' first':''}${open?' open':''}${card.is_test?' test':''}" data-card="${esc(card.id)}">
+    <button class="pr-row" type="button" data-toggle="${esc(card.id)}" aria-expanded="${open}">
+      <div>
+        <div class="pr-agency">${esc(card.agency_name)}${card.location?` <span class="muted" style="font-weight:400">· ${esc(card.location)}</span>`:''}${card.is_test?' <span class="pill t-grey bare">test record</span>':''}${busy}</div>
+        <div class="pr-head">${esc(card.headline)}</div>
+        <div class="pr-sum">${esc(card.summary)}</div>
+      </div>
+      <div class="pr-when${due.over?' over':''}"><b>${esc(due.big)}</b>${due.small?esc(due.small):''}<div class="pr-who">${esc(personName(card.assignee_id, roster))}</div></div>
+    </button>
+    ${open ? detailHtml(card, isSetter) : ''}
+  </article>`;
+}
+
+const unknown = (s) => `<div class="pr-v unk">${esc(s)}</div>`;
+function whoLabel(id){ return id ? personName(id, DATA.roster) : ''; }
+function detailHtml(card, isSetter){
+  const c = card.contact || {}; const lc = card.last_contact; const m = card.meeting;
+  const ctrl = cardControls(card);
+  const requested = card.requested && !(card.facts||[]).some((f) => f.text === card.requested) ? card.requested : '';
+  const facts = (card.facts||[]).map((f) => `<li><span class="when">${esc(fmt(f.at, { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }))}${f.by?` · ${esc(whoLabel(f.by))}`:''}</span><br><b>${esc(f.label)}:</b> ${esc(f.text)}</li>`).join('');
+  const contactBits = [c.name ? `<b>${esc(c.name)}</b>${c.role?` — ${esc(c.role)}`:''}${c.decision_maker?' <span class="pill t-blue bare">decision-maker</span>':''}` : '<span class="unk">Name not recorded</span>',
+    c.phone ? `<a href="tel:${esc(c.phone.replace(/\s+/g,''))}">${esc(c.phone)}</a>` : 'No phone number on file', c.email ? esc(c.email) : ''].filter(Boolean).join('<br>');
+  const assign = ctrl.assign ? `<select data-assign="${esc(card.action_id)}" aria-label="Assigned to">${[['', 'Unassigned'], ...(DATA.roster||[]).map((u) => [u.user_id, u.display_name||u.user_id])].map(([v, l]) => `<option value="${esc(v)}"${v===card.assignee_id?' selected':''}>${esc(l)}</option>`).join('')}</select>` : '';
+  const pickUp = ctrl.assign && ME && card.assignee_id !== ME.user_id ? `<button class="btn btn-secondary btn-sm" type="button" data-pickup="${esc(card.action_id)}">Pick this up</button>` : '';
+  const primary = card.primary?.kind === 'call' && isSetter && card.assignee_id && card.assignee_id !== ME?.user_id
+    ? `<button class="btn btn-primary" type="button" data-pickcall="${esc(card.id)}">Pick up &amp; call</button>`
+    : `<a class="btn btn-primary" href="${esc(primaryHref(card, isSetter))}">${esc(card.primary?.label || 'Open')}</a>`;
+  return `<div class="pr-detail">
+    <div class="pr-grid">
+      <div><div class="pr-k">What happened</div>${facts ? `<ul class="pr-facts">${facts}</ul>` : `<div class="pr-v">${esc(card.summary)}</div>`}</div>
+      <div>
+        <div class="pr-k">Last contact</div>${lc ? `<div class="pr-v">${esc(fmt(lc.at, { weekday:'long', day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' }))}<br>${esc(lc.channel)}${lc.by?` by ${esc(whoLabel(lc.by))}`:''} — ${esc(lc.summary)}</div>` : unknown('No contact recorded yet')}
+        <div class="pr-k" style="margin-top:12px">Who to contact</div><div class="pr-v">${contactBits}</div>
+      </div>
+      ${requested || card.promised ? `<div><div class="pr-k">Asked for / promised</div><div class="pr-v">${[requested && `They asked: ${esc(requested)}`, card.promised && esc(card.promised)].filter(Boolean).join('<br>')}</div></div>` : ''}
+      ${(card.objections||[]).length || (card.not_interested_reasons||[]).length ? `<div><div class="pr-k">Previous objections</div><div class="pr-v">${esc([...(card.objections||[]), ...(card.not_interested_reasons||[])].join(', '))}</div></div>` : ''}
+      ${m ? `<div><div class="pr-k">Meeting</div><div class="pr-v">${m.at ? esc(fmt(m.at, { weekday:'long', day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' })) : 'No time recorded'}${m.outcome_label?`<br>Outcome: ${esc(m.outcome_label)}`:''}${m.booked_by?`<br>Booked by ${esc(whoLabel(m.booked_by))}`:''}${m.note?`<br>“${esc(m.note)}”`:''}</div></div>` : ''}
+    </div>
+    <div class="pr-next"><div class="pr-k">What to do next · suggested by NOVUS</div><div class="pr-v">${esc(card.next_step)}</div></div>
+    ${(card.also_open||[]).length ? `<div class="pr-also">Also open for this agency:<ul>${card.also_open.map((x) => `<li>${esc(x.headline)}${x.due_at?` — ${esc(fmt(x.due_at, { weekday:'short', day:'numeric', month:'short' }))}`:''}${x.overdue?' (overdue)':''}</li>`).join('')}</ul></div>` : ''}
+    <div class="pr-actions">
+      ${primary}
+      ${ctrl.noShow ? `<button class="btn btn-secondary btn-sm" type="button" data-noshow="${esc(card.id)}">No-show</button>` : ''}
+      ${ctrl.reschedule ? `<button class="btn btn-secondary btn-sm" type="button" data-resched="${esc(card.id)}">Reschedule</button>` : ''}
+      ${ctrl.complete ? `<button class="btn btn-secondary btn-sm" type="button" data-complete="${esc(card.id)}">Mark completed</button>` : ''}
+      <a class="btn btn-quiet btn-sm" href="${esc(historyHref(card, isSetter))}">Full agency history</a>
+      ${pickUp}${assign}
+    </div>
+    <details class="pr-why"><summary>Why this priority?</summary>${(card.score_reasons||[]).map((r) => `${esc(r.label)} ${r.points>0?'+':''}${r.points}`).join(' · ')} = ${card.score}</details>
+    <div class="pr-debug">${esc(JSON.stringify(card.debug, null, 2))}</div>
+  </div>`;
+}
+
+function renderScoreboard(){
+  const s = DATA.scoreboard; if(!s) return;
+  const w = s.this_week, l = s.last_week;
+  const num = (label, v, prev) => `<div class="pr-num"><span>${esc(label)}</span><b>${v}</b><small>last week ${prev}</small></div>`;
+  $('score-note').textContent = `week of ${fmt(s.week_start + 'T12:00:00Z', { day:'numeric', month:'short' })}`;
+  const people = (s.people||[]).map((p) => `<tr><td>${esc(personName(p.user_id, DATA.roster))}</td><td class="n">${p.calls}</td><td class="n">${p.decision_makers}</td><td class="n">${p.conversations}</td><td class="n">${p.meetings_booked}</td><td class="n">${p.callbacks_done}/${p.callbacks_due}</td></tr>`).join('');
+  $('score-body').innerHTML = `
+    <div class="pr-k">Results</div>
+    <div class="pr-nums">${num('Meetings booked', w.meetings_booked, l.meetings_booked)}${num('Meetings held', w.meetings_held, l.meetings_held)}${num('Proposals', w.proposals, l.proposals)}${num('Pilots sold', w.pilots, l.pilots)}</div>
+    <div class="pr-k">Activity</div>
+    <div class="pr-nums">${num('Calls', w.calls, l.calls)}${num('Decision-makers reached', w.decision_makers, l.decision_makers)}${num('Conversations', w.conversations, l.conversations)}${num('Follow-ups done', w.follow_ups_done, l.follow_ups_done)}</div>
+    ${people ? `<table class="pr-table"><thead><tr><th>This week</th><th class="n">Calls</th><th class="n">DMs reached</th><th class="n">Conversations</th><th class="n">Meetings</th><th class="n">Callbacks done/due</th></tr></thead><tbody>${people}</tbody></table>` : ''}
+    <div class="pr-k">Funnel (all time, agencies)</div>
+    <table class="pr-table"><tbody>${(s.funnel||[]).map((f) => `<tr><td>${esc(f.label)}</td><td class="n">${f.count}</td><td class="n">${f.rate_from_previous==null?'':`${f.rate_from_previous}%`}</td></tr>`).join('')}</tbody></table>
+    ${(s.lost_reasons||[]).length ? `<div class="pr-k">Why opportunities were lost</div><div class="pr-v">${s.lost_reasons.map((r) => `${esc(r.reason.replace(/_/g,' ').toLowerCase())} (${r.count})`).join(' · ')}</div>` : ''}
+    <div class="pr-v" style="margin-top:10px;font-size:11.5px;color:var(--ink-4)">${esc(s.note)} Monday: set this week's goals from these numbers. Friday: review them with the call notes.</div>`;
+}
+
+/* ── dialogs ───────────────────────────────────────────────────────── */
+let DLG = null;
+function openDlg(title, bodyHtml, onOk, okLabel='Save'){
+  DLG = onOk; $('dlg-title').textContent = title; $('dlg-body').innerHTML = bodyHtml; $('dlg-ok').textContent = okLabel;
+  $('dlg-err').classList.add('hidden'); $('dlg').classList.remove('hidden'); $('dlg-ok').disabled = false;
+  setTimeout(() => { const f = $('dlg-body').querySelector('input,textarea,select'); if(f) f.focus(); }, 0);
+}
+function closeDlg(){ $('dlg').classList.add('hidden'); DLG = null; }
+const isoLocal = (ms) => { const d = new Date(ms); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+function nineAm(daysAhead){ const d = new Date(); d.setDate(d.getDate() + daysAhead); if(daysAhead > 0){ while(d.getDay()===0||d.getDay()===6) d.setDate(d.getDate()+1); } d.setHours(9,0,0,0); return d.getTime(); }
+const byId = (id) => (DATA.items||[]).find((c) => c.id === id);
+
+function reschedule(card){
+  openDlg(`Reschedule — ${card.agency_name}`, `
+    <div class="pr-quick"><button class="btn btn-quiet btn-sm" type="button" data-quick="${Date.now()+2*3600e3}">In 2 hours</button><button class="btn btn-quiet btn-sm" type="button" data-quick="${nineAm(1)}">Next working day 9:00</button><button class="btn btn-quiet btn-sm" type="button" data-quick="${nineAm(7)}">In a week</button></div>
+    <label>New date and time (your clock)<input type="datetime-local" id="d-due" value="${isoLocal(nineAm(1))}" /></label>
+    <label>Why (optional)<input type="text" id="d-note" maxlength="300" placeholder="e.g. they're on holiday until then" /></label>`, async () => {
+    const ms = Date.parse($('d-due').value);
+    if(!Number.isFinite(ms) || ms <= Date.now()) throw new Error('Choose a time in the future.');
+    await post('operator-action-snooze', { confirm:'SNOOZE_ACTION', action_id: card.action_id, due_at: new Date(ms).toISOString(), note: $('d-note').value });
+  });
+}
+function complete(card){
+  openDlg(`Mark completed — ${card.agency_name}`, `
+    <div class="pr-v" style="margin-bottom:10px">${card.primary?.kind==='call' ? 'If you spoke to them, log the call in Calling instead — it schedules the next step for you.' : 'This closes the task. Anything still to do should be its own task.'}</div>
+    <label>What was done<textarea id="d-note" rows="3" maxlength="500" placeholder="e.g. Replied with pricing and two meeting times"></textarea></label>`, async () => {
+    const note = $('d-note').value.trim();
+    if(!note) throw new Error('Add a short note so the other person knows what happened.');
+    await post('operator-action-complete', { confirm:'COMPLETE_ACTION', action_id: card.action_id, completion_note: note });
+  }, 'Mark completed');
+}
+function noShow(card){
+  const m = card.meeting || {};
+  openDlg(`No-show — ${card.agency_name}`, `
+    <div class="pr-v" style="margin-bottom:10px">Records that the meeting${m.at?` on ${esc(fmt(m.at, { weekday:'long', day:'numeric', month:'short' }))}`:''} did not happen and schedules a call to rebook it.</div>
+    <label>Who rebooks<select id="d-who">${(DATA.roster||[]).map((u) => `<option value="${esc(u.user_id)}"${u.user_id===(m.booked_by||card.assignee_id)?' selected':''}>${esc(u.display_name||u.user_id)}</option>`).join('')}</select></label>
+    <label>Rebook by<input type="datetime-local" id="d-due" value="${isoLocal(Date.now()+3600e3)}" /></label>`, async () => {
+    const ms = Date.parse($('d-due').value);
+    if(!Number.isFinite(ms)) throw new Error('Choose when to rebook.');
+    const next = { action_type:'FOLLOW_UP', priority:'HIGH', title:'Missed meeting — rebook it', note:`Meeting ${m.at || ''} did not happen. Call to rebook.`, due_at:new Date(ms).toISOString(), no_show:true, meeting_at: m.at || '' };
+    // Prep task open → complete it AND create the rebook in one server call
+    // (the server rolls the rebook back if the completion fails).
+    if(card.action_id){
+      const out = await post('operator-action-complete', { confirm:'COMPLETE_ACTION', action_id: card.action_id, completion_note:'No-show: meeting did not happen', next_action: next });
+      if(out.next_action?.action_id) await post('action-assign', { confirm:'ASSIGN_ACTION', action_id: out.next_action.action_id, user_id: $('d-who').value });
+    } else {
+      await post('operator-action-create', { confirm:'CREATE_ACTION', agency_id: card.agency_id, assigned_user_id: $('d-who').value, ...next });
+    }
+  }, 'Record no-show');
+}
+async function assign(actionId, userId){
+  await post('action-assign', { confirm:'ASSIGN_ACTION', action_id: actionId, user_id: userId });
+  await load(true);
+}
+
+/* ── events ────────────────────────────────────────────────────────── */
+document.addEventListener('click', async (e) => {
+  const t = e.target;
+  const f = t.closest('[data-filter]'); if(f){ FILTER = f.dataset.filter; try{ localStorage.setItem('novus.priorities.filter', FILTER); }catch{} render(); return; }
+  const tg = t.closest('[data-toggle]'); if(tg){ const id = tg.dataset.toggle; OPEN.has(id) ? OPEN.delete(id) : OPEN.add(id); render(); return; }
+  if(t.id === 'more-coming'){ SHOW_ALL_COMING = !SHOW_ALL_COMING; render(); return; }
+  const r = t.closest('[data-resched]'); if(r){ reschedule(byId(r.dataset.resched)); return; }
+  const c = t.closest('[data-complete]'); if(c){ complete(byId(c.dataset.complete)); return; }
+  const n = t.closest('[data-noshow]'); if(n){ noShow(byId(n.dataset.noshow)); return; }
+  const q = t.closest('[data-quick]'); if(q){ $('d-due').value = isoLocal(Number(q.dataset.quick)); return; }
+  const p = t.closest('[data-pickup]'); if(p){ p.disabled = true; try{ await assign(p.dataset.pickup, ME.user_id); }catch(err){ p.disabled = false; alert(err.message); } return; }
+  const pc = t.closest('[data-pickcall]'); if(pc){
+    const card = byId(pc.dataset.pickcall); pc.disabled = true;
+    try{ await post('action-assign', { confirm:'ASSIGN_ACTION', action_id: card.action_id, user_id: ME.user_id }); location.href = primaryHref(card, true); }
+    catch(err){ pc.disabled = false; alert(err.message); }
+    return;
+  }
+  if(t.id === 'dlg-cancel' || t.id === 'dlg'){ closeDlg(); return; }
+  if(t.id === 'dlg-ok' && DLG){
+    $('dlg-ok').disabled = true;
+    try{ await DLG(); closeDlg(); await load(true); }
+    catch(err){ $('dlg-err').textContent = err.message; $('dlg-err').classList.remove('hidden'); $('dlg-ok').disabled = false; }
+  }
+});
+document.addEventListener('change', async (e) => {
+  const a = e.target.closest('[data-assign]');
+  if(a){ a.disabled = true; try{ await assign(a.dataset.assign, a.value); }catch(err){ a.disabled = false; alert(err.message); } }
+  if(e.target.id === 'debug-toggle'){ document.body.classList.toggle('show-debug', e.target.checked); }
+});
+document.addEventListener('keydown', (e) => { if(e.key === 'Escape' && DLG) closeDlg(); });
+$('refresh').addEventListener('click', () => load(true));
+document.querySelectorAll('.nav-item[data-nav]').forEach((el) => { const on = ['actions', 'priorities'].includes(el.dataset.nav); el.classList.toggle('on', on); el.setAttribute('aria-current', on ? 'page' : 'false'); });
+try{ FILTER = localStorage.getItem('novus.priorities.filter') || 'all'; }catch{ FILTER = 'all'; }
+loadMe().then(() => load(false));
+/* Stay current while the page is open: someone else's call or reply changes the list. */
+setInterval(() => { if(!DLG && document.visibilityState === 'visible') load(false); }, 120000);
+</script>
+</body>
+</html>

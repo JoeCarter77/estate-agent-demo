@@ -14,6 +14,7 @@
     { "source": "/novus/operator", "destination": "/novus/operator.html" },
     { "source": "/novus/communications", "destination": "/novus/communications.html" },
     { "source": "/novus/calling", "destination": "/novus/calling.html" },
+    { "source": "/novus/priorities", "destination": "/novus/priorities.html" },
     { "source": "/novus/campaigns", "destination": "/novus/campaigns.html" },
     { "source": "/novus/meetings", "destination": "/novus/meetings.html" },
     { "source": "/novus/login", "destination": "/novus/login.html" },
