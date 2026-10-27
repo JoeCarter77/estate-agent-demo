@@ -284,7 +284,7 @@ assert.equal((await login('joe', 'admin-env-pass')).res.statusCode, 503, 'no ses
 process.env.NOVUS_SESSION_SECRET = secret;
 __setKvForTests({ command: async () => { throw new Error('down'); } });
 assert.equal((await login('joe', 'admin-env-pass')).res.statusCode, 503, 'session store down → sign-in refuses');
-assert.equal((await request('GET', 'whoami', { cookie: LOUIS })).statusCode, 401, 'and existing sessions cannot be validated, so they are refused');
+assert.equal((await request('GET', 'whoami', { cookie: LOUIS })).statusCode, 503, 'existing sessions cannot be validated: refused with 503 (retry), never 401 (which signs the page out)');
 assert.equal((await request('GET', 'whoami', { auth: ADMIN_BASIC, browser: false })).statusCode, 200, 'machine credential unaffected');
 __setKvForTests(kv);
 ok('5 failed sign-ins lock the username for 15 minutes; a missing secret or session store fails closed');
@@ -328,8 +328,22 @@ ok('5 failed sign-ins lock the username for 15 minutes; a missing secret or sess
     const forgedBody = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(body, 'base64url').toString()), uid: louisId })).toString('base64url');
     assert.equal((await mw('/novus/operator.html', { cookie: `novus_session=${forgedBody}.${sig}` })).status, 302, 'forged token rejected');
     assert.equal(await mw('/api/novus/webhooks/voice-outbound'), undefined, 'webhooks unchanged');
+    // Canonical domain.
+    const at = (host, path, headers = {}, method = 'GET') => middleware({ url: `https://${host}${path}`, method, headers: new Headers(headers) });
+    for (const host of ['estate-agent-demo.vercel.app', 'www.getnovus.co.uk', 'demo.getnovus.co.uk']) {
+      out = await at(host, '/novus/operator.html?x=1');
+      assert.equal(out.status, 307, host); assert.equal(loc(out), 'https://app.getnovus.co.uk/novus/operator.html?x=1');
+    }
+    assert.equal(loc(await at('estate-agent-demo.vercel.app', '/novus/login.html?next=%2Fnovus%2Fcalling.html')), 'https://app.getnovus.co.uk/novus/login.html?next=%2Fnovus%2Fcalling.html', 'sign-in happens on the canonical host');
+    out = await at('app.getnovus.co.uk', '/novus/operator.html');
+    assert.equal(out.status, 302); assert.equal(loc(out), 'https://app.getnovus.co.uk/novus/login.html?next=%2Fnovus%2Foperator.html', 'canonical host: no redirect loop, straight to its own login');
+    assert.equal(await at('app.getnovus.co.uk', '/novus/login.html'), undefined);
+    assert.equal(await at('estate-agent-demo-git-branch.vercel.app', '/novus/login.html'), undefined, 'preview deployments are not redirected');
+    assert.equal(await at('estate-agent-demo.vercel.app', '/api/novus/webhooks/voice-outbound-status', {}, 'POST'), undefined, 'Twilio keeps its configured host');
+    assert.equal(await at('estate-agent-demo.vercel.app', '/api/novus/personalisation', { authorization: ADMIN_BASIC }, 'POST'), undefined, 'GitHub poller keeps working on the old host');
+    assert.equal(await at('estate-agent-demo.vercel.app', '/novus/probe.html', { authorization: ADMIN_BASIC, 'x-novus-client': 'worker' }), undefined, 'the worker is never redirected');
   } finally { globalThis.fetch = realFetch; }
-  ok('middleware: login page public; pages redirect to it when signed out; Louis confined to Calling Mode; revoked and forged cookies refused; machine clients unchanged');
+  ok('middleware: login page public; pages redirect to it when signed out; Louis confined to Calling Mode; revoked and forged cookies refused; machine clients unchanged; old hosts send browsers to app.getnovus.co.uk without loops');
 }
 
 __setRepoForTests(null);

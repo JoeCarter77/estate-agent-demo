@@ -248,7 +248,8 @@
     // leaving just the sign-out icon.
     var who = document.createElement('span');
     who.className = 'nav-stamp'; who.style.fontSize = '12px'; who.style.color = 'var(--ink-3)';
-    who.textContent = 'Signed in as ' + user.display_name + (user.role === 'SETTER' ? ' · Setter' : '');
+    who.textContent = 'Signed in as ' + user.display_name + (user.role === 'SETTER' ? ' · Setter' : ' · Admin');
+    who.title = (user.username ? 'Username: ' + user.username + '. ' : '') + 'Everything you do is recorded as ' + user.display_name + '.';
     var out = document.createElement('button');
     out.type = 'button'; out.className = 'btn btn-quiet btn-sm'; out.id = 'novus-signout';
     out.title = 'Sign out'; out.setAttribute('aria-label', 'Sign out');
@@ -256,9 +257,45 @@
     out.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/></svg><span class="nav-stamp" style="font-size:12px;color:inherit">Sign out</span>';
     out.addEventListener('click', function () { out.disabled = true; out.title = 'Signing out…'; window.NovusAuth.signOut(); });
     box.appendChild(who); box.appendChild(out);
+    // Self-service password change (lib/auth-session.mjs auth-change-password).
+    // The env administrator's password lives in Vercel, so no link for it.
+    if (user.user_id !== 'admin') {
+      var pw = document.createElement('button');
+      pw.type = 'button'; pw.className = 'btn btn-quiet btn-sm nav-stamp'; pw.id = 'novus-password';
+      pw.style.cssText = 'font-size:12px;padding:3px 6px'; pw.textContent = 'Change password';
+      pw.addEventListener('click', changePassword);
+      box.appendChild(pw);
+    }
     // Under Settings, above the freshness stamp: the account is always at the
     // bottom of the rail, which never scrolls away (novus-ui.css .nav-scroll).
     foot.insertBefore(box, foot.querySelector('.nav-stamp') || foot.firstChild);
+  }
+  function changePassword() {
+    var ovl = document.createElement('div');
+    ovl.style.cssText = 'position:fixed;inset:0;z-index:95;background:rgba(10,14,24,.45);display:flex;align-items:flex-start;justify-content:center;padding:12vh 16px';
+    ovl.innerHTML = '<form style="width:min(380px,100%);background:var(--bg-2,#fff);border:1px solid var(--hair-2,#e3e6ec);border-radius:12px;padding:20px 22px;box-shadow:0 10px 30px rgba(0,0,0,.2)">'
+      + '<h2 style="margin:0 0 6px;font-size:16px">Change your password</h2><p style="margin:0 0 12px;font-size:12.5px;color:var(--ink-3,#6b7280)">At least 12 characters. Your other devices will be signed out; this one stays signed in.</p>'
+      + '<label class="field-l" for="pw-cur">Current password</label><input class="input block" id="pw-cur" type="password" autocomplete="current-password" required style="margin-bottom:10px" />'
+      + '<label class="field-l" for="pw-new">New password</label><input class="input block" id="pw-new" type="password" autocomplete="new-password" minlength="12" required style="margin-bottom:10px" />'
+      + '<label class="field-l" for="pw-new2">Repeat new password</label><input class="input block" id="pw-new2" type="password" autocomplete="new-password" minlength="12" required />'
+      + '<div id="pw-msg" style="font-size:12.5px;margin-top:10px"></div>'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn btn-quiet" type="button" id="pw-cancel">Cancel</button><button class="btn btn-primary" type="submit">Change password</button></div></form>';
+    document.body.appendChild(ovl);
+    var f = ovl.querySelector('form'); var m = ovl.querySelector('#pw-msg');
+    ovl.querySelector('#pw-cancel').addEventListener('click', function () { ovl.remove(); });
+    ovl.querySelector('#pw-cur').focus();
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var a = ovl.querySelector('#pw-new').value, b = ovl.querySelector('#pw-new2').value;
+      if (a !== b) { m.style.color = 'var(--red)'; m.textContent = 'The new passwords do not match.'; return; }
+      realFetch('/api/novus/personalisation?novus_operation=auth-change-password', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ current_password: ovl.querySelector('#pw-cur').value, new_password: a }) })
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok && d.success, d: d }; }); })
+        .then(function (x) {
+          m.style.color = x.ok ? 'var(--green)' : 'var(--red)'; m.textContent = x.ok ? (x.d.message || 'Password changed.') : (x.d.error || 'Could not change the password.');
+          if (x.ok && x.d.signed_out) setTimeout(function () { location.replace('/novus/login.html?reason=signed-out'); }, 1500);
+          else if (x.ok) setTimeout(function () { ovl.remove(); }, 1500);
+        }).catch(function () { m.style.color = 'var(--red)'; m.textContent = 'NOVUS could not be reached. Try again.'; });
+    });
   }
   function load() {
     realFetch('/api/novus/personalisation?novus_operation=whoami', { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
@@ -267,4 +304,21 @@
       .catch(function () {});
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', load); else load();
+
+  // ONE BROWSER, ONE SIGNED-IN PERSON. The session cookie is per browser, so
+  // signing in as someone else in another tab changes who THIS tab acts as.
+  // The server always attributes to the real cookie; this keeps the screen
+  // honest: another tab announcing a sign-in (localStorage 'novus-auth-user',
+  // written by login.html) or a whoami that no longer matches on focus
+  // reloads the page as the person actually signed in.
+  function recheck() {
+    if (leaving || !window.NovusAuth.me) return;
+    realFetch('/api/novus/personalisation?novus_operation=whoami', { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+      .then(function (r) { if (r.status === 401) { toLogin('expired'); return null; } return r.ok ? r.json() : null; })
+      .then(function (d) { if (d && d.user && d.user.user_id !== window.NovusAuth.me.user_id) { leaving = true; location.reload(); } })
+      .catch(function () {});
+  }
+  window.addEventListener('storage', function (e) { if (e.key === 'novus-auth-user' && window.NovusAuth.me && e.newValue && e.newValue !== window.NovusAuth.me.user_id) { leaving = true; location.reload(); } });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') recheck(); });
+  window.addEventListener('focus', recheck);
 })();

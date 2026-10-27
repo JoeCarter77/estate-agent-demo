@@ -32,8 +32,13 @@ import { getRepo } from '../../lib/sheets.mjs';
 import { NeverBounceError, verifyEmail } from '../../lib/neverbounce.mjs';
 import { resolveAgencyContact, listResolutionBacklog } from '../../lib/contact-resolution.mjs';
 import { requireAuth as requireAdminAuth, resolveCaller, sendUnauthorized, requireReplyPollerSecret, requireCampaignPollerSecret } from './_auth.mjs';
-import { handleAuthLogin, handleAuthLogout, isSameOriginWrite } from '../../lib/auth-session.mjs';
+import { handleAuthChangePassword, handleAuthLogin, handleAuthLogout, isSameOriginWrite, isUnavailableError } from '../../lib/auth-session.mjs';
 import { SETTER_OPERATIONS } from '../../lib/novus-users.mjs';
+import { handleMyPreferences, handleMyPreferencesSave } from '../../lib/user-preferences.mjs';
+import {
+  handleMailStatus, handleMailConnectStart, handleMailOAuthCallback, handleMailDisconnect, handleMailSend,
+  handleMailTemplates, handleMailTemplateSave, handleMailTemplateStatus, handleMailTemplateDuplicate,
+} from '../../lib/mail-handlers.mjs';
 import { handleWhoami, handleTeamUsers, handleTeamUserCreate, handleTeamUserStatus, handleTeamUserReset, handleTeamUserRole } from '../../lib/team-handlers.mjs';
 import { handleTeamRoster, handleLeadOwnerSet, handleActionAssign, handleTeamUserDeletePreview, handleTeamUserDelete, handleOwnershipMigrate, readRoster } from '../../lib/ownership-handlers.mjs';
 import { claimLeadIfUnassigned, claimingUser, leadOwnerOf, readOwnershipTable } from '../../lib/lead-ownership.mjs';
@@ -86,7 +91,7 @@ import { buildInstantlyReplyPayload } from '../../lib/instantly-reply-send.mjs';
 // calling workspace is a set of operations here, implemented in lib/.
 import {
   handleCallingWorkspace, handleCallingAnalytics, handleCallingSetup, handleCallingStart, handleCallingSave, handleCallingDiscard, handleCallingRepair, handleCallingActionReview,
-  handleScriptSave, handleScriptDuplicate, handleScriptStatus, handleObjectionSave, invalidateCallingCache,
+  handleScriptSave, handleScriptDuplicate, handleScriptStatus, handleScriptDelete, handleObjectionSave, invalidateCallingCache,
 } from '../../lib/calling-handlers.mjs';
 import {
   handleTwilioToken, handleVoiceOutbound, handleVoiceStatus, handleVoiceRecording, handleCallingRecording,
@@ -1821,7 +1826,15 @@ export default async function handler(req, res) {
   // A login-page session (validated against its server-side record and, for
   // a setter, the USERS row) or the admin machine credential (Basic Auth).
   // No caller → 401. A setter outside the allowlist → 403.
-  const caller = await resolveCaller(req);
+  let caller;
+  try { caller = await resolveCaller(req); }
+  catch (err) {
+    if (!isUnavailableError(err)) throw err;
+    // Not signed out: the session/account store did not answer. 503 keeps the
+    // page signed in (novus-ui.js only sends a 401 to the login screen).
+    res.setHeader('Retry-After', '5');
+    return res.status(503).json({ success: false, retryable: true, error: err.message });
+  }
   if (!caller) return sendUnauthorized(req, res);
   // CSRF: a write authenticated by the session cookie must come from a
   // NOVUS page (same Origin). Basic-Auth machine clients send no Origin.
@@ -1834,6 +1847,30 @@ export default async function handler(req, res) {
   req.novusUser = caller;
   // ── Team / accounts ──────────────────────────────────────────────────
   if (req.method === 'GET' && req.query?.novus_operation === 'whoami') return handleWhoami(req, res);
+  // Every signed-in account changes its own password (SETTER_OPERATIONS too).
+  if (req.method === 'POST' && req.query?.novus_operation === 'auth-change-password') return handleAuthChangePassword(req, res, { repo: getRepo() });
+  // ── Personal preferences (lib/user-preferences.mjs) — always the caller's own.
+  if (req.method === 'GET' && req.query?.novus_operation === 'my-preferences') return handleMyPreferences(req, res);
+  if (req.method === 'POST' && req.query?.novus_operation === 'my-preferences-save') return handleMyPreferencesSave(req, res);
+  // ── Connected inboxes + one-to-one email (lib/mail-handlers.mjs) ─────
+  // Each person's own inbox; sending is manual only (a person pressing Send).
+  // Account + send operations are the caller's own (SETTER_OPERATIONS too);
+  // editing the shared template library is admin-only.
+  const MAIL_READ_OPERATIONS = { 'mail-status': handleMailStatus, 'mail-oauth-callback': handleMailOAuthCallback, 'mail-templates': handleMailTemplates };
+  const MAIL_WRITE_OPERATIONS = {
+    'mail-connect-start': handleMailConnectStart, 'mail-disconnect': handleMailDisconnect, 'mail-send': handleMailSend,
+    'mail-template-save': handleMailTemplateSave, 'mail-template-status': handleMailTemplateStatus, 'mail-template-duplicate': handleMailTemplateDuplicate,
+  };
+  if (req.method === 'GET' && MAIL_READ_OPERATIONS[req.query?.novus_operation]) {
+    if (!requireAuth(req, res)) return;
+    return MAIL_READ_OPERATIONS[req.query.novus_operation](req, res);
+  }
+  if (req.method === 'POST' && MAIL_WRITE_OPERATIONS[req.query?.novus_operation]) {
+    if (!requireAuth(req, res)) return;
+    const out = await MAIL_WRITE_OPERATIONS[req.query.novus_operation](req, res);
+    if (req.query.novus_operation === 'mail-send') { invalidateOperatorCaches(); invalidateLeadIndex(); }
+    return out;
+  }
   const TEAM_OPERATIONS = { 'team-user-create': handleTeamUserCreate, 'team-user-status': handleTeamUserStatus, 'team-user-reset': handleTeamUserReset, 'team-user-role': handleTeamUserRole };
   // ── Ownership (lib/ownership-handlers.mjs) ───────────────────────────
   // team-roster is on SETTER_OPERATIONS (names only); the rest are ADMIN.
@@ -2119,6 +2156,7 @@ export default async function handler(req, res) {
     'script-save': handleScriptSave,
     'script-duplicate': handleScriptDuplicate,
     'script-status': handleScriptStatus,
+    'script-delete': handleScriptDelete,
     'objection-save': handleObjectionSave,
   };
   if (req.method === 'POST' && CALLING_WRITE_OPERATIONS[req.query?.novus_operation]) {

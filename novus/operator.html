@@ -25,6 +25,7 @@
   <link rel="stylesheet" href="/novus/novus-ui.css" />
   <link rel="stylesheet" href="/novus/novus-shell.css" />
   <script src="/novus/novus-ui.js" defer></script>
+  <script src="/novus/novus-mail.js" defer></script>
   <!-- Shared shell: global lead search (⌘K) and the incoming-callback overlay.
        The Twilio Voice SDK is vendored; it only ever receives a short-lived
        access token minted server-side (novus/novus-inbound.js). -->
@@ -455,6 +456,16 @@
           <h1 class="page-title">Settings</h1>
           <p class="page-sub">System health and administration. Administrator only. No secret or API key is ever shown here.</p>
         </div>
+        <div class="section" style="margin-top:0" id="st-mail">
+          <div class="section-head"><div class="section-title">Email accounts</div>
+            <div class="section-note">Your own inbox, for one-to-one email you send from NOVUS (Calling Mode, lead profiles). Each person connects their own; cold-outreach campaigns keep sending from Instantly.</div></div>
+          <div class="card"><div class="card-body" id="st-mail-accounts"></div></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><div class="section-title">Email templates</div>
+            <div class="section-note">The shared library offered when composing. Versioned like scripts: a version that was sent is kept; editing it creates the next one.</div></div>
+          <div id="st-mail-templates"></div>
+        </div>
         <div class="section" style="margin-top:0">
           <div class="section-head"><div class="section-title">Integrations</div>
             <div class="section-note">What this page's own reads report. Nothing here is a new check.</div></div>
@@ -868,7 +879,17 @@ function showView(name, { push = true } = {}){
   window.scrollTo({ top:0 });
   renderView();
   if(VIEW === 'prober') loadProbeQueue();
+  if(VIEW === 'exceptions') mountMailSettings();
 }
+/* Settings → Email accounts / templates (novus/novus-mail.js, deferred: on a
+   first load straight into #settings — e.g. back from the Google/Microsoft
+   sign-in — it is not there yet, so DOMContentLoaded mounts it). */
+function mountMailSettings(){
+  if(!window.NovusMail) return;
+  NovusMail.mountAccounts($('st-mail-accounts'), { returnTo: '/novus/operator.html#settings' });
+  NovusMail.mountTemplates($('st-mail-templates'));
+}
+document.addEventListener('DOMContentLoaded', () => { if(VIEW === 'exceptions') mountMailSettings(); });
 
 /* ═══ RENDERERS ═════════════════════════════════════════════════════════ */
 
@@ -1891,8 +1912,18 @@ function paintDrawerHead(lead){
   $('d-pills').innerHTML = stagePill(lead.current_stage)
     + (lead.action_queue ? pill(QUEUE_LABEL[lead.action_queue], QUEUE_TONE[lead.action_queue]) : '')
     + (lead.priority ? pill(lead.priority.toLowerCase(), PRIORITY_TONE[lead.priority], true) : '')
-    + ownerSelectHtml(lead);
+    + ownerSelectHtml(lead)
+    + ` <button class="btn btn-quiet btn-sm" id="d-email" type="button" title="One-to-one email from your own inbox (sent only when you press Send)">Email</button>`;
 }
+/* Drawer → compose (novus/novus-mail.js). After a send, the History pane is
+   refreshed so the new "Email sent by …" entry shows straight away. */
+document.addEventListener('click', (e) => {
+  if(!e.target.closest || !e.target.closest('#d-email') || !OPEN_LEAD || !window.NovusMail) return;
+  const lead = OPEN_LEAD;
+  NovusMail.compose({ agency_id: lead.agency_id, agency_name: lead.agency_name, contact_name: lead.contact?.name||'', to: lead.contact?.email||'', location: lead.location||'',
+    purpose: 'DECISION_MAKER_FOLLOW_UP', source: 'PROFILE',
+    onSent: () => { try{ if(typeof LEAD_DATA !== 'undefined' && LEAD_DATA && typeof LEAD_DATA.delete === 'function') LEAD_DATA.delete(lead.agency_id); }catch{} } });
+});
 
 function closeDrawer(){
   $('drawer').classList.remove('on');

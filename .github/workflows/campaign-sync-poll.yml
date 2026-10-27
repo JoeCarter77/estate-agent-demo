@@ -13,7 +13,8 @@
 # and each endpoint's dedicated poller secret (see api/novus/_auth.mjs).
 #
 # Setup: GitHub repo → Settings → Secrets and variables → Actions → add
-#   NOVUS_BASE_URL              e.g. https://estate-agent-demo.vercel.app (no trailing slash)
+#   NOVUS_BASE_URL              e.g. https://app.getnovus.co.uk (no trailing slash; the old
+#                               estate-agent-demo.vercel.app host also still works for /api)
 #   NOVUS_BASIC_AUTH_USER
 #   NOVUS_BASIC_AUTH_PASS
 #   NOVUS_CAMPAIGN_POLLER_SECRET   the exact same value set in Vercel

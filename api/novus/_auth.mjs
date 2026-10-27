@@ -94,9 +94,12 @@ export function sendUnauthorized(req, res) {
   return res.status(401).json({ success: false, error: 'Authentication required', login: '/novus/login.html' });
 }
 
+// THROWS (SessionUnavailableError) when the session or account store could
+// not be read — the caller answers 503 and the page keeps the person signed
+// in. Only a genuinely invalid session falls through to null → 401.
 export async function resolveCaller(req, { repo = null } = {}) {
   if (sessionCookieOf(req)) {
-    const viaSession = await resolveSessionCaller(req, { repo: repo || getRepo() }).catch(() => null);
+    const viaSession = await resolveSessionCaller(req, { repo: repo || getRepo() });
     if (viaSession) return viaSession;
   }
   if (isAdminCredential(req)) return { ...adminCaller(), via: 'basic' };

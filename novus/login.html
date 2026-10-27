@@ -66,7 +66,8 @@
         <button class="btn btn-primary btn-block" id="go" type="submit"><span class="spin" aria-hidden="true"></span><span id="go-t">Sign in</span></button>
       </form>
     </div>
-    <p class="foot" id="foot">Signed-in sessions last up to 12 hours and end after 2 hours without use.</p>
+    <p class="foot" id="foot">Signed-in sessions last up to 12 hours and end after 2 hours without use.<br>
+      Forgotten your password, or locked out? Ask an administrator to reset it from Team &amp; access — a reset also unlocks the account straight away. You can then choose your own password from the account menu.</p>
   </main>
 <script>
 (function(){
@@ -88,9 +89,14 @@
       body: JSON.stringify({ username: u.value.trim(), password: p.value, next: params.get('next') || '' })
     }).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok: r.ok, status: r.status, d: d }; }); })
       .then(function(x){
-        if (x.ok && x.d.success) { goT.textContent = 'Opening NOVUS…'; location.replace(x.d.redirect || '/novus/operator.html'); return; }
+        if (x.ok && x.d.success) {
+          // Tell other open NOVUS tabs who is signed in now (novus-ui.js reloads them).
+          try { localStorage.setItem('novus-auth-user', x.d.user.user_id); } catch (e) { /* private mode */ }
+          goT.textContent = 'Opening NOVUS…'; location.replace(x.d.redirect || '/novus/operator.html'); return;
+        }
         p.value = '';
-        show(x.d.error || (x.status === 429 ? 'Too many attempts. Try again later.' : 'Sign-in failed. Try again.'));
+        // 503 = NOVUS could not check the account (not a wrong password, not counted).
+        show(x.d.error || (x.status === 429 ? 'Too many attempts. Try again later.' : 'Sign-in failed. Try again.'), x.status === 503 ? 'warn' : 'err');
         go.disabled = false; go.classList.remove('busy'); goT.textContent = 'Sign in'; p.focus();
       })
       .catch(function(){ show('NOVUS could not be reached. Check your connection and try again.'); go.disabled = false; go.classList.remove('busy'); goT.textContent = 'Sign in'; });

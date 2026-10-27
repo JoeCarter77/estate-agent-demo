@@ -89,6 +89,7 @@
     "novus:team-access-selftest": "node scripts/novus-team-access-selftest.mjs",
     "novus:role-change-selftest": "node scripts/novus-role-change-selftest.mjs",
     "novus:team-ownership-selftest": "node scripts/novus-team-ownership-selftest.mjs",
+    "novus:multi-admin-selftest": "node scripts/novus-multi-admin-selftest.mjs",
     "novus:call-sessions-selftest": "node scripts/novus-call-sessions-selftest.mjs",
     "novus:operator": "node worker/src/index.mjs",
     "novus:operator-selftest": "node worker/test/run.mjs"

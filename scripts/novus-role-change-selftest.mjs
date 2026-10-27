@@ -198,6 +198,9 @@ for (const op of ['', ...ops]) {
     restoreStore(snap);
     if (!SETTER_OPERATIONS.has(op)) { assert.equal(c.statusCode, 403, `${method} ${op}: setter control got ${c.statusCode}`); refusedForSetter += 1; }
     const label = `${method} ${op || '(none)'}`;
+    // Self-service on one's OWN account differs by identity, not permission:
+    // the env admin's password lives in Vercel. Louis must still pass the gate.
+    if (op === 'auth-change-password') { assert.ok(![401, 403].includes(b.statusCode), `${label}: promoted admin refused`); compared += 1; continue; }
     assert.equal(b.statusCode, a.statusCode, `${label}: Joe ${a.statusCode} vs Louis ${b.statusCode} ${JSON.stringify(b.body)?.slice(0, 200)}`);
     assert.equal(b.body?.error, a.body?.error, `${label}: different error`);
     if (!SECRET_GUARDED.test(String(a.body?.error || ''))) {

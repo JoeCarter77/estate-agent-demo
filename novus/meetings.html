@@ -429,7 +429,7 @@
         <div class="card">
           <div class="card-head"><div class="card-title">Booked meetings and discovery sessions</div><div class="card-note" id="m-note"></div></div>
           <div class="tablewrap"><table>
-            <thead><tr><th>Agency</th><th>Meeting</th><th>Contact</th><th>Discovery</th><th>Diagnosis</th><th>Outcome</th><th></th></tr></thead>
+            <thead><tr><th>Agency</th><th>Meeting</th><th>Contact</th><th>Booked by · Runs it</th><th>Discovery</th><th>Diagnosis</th><th>Outcome</th><th></th></tr></thead>
             <tbody id="m-rows"></tbody>
           </table></div>
           <div id="m-empty"></div>
@@ -554,10 +554,28 @@ function showView(name){
 function setHash(h){ if(location.hash !== h) history.pushState(null, '', h); }
 
 /* ═══ MEETINGS LIST ═════════════════════════════════════════════════════ */
+/* Who booked a meeting never changes; who RUNS it is the prep action's
+   assignee, which any admin can hand to another person here. */
+let ROSTER = [];
+const personLabel = (id) => !id ? 'Unassigned' : (ROSTER.find((u) => u.user_id === id)?.display_name || (id === 'admin' ? 'Joe' : 'Former team member'));
+function hostCell(m){
+  const booked = m.booked_by_user_id ? `<div class="t-sub">Booked by ${esc(personLabel(m.booked_by_user_id))}</div>` : '<div class="t-sub">Booker not recorded</div>';
+  if(!m.prepare_action_id) return `${m.host_user_id ? esc(personLabel(m.host_user_id)) : '<span class="muted">&mdash;</span>'}${booked}`;
+  const opts = [['', 'Unassigned'], ...ROSTER.filter((u) => u.role === 'ADMIN' && u.status === 'ACTIVE').map((u) => [u.user_id, u.display_name || u.user_id])];
+  if(m.host_user_id && !opts.some(([v]) => v === m.host_user_id)) opts.push([m.host_user_id, personLabel(m.host_user_id)]);
+  return `<select class="input" data-host="${esc(m.prepare_action_id)}" aria-label="Who runs this meeting" style="font-size:12px;padding:4px 26px 4px 8px">${opts.map(([v, l]) => `<option value="${esc(v)}"${v === m.host_user_id ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>${booked}`;
+}
+document.addEventListener('change', async (e) => {
+  const sel = e.target.closest && e.target.closest('select[data-host]'); if(!sel) return;
+  sel.disabled = true;
+  try{ await post(OP('action-assign'), { confirm:'ASSIGN_ACTION', action_id: sel.dataset.host, user_id: sel.value }); notice(`Meeting now run by ${personLabel(sel.value)}. Booking attribution is unchanged.`); await loadList(); }
+  catch(err){ showErr(`Could not reassign: ${err.message}`); sel.disabled = false; }
+});
 async function loadList(){
   $('refresh').disabled = true; $('stamp').innerHTML = '<span class="spin"></span>Loading'; hideErr();
   try{
-    LIST = await get(OP('discovery-meetings'));
+    const [list, roster] = await Promise.all([get(OP('discovery-meetings')), get(OP('team-roster')).catch(() => null)]);
+    LIST = list; ROSTER = [...(roster?.members || []), ...(roster?.archived || [])];
     renderSetup();
     renderList();
     $('stamp').innerHTML = `<span class="nav-dot"></span>${esc(when(LIST.generated_at))}`;
@@ -593,6 +611,7 @@ function renderList(){
       <td><div class="t-name">${esc(m.agency_name)}</div><div class="t-sub">${esc(m.location||'')}${m.crm_name ? ` · ${esc(m.crm_name)}` : ''}${m.pipeline_status ? ` · ${esc(m.pipeline_status.replace(/_/g,' ').toLowerCase())}` : ''}</div></td>
       <td>${m.meeting_at ? `<b>${esc(when(m.meeting_at))}</b>` : '<span class="muted">not dated</span>'}<div class="t-sub">${esc(m.meeting_sources.map((x) => ({ CALLS:'booked on a call', ACTIONS:'prepare-for-meeting action', DEMOS:'booked from demo', AGENCIES:'marked booked' }[x] || x)).join(' · '))}${m.meeting_note ? ` · ${esc(m.meeting_note)}` : ''}</div></td>
       <td>${dash(m.contact_name)}</td>
+      <td>${hostCell(m)}</td>
       <td>${s ? `${pill(s.status === 'IN_PROGRESS' ? `in progress · ${s.stage}` : 'completed', s.status === 'IN_PROGRESS' ? 't-blue' : 't-grey', true)}<div class="t-sub">${esc(prog)}${s.pitch_count ? ` · ${s.pitch_count} pitch${s.pitch_count === 1 ? '' : 'es'}` : ''}${m.sessions.length > 1 ? ` · ${m.sessions.length} sessions` : ''}</div>` : '<span class="muted">not started</span>'}</td>
       <td>${s?.suitability ? pill(SUIT_LABEL[s.suitability]||s.suitability, SUIT_TONE[s.suitability]) : '<span class="muted">&mdash;</span>'}${s?.proposed?.length ? `<div class="t-sub mono">${esc(s.proposed.join(' '))}</div>` : ''}</td>
       <td>${s?.outcome ? pill((S?.registry?.outcomes||LIST.outcomes||{})[s.outcome] || s.outcome.replace(/_/g,' ').toLowerCase(), OUTCOME_TONE[s.outcome]) : '<span class="muted">&mdash;</span>'}${s?.follow_up_at ? `<div class="t-sub">follow-up ${esc(when(s.follow_up_at))}</div>` : ''}</td>

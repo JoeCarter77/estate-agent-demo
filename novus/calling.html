@@ -61,6 +61,7 @@
     .formrow label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--ink-3);}
   </style>
   <script src="/novus/novus-ui.js" defer></script>
+  <script src="/novus/novus-mail.js" defer></script>
   <!-- Twilio Voice JS SDK, vendored (novus/vendor). It only ever receives a
        short-lived access token minted server-side; no Twilio secret is here. -->
   <script src="/novus/vendor/twilio-voice-sdk-2.18.5.min.js" defer></script>
@@ -202,6 +203,8 @@
           <div class="section-head">
             <div class="section-title">Due to call</div>
             <div class="section-note" id="q-note"></div>
+            <select class="input" id="q-owner" aria-label="Whose leads" title="Remembered for you only" style="margin-left:auto;font-size:12px;padding:4px 26px 4px 8px">
+              <option value="all">Everyone's leads</option><option value="mine">My leads</option><option value="unassigned">Unassigned leads</option></select>
           </div>
           <div class="card"><div class="tablewrap"><table>
             <thead><tr><th>Agency</th><th>Contact</th><th>Phone</th><th class="col-md">Last call</th><th class="col-md">Next due</th>
@@ -232,10 +235,15 @@
       <section class="view" id="v-scripts">
         <div class="page-head">
           <h1 class="page-title">Scripts</h1>
-          <p class="page-sub">One script is <b>Current</b>; a <b>Testing</b> version can be picked in Calling Mode. Every call
-            records the exact version it was made with, so a version that has calls is frozen — editing it creates the next
-            version instead.</p>
+          <p class="page-sub">A shared company library. One version of each kind is the <b>company default</b>; anyone can pick a
+            different version <b>for their own calls</b> without changing anyone else's. Every call records the exact version it
+            was made with, so a version that has calls is frozen — editing it creates the next version instead.</p>
         </div>
+        <div class="wstabs" id="scr-kinds" role="tablist" style="margin-bottom:var(--s-4)">
+          <button class="wstab on" data-scr-kind="MAIN" type="button" role="tab">Main script</button>
+          <button class="wstab" data-scr-kind="GATEKEEPER" type="button" role="tab">Gatekeeper script</button>
+        </div>
+        <div class="banner info hidden" id="scr-mine" style="margin-bottom:var(--s-4)"></div>
         <div class="scr-grid">
           <div>
             <div class="section-head"><div class="section-title">Versions</div>
@@ -494,6 +502,8 @@
       <div class="cm-name" id="cm-name">&mdash;</div>
       <div class="cm-meta" id="cm-meta"></div>
     </div>
+    <button class="btn btn-quiet btn-sm" id="cm-email" type="button" title="Write a one-to-one email from your own inbox (sent only when you press Send)">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/></svg>Email</button>
     <div class="cm-call" id="cm-call"></div>
   </div>
   <div id="cm-kp-slot"></div>
@@ -532,6 +542,8 @@ const START_URL         = OP('calling-start');
 const SCRIPT_SAVE_URL   = OP('script-save');
 const SCRIPT_DUP_URL    = OP('script-duplicate');
 const SCRIPT_STATUS_URL = OP('script-status');
+const SCRIPT_DELETE_URL = OP('script-delete');
+const PREFS_SAVE_URL    = OP('my-preferences-save');
 const OBJECTION_SAVE_URL = OP('objection-save');
 const REPAIR_URL        = OP('calling-repair');
 const DISCARD_URL       = OP('calling-discard');
@@ -574,31 +586,10 @@ const CONSTRAINTS = [['INSUFFICIENT_DEMAND', 'Insufficient demand'], ['POOR_INCO
 const NEEDS_DETAILS = new Set(['OWNER_UNAVAILABLE', 'CALLBACK_REQUESTED', 'MORE_INFO_REQUESTED', 'NOT_INTERESTED', 'BOOKED_MEETING', 'NOT_THE_DECISION_MAKER', 'DO_NOT_CALL', 'REFERRED_TO_EMAIL']);
 const BUCKET_LABEL = { 1: 'Callback overdue', 2: 'Callback due today', 3: 'No-answer retry', 4: 'Call action due', 5: 'Never called' };
 
-/* Fixed, global — not versioned per lead and not affected by the assigned
-   main script. Only {{first_name}} is substituted (via scriptHtml). */
-const GATEKEEPER_SCRIPT = `# GATEKEEPER
-
-Hi, is {{first_name}} around at all?
-
-If they ask who's calling:
-
-It's [your name] from NOVUS.
-
-If they ask what it's regarding:
-
-We help independent agents get more valuations from the enquiries and contacts they already have. We've got a founding offer I'd like to run past {{first_name}}. It's a two-minute call.
-
-If they ask you to send an email:
-
-Of course. What's the best email for {{first_name}}? And when's a good time to catch them? It's much quicker to explain in two minutes than in an email.
-
-If they say {{first_name}} doesn't take these calls:
-
-Understood. Who looks after valuations and new business there? (Record the name as a referral.)
-
-If unavailable:
-
-No worries. When's usually the best time to catch them?`;
+/* The gatekeeper script is a versioned SCRIPTS row like the main script
+   (kind GATEKEEPER, lib/calling-store.mjs) — company default + each person's
+   own pick (WS.me.scripts.gatekeeper). WS.default_gatekeeper_content is only
+   the fallback before calling-setup has seeded gatekeeper v1. */
 
 /* ── helpers ────────────────────────────────────────────────────────── */
 /* The one lead profile (Command Centre drawer). New tab from Calling Mode so a live call is never interrupted. */
@@ -867,6 +858,10 @@ function metricsGrid(x, defs){
     <div class="m" title="${t('meetings_per_active_hour')}"><b>${num(x.meetings_per_active_hour)}</b><span>Meetings / active hr</span></div>
     <div class="m" title="${t('meetings_per_owner_conversation')}"><b>${num(x.meetings_per_owner_conversation)}</b><span>Meetings / owner conv</span></div>
     <div class="m" title="${t('callbacks_created')}"><b>${x.callbacks_created}</b><span>Callbacks created</span><small>${x.followups_created} other follow-ups</small></div>
+    ${x.positive_responses==null?'':`<div class="m" title="${t('positive_responses')}"><b>${x.positive_responses}</b><span>Positive responses</span></div>`}
+    ${x.emails_sent==null?'':`<div class="m" title="${t('emails_sent')}"><b>${x.emails_sent}</b><span>Emails sent (own inbox)</span></div>`}
+    ${x.qualified_opportunities==null?'':`<div class="m" title="${t('qualified_opportunities')}"><b>${x.qualified_opportunities}</b><span>Qualified opportunities</span></div>`}
+    ${x.pilots_agreed==null?'':`<div class="m" title="${t('pilots_agreed')}"><b>${x.pilots_agreed}</b><span>Pilots agreed</span></div>`}
   </div>`;
 }
 function showSessionSummary(s){
@@ -1035,7 +1030,10 @@ function renderPerf(){
   const users = IS_SETTER() ? PERF.users
     : own ? PERF.users.filter((u) => u.user.user_id===ME?.user_id)
     : PERF.users.filter((u) => u.user.role!=='ADMIN' || u.summary.sessions || u.summary.dials);
-  $('perf-body').innerHTML = users.length ? users.map((u) => `<div class="perf-user">
+  /* Team view: the company total first (same definitions; every call and
+     email belongs to exactly one person, so it is never a double count). */
+  const company = !own && PERF.company ? `<div class="perf-user"><div class="section-head"><div class="section-title">Company — everyone</div><div class="section-note">${esc(PERF.definitions?.company||'')}</div></div>${metricsGrid(PERF.company, PERF.definitions)}</div>` : '';
+  $('perf-body').innerHTML = company + (users.length ? users.map((u) => `<div class="perf-user">
     ${IS_SETTER() ? '' : `<div class="section-head"><div class="section-title">${esc(u.user.display_name)} ${pill(u.user.role, u.user.role==='SETTER'?'t-blue':'t-grey', true)}</div></div>`}
     ${metricsGrid(u.summary, PERF.definitions)}
     <div class="card"><div class="tablewrap"><table>
@@ -1048,7 +1046,7 @@ function renderPerf(){
         <td>${s.approval.status==='APPROVED'?`${pill('Approved','t-green',true)} <span class="t-sub">${dur((s.approval.approved_minutes||0)*60)}</span>`:s.approval.status==='REJECTED'?pill('Rejected','t-red',true):'<span class="muted">Pending</span>'}</td>
         <td><button class="btn btn-quiet btn-sm" data-sess-open="${esc(s.session_id)}" type="button">Review</button></td></tr>`).join('')
         : `<tr><td colspan="11" class="muted">No sessions in this range.</td></tr>`}</tbody></table></div></div>
-  </div>`).join('') : emptyState('No activity in this range', 'Sessions and calls will appear here.');
+  </div>`).join('') : emptyState('No activity in this range', 'Sessions and calls will appear here.'));
 }
 async function openSession(id){
   $('sess-panel').innerHTML = '<p><span class="spin"></span> Loading session</p>'; $('sess-ovl').classList.remove('hidden');
@@ -1225,8 +1223,20 @@ function renderSetup(){
   box.classList.remove('hidden');
 }
 /* ═══ CALLING VIEW ══════════════════════════════════════════════════════ */
+/* OWNERSHIP FILTER (pure; per-person default in WS.me.preferences). "Mine" =
+   leads I own plus call actions assigned to me; the queue order is unchanged.
+   Starting a session calls through the filtered queue. */
+let Q_OWNER = null;
+function queueOwnerFilter(){ if(Q_OWNER===null) Q_OWNER = WS?.me?.preferences?.queue_owner_filter || 'all'; return Q_OWNER; }
+function filterQueue(queue, filter, meId, ownerOf){
+  if(filter==='mine') return queue.filter((l) => ownerOf(l.agency_id)===meId || l.assigned_user_id===meId);
+  if(filter==='unassigned') return queue.filter((l) => !ownerOf(l.agency_id) && !l.assigned_user_id);
+  return queue;
+}
+const visibleQueue = () => filterQueue(WS?.queue||[], queueOwnerFilter(), ME?.user_id||'admin', leadOwnerId);
 function renderCalling(){
-  const c = WS.counts||{}; const q = WS.queue||[];
+  const c = WS.counts||{}; const q = visibleQueue();
+  $('q-owner').value = queueOwnerFilter();
   $('q-count').textContent = c.callable ?? q.length;
   $('q-cap').textContent = (c.callable===1) ? 'lead due to call' : 'leads due to call';
   $('s-today').textContent = c.calls_today ?? 0;
@@ -1234,10 +1244,10 @@ function renderCalling(){
   $('s-overdue').textContent = c.by_bucket?.[1]||0;
   $('s-new').textContent = c.by_bucket?.[5]||0;
   $('start-all').disabled = !q.length;
-  $('q-note').textContent = `${q.length} in order · ${c.scheduled_later||0} scheduled for later · ${c.suppressed||0} suppressed · ${c.no_phone||0} without a usable number`;
+  $('q-note').textContent = `${q.length} in order${queueOwnerFilter()!=='all'?` (of ${(WS.queue||[]).length})`:''} · ${c.scheduled_later||0} scheduled for later · ${c.suppressed||0} suppressed · ${c.no_phone||0} without a usable number`;
   $('q-funnel').innerHTML = funnelHtml(WS.funnel||{});
   $('q-rows').innerHTML = q.slice(0, 300).map((l) => `<tr data-id="${esc(l.agency_id)}">
-    <td><div class="t-name">${dash(l.agency_name)} <a class="muted" href="${profileLink(l.agency_id)}" target="_blank" rel="noopener" title="Full lead profile" style="font-size:11px">profile ↗</a></div><div class="t-sub">${dash(l.location)}</div></td>
+    <td><div class="t-name">${dash(l.agency_name)} <a class="muted" href="${profileLink(l.agency_id)}" target="_blank" rel="noopener" title="Full lead profile" style="font-size:11px">profile ↗</a></div><div class="t-sub">${dash(l.location)} · ${esc(ownerLabel(leadOwnerId(l.agency_id)))}</div>${(()=>{ const o = liveDialByOther(l.agency_id); return o ? `<div class="t-sub" style="color:var(--amber)">${esc(ownerLabel(o.user_id))} is on a call to them</div>` : ''; })()}</td>
     <td><div>${dash(l.contact_name)}</div><div class="t-sub">${dash(l.contact_role)}</div></td>
     <td class="mono nowrap">${dash(l.phone)}</td>
     <td class="col-md">${l.last_call ? `${esc(outcomeLabel(l.last_call.outcome))}<div class="t-sub">${esc(ago(l.last_call.at))}</div>` : '<span class="muted">&mdash;</span>'}</td>
@@ -1248,7 +1258,7 @@ function renderCalling(){
     <td class="nowrap"><button class="btn btn-secondary btn-sm call-one" data-id="${esc(l.agency_id)}" type="button">Call</button></td>
   </tr>`).join('');
   $('q-empty').innerHTML = q.length ? (q.length>300 ? `<div class="empty"><div class="empty-s">Showing the first 300 of ${q.length}.</div></div>` : '')
-    : emptyState('Nothing is due to call', 'Scheduled callbacks appear here when their time arrives.');
+    : emptyState(queueOwnerFilter()==='all' ? 'Nothing is due to call' : `Nothing due in ${queueOwnerFilter()==='mine'?'your leads':'unassigned leads'}`, queueOwnerFilter()==='all' ? 'Scheduled callbacks appear here when their time arrives.' : 'Switch to “Everyone’s leads” to see the whole queue.');
 }
 
 /* Dials → Connected → Owner → Pitched → Interested → Meeting. Pure counts
@@ -1326,46 +1336,71 @@ async function reviewCallAction(actionId){
 }
 
 /* ═══ SCRIPTS VIEW ══════════════════════════════════════════════════════ */
-let SCR_SEL = null; let SCR_NEW = false; let OBJ_SEL = null; let OBJ_NEW = false;
+let SCR_SEL = null; let SCR_NEW = false; let OBJ_SEL = null; let OBJ_NEW = false; let SCR_KIND = 'MAIN';
 const STATUS_TONE = { CURRENT:'t-green', TESTING:'t-amber', ARCHIVED:'t-grey' };
+const KIND_WORD = { MAIN:'main script', GATEKEEPER:'gatekeeper script' };
+const scriptsOfKind = (kind = SCR_KIND) => (kind==='GATEKEEPER' ? WS.gatekeeper_scripts : WS.scripts) || [];
+const myScriptId = (kind = SCR_KIND) => (kind==='GATEKEEPER' ? WS.me?.preferences?.gatekeeper_script_id : WS.me?.preferences?.main_script_id) || '';
+const myResolved = (kind = SCR_KIND) => (kind==='GATEKEEPER' ? WS.me?.scripts?.gatekeeper : WS.me?.scripts?.main) || {};
 function renderScripts(){
-  const scripts = WS.scripts||[];
-  if(!SCR_SEL && !SCR_NEW && scripts.length) SCR_SEL = (scripts.find((s)=>s.status==='CURRENT')||scripts[0]).script_id;
+  document.querySelectorAll('[data-scr-kind]').forEach((b)=>b.classList.toggle('on', b.dataset.scrKind===SCR_KIND));
+  const scripts = scriptsOfKind();
+  if(SCR_SEL && !scripts.some((s)=>s.script_id===SCR_SEL)) SCR_SEL = null;
+  if(!SCR_SEL && !SCR_NEW && scripts.length) SCR_SEL = (scripts.find((s)=>s.script_id===myResolved().script_id)||scripts.find((s)=>s.status==='CURRENT')||scripts[0]).script_id;
+  /* Which version THIS person's calls use, in words. */
+  const r = myResolved(); const using = scripts.find((s)=>s.script_id===r.script_id);
+  const mine = $('scr-mine');
+  mine.innerHTML = using ? `Your calls use <b>${esc(using.name)} v${using.version}</b> — ${r.source==='COMPANY_DEFAULT'?'the company default (you have not picked your own)':r.source==='YOURS_LATEST'?'the newest version of the script you picked':'your own selection'}.${r.notice?` ${esc(r.notice)}`:''}${myScriptId()?` <button class="btn btn-quiet btn-sm" id="se-mine-clear" type="button">Use the company default</button>`:''}`
+    : (SCR_KIND==='GATEKEEPER' ? 'No gatekeeper script saved yet — Calling Mode shows the built-in wording. Create one here (or run setup) to manage versions.' : 'No main script yet.');
+  mine.classList.remove('hidden');
   $('scr-list').innerHTML = scripts.length ? scripts.map((s) => `<div class="scr ${SCR_SEL===s.script_id?'on':''}" data-script="${esc(s.script_id)}">
-      <div class="scr-top"><span class="scr-name">${esc(s.name)}</span><span class="scr-v">v${s.version}</span>${pill(s.status.toLowerCase(), STATUS_TONE[s.status])}
+      <div class="scr-top"><span class="scr-name">${esc(s.name)}</span><span class="scr-v">v${s.version}</span>${pill(s.status==='CURRENT'?'company default':s.status.toLowerCase(), STATUS_TONE[s.status])}
+        ${s.script_id===r.script_id?pill('your calls','t-blue'):''}
         <span class="scr-v" style="margin-left:auto">${s.call_count} call${s.call_count===1?'':'s'}</span></div>
-      <div class="scr-stats">
+      ${SCR_KIND==='MAIN'?`<div class="scr-stats">
         ${[['Dials',s.funnel.dials],['Connected',s.funnel.connected],['Owner',s.funnel.owner_conversations],['Pitched',s.funnel.pitched],['Meetings',s.funnel.booked_meetings]]
           .map(([l,n])=>`<div class="scr-stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('')}
       </div>
       <div class="t-sub" style="margin-top:8px">Pitched → meeting ${s.funnel.pitched_to_meeting_pct==null?'&mdash;':s.funnel.pitched_to_meeting_pct+'%'} &middot;
         Owner → meeting ${s.funnel.owner_to_meeting_pct==null?'&mdash;':s.funnel.owner_to_meeting_pct+'%'} &middot;
-        More info ${s.funnel.more_info} &middot; Callbacks ${s.funnel.callbacks} &middot; Not interested ${s.funnel.not_interested}</div>
-    </div>`).join('') : emptyState('No scripts yet', 'Create one, or run setup to seed a starter.');
+        More info ${s.funnel.more_info} &middot; Callbacks ${s.funnel.callbacks} &middot; Not interested ${s.funnel.not_interested}</div>`
+      : `<div class="t-sub" style="margin-top:8px">Gatekeeper calls ${s.call_count} &middot; then reached the owner ${s.funnel.owner_conversations} &middot; meetings ${s.funnel.booked_meetings}</div>`}
+    </div>`).join('') : emptyState(`No ${KIND_WORD[SCR_KIND]}s yet`, SCR_KIND==='GATEKEEPER' ? 'Create one — it starts from the built-in wording.' : 'Create one, or run setup to seed a starter.');
   renderScriptEditor(); renderObjections();
 }
 function renderScriptEditor(){
-  const s = SCR_NEW ? { script_id:'', name:'', version:1, status: (WS.scripts||[]).some((x)=>x.status==='CURRENT')?'TESTING':'CURRENT', content:'', notes:'', call_count:0 } : (WS.scripts||[]).find((x)=>x.script_id===SCR_SEL);
+  const list = scriptsOfKind();
+  const s = SCR_NEW ? { script_id:'', name: SCR_KIND==='GATEKEEPER'?'Gatekeeper':'', version:1, status: list.some((x)=>x.status==='CURRENT')?'TESTING':'CURRENT',
+      content: SCR_KIND==='GATEKEEPER' && !list.length ? (WS.default_gatekeeper_content||'') : '', notes:'', call_count:0 } : list.find((x)=>x.script_id===SCR_SEL);
   if(!s){ $('scr-editor').innerHTML = '<div class="note">Select a script version to edit it.</div>'; return; }
   const frozen = !SCR_NEW && s.call_count > 0;
+  const isMine = !SCR_NEW && myResolved().script_id===s.script_id;
   $('scr-editor').innerHTML = `
-    <div class="field"><label class="field-l">Name</label><input class="input block" id="se-name" value="${esc(s.name)}" placeholder="Seller Opportunity" /></div>
+    <div class="field"><label class="field-l">Name</label><input class="input block" id="se-name" value="${esc(s.name)}" placeholder="${SCR_KIND==='GATEKEEPER'?'Gatekeeper — referral ask':'Seller Opportunity'}" /></div>
     <div class="field" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
       <div><label class="field-l">Version</label><input class="input block" value="v${s.version}" readonly /></div>
       <div><label class="field-l">Status</label><select class="input block" id="se-status">
-        ${['CURRENT','TESTING','ARCHIVED'].map((v)=>`<option value="${v}" ${s.status===v?'selected':''}>${v[0]+v.slice(1).toLowerCase()}</option>`).join('')}</select></div>
+        ${[['CURRENT','Company default'],['TESTING','Testing'],['ARCHIVED','Archived']].map(([v,l])=>`<option value="${v}" ${s.status===v?'selected':''}>${l}</option>`).join('')}</select></div>
     </div>
-    <div class="field"><label class="field-l">Script</label>
-      <textarea class="input" id="se-content" placeholder="Hi, is that {{first_name}}? ... Lines starting with # become headings; {{name}}, {{first_name}}, {{agency}}, {{location}} and {{property}} are filled in.">${esc(s.content)}</textarea>
-      <div class="field-note">Placeholders: <span class="mono">{{first_name}}</span> <span class="mono">{{name}}</span> <span class="mono">{{agency}}</span> <span class="mono">{{location}}</span> <span class="mono">{{property}}</span>. A line starting with <span class="mono">#</span> is a heading.</div></div>
+    <div class="field"><label class="field-l">${SCR_KIND==='GATEKEEPER'?'Gatekeeper script':'Script'}</label>
+      <textarea class="input" id="se-content" placeholder="Hi, is that {{first_name}}? ... Lines starting with # become headings.">${esc(s.content)}</textarea>
+      <div class="field-note">Placeholders: <span class="mono">{{first_name}}</span> <span class="mono">{{name}}</span> <span class="mono">{{agency}}</span> <span class="mono">{{location}}</span> <span class="mono">{{property}}</span> <span class="mono">{{sender_first_name}}</span> (you). A line starting with <span class="mono">#</span> is a heading.</div></div>
     <div class="field"><label class="field-l">Notes</label><input class="input block" id="se-notes" value="${esc(s.notes||'')}" placeholder="What changed in this version" /></div>
-    ${frozen ? `<div class="hintbox"><b>${s.call_count} call${s.call_count===1?'':'s'} recorded with this version.</b> Its wording is frozen. Saving creates v${(Math.max(...(WS.scripts||[]).filter((x)=>x.script_key===s.script_key).map((x)=>x.version)))+1}; status changes still apply to this version.</div>` : ''}
+    ${frozen ? `<div class="hintbox"><b>${s.call_count} call${s.call_count===1?'':'s'} recorded with this version.</b> Its wording is frozen. Saving creates v${(Math.max(...list.filter((x)=>x.script_key===s.script_key).map((x)=>x.version)))+1}; status changes still apply to this version.</div>` : ''}
+    ${!SCR_NEW&&s.status!=='ARCHIVED'&&!isMine?`<div style="margin-top:18px;display:flex;gap:8px;align-items:center"><button class="btn btn-secondary" id="se-mine" type="button">Use for my calls</button><span class="field-note" style="margin:0">Only your own calls change.</span></div>`:''}
     <div class="btnrow" style="margin-top:18px">
       <button class="btn btn-primary" id="se-save" type="button">${frozen?'Save as new version':'Save'}</button>
-      ${!SCR_NEW?`<button class="btn btn-secondary" id="se-dup" type="button">Duplicate as new version</button>`:''}
-      ${!SCR_NEW&&s.status!=='CURRENT'?`<button class="btn btn-quiet" id="se-current" type="button">Make current</button>`:''}
+      ${!SCR_NEW&&s.status!=='CURRENT'?`<button class="btn btn-quiet" id="se-current" type="button" title="Changes the default for everyone who has not picked their own">Make company default</button>`:''}
+      ${!SCR_NEW&&s.status==='ARCHIVED'?`<button class="btn btn-quiet" id="se-restore" type="button">Restore</button>`:''}
+      ${!SCR_NEW?`<button class="btn btn-quiet" id="se-dup" type="button">Duplicate as new version</button><button class="btn btn-quiet" id="se-dup-new" type="button">Duplicate as new script</button>`:''}
+      ${!SCR_NEW&&s.call_count===0&&s.status!=='CURRENT'?`<button class="btn btn-quiet" id="se-delete" type="button" style="color:var(--red)">Delete version</button>`:''}
       ${SCR_NEW?`<button class="btn btn-quiet" id="se-cancel" type="button">Cancel</button>`:''}
     </div><div id="se-err" class="formerr"></div>`;
+}
+async function setMyScript(scriptId){
+  const key = SCR_KIND==='GATEKEEPER' ? 'gatekeeper_script_id' : 'main_script_id';
+  await post(PREFS_SAVE_URL, { confirm:'SAVE_PREFERENCES', preferences:{ [key]: scriptId||'' } });
+  await load(true);
 }
 function renderObjections(){
   const rows = WS.objections||[];
@@ -1387,8 +1422,8 @@ function renderObjections(){
       ${OBJ_NEW?`<button class="btn btn-quiet" id="oe-cancel" type="button">Cancel</button>`:''}</div><div id="oe-err" class="formerr"></div>`;
 }
 async function saveScript(asNew){
-  const s = SCR_NEW ? null : (WS.scripts||[]).find((x)=>x.script_id===SCR_SEL);
-  const body = { confirm:'SAVE_SCRIPT', script_id: s?s.script_id:'', name: $('se-name').value, content: $('se-content').value, notes: $('se-notes').value, status: $('se-status').value, as_new_version: Boolean(asNew || (s && s.call_count>0)) };
+  const s = SCR_NEW ? null : scriptsOfKind().find((x)=>x.script_id===SCR_SEL);
+  const body = { confirm:'SAVE_SCRIPT', kind: SCR_KIND, script_id: s?s.script_id:'', name: $('se-name').value, content: $('se-content').value, notes: $('se-notes').value, status: $('se-status').value, as_new_version: Boolean(asNew || (s && s.call_count>0)) };
   const err = $('se-err'); err.classList.remove('show');
   try{ const out = await post(SCRIPT_SAVE_URL, body); SCR_NEW = false; SCR_SEL = out.script.script_id; await load(true); }
   catch(e){ err.textContent = e.message; err.classList.add('show'); }
@@ -1411,7 +1446,7 @@ function renderResume(){
   box.classList.remove('hidden');
 }
 function nextLead(){
-  const q = WS?.queue||[];
+  const q = visibleQueue();
   return q.find((l) => !SESSION.done.has(l.agency_id) && (SESSION.mode==='all' || l.bucket<=4)) || null;
 }
 function startSession(mode, agencyId, actionId=''){
@@ -1444,9 +1479,15 @@ function beginCall(lead){
      override the server's assignment back to CURRENT the moment a version
      is archived, which is exactly what must not happen. */
   const all = WS.scripts||[];
-  const script = (lead.script && all.find((s)=>s.script_id===lead.script.script_id))
+  /* Then the caller's OWN pick (WS.me.scripts, server-resolved from their
+     preferences) for a lead that has never been called — Joe and Louis can
+     each use a different version without changing the company default. */
+  const mine = WS.me?.scripts || {};
+  const script = (lead.script?.inherited && all.find((s)=>s.script_id===lead.script.script_id))
+    || all.find((s)=>s.script_id===mine.main?.script_id)
+    || (lead.script && all.find((s)=>s.script_id===lead.script.script_id))
     || all.find((s)=>s.status==='CURRENT') || all.filter((s)=>s.status!=='ARCHIVED')[0] || null;
-  CALL = { client_key: uid(), lead, script_id: script?script.script_id:'', source_action_id: lead.action_id||'', opened_at: new Date().toISOString(),
+  CALL = { client_key: uid(), lead, script_id: script?script.script_id:'', gatekeeper_script_id: mine.gatekeeper?.script_id || '', source_action_id: lead.action_id||'', opened_at: new Date().toISOString(),
     call_mode:'MANUAL', state:'idle', started_at:'', connected_at:'', ended_at:'', duration_seconds:0, objections:[], outcome:'', details:{}, commercial:{ main_priority:'', main_constraint:'', useful_note:'' }, stage:'live',
     reach: { stage:'ASK', gatekeeper_reached:false, gatekeeper_reached_at:'', owner_reached_at:'', owner_reach_source:'' } };
   DTMF.sent = []; KEYPAD = false;
@@ -1482,10 +1523,12 @@ function resumeDraft(){
 }
 function currentScript(){ return (WS.scripts||[]).find((s)=>s.script_id===CALL.script_id) || null; }
 function scriptHtml(content, lead){
-  const vars = { name: lead.contact_name||'there', first_name: firstName(lead.contact_name)||'there', agency: lead.agency_name||'your agency', location: lead.location||'your area' };
+  const me = (typeof window!=='undefined' && window.NovusAuth && window.NovusAuth.me) || (typeof ME!=='undefined' && ME) || {};
+  const vars = { name: lead.contact_name||'there', first_name: firstName(lead.contact_name)||'there', agency: lead.agency_name||'your agency', location: lead.location||'your area',
+    sender_name: me.display_name||'[your name]', sender_first_name: firstName(me.display_name)||'[your name]' };
   const property = lead.context && lead.context.property || '';
   return esc(content||'(this script has no content yet — add it in Scripts)')
-    .replace(/\{\{\s*(name|first_name|agency|location|property)\s*\}\}/g, (_, k) => k==='property'
+    .replace(/\{\{\s*(name|first_name|agency|location|property|sender_name|sender_first_name)\s*\}\}/g, (_, k) => k==='property'
       ? (property ? `<span class="var">${esc(property)}</span>` : `<span class="var missing" title="No property on record for this lead's probe">[property unavailable]</span>`)
       : `<span class="var">${esc(vars[k])}</span>`)
     .replace(/\n{0,2}^#+\s*(.+)$\n?/gm, '<h3>$1</h3>');
@@ -1583,11 +1626,14 @@ function askScreenHtml(){
     </div>
   </div></div>`;
 }
+function gatekeeperScript(){ const id = CALL.gatekeeper_script_id || WS.me?.scripts?.gatekeeper?.script_id || ''; return (WS.gatekeeper_scripts||[]).find((x)=>x.script_id===id) || null; }
 function gatekeeperScreenHtml(){
   const l = CALL.lead;
   return `<div class="cm-main">
-    <div class="cm-label">Gatekeeper script</div>
-    <div class="script">${scriptHtml(GATEKEEPER_SCRIPT, l)}</div>
+    ${(()=>{ const g = gatekeeperScript(); const opts = (WS.gatekeeper_scripts||[]).filter((x)=>x.status!=='ARCHIVED' || x.script_id===CALL.gatekeeper_script_id);
+      const sel = opts.length > 1 ? `<select class="input" id="cm-gk-sel" style="margin-left:auto;font-size:11.5px;padding:4px 26px 4px 8px">${opts.map((x)=>`<option value="${esc(x.script_id)}" ${x.script_id===CALL.gatekeeper_script_id?'selected':''}>${esc(x.name)} v${x.version} · ${x.status==='CURRENT'?'company default':x.status.toLowerCase()}</option>`).join('')}</select>` : '';
+      return `<div class="cm-label">Gatekeeper script ${g?`<span class="mono muted">${esc(g.name)} v${g.version}</span>`:''}${sel}</div>
+    <div class="script">${scriptHtml(g ? g.content : (WS.default_gatekeeper_content||''), l)}</div>`; })()}
     <div style="margin-top:28px"><button class="btn btn-primary" id="cm-owner-through" type="button" style="padding:14px 28px;font-size:15px">Got through to owner &rarr;</button></div>
   </div>`;
 }
@@ -1734,6 +1780,27 @@ function followupSummary(){
   if(o==='REFERRED_TO_EMAIL'){ const r=d.referred_contact||{}; return `Follow up ${r.name||'the contact'} by email${r.email?` (${r.email})`:''} ${when(d.followup_at)} — gatekeeper referred us`; }
   return '';
 }
+/* EMAIL FROM CALLING MODE (novus/novus-mail.js). Context from the call;
+   saving a call NEVER sends an email — this only opens the compose window. */
+const OUTCOME_EMAIL = {
+  MORE_INFO_REQUESTED: ['MORE_INFO', 'They asked for more information'],
+  REFERRED_TO_EMAIL: ['GATEKEEPER_REFERRAL', 'The gatekeeper asked us to email'],
+  BOOKED_MEETING: ['MEETING_CONFIRMATION', 'Confirm the meeting by email'],
+  CALLBACK_REQUESTED: ['CALLBACK_INFO', 'Send something before the callback'],
+  OWNER_UNAVAILABLE: ['CALLBACK_INFO', 'Send something before the callback'],
+  NOT_THE_DECISION_MAKER: ['GATEKEEPER_REFERRAL', 'Email the decision-maker they named'],
+};
+function emailFromCall(){
+  if(!CALL || !window.NovusMail) return;
+  const l = CALL.lead; const d = CALL.details||{}; const ref = d.referred_contact||{};
+  const referred = ['REFERRED_TO_EMAIL','NOT_THE_DECISION_MAKER'].includes(CALL.outcome) && (ref.email || ref.name);
+  NovusMail.compose({
+    agency_id: l.agency_id, agency_name: l.agency_name, location: l.location||'', property: l.context?.property||'',
+    contact_name: referred ? (ref.name||'') : (l.contact_name||''), to: referred ? (ref.email||'') : (l.email||''),
+    purpose: (OUTCOME_EMAIL[CALL.outcome]||['DECISION_MAKER_FOLLOW_UP'])[0], source:'CALLING', call_id: CALL.call_id||'',
+    meeting_time: d.meeting_at ? when(d.meeting_at) : '', callback_time: (d.callback_at||d.followup_at) ? when(d.callback_at||d.followup_at) : '',
+  });
+}
 function reviewHtml(){
   const c = CALL.commercial;
   const row = (k, v, back) => `<div class="review-row"><div class="k">${esc(k)}</div><div class="v">${v}</div>${back?`<button class="edit" data-back="${back}" type="button">Edit</button>`:'<span></span>'}</div>`;
@@ -1749,6 +1816,7 @@ function reviewHtml(){
       ${row('Note', c.useful_note?esc(c.useful_note):'<span class="muted">none</span>', 'commercial')}
       ${row('Script', currentScript()?`${esc(currentScript().name)} v${currentScript().version}`:'<span class="muted">none</span>', null)}
     </div>
+    ${OUTCOME_EMAIL[CALL.outcome]?`<div class="hintbox" style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span><b>${esc(OUTCOME_EMAIL[CALL.outcome][1])}?</b> Write it now from your own inbox — it is sent only when you press Send. Saving this call never sends an email.</span><button class="btn btn-secondary btn-sm" id="cm-email-now" type="button">Write email</button></div>`:''}
     <div id="r-err" class="formerr cm-err"></div>
     <div class="cstage-actions"><button class="btn btn-secondary" id="r-exit" type="button">Save &amp; exit</button><span class="spacer"></span>
       <span class="hint">Enter = next call</span><button class="btn btn-primary" id="r-next" type="button">Save &amp; next call &rarr;</button></div>
@@ -1850,8 +1918,20 @@ function wireTwilioCall(call){
   call.on('mute', (muted) => { CALL.muted = muted; renderCallControls(); });
   CALL.twilio_call_sid = call.parameters?.CallSid || CALL.twilio_call_sid || '';
 }
+/* DUPLICATE-CALL PROTECTION. Someone else is mid-call to this agency (an
+   opened dial with no outcome yet): say who and ask before dialling. The
+   server repeats the check for Twilio dials (calling-start → 409). */
+function liveDialByOther(agencyId){
+  const me = ME?.user_id || 'admin';
+  return (WS?.live_dials||[]).find((d)=>d.agency_id===agencyId && d.user_id!==me) || null;
+}
+function confirmConcurrent(who, startedAt){
+  return confirm(`${who||'Someone else'} started a call to this agency ${startedAt?ago(startedAt):'recently'} and has not saved an outcome yet. Call anyway?`);
+}
 async function dial(){
   if(!CALL || CALL.state!=='idle') return;
+  const other = liveDialByOther(CALL.lead.agency_id);
+  if(other && !CALL.allow_concurrent){ if(!confirmConcurrent(ownerLabel(other.user_id), other.started_at)) return; CALL.allow_concurrent = true; }
   if(!DIALER.enabled){
     CALL.call_mode='MANUAL'; CALL.state='connected'; CALL.started_at = CALL.started_at || new Date().toISOString(); CALL.connected_at = new Date().toISOString();
     saveDraft(); renderMode(); return;
@@ -1860,8 +1940,15 @@ async function dial(){
   if(!l.phone_e164){ CALL.state='failed'; CALL.error='no dialable number'; saveDraft(); renderMode(); return; }
   CALL.call_mode='TWILIO'; CALL.state='connecting'; CALL.started_at = new Date().toISOString(); CALL.error=''; DTMF.sent=[]; saveDraft(); renderMode();
   try{
-    const opened = await post(START_URL, { confirm:'START_CALL', client_key: CALL.client_key, agency_id: l.agency_id, script_id: CALL.script_id, source_action_id: CALL.source_action_id||'',
-      contact_name: l.contact_name||'', contact_role: l.contact_role||'', phone: l.phone||'', call_mode:'TWILIO', started_at: CALL.started_at });
+    const startBody = { confirm:'START_CALL', client_key: CALL.client_key, agency_id: l.agency_id, script_id: CALL.script_id, source_action_id: CALL.source_action_id||'',
+      contact_name: l.contact_name||'', contact_role: l.contact_role||'', phone: l.phone||'', call_mode:'TWILIO', started_at: CALL.started_at, allow_concurrent: CALL.allow_concurrent===true };
+    let opened;
+    try { opened = await post(START_URL, startBody); }
+    catch(err){
+      if(err.status!==409 || !err.data?.in_progress) throw err;
+      if(!confirmConcurrent(err.data.by_user_name || ownerLabel(err.data.by_user_id), err.data.started_at)){ CALL.state='idle'; CALL.started_at=''; saveDraft(); renderMode(); return; }
+      CALL.allow_concurrent = true; opened = await post(START_URL, { ...startBody, allow_concurrent: true });
+    }
     CALL.call_id = opened.call.call_id; saveDraft();
     console.debug('[twilio] call connecting', { call_id: CALL.call_id });
     const call = await DIALER.device.connect({ params: { call_id: CALL.call_id, To: l.phone_e164 } });
@@ -1986,6 +2073,7 @@ function payload(){
     started_at: CALL.started_at || CALL.opened_at, connected_at: CALL.connected_at||'', ended_at: CALL.ended_at||'', duration_seconds: CALL.duration_seconds||0,
     outcome: CALL.outcome, callback_at: d.callback_at||'', callback_note: d.callback_note||'', owner_reached: d.owner_reached!==false, pitched_override: d.pitched_override===true,
     gatekeeper_reached: reach().gatekeeper_reached===true, gatekeeper_reached_at: reach().gatekeeper_reached_at||'', owner_reached_at: reach().owner_reached_at||'', owner_reach_source: reach().owner_reach_source||'',
+    gatekeeper_script_id: reach().gatekeeper_reached===true ? (CALL.gatekeeper_script_id||'') : '',
     more_info_type: d.more_info_type||'', more_info_note: d.more_info_note||'', followup_at: d.followup_at||'',
     not_interested_reason: d.not_interested_reason||'', not_interested_detail: d.not_interested_detail||'', meeting_at: d.meeting_at||'', meeting_note: d.meeting_note||'',
     referred_contact: d.referred_contact||null, objections: CALL.objections, main_priority: c.main_priority||'', main_constraint: c.main_constraint||'', useful_note: c.useful_note||'' };
@@ -2448,6 +2536,12 @@ document.addEventListener('click', (e) => {
 $('refresh').addEventListener('click', () => { if(VIEW==='calling-analytics') loadAnalytics(true); else load(true); });
 $('start-all').addEventListener('click', () => startSession('all'));
 $('start-actions').addEventListener('click', () => startSession('actions'));
+$('cm-email').addEventListener('click', emailFromCall);
+$('q-owner').addEventListener('change', (e) => {
+  Q_OWNER = e.target.value; renderCalling();
+  post(PREFS_SAVE_URL, { confirm:'SAVE_PREFERENCES', preferences:{ queue_owner_filter: Q_OWNER } }).catch(() => {});
+});
+document.addEventListener('click', (e) => { if(e.target.closest && e.target.closest('#cm-email-now')) emailFromCall(); });
 $('cm-exit').addEventListener('click', () => {
   if(CALL && CALL.outcome && CALL.stage!=='done'){ if(!confirm('This call has an outcome but is not saved yet. Exit anyway? It stays saved locally and can be resumed.')) return; }
   closeMode();
@@ -2468,8 +2562,13 @@ document.addEventListener('click', async (e) => {
   const scr = t.closest('.scr'); if(scr && !t.closest('button')){ SCR_NEW=false; SCR_SEL = scr.dataset.script; renderScripts(); return; }
   if(t.id==='se-save'){ saveScript(false); return; }
   if(t.id==='se-cancel'){ SCR_NEW=false; renderScripts(); return; }
-  if(t.id==='se-dup'){ try{ const out = await post(SCRIPT_DUP_URL, { confirm:'DUPLICATE_SCRIPT', script_id: SCR_SEL }); SCR_SEL = out.script.script_id; await load(true); }catch(err){ showErr(err.message); } return; }
-  if(t.id==='se-current'){ try{ await post(SCRIPT_STATUS_URL, { confirm:'SET_SCRIPT_STATUS', script_id: SCR_SEL, status:'CURRENT' }); await load(true); }catch(err){ showErr(err.message); } return; }
+  const kindTab = t.closest('[data-scr-kind]'); if(kindTab){ SCR_KIND = kindTab.dataset.scrKind; SCR_SEL = null; SCR_NEW = false; renderScripts(); return; }
+  if(t.id==='se-dup' || t.id==='se-dup-new'){ try{ const out = await post(SCRIPT_DUP_URL, { confirm:'DUPLICATE_SCRIPT', script_id: SCR_SEL, as_new_script: t.id==='se-dup-new' }); SCR_SEL = out.script.script_id; await load(true); }catch(err){ showErr(err.message); } return; }
+  if(t.id==='se-current'){ if(!confirm(`Make this the company default ${KIND_WORD[SCR_KIND]}? Everyone who has not picked their own version will use it.`)) return; try{ await post(SCRIPT_STATUS_URL, { confirm:'SET_SCRIPT_STATUS', script_id: SCR_SEL, status:'CURRENT' }); await load(true); }catch(err){ showErr(err.message); } return; }
+  if(t.id==='se-restore'){ try{ await post(SCRIPT_STATUS_URL, { confirm:'SET_SCRIPT_STATUS', script_id: SCR_SEL, status:'TESTING' }); await load(true); }catch(err){ showErr(err.message); } return; }
+  if(t.id==='se-mine'){ try{ await setMyScript(SCR_SEL); }catch(err){ showErr(err.message); } return; }
+  if(t.id==='se-mine-clear'){ try{ await setMyScript(''); }catch(err){ showErr(err.message); } return; }
+  if(t.id==='se-delete'){ if(!confirm('Delete this version permanently? It has never been used on a call.')) return; try{ await post(SCRIPT_DELETE_URL, { confirm:'DELETE_SCRIPT_VERSION', script_id: SCR_SEL }); SCR_SEL = null; await load(true); }catch(err){ showErr(err.message); } return; }
   const objEdit = t.closest('.obj-edit'); if(objEdit){ OBJ_NEW=false; OBJ_SEL = objEdit.dataset.objection; renderObjections(); return; }
   if(t.id==='oe-save'){ saveObjection(); return; }
   if(t.id==='oe-cancel'){ OBJ_NEW=false; renderObjections(); return; }
@@ -2515,6 +2614,7 @@ document.addEventListener('click', async (e) => {
 });
 document.addEventListener('change', (e) => {
   if(e.target.id==='cm-script-sel' && CALL){ CALL.script_id = e.target.value; saveDraft(); renderMode(); }
+  if(e.target.id==='cm-gk-sel' && CALL){ CALL.gatekeeper_script_id = e.target.value; saveDraft(); renderMode(); }
 });
 document.addEventListener('input', (e) => {
   if(!CALL) return;
@@ -2523,6 +2623,9 @@ document.addEventListener('input', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if(!CALL || !$('cm').classList.contains('on')) return;
+  /* The email compose window owns the keyboard while it is open (Enter in
+     its fields must never save the call or move to the next lead). */
+  if(document.querySelector('.nm-ovl')) return;
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
   if(CALL.stage==='live' && KEYPAD && !typing && DTMF_KEYS.includes(e.key) && dtmfActive()){ e.preventDefault(); pressKey(e.key); return; }
   if(e.key==='Escape' && CALL.stage!=='live'){ if(!typing) goto(CALL.stage==='outcome'?'live':CALL.stage==='details'?'outcome':CALL.stage==='commercial'?(NEEDS_DETAILS.has(CALL.outcome)?'details':'outcome'):CALL.stage==='review'?(ownerReached()?'commercial':NEEDS_DETAILS.has(CALL.outcome)?'details':'outcome'):'live'); return; }

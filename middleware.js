@@ -31,6 +31,15 @@
 // Cron endpoint (/api/novus/intelligence/finalize) by NOVUS_CRON_SECRET, so
 // both are skipped here, exactly as before.
 //
+// CANONICAL DOMAIN. People use NOVUS at https://app.getnovus.co.uk. The same
+// deployment also answers on older hosts (LEGACY_HOSTS); a browser opening a
+// /novus page there is sent to the same path on the canonical origin, so
+// sign-in (a host-only cookie) always happens on app.getnovus.co.uk.
+// Deliberately NOT redirected: every /api path (Twilio signs the exact URL it
+// calls, and the GitHub poller / Apps Script use POST), non-GET requests, and
+// the Playwright worker's page loads (X-NOVUS-Client: worker). Only the listed
+// hosts redirect, so the canonical host and preview deployments cannot loop.
+//
 // Env: NOVUS_BASIC_AUTH_USER, NOVUS_BASIC_AUTH_PASS, NOVUS_SESSION_SECRET,
 //      KV_REST_API_URL, KV_REST_API_TOKEN
 
@@ -38,11 +47,20 @@ export const config = {
   matcher: ['/novus/:path*', '/api/novus/:path*'],
 };
 
+const CANONICAL_ORIGIN = 'https://app.getnovus.co.uk';
+const LEGACY_HOSTS = new Set([
+  'estate-agent-demo.vercel.app', 'estate-agent-demo-688n.vercel.app',
+  'www.getnovus.co.uk', 'getnovus.co.uk', 'demo.getnovus.co.uk',
+]);
 const SESSION_COOKIE = 'novus_session';
 const LOGIN_PAGE = '/novus/login.html';
 const PUBLIC_PAGES = new Set(['/novus/login', '/novus/login.html']);
 const PUBLIC_API = new Set(['/api/novus/auth/login', '/api/novus/auth/logout']);
 const SETTER_PAGES = new Set(['/novus/calling', '/novus/calling.html', '/novus/priorities', '/novus/priorities.html']);
+// API paths a setter's browser reaches directly (not via personalisation):
+// the email OAuth callback, a rewrite onto personalisation, which re-checks
+// the operation against SETTER_OPERATIONS in full.
+const SETTER_API = new Set(['/api/novus/mail/oauth/callback']);
 // Stylesheets, scripts, images and fonts hold no NOVUS data (the repository is
 // public); the login page needs them before anyone is signed in.
 const STATIC_ASSET = /\.(css|js|png|svg|ico|woff2?)$/i;
@@ -84,7 +102,10 @@ async function verifyToken(token, secret) {
   } catch { return null; }
 }
 
-// The server-side record (lib/auth-session.mjs sessionKey). Fails closed.
+// The server-side record (lib/auth-session.mjs sessionKey). Fails closed —
+// but an unreachable store is 'unavailable', not 'signed out': answering
+// that with the login page is what logged people out on every Redis blip.
+// Returns true | false | 'unavailable'.
 async function sessionRecordExists(payload) {
   const url = process.env.KV_REST_API_URL;
   const token = process.env.KV_REST_API_TOKEN;
@@ -95,11 +116,16 @@ async function sessionRecordExists(payload) {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(['GET', `novus:auth:s:${payload.sid}`]),
     });
-    if (!r.ok) return false;
+    if (!r.ok) return 'unavailable';
     const record = JSON.parse((await r.json())?.result || 'null');
     return Boolean(record && record.uid === payload.uid && record.role === payload.role);
-  } catch { return false; }
+  } catch { return 'unavailable'; }
 }
+
+const UNAVAILABLE_PAGE = '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NOVUS</title>'
+  + '<body style="font:15px/1.5 system-ui,sans-serif;max-width:460px;margin:12vh auto;padding:0 16px;color:#1d2433">'
+  + '<h1 style="font-size:20px">NOVUS is briefly unavailable</h1><p>Your sign-in could not be checked just now. You are still signed in.</p>'
+  + '<p><a href="" onclick="location.reload();return false">Try again</a></p><script>setTimeout(function(){location.reload()},5000)</script>';
 
 function json(status, body, headers = {}) {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
@@ -117,6 +143,12 @@ export default async function middleware(req) {
   // not Basic Auth — see api/novus/intelligence/finalize.js.
   if (pathname === '/api/novus/intelligence/finalize') return;
 
+  // Browsers on an old host → the same page on the canonical domain.
+  if (!isApi && LEGACY_HOSTS.has(url.host.toLowerCase()) && ['GET', 'HEAD'].includes(req.method || 'GET')
+    && req.headers.get('x-novus-client') !== 'worker') {
+    return Response.redirect(new URL(pathname + url.search, CANONICAL_ORIGIN), 307);
+  }
+
   // The login page, its sign-in/out calls and static assets.
   if (PUBLIC_API.has(pathname) || PUBLIC_PAGES.has(pathname)) return;
   if (!isApi && STATIC_ASSET.test(pathname)) return;
@@ -130,8 +162,13 @@ export default async function middleware(req) {
   // 1) A login-page session.
   const session = await verifyToken(cookieValue(req, SESSION_COOKIE), process.env.NOVUS_SESSION_SECRET || '');
   if (session) {
-    const fullCheckDownstream = pathname === '/api/novus/personalisation';
-    if (fullCheckDownstream || await sessionRecordExists(session)) {
+    const fullCheckDownstream = pathname === '/api/novus/personalisation' || SETTER_API.has(pathname);
+    const exists = fullCheckDownstream || await sessionRecordExists(session);
+    if (exists === 'unavailable') {
+      if (isApi) return json(503, { success: false, retryable: true, error: 'NOVUS could not check your sign-in just now. Try again in a moment.' }, { 'Retry-After': '5' });
+      return new Response(UNAVAILABLE_PAGE, { status: 503, headers: { 'content-type': 'text/html; charset=utf-8', 'Retry-After': '5', 'cache-control': 'no-store' } });
+    }
+    if (exists === true) {
       if (session.role === 'ADMIN') return;
       if (session.role === 'SETTER') {
         if (fullCheckDownstream || SETTER_PAGES.has(pathname)) return;

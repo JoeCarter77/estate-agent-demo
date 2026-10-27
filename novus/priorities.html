@@ -363,7 +363,7 @@ function cardHtml(card){
         <div class="pr-head">${esc(card.headline)}</div>
         <div class="pr-sum">${esc(card.summary)}</div>
       </div>
-      <div class="pr-when${due.over?' over':''}"><b>${esc(due.big)}</b>${due.small?esc(due.small):''}<div class="pr-who">${esc(personName(card.assignee_id, roster))}</div></div>
+      <div class="pr-when${due.over?' over':''}"><b>${esc(due.big)}</b>${due.small?esc(due.small):''}<div class="pr-who">${card.booked_by_id?`Run by ${esc(personName(card.assignee_id, roster))}<br>Booked by ${esc(personName(card.booked_by_id, roster))}`:esc(personName(card.assignee_id, roster))}</div></div>
     </button>
     ${open ? detailHtml(card, isSetter) : ''}
   </article>`;
